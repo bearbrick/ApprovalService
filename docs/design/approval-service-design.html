@@ -159,7 +159,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <div><dt>技术栈</dt><dd>沿用标签服务</dd></div>
     </dl>
     <ol class="steps">
-      <li><div class="no">01</div><b>画流程</b><p>钉钉式点“+”加节点，复杂的用自由画布按 BPMN 画；定义业务系统要传的审批数据和审批人看到的样子。常用流程从模板库复制。</p></li>
+      <li><div class="no">01</div><b>画流程</b><p>统一自由画布拖节点、连线，按 BPMN 常用子集绘制；定义业务系统要传的审批数据和审批人看到的样子。常用流程从模板库复制。</p></li>
       <li><div class="no">02</div><b>业务系统发起</b><p>单据在业务系统里，提交时调接口发起审批，撤回、重新提交也在业务系统里；登录后显示待审批数量，点开直接审批。</p></li>
       <li><div class="no">03</div><b>审批、打印与回写</b><p>审批人看摘要就能判断；每一步留痕；结果回调或回写业务系统；审批单一键打印 PDF。</p></li>
     </ol>
@@ -217,7 +217,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <div class="pane">
             <h3>初版做</h3>
             <ul>
-              <li>流程：钉钉式和自由画布（BPMN 常用子集）两种画法；审批、办理、抄送、条件、包容、并行分支、子流程、自动节点（第 3 节）</li>
+              <li>流程：统一自由画布（BPMN 常用子集）；审批、办理、抄送、条件、包容、并行分支、子流程、自动节点（第 3 节）</li>
               <li>审批规则：按第 4 节的需求清单全部做，标“二期”的除外</li>
               <li>示例业务系统（WinUI 3 界面 + 单独的对接类库）：费用报销、采购申请两种单据，演示对接全流程和业务系统要改多少（第 14 节）</li>
               <li>引擎内核和扩展点按平台化要求做：执行图加令牌、操作都是命令、事件留底、可插拔的扩展点（第 9、10 节）</li>
@@ -299,7 +299,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
 
               <rect x="48" y="264" width="664" height="44" rx="8" class="d-accent"/>
               <text x="380" y="282" text-anchor="middle" class="d-name">流程引擎</text>
-              <text x="380" y="299" text-anchor="middle" class="d-sub">两种画法编译成同一种执行图；按发起时的版本推进节点、计算审批人、记录每一步操作</text>
+              <text x="380" y="299" text-anchor="middle" class="d-sub">自由画布编译成执行图；按发起时的版本推进节点、计算审批人、记录每一步操作</text>
 
               <rect x="48" y="332" width="184" height="48" rx="8" class="d-box"/>
               <text x="140" y="352" text-anchor="middle" class="d-name">组织架构</text>
@@ -347,7 +347,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <table>
             <thead><tr><th>部分</th><th>选型</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>钉钉式设计器是树形布局，用 HTML、CSS 画；自由画布用开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
+              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>统一自由画布，候选开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
               <tr><td>后端</td><td>.NET 10，ASP.NET Core</td><td>领域、应用、基础设施、接口四层，命名和标签服务一致；流程引擎自己写，不用 Elsa、Camunda 这类通用引擎（中国式审批规则要深度定制，套通用引擎反而绕）</td></tr>
               <tr><td>数据库</td><td>EF Core；MVP 用 SQLite</td><td>和标签服务一样，SQLite、SQL Server、PostgreSQL 三种的迁移都生成，不写某一种数据库特有的 SQL；MVP 只在 SQLite 上测透，需要时改配置切换</td></tr>
               <tr><td>附件</td><td>本地文件或 MinIO / S3</td><td>统一的存储接口，改配置切换；数据库只存文件信息（第 9 节）</td></tr>
@@ -361,82 +361,19 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <!-- 3 -->
       <section id="designer">
         <h2><span class="n">3</span>流程设计器</h2>
-        <p class="lead">提供两种画法。简单的流程用钉钉式：从上往下像一棵树，点两个节点之间的“+”加节点，业务人员看得懂、改得动。流程复杂（要返工重审、跨分支跳转）时用自由画布，按 BPMN 2.0 画。两种画法发布后编译成同一种执行图，引擎、审批规则、审批数据定义都一样。</p>
-        <div class="tw">
-          <table>
-            <thead><tr><th></th><th>钉钉式</th><th>自由画布（BPMN）</th></tr></thead>
-            <tbody>
-              <tr><td>适合谁</td><td>业务人员、行政</td><td>实施人员、流程复杂的业务</td></tr>
-              <tr><td>怎么画</td><td>从上往下，点“+”加节点，点节点在右侧抽屉里设置</td><td>拖节点、随意连线，连线上写条件</td></tr>
-              <tr><td>能画什么</td><td>顺序、条件、包容、并行分支，子流程，自动节点</td><td>以上全部，加回路（返工后重新审）、跨分支跳转</td></tr>
-              <tr><td>导入导出</td><td>流程文件（本系统的格式）</td><td>BPMN 2.0 文件，加本系统的扩展信息；只能导入本系统导出的，其他工具画的暂不支持</td></tr>
-              <tr><td>互相转换</td><td>可以一键转成自由画布继续画</td><td>不能转回钉钉式（回路等表达不了）</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="lead">所有流程统一使用自由画布，按 BPMN 2.0 常用子集绘制。简单流程从模板开始，复杂流程直接配置条件、并行、回路和子流程，不再区分画法。节点属性、审批规则、业务数据和发布检查在同一工作台完成。</p>
+        <div class="callout"><b>已确认调整 · 2026-10-13</b>用户要求取消钉钉式设计，一步到位使用自由画布。详见 ADR 0007；执行图和纯引擎架构保持不变。</div>
+        <div class="tw"><table>
+          <thead><tr><th>能力</th><th>统一自由画布</th></tr></thead>
+          <tbody>
+            <tr><td>基本操作</td><td>拖动节点、连线、缩放和平移、适配视图、对齐吸附、撤销重做；选中节点或连线后在属性面板配置。</td></tr>
+            <tr><td>常见路径</td><td>顺序审批、金额与组织条件、会签与票签、并行会审和汇合、条件包容分支、返工重审、子流程、办理、抄送、自动业务动作。</td></tr>
+            <tr><td>业务人员使用</td><td>从报销、采购、合同、质量异常模板复制；属性说明提示规则后果；校验问题直接定位对应节点与连线。</td></tr>
+            <tr><td>条件与汇合</td><td>条件写在线上，排他分支按优先级命中一条，包容分支可命中多条；显式设置兜底线和配对汇合，避免漏配后卡住。</td></tr>
+            <tr><td>导入导出</td><td>BPMN 2.0 文件加本系统扩展信息，只支持本系统导出的兼容版本。原型草稿 JSON 与正式文件明确区分。</td></tr>
+          </tbody>
+        </table></div>
         <p>导入导出主要用来在测试环境和正式环境之间搬流程，以及给新客户装常用流程；导入时检查文件是本系统导出的、版本兼容，不认的直接提示。</p>
-        <figure>
-          <div class="fig">
-            <svg viewBox="0 0 760 548" role="img" aria-labelledby="flow-t">
-              <title id="flow-t">钉钉式例子：采购申请，金额 1 万元以上要总经理和财务总监会签</title>
-              <defs><marker id="arr-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
-              <text x="24" y="32" class="d-title">钉钉式：采购申请，金额 1 万元以上要总经理和财务总监会签</text>
-              <text x="24" y="52" class="d-note">实心框是要处理的节点，虚线框是分支条件</text>
-
-              <g class="d-edges">
-                <path d="M380 120V144" marker-end="url(#arr-f)"/>
-                <path d="M380 192V212"/>
-                <path d="M220 224H540"/>
-                <path d="M220 224V252" marker-end="url(#arr-f)"/>
-                <path d="M540 224V252" marker-end="url(#arr-f)"/>
-                <path d="M220 300V324" marker-end="url(#arr-f)"/>
-                <path d="M220 372V400"/>
-                <path d="M540 300V400"/>
-                <path d="M220 400H540"/>
-                <path d="M380 400V428" marker-end="url(#arr-f)"/>
-                <path d="M380 476V500" marker-end="url(#arr-f)"/>
-              </g>
-
-              <rect x="280" y="72" width="200" height="48" rx="8" class="d-group"/>
-              <text x="380" y="90" text-anchor="middle" class="d-note">发起人</text>
-              <text x="380" y="110" text-anchor="middle" class="d-name">业务系统提交</text>
-              <text x="264" y="100" text-anchor="end" class="d-note">业务系统提交单据时进入流程</text>
-
-              <rect x="280" y="144" width="200" height="48" rx="8" class="d-accent"/>
-              <text x="380" y="162" text-anchor="middle" class="d-note">审批人 · 依次审批</text>
-              <text x="380" y="182" text-anchor="middle" class="d-name">直属上级 → 部门负责人</text>
-              <text x="500" y="162" class="d-note">审批人按规则自动算：上级、部门负责人、</text>
-              <text x="500" y="178" class="d-note">角色、审批矩阵、业务系统接口……</text>
-
-              <rect x="336" y="212" width="88" height="24" rx="12" class="d-box"/>
-              <text x="380" y="228" text-anchor="middle" class="d-sub">条件分支</text>
-              <text x="208" y="218" text-anchor="end" class="d-note">从左到右判断，</text>
-              <text x="208" y="234" text-anchor="end" class="d-note">走第一条满足的</text>
-
-              <rect x="120" y="252" width="200" height="48" rx="8" class="d-cond"/>
-              <text x="220" y="270" text-anchor="middle" class="d-note">条件 1</text>
-              <text x="220" y="290" text-anchor="middle" class="d-name">金额 ≥ 10000 元</text>
-              <rect x="440" y="252" width="200" height="48" rx="8" class="d-cond"/>
-              <text x="540" y="270" text-anchor="middle" class="d-note">条件 2（兜底，必须有）</text>
-              <text x="540" y="290" text-anchor="middle" class="d-name">其他情况</text>
-
-              <rect x="120" y="324" width="200" height="48" rx="8" class="d-accent"/>
-              <text x="220" y="342" text-anchor="middle" class="d-note">审批人 · 会签</text>
-              <text x="220" y="362" text-anchor="middle" class="d-name">总经理、财务总监都同意</text>
-              <text x="556" y="352" class="d-note">不满足条件 1 时直接往下走</text>
-              <text x="208" y="420" text-anchor="end" class="d-note">分支走完后汇合</text>
-
-              <rect x="280" y="428" width="200" height="48" rx="8" class="d-box"/>
-              <text x="380" y="446" text-anchor="middle" class="d-note">抄送人</text>
-              <text x="380" y="466" text-anchor="middle" class="d-name">采购部</text>
-              <text x="500" y="456" class="d-note">抄送只通知，不用处理</text>
-
-              <rect x="340" y="500" width="80" height="24" rx="12" class="d-box"/>
-              <text x="380" y="516" text-anchor="middle" class="d-sub">结束</text>
-            </svg>
-          </div>
-          <figcaption>钉钉式只能从上往下走，不会画出死循环，适合大多数审批。</figcaption>
-        </figure>
         <figure>
           <div class="fig">
             <svg viewBox="0 0 760 320" role="img" aria-labelledby="canvas-t">
@@ -495,7 +432,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
               <text x="706" y="246" text-anchor="middle" class="d-note">结束</text>
             </svg>
           </div>
-          <figcaption>钉钉式画不出“返工后回到前面重新确认”这种回路，自由画布可以。发布时检查：每个节点都能从开始走到、也都能走到结束，并行网关的分叉和汇合成对出现，排他网关除了兜底的那条线，其他线都有条件。</figcaption>
+          <figcaption>自由画布同时表达常规顺序审批和“返工后回到前面重新确认”的回路。发布时检查：每个节点都能从开始走到、也都能走到结束，并行网关的分叉和汇合成对出现，排他网关除了兜底的那条线，其他线都有条件。</figcaption>
         </figure>
         <h3>节点</h3>
         <div class="tw">
@@ -506,7 +443,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
               <tr><td>审批人</td><td>同意或拒绝</td><td>找审批人、多人审批方式、自动处理、能用哪些操作、能看能改哪些字段（第 4、5 节）</td></tr>
               <tr><td>办理人</td><td>只办理、不能拒绝，如财务付款、仓库发货</td><td>和审批人一样，按钮是“提交”</td></tr>
               <tr><td>抄送人</td><td>只通知，不用处理</td><td>抄送给谁；可以让发起人自己选；可以要求点“已阅”</td></tr>
-              <tr><td>条件分支 / 排他网关</td><td>按条件走一条路线</td><td>条件用审批数据（含明细合计、计算字段）、发起人的部门、角色、职级；钉钉式从左到右取第一条满足的，自由画布写在连线上；都要有“其他情况”兜底</td></tr>
+              <tr><td>条件分支 / 排他网关</td><td>按条件走一条路线</td><td>条件用审批数据（含明细合计、计算字段）、发起人的部门、角色、职级；条件写在连线上，按优先级取第一条满足的；必须有“其他情况”兜底</td></tr>
               <tr><td>包容分支 / 包容网关</td><td>满足条件的路线都走</td><td>如“金额超过 5 万要法务看”“涉及进口要关务看”，两个都满足就两条都走，全部走完再汇合</td></tr>
               <tr><td>并行分支 / 并行网关</td><td>几条路线同时走，如技术、质量同时会审</td><td>全部走完才往下</td></tr>
               <tr><td>子流程</td><td>调用另一个流程</td><td>如采购审批里调合同审批；把哪些字段带过去；等子流程结束再往下，或者不等</td></tr>
@@ -820,13 +757,13 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <!-- 9 -->
       <section id="engine">
         <h2><span class="n">9</span>引擎、数据与文件</h2>
-        <p class="lead">两种画法发布时都编译成同一种执行图（节点、连线、网关），引擎只认执行图。审批人一操作，引擎判断当前节点是否完成、下一步去哪、新任务给谁，在一个数据库事务里写完。</p>
+        <p class="lead">自由画布发布时编译成执行图（节点、连线、网关），引擎只认执行图。审批人一操作，引擎判断当前节点是否完成、下一步去哪、新任务给谁，在一个数据库事务里写完。</p>
         <h3>引擎内核（要做扎实的部分）</h3>
         <div class="tw">
           <table>
             <thead><tr><th>做法</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>执行图 + 令牌</td><td>运行时用“令牌”标记走到哪：并行分叉生出几个令牌，汇合时等齐；包容网关只等真正走了的分支；回路、子流程都用同一套机制。钉钉式、自由画布和以后加的节点都跑在这一套上</td></tr>
+              <tr><td>执行图 + 令牌</td><td>运行时用“令牌”标记走到哪：并行分叉生出几个令牌，汇合时等齐；包容网关只等真正走了的分支；回路、子流程都用同一套机制。自由画布及以后扩展的节点都跑在这一套上</td></tr>
               <tr><td>操作都是命令</td><td>同意、拒绝、退回、转交、加签、撤回、跳转……每个操作是一条命令：引擎检查能不能做 → 改状态 → 产生事件，一个事务写完。审批中心、开放接口、管理员干预、定时任务都走这一个入口，规则只写一处</td></tr>
               <tr><td>事件留底</td><td>每条命令产生的事件写进操作记录（只追加、带校验值）；回调、消息、统计都从事件来，出了问题能按事件重放、核对状态对不对</td></tr>
               <tr><td>幂等</td><td>命令带请求 ID，网络重试、连点造成的重复提交只生效一次</td></tr>
@@ -872,8 +809,8 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <table>
             <thead><tr><th>表</th><th>内容</th></tr></thead>
             <tbody>
-              <tr><td>流程</td><td>流程编码、名称、分组、画法（钉钉式或自由画布）、管理员、当前发布的版本</td></tr>
-              <tr><td>流程版本</td><td>设计内容（钉钉式 JSON 或自由画布 JSON）、编译后的执行图、审批数据定义和详情排版、打印设置，发布后不能改</td></tr>
+              <tr><td>流程</td><td>流程编码、名称、分组、设计格式版本、管理员、当前发布的版本</td></tr>
+              <tr><td>流程版本</td><td>设计内容（自由画布 JSON）、编译后的执行图、审批数据定义和详情排版、打印设置，发布后不能改</td></tr>
               <tr><td>审批单</td><td>编号、流程编码、版本、业务单号、标题、发起人、发起部门、代发人、来源接入应用、业务数据快照、详情链接、加急、状态、父审批单（子流程）、发起和结束时间</td></tr>
               <tr><td>任务</td><td>审批单、节点、处理人、代谁处理、状态、意见、签名、到期时间、处理时间</td></tr>
               <tr><td>操作记录</td><td>每一次操作（含打印），只追加，带校验值</td></tr>
@@ -1423,7 +1360,7 @@ X-Approval-Signature: sha256=…
               <rect x="24" y="72" width="224" height="116" rx="8" class="d-accent"/>
               <text x="40" y="98" class="d-name">M1 设计器原型</text>
               <text x="40" y="116" class="d-note">评审：画流程、配审批数据的体验</text>
-              <text x="40" y="140" class="d-sub">钉钉式和自由画布</text>
+              <text x="40" y="140" class="d-sub">统一自由画布</text>
               <text x="40" y="158" class="d-sub">审批数据和详情排版</text>
               <text x="40" y="176" class="d-sub">流程 JSON 定稿</text>
 
@@ -1478,6 +1415,7 @@ X-Approval-Signature: sha256=…
           <li><span class="tag done">已定</span><span>业务系统都是 .NET：Web 是 Vue + .NET 10，另有 WinForms。只出 .NET SDK（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>组织架构审批服务自己维护，业务系统绑定关联、接口推送变更；以后由主数据系统统一管理（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>账号先独立；公司以后做统一登录，审批服务和标签服务一起接进产品平台（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>设计器统一为自由画布，不再开发树形设计与画法转换；简单和复杂流程均从同一工作台完成（2026-10-13，ADR 0007）。</span></li>
           <li><span class="tag done">已定</span><span>消息先做邮件；企业微信、钉钉预留。要给业务系统待办数量、跳转和内嵌审批的接口（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>内网服务器，能访问外网（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>手机端：初版只做手机网页适配；App（原生或 H5 套壳）以后再讨论，现在把接口、登录、推送、设备能力预留好（2026-10-13）。</span></li>

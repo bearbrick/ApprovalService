@@ -14,7 +14,8 @@
 
 - `docs/prototypes/**`：共享视觉、流程设计、审批中心、手机端、管理与接入、示例业务、覆盖清单和视觉检查。
 - 本任务文件。
-- 设计书、架构、规划契约、相关任务与 ADR：同步用户确认的单一自由画布方案。
+- `docs/design/approval-service-design.html`、架构、规划契约、任务 T-001/T-008/T-009 与 ADR：同步用户确认的单一自由画布方案。
+- `README.md`、`frontend/README.md`、`frontend/src/pages/DesignerPage.vue`：只同步原有说明与占位文案，不新增产品业务代码。
 
 ## 共享文件
 

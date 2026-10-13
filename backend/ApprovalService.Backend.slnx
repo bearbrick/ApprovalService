@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApprovalService.Contracts/ApprovalService.Contracts.csproj" />
+    <Project Path="src/ApprovalService.Engine/ApprovalService.Engine.csproj" />
+    <Project Path="src/ApprovalService.Domain/ApprovalService.Domain.csproj" />
+    <Project Path="src/ApprovalService.Application/ApprovalService.Application.csproj" />
+    <Project Path="src/ApprovalService.Infrastructure/ApprovalService.Infrastructure.csproj" />
+    <Project Path="src/ApprovalService.Api/ApprovalService.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ApprovalService.Backend.Checks/ApprovalService.Backend.Checks.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    .NET SDK：把审批流服务的开放接口包成 C# 方法，给业务系统用（只提供数据接口，不提供界面组件）。
+    不引用本仓库任何项目，协议常量是后端 Contracts 的副本，由后端检查程序按文本核对一致。
+    兼容 .NET Framework 4.6.1：不要用 record、init、required、Index/Range 等需要新运行时类型的语法；不依赖任何 NuGet 包（JSON 读写是自带的）。
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net461;netstandard2.0;net8.0</TargetFrameworks>
+    <Description>审批流服务的 .NET 客户端：发起审批、查询进度、待办和审批操作、回调验签。</Description>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net461'">
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ApprovalService.Client.Checks" />
+  </ItemGroup>
+
+</Project>

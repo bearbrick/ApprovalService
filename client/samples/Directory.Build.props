@@ -1,0 +1,11 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)..'))" />
+
+  <!-- 示例业务系统：输出 XML 文档，调用端检查程序据此核对每个类型和成员都写了注释（AGENTS.md R5）。公开成员缺注释时编译失败。 -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1573;CS1591</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

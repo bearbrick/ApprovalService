@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------
+# 编译输出（backend/、client/ 的 .NET 项目）
+# ---------------------------------------------------------------
+bin/
+obj/
+publish/
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg
+
+# Visual Studio、Rider、VS Code 的个人设置
+.vs/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+.vscode/*
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------
+# 前端（frontend/）：依赖和打包输出
+# ---------------------------------------------------------------
+node_modules/
+dist/
+coverage/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+
+# ---------------------------------------------------------------
+# 运行时数据：数据目录（SQLite 库、本地附件、备份）、日志
+# ---------------------------------------------------------------
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+/backend/src/ApprovalService.Api/data/
+backup/
+# 运行日志限定为仓库或组件运行目录，避免忽略 Domain/Logs、Application/Logs 等源码目录。
+/logs/
+/backend/logs/
+/client/logs/
+/frontend/logs/
+*.log
+
+# ---------------------------------------------------------------
+# 本地配置与密钥：不进仓库（AGENTS.md R7）
+# ---------------------------------------------------------------
+appsettings.*.local.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.snk
+*.key
+
+# AI 助手的个人设置（共享规则写在 AGENTS.md）
+.claude/settings.local.json
+CLAUDE.local.md
+
+# 系统文件
+Thumbs.db
+.DS_Store

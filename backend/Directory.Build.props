@@ -1,0 +1,16 @@
+<Project>
+
+  <!-- 后端全部项目共用。产品项目（src/）另有 src/Directory.Build.props 强制 XML 注释。调用端（client/）有自己的一份，互不影响。 -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NuGet 漏洞公告不阻断本地构建，但会以警告出现，需要及时处理。 -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <Product>审批流服务</Product>
+    <VersionPrefix>0.1.0</VersionPrefix>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+</Project>

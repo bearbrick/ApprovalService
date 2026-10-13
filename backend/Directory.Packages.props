@@ -1,0 +1,17 @@
+<Project>
+
+  <!-- 后端的包版本集中在这里管理。新增或升级包属于共享文件改动，见根目录 AGENTS.md 的 R8。版本和标签服务保持一致，方便同一批人维护。 -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup Label="分层：应用层、基础设施层用的 .NET 扩展库">
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup Label="检查程序">
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>

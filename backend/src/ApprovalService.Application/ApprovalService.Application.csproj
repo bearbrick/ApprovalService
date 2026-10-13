@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 应用层：应用服务（IXxxAppService）、输入输出模型（XxxDto），按业务模块分文件夹。不引用 EF Core、ASP.NET Core（AGENTS.md R2）。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApprovalService.Contracts\ApprovalService.Contracts.csproj" />
+    <ProjectReference Include="..\ApprovalService.Engine\ApprovalService.Engine.csproj" />
+    <ProjectReference Include="..\ApprovalService.Domain\ApprovalService.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+</Project>

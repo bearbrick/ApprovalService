@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 后端检查程序：服务端行为、分层和仓库规范、注释，以及跨调用端的契约一致性（按文本读取，不引用项目）。运行命令见根目录 AGENTS.md。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ApprovalService.Contracts\ApprovalService.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ApprovalService.Engine\ApprovalService.Engine.csproj" />
+    <ProjectReference Include="..\..\src\ApprovalService.Api\ApprovalService.Api.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+</Project>

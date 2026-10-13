@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    引擎核心：流程执行图、令牌、命令、事件、审批规则的纯逻辑（设计书第 9 节、ADR 0004）。
+    只引用 Contracts，不引用任何包，不碰数据库、文件、网络和 Web 框架；预览流程、测试模式直接在内存里跑它。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApprovalService.Contracts\ApprovalService.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ApprovalService.Backend.Checks" />
+  </ItemGroup>
+
+</Project>

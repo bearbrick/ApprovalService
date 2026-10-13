@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApprovalService.Client/ApprovalService.Client.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/ApprovalService.Demo.Integration/ApprovalService.Demo.Integration.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ApprovalService.Client.Checks/ApprovalService.Client.Checks.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 调用端检查程序：SDK 的行为、对接类库、架构约定和注释；设置 APPROVAL_SERVICE_URL 时加跑对真实服务的端到端检查。运行命令见根目录 AGENTS.md。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ApprovalService.Client\ApprovalService.Client.csproj" />
+    <ProjectReference Include="..\..\samples\ApprovalService.Demo.Integration\ApprovalService.Demo.Integration.csproj" />
+  </ItemGroup>
+
+</Project>

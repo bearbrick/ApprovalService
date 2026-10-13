@@ -1,0 +1,22 @@
+# 仓库里统一存 LF，检出时一律转成 CRLF（和 .editorconfig 一致）。
+# 这样在 Linux 上检出（CI、云端 AI 助手）时 dotnet format --verify-no-changes 也能通过。
+* text=auto eol=crlf
+
+*.sh text eol=lf
+# Dockerfile 里的 RUN 用反斜杠续行，在 Linux 上构建，保持 LF。
+Dockerfile text eol=lf
+*.dockerignore text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary
+*.db binary
+*.otf binary
+*.ttc binary
+*.otc binary

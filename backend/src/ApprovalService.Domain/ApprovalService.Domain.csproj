@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 领域层：实体（XxxEntity）、领域规则、仓储接口（IXxxRepository）。不引用 EF Core、ASP.NET Core，也不引用任何包（AGENTS.md R2）。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApprovalService.Contracts\ApprovalService.Contracts.csproj" />
+    <ProjectReference Include="..\ApprovalService.Engine\ApprovalService.Engine.csproj" />
+  </ItemGroup>
+
+</Project>

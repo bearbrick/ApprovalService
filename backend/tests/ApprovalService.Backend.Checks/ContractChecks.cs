@@ -1,0 +1,75 @@
+using System.Text.RegularExpressions;
+
+namespace ApprovalService.Backend.Checks;
+
+/// <summary>
+/// 契约一致性（AGENTS.md §6.4）：HTTP 头、错误码只在后端 Contracts 定义，调用端 SDK 的副本和 docs/contracts.md 要跟着改齐。
+/// 按文本读取，不引用调用端的项目（三个部分互不引用）。
+/// </summary>
+internal static partial class ContractChecks
+{
+    /// <summary>
+    /// SDK 自己的错误码（没收到服务响应时用），服务端没有。
+    /// </summary>
+    private static readonly KeyValuePair<string, string>[] ClientOnlyCodes =
+    [
+        KeyValuePair.Create("NetworkError", "NETWORK_ERROR"),
+        KeyValuePair.Create("Timeout", "TIMEOUT"),
+    ];
+
+    /// <summary>
+    /// 核对 SDK 副本和契约文档。
+    /// </summary>
+    /// <param name="repositoryRoot">仓库根目录。</param>
+    /// <param name="check">记录检查结果。</param>
+    public static void Run(string repositoryRoot, Action<string, bool> check)
+    {
+        string Read(string relative) => File.ReadAllText(Path.Combine(repositoryRoot, relative));
+        var contracts = Path.Combine("backend", "src", "ApprovalService.Contracts", "Protocol");
+        var sdk = Path.Combine("client", "src", "ApprovalService.Client");
+
+        var headers = Constants(Read(Path.Combine(contracts, "HeaderNames.cs")));
+        var sdkHeaders = Constants(Read(Path.Combine(sdk, "Internal", "Protocol.cs")));
+        check("SDK 的 HTTP 头和后端 Contracts 一致" + Difference(headers, sdkHeaders), headers.SetEquals(sdkHeaders));
+
+        // SDK 多出的只能是它自己的两个错误码（连不上、超时），服务端不会返回。
+        var codes = Constants(Read(Path.Combine(contracts, "ErrorCodes.cs")));
+        var sdkCodes = Constants(Read(Path.Combine(sdk, "ApprovalErrorCodes.cs")));
+        sdkCodes.ExceptWith(ClientOnlyCodes);
+        check("SDK 的错误码和后端 Contracts 一致（SDK 另有 NETWORK_ERROR、TIMEOUT）" + Difference(codes, sdkCodes), codes.SetEquals(sdkCodes));
+
+        var document = Read(Path.Combine("docs", "contracts.md"));
+        var undocumented = codes.Concat(ClientOnlyCodes).Select(item => item.Value).Concat(headers.Select(item => item.Value))
+            .Where(value => !document.Contains($"`{value}`", StringComparison.Ordinal))
+            .ToArray();
+        check("docs/contracts.md 写了全部错误码和 HTTP 头" + (undocumented.Length > 0 ? "，缺：" + string.Join("、", undocumented) : ""), undocumented.Length == 0);
+    }
+
+    /// <summary>
+    /// 读出源码里的字符串常量（public const string 名字 = "值"）。
+    /// </summary>
+    /// <param name="source">C# 源码。</param>
+    /// <returns>名字和值的集合。</returns>
+    private static HashSet<KeyValuePair<string, string>> Constants(string source) =>
+        ConstantPattern().Matches(source).Select(match => KeyValuePair.Create(match.Groups["name"].Value, match.Groups["value"].Value)).ToHashSet();
+
+    /// <summary>
+    /// 两边不一致时的说明。
+    /// </summary>
+    /// <param name="backend">后端的常量。</param>
+    /// <param name="copy">副本的常量。</param>
+    /// <returns>一致时为空字符串；否则列出多出和缺少的。</returns>
+    private static string Difference(HashSet<KeyValuePair<string, string>> backend, HashSet<KeyValuePair<string, string>> copy)
+    {
+        var missing = backend.Except(copy).Select(item => $"{item.Key}={item.Value}").ToArray();
+        var extra = copy.Except(backend).Select(item => $"{item.Key}={item.Value}").ToArray();
+        return missing.Length + extra.Length == 0 ? "" : $"（副本缺：{string.Join("、", missing)}；副本多：{string.Join("、", extra)}）";
+    }
+
+    /// <summary>
+    /// 字符串常量的写法。
+    /// </summary>
+    /// <returns>编译好的正则，名字在 name 组，值在 value 组。</returns>
+    [GeneratedRegex("""public const string (?<name>\w+) = "(?<value>[^"]+)";""")]
+    private static partial Regex ConstantPattern();
+}

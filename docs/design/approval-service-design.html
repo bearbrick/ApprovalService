@@ -1,0 +1,1502 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>审批流服务设计书</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* 版式和标签服务设计书一致：单栏阅读（最宽 760px），宽屏时左侧固定目录；图和表格在手机上各自横向滚动。 */
+:root {
+  --paper: #F5F7F9;
+  --surface: #FFFFFF;
+  --group: #ECF0F3;
+  --ink: #14181D;
+  --ink-2: #48505B;
+  --ink-3: #7B838E;
+  --rule: #DEE3E8;
+  --rule-strong: #B8C0C9;
+  --accent: #0E6F73;
+  --accent-tint: #E2F0F0;
+  --code-bg: #EEF2F5;
+  --warn-tint: #FFF4D9;
+  --warn-ink: #6E4B00;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Noto Sans SC", "Arial Narrow", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #101317; --surface: #171B20; --group: #1D2228; --ink: #E6E9ED; --ink-2: #AEB5BE; --ink-3: #7E8691;
+    --rule: #2A3037; --rule-strong: #3E4650; --accent: #57B9BB; --accent-tint: #15302F; --code-bg: #1B2026;
+    --warn-tint: #2D2512; --warn-ink: #EFC766;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #101317; --surface: #171B20; --group: #1D2228; --ink: #E6E9ED; --ink-2: #AEB5BE; --ink-3: #7E8691;
+  --rule: #2A3037; --rule-strong: #3E4650; --accent: #57B9BB; --accent-tint: #15302F; --code-bg: #1B2026;
+  --warn-tint: #2D2512; --warn-ink: #EFC766;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.75 var(--font-body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 48px 96px; }
+@media (min-width: 640px) { .wrap { padding-inline: 20px; } }
+.eyebrow { font-family: var(--font-display); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; color: var(--accent); }
+h1 { font-size: clamp(32px, 6vw, 44px); line-height: 1.2; margin: 8px 0 16px; font-weight: 700; text-wrap: balance; }
+.lede { font-size: 17px; color: var(--ink-2); max-width: 40em; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 20px 0 0; font-size: 13px; color: var(--ink-3); }
+.meta div { display: flex; gap: 8px; }
+.meta dt { font-weight: 500; }
+.meta dd { margin: 0; color: var(--ink-2); }
+.steps { list-style: none; padding: 0; margin: 36px 0 0; display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
+.steps li { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.steps .no { font-family: var(--font-display); font-size: 28px; font-weight: 600; color: var(--accent); line-height: 1; }
+.steps b { display: block; font-size: 16px; margin: 8px 0 4px; }
+.steps p { margin: 0; font-size: 14px; color: var(--ink-2); line-height: 1.65; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: 40px; }
+.toc { display: none; }
+.toc-mobile { margin: 0 0 8px; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); padding: 10px 16px; font-size: 14px; }
+.toc-mobile summary { cursor: pointer; font-weight: 500; }
+.toc-mobile ol, .toc ol { list-style: none; padding: 0; margin: 8px 0 0; }
+.toc-mobile li, .toc li { margin: 2px 0; }
+.toc a, .toc-mobile a { color: var(--ink-2); text-decoration: none; display: flex; gap: 10px; padding: 3px 0; }
+.toc a:hover, .toc-mobile a:hover { color: var(--accent); }
+.toc a span, .toc-mobile a span { font-family: var(--font-display); font-weight: 600; color: var(--ink-3); min-width: 1.4em; }
+@media (min-width: 1100px) {
+  .layout { grid-template-columns: 190px minmax(0, 760px); gap: 64px; }
+  .toc { display: block; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+  .toc-title { font-family: var(--font-display); font-weight: 600; letter-spacing: 0.08em; color: var(--ink-3); font-size: 13px; }
+  .toc-mobile { display: none; }
+}
+main { min-width: 0; max-width: 760px; }
+section { padding-block: 40px 8px; border-top: 1px solid var(--rule); margin-top: 32px; scroll-margin-top: 16px; }
+section:first-of-type { border-top: 0; margin-top: 0; }
+h2 { display: flex; align-items: baseline; gap: 14px; font-size: 24px; line-height: 1.3; margin: 0 0 14px; font-weight: 700; text-wrap: balance; }
+h2 .n { font-family: var(--font-display); font-weight: 600; font-size: 30px; color: var(--accent); min-width: 1.2em; }
+h3 { font-size: 16px; margin: 28px 0 10px; font-weight: 700; }
+p { margin: 0 0 12px; }
+.lead { font-size: 16px; color: var(--ink); }
+ul, ol { margin: 0 0 12px; padding-left: 1.4em; }
+li { margin: 4px 0; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--code-bg); border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font: 13px/1.65 var(--font-mono); margin: 0 0 16px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.tw { overflow-x: auto; margin: 0 0 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.6; }
+th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 13px; border-bottom: 1.5px solid var(--rule-strong); padding: 8px 12px 8px 0; white-space: nowrap; }
+td { border-bottom: 1px solid var(--rule); padding: 9px 12px 9px 0; vertical-align: top; }
+td:first-child { white-space: nowrap; }
+.split { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 8px; }
+@media (min-width: 640px) { .split { grid-template-columns: 1fr 1fr; } }
+.pane { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 16px 18px; min-width: 0; }
+.pane.muted { background: transparent; border-style: dashed; }
+.pane h3 { margin: 0 0 8px; }
+.pane ul { margin: 0; }
+.pane li { font-size: 14px; }
+.callout { background: var(--warn-tint); color: var(--ink); border-radius: 8px; padding: 12px 16px; font-size: 14px; margin: 0 0 16px; }
+.callout b { color: var(--warn-ink); margin-right: 6px; }
+figure { margin: 8px 0 20px; }
+.fig { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 8px; }
+.fig svg { display: block; width: 100%; min-width: 600px; height: auto; font-family: var(--font-body); }
+figcaption { font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+.d-title { font-size: 15px; font-weight: 700; fill: var(--ink); }
+.d-note { font-size: 11.5px; fill: var(--ink-3); }
+.d-name { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.d-sub { font-size: 11.5px; fill: var(--ink-2); }
+.d-box { fill: var(--surface); stroke: var(--rule-strong); stroke-width: 1.25; }
+.d-accent { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+.d-group { fill: var(--group); stroke: var(--rule-strong); stroke-width: 1.25; }
+.d-cond { fill: var(--surface); stroke: var(--accent); stroke-width: 1.25; stroke-dasharray: 4 3; }
+.d-edges path, .d-edges line { fill: none; stroke: var(--ink-3); stroke-width: 1.25; }
+.d-head { fill: var(--ink-3); }
+.d-rule { stroke: var(--rule-strong); stroke-width: 1; }
+.d-end { fill: var(--surface); stroke: var(--ink-3); stroke-width: 3; }
+.d-future { fill: none; stroke: var(--rule-strong); stroke-width: 1.25; stroke-dasharray: 4 4; }
+.d-life { stroke: var(--rule-strong); stroke-width: 1; stroke-dasharray: 3 4; }
+/* 打印审批单示意：纸张在深色模式下也保持白底黑字 */
+.sheet-wrap { overflow-x: auto; background: var(--group); border: 1px solid var(--rule); border-radius: 10px; padding: 16px; }
+.sheet { min-width: 640px; max-width: 700px; margin: 0 auto; background: #FFFFFF; color: #111111; padding: 28px 32px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); font: 12px/1.6 var(--font-body); }
+.sh-head { display: flex; align-items: flex-start; gap: 12px; border-bottom: 2px solid #111111; padding-bottom: 10px; }
+.sh-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 14px; flex: 1; }
+.sh-logo { display: inline-grid; place-items: center; width: 48px; height: 28px; border: 1px dashed #888888; font: 600 10px var(--font-display); color: #666666; letter-spacing: 0.05em; }
+.sh-meta { text-align: right; font-size: 11px; color: #333333; line-height: 1.5; }
+.sh-qr { width: 52px; height: 52px; flex: none; }
+.sh-title { text-align: center; font-size: 20px; font-weight: 700; letter-spacing: 0.2em; margin: 14px 0 12px; position: relative; }
+.sh-status { position: absolute; right: 0; top: 3px; font-size: 13px; letter-spacing: 0.1em; color: #B42318; border: 2px solid #B42318; border-radius: 3px; padding: 0 8px; line-height: 1.6; }
+.sheet table { width: 100%; border-collapse: collapse; margin: 0 0 10px; }
+.sheet th, .sheet td, .sheet td:first-child { border: 1px solid #555555; padding: 5px 8px; text-align: left; vertical-align: middle; color: #111111; white-space: normal; font-size: 12px; line-height: 1.5; font-weight: 400; }
+.sheet th { background: #F0F0F0; font-weight: 600; }
+.sheet .r { text-align: right; font-variant-numeric: tabular-nums; }
+.sh-sub { font-weight: 700; font-size: 13px; margin: 12px 0 6px; }
+.sh-sign { font-family: "KaiTi", "STKaiti", "楷体", serif; font-size: 16px; color: #1F3A93; }
+.sh-line { font-size: 12px; margin: 6px 0 14px; }
+.sh-foot { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #999999; padding-top: 6px; font-size: 11px; color: #444444; }
+.qs { list-style: none; padding: 0; }
+.qs li { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--rule); margin: 0; }
+.qs .tag { flex: none; font-size: 12px; color: var(--warn-ink); background: var(--warn-tint); border-radius: 4px; padding: 1px 8px; height: fit-content; margin-top: 3px; }
+.qs .tag.done { color: var(--accent); background: var(--accent-tint); }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">设计说明书 · V0.7</div>
+    <h1>审批流服务</h1>
+    <p class="lede">一个独立部署的审批服务，和标签服务一起组成公司的产品平台。它不产生业务单据，只管审批：画审批流程、按流程流转、记录每个节点谁在什么时候怎么批的。所有审批都由业务系统发起：公司的业务系统（Vue + .NET 10 的 Web 系统和 WinForms 客户端）通过开放接口和 .NET SDK 接入，登录后就能看到有几件待审批、点开直接审批；审批结果回到业务系统，审批单可以直接打印。它按公司产品平台里的一个微服务来设计，引擎和扩展点为以后的平台化留好位置。</p>
+    <dl class="meta">
+      <div><dt>日期</dt><dd class="num">2026-10-13</dd></div>
+      <div><dt>状态</dt><dd>草稿，待讨论</dd></div>
+      <div><dt>初版重点</dt><dd>中国式审批规则做全、业务系统少改造</dd></div>
+      <div><dt>试点</dt><dd>示例业务系统提交费用报销、采购申请</dd></div>
+      <div><dt>技术栈</dt><dd>沿用标签服务</dd></div>
+    </dl>
+    <ol class="steps">
+      <li><div class="no">01</div><b>画流程</b><p>钉钉式点“+”加节点，复杂的用自由画布按 BPMN 画；定义业务系统要传的审批数据和审批人看到的样子。常用流程从模板库复制。</p></li>
+      <li><div class="no">02</div><b>业务系统发起</b><p>单据在业务系统里，提交时调接口发起审批，撤回、重新提交也在业务系统里；登录后显示待审批数量，点开直接审批。</p></li>
+      <li><div class="no">03</div><b>审批、打印与回写</b><p>审批人看摘要就能判断；每一步留痕；结果回调或回写业务系统；审批单一键打印 PDF。</p></li>
+    </ol>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="章节">
+      <div class="toc-title">目录</div>
+      <ol>
+        <li><a href="#scope"><span>1</span>初版范围</a></li>
+        <li><a href="#arch"><span>2</span>总体架构</a></li>
+        <li><a href="#designer"><span>3</span>流程设计器</a></li>
+        <li><a href="#rules"><span>4</span>中国式审批规则</a></li>
+        <li><a href="#form"><span>5</span>审批数据与详情展示</a></li>
+        <li><a href="#center"><span>6</span>审批中心、手机端与提醒</a></li>
+        <li><a href="#print"><span>7</span>打印审批单</a></li>
+        <li><a href="#stats"><span>8</span>统计报表</a></li>
+        <li><a href="#engine"><span>9</span>引擎、数据与文件</a></li>
+        <li><a href="#platform"><span>10</span>可扩展与平台化</a></li>
+        <li><a href="#org"><span>11</span>组织架构与账号</a></li>
+        <li><a href="#integration"><span>12</span>业务系统对接</a></li>
+        <li><a href="#api"><span>13</span>接口清单</a></li>
+        <li><a href="#demo"><span>14</span>示例业务系统与试点</a></li>
+        <li><a href="#plan"><span>15</span>计划与待确认</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <details class="toc-mobile">
+        <summary>目录</summary>
+        <ol>
+          <li><a href="#scope"><span>1</span>初版范围</a></li>
+          <li><a href="#arch"><span>2</span>总体架构</a></li>
+          <li><a href="#designer"><span>3</span>流程设计器</a></li>
+          <li><a href="#rules"><span>4</span>中国式审批规则</a></li>
+          <li><a href="#form"><span>5</span>审批数据与详情展示</a></li>
+          <li><a href="#center"><span>6</span>审批中心、手机端与提醒</a></li>
+          <li><a href="#print"><span>7</span>打印审批单</a></li>
+          <li><a href="#stats"><span>8</span>统计报表</a></li>
+          <li><a href="#engine"><span>9</span>引擎、数据与文件</a></li>
+          <li><a href="#platform"><span>10</span>可扩展与平台化</a></li>
+          <li><a href="#org"><span>11</span>组织架构与账号</a></li>
+          <li><a href="#integration"><span>12</span>业务系统对接</a></li>
+          <li><a href="#api"><span>13</span>接口清单</a></li>
+          <li><a href="#demo"><span>14</span>示例业务系统与试点</a></li>
+          <li><a href="#plan"><span>15</span>计划与待确认</a></li>
+        </ol>
+      </details>
+
+      <!-- 1 -->
+      <section id="scope">
+        <h2><span class="n">1</span>初版范围</h2>
+        <p class="lead">审批服务只管审批，不产生业务单据，所有审批都由业务系统发起。两个目标：中国式审批的常见需求尽量一次做全；业务系统接入时改得越少越好，审批相关的事都由审批服务包下来。和平台有关的部分（统一登录、主数据、企业微信和钉钉）先把接口留好，后面接入时不动核心。</p>
+        <div class="split">
+          <div class="pane">
+            <h3>初版做</h3>
+            <ul>
+              <li>流程：钉钉式和自由画布（BPMN 常用子集）两种画法；审批、办理、抄送、条件、包容、并行分支、子流程、自动节点（第 3 节）</li>
+              <li>审批规则：按第 4 节的需求清单全部做，标“二期”的除外</li>
+              <li>示例业务系统（WinUI 3 界面 + 单独的对接类库）：费用报销、采购申请两种单据，演示对接全流程和业务系统要改多少（第 14 节）</li>
+              <li>引擎内核和扩展点按平台化要求做：执行图加令牌、操作都是命令、事件留底、可插拔的扩展点（第 9、10 节）</li>
+              <li>审批数据和详情展示：字段定义、发起时校验、详情排版、摘要字段、审批人填写的字段、节点字段权限、附件（第 5 节）</li>
+              <li>审批中心（给审批人用）：待我处理、我已处理、抄送我的、我发起的（看进度），批量审批；电脑网页和单独设计的手机网页；邮件和站内消息提醒（第 6 节）</li>
+              <li>打印审批单：默认样式，每个流程可以调（第 7 节）</li>
+              <li>统计报表（第 8 节）</li>
+              <li>附件存储：本地文件和 MinIO / S3 两种，改配置切换（第 9 节）</li>
+              <li>组织架构自己维护，业务系统绑定、推送变更；账号先独立（第 11 节）</li>
+              <li>业务系统对接：只提供数据接口（开放接口和 .NET SDK），不提供界面组件；待办数量、免登录跳转和内嵌审批中心页面；接入向导、流程模板库、测试模式（第 12 节）</li>
+              <li>数据库：MVP 用 SQLite，代码按 SQL Server、PostgreSQL 也能用的方式写，需要时切换</li>
+              <li>管理后台沿用标签服务的做法：登录、用户和权限、系统信息、操作日志</li>
+            </ul>
+          </div>
+          <div class="pane muted">
+            <h3>预留接口，后续接入</h3>
+            <ul>
+              <li>企业微信、钉钉：消息卡片、应用内审批、免登录（第 6 节）</li>
+              <li>公司统一登录：审批服务和标签服务一起接进产品平台（第 11 节）</li>
+              <li>主数据系统：以后组织架构从这里同步（第 11 节）</li>
+              <li>安卓、iOS App：原生还是 H5 套壳到时候定，现在把接口、登录、推送留好（第 6 节）</li>
+              <li>平台公共能力：ESB 统一出口、API 网关、消息总线、平台的消息中心和文件服务（第 10 节）</li>
+            </ul>
+            <h3 style="margin-top: 16px">二期再议</h3>
+            <ul>
+              <li>超时自动处理（初版到期只提醒）</li>
+              <li>多租户</li>
+              <li>完全自定义的打印模板（初版是默认样式加配置）</li>
+              <li>Office、OFD 附件在线预览（初版图片、PDF 能在线看，其他下载查看）</li>
+              <li>BPMN 里不常用的部分：定时和消息事件、补偿、事务</li>
+            </ul>
+            <h3 style="margin-top: 16px">不做</h3>
+            <ul>
+              <li>在审批服务里发起审批、填业务表单：审批服务不产生业务单据，发起都来自业务系统</li>
+              <li>给业务系统的界面和框架组件（Vue 组件、WinForms 控件、ASP.NET Core 扩展）：只提供数据接口，界面由业务系统自己做，以后需要再讨论</li>
+              <li>直连业务库：审批库和业务库分开，审批服务只通过接口和业务系统交互</li>
+              <li>电子签章：暂不考虑（初版有手写签名和签名图片）</li>
+              <li>导入其他工具画的 BPMN 文件：只导入本系统导出的</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout"><b>范围变化</b>2026-10-13 四次调整：先加入自由画布、委托和票签、统计报表；再补齐中国式审批规则清单和业务系统对接；再按待确认问题的答复，把企业微信、钉钉改为预留、邮件先做，加入待办集成、附件存储、打印样式和两个试点；最后明确审批服务不产生业务单据、发起都来自业务系统，把表单设计器改成“审批数据与详情展示”，去掉在审批中心发起。工作量大约是第一稿的三倍，排期见第 15 节。</div>
+      </section>
+
+      <!-- 2 -->
+      <section id="arch">
+        <h2><span class="n">2</span>总体架构</h2>
+        <p class="lead">服务由管理 API、开放接口、审批中心 API 和流程引擎组成，进程本身不保存状态，初版单实例部署在内网服务器（能访问外网）。和标签服务分开部署、各用各的数据库，技术栈、代码结构、接口风格保持一致，以后一起接入公司的产品平台。</p>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 500" role="img" aria-labelledby="arch-t">
+              <title id="arch-t">审批流服务架构：业务系统发起审批，审批人在审批中心或业务系统里处理，结果回到业务系统</title>
+              <defs><marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">业务系统发起审批，审批人在审批中心或业务系统里处理，结果回到业务系统</text>
+              <text x="24" y="52" class="d-note">独立部署的 ASP.NET Core 进程，内网单实例起步；和标签服务一起组成公司的产品平台</text>
+
+              <rect x="48" y="72" width="184" height="52" rx="8" class="d-box"/>
+              <text x="140" y="94" text-anchor="middle" class="d-name">流程管理员</text>
+              <text x="140" y="112" text-anchor="middle" class="d-sub">流程设计器（浏览器）</text>
+              <rect x="288" y="72" width="184" height="52" rx="8" class="d-box"/>
+              <text x="380" y="94" text-anchor="middle" class="d-name">业务系统</text>
+              <text x="380" y="112" text-anchor="middle" class="d-sub">Vue + .NET 10、WinForms</text>
+              <rect x="528" y="72" width="184" height="52" rx="8" class="d-box"/>
+              <text x="620" y="94" text-anchor="middle" class="d-name">审批人</text>
+              <text x="620" y="112" text-anchor="middle" class="d-sub">审批中心，或业务系统里内嵌</text>
+
+              <rect x="24" y="152" width="712" height="244" rx="10" class="d-group"/>
+              <text x="40" y="176" class="d-name">审批流服务 · ASP.NET Core</text>
+
+              <rect x="48" y="192" width="184" height="48" rx="8" class="d-box"/>
+              <text x="140" y="212" text-anchor="middle" class="d-name">管理 API</text>
+              <text x="140" y="230" text-anchor="middle" class="d-sub">流程设计、组织架构</text>
+              <rect x="288" y="192" width="184" height="48" rx="8" class="d-box"/>
+              <text x="380" y="212" text-anchor="middle" class="d-name">开放接口</text>
+              <text x="380" y="230" text-anchor="middle" class="d-sub">发起、待办、附件、组织</text>
+              <rect x="528" y="192" width="184" height="48" rx="8" class="d-box"/>
+              <text x="620" y="212" text-anchor="middle" class="d-name">审批中心 API</text>
+              <text x="620" y="230" text-anchor="middle" class="d-sub">待办、审批、打印、统计</text>
+
+              <rect x="48" y="264" width="664" height="44" rx="8" class="d-accent"/>
+              <text x="380" y="282" text-anchor="middle" class="d-name">流程引擎</text>
+              <text x="380" y="299" text-anchor="middle" class="d-sub">两种画法编译成同一种执行图；按发起时的版本推进节点、计算审批人、记录每一步操作</text>
+
+              <rect x="48" y="332" width="184" height="48" rx="8" class="d-box"/>
+              <text x="140" y="352" text-anchor="middle" class="d-name">组织架构</text>
+              <text x="140" y="370" text-anchor="middle" class="d-sub">自己维护，业务系统绑定</text>
+              <rect x="288" y="332" width="184" height="48" rx="8" class="d-box"/>
+              <text x="380" y="352" text-anchor="middle" class="d-name">通知与回调</text>
+              <text x="380" y="370" text-anchor="middle" class="d-sub">消息提醒、结果回调、钩子</text>
+              <rect x="528" y="332" width="184" height="48" rx="8" class="d-box"/>
+              <text x="620" y="352" text-anchor="middle" class="d-name">定时任务</text>
+              <text x="620" y="370" text-anchor="middle" class="d-sub">提醒、重发、统计汇总</text>
+
+              <rect x="48" y="428" width="151" height="48" rx="8" class="d-box"/>
+              <text x="123.5" y="448" text-anchor="middle" class="d-name">数据库</text>
+              <text x="123.5" y="466" text-anchor="middle" class="d-sub">SQLite，可切换</text>
+              <rect x="219" y="428" width="151" height="48" rx="8" class="d-box"/>
+              <text x="294.5" y="448" text-anchor="middle" class="d-name">附件存储</text>
+              <text x="294.5" y="466" text-anchor="middle" class="d-sub">本地或 MinIO / S3</text>
+              <rect x="390" y="428" width="151" height="48" rx="8" class="d-box"/>
+              <text x="465.5" y="448" text-anchor="middle" class="d-name">消息</text>
+              <text x="465.5" y="466" text-anchor="middle" class="d-sub">邮件；企业微信、钉钉预留</text>
+              <rect x="561" y="428" width="151" height="48" rx="8" class="d-box"/>
+              <text x="636.5" y="448" text-anchor="middle" class="d-name">业务系统</text>
+              <text x="636.5" y="466" text-anchor="middle" class="d-sub">回调、钩子接口</text>
+
+              <g class="d-edges">
+                <path d="M140 124V192" marker-end="url(#arr-a)"/>
+                <path d="M380 124V192" marker-end="url(#arr-a)"/>
+                <path d="M620 124V192" marker-end="url(#arr-a)"/>
+                <path d="M140 240V264" marker-end="url(#arr-a)"/>
+                <path d="M380 240V264" marker-end="url(#arr-a)"/>
+                <path d="M620 240V264" marker-end="url(#arr-a)"/>
+                <path d="M140 308V332" marker-end="url(#arr-a)"/>
+                <path d="M380 308V332" marker-end="url(#arr-a)"/>
+                <path d="M620 332V308" marker-end="url(#arr-a)"/>
+                <path d="M123.5 396V428" marker-end="url(#arr-a)"/>
+                <path d="M294.5 396V428" marker-end="url(#arr-a)"/>
+                <path d="M380 380V404H636.5V428" marker-end="url(#arr-a)"/>
+                <path d="M465.5 404V428" marker-end="url(#arr-a)"/>
+              </g>
+            </svg>
+          </div>
+          <figcaption>业务系统怎么接见第 12 节。服务只需要往外连（发邮件，以后连企业微信、钉钉），不需要从外网访问进来。</figcaption>
+        </figure>
+        <div class="tw">
+          <table>
+            <thead><tr><th>部分</th><th>选型</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>钉钉式设计器是树形布局，用 HTML、CSS 画；自由画布用开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
+              <tr><td>后端</td><td>.NET 10，ASP.NET Core</td><td>领域、应用、基础设施、接口四层，命名和标签服务一致；流程引擎自己写，不用 Elsa、Camunda 这类通用引擎（中国式审批规则要深度定制，套通用引擎反而绕）</td></tr>
+              <tr><td>数据库</td><td>EF Core；MVP 用 SQLite</td><td>和标签服务一样，SQLite、SQL Server、PostgreSQL 三种的迁移都生成，不写某一种数据库特有的 SQL；MVP 只在 SQLite 上测透，需要时改配置切换</td></tr>
+              <tr><td>附件</td><td>本地文件或 MinIO / S3</td><td>统一的存储接口，改配置切换；数据库只存文件信息（第 9 节）</td></tr>
+              <tr><td>对接</td><td>开放接口、.NET SDK</td><td>只提供数据接口，不提供界面组件；公司业务系统都是 .NET，只出 .NET 的 SDK；SDK 兼容 .NET Framework 4.6.1，和标签服务的 SDK 一样不依赖第三方包；公司没有私有包源，先不发布，业务系统按接口对接</td></tr>
+              <tr><td>网络</td><td>内网部署，能访问外网</td><td>发邮件、以后接企业微信和钉钉都只需要往外连；手机网页在公司网络里能直接打开，在外面要走 VPN；以后上 App 要给服务配一个公网入口</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section id="designer">
+        <h2><span class="n">3</span>流程设计器</h2>
+        <p class="lead">提供两种画法。简单的流程用钉钉式：从上往下像一棵树，点两个节点之间的“+”加节点，业务人员看得懂、改得动。流程复杂（要返工重审、跨分支跳转）时用自由画布，按 BPMN 2.0 画。两种画法发布后编译成同一种执行图，引擎、审批规则、审批数据定义都一样。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th></th><th>钉钉式</th><th>自由画布（BPMN）</th></tr></thead>
+            <tbody>
+              <tr><td>适合谁</td><td>业务人员、行政</td><td>实施人员、流程复杂的业务</td></tr>
+              <tr><td>怎么画</td><td>从上往下，点“+”加节点，点节点在右侧抽屉里设置</td><td>拖节点、随意连线，连线上写条件</td></tr>
+              <tr><td>能画什么</td><td>顺序、条件、包容、并行分支，子流程，自动节点</td><td>以上全部，加回路（返工后重新审）、跨分支跳转</td></tr>
+              <tr><td>导入导出</td><td>流程文件（本系统的格式）</td><td>BPMN 2.0 文件，加本系统的扩展信息；只能导入本系统导出的，其他工具画的暂不支持</td></tr>
+              <tr><td>互相转换</td><td>可以一键转成自由画布继续画</td><td>不能转回钉钉式（回路等表达不了）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>导入导出主要用来在测试环境和正式环境之间搬流程，以及给新客户装常用流程；导入时检查文件是本系统导出的、版本兼容，不认的直接提示。</p>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 548" role="img" aria-labelledby="flow-t">
+              <title id="flow-t">钉钉式例子：采购申请，金额 1 万元以上要总经理和财务总监会签</title>
+              <defs><marker id="arr-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">钉钉式：采购申请，金额 1 万元以上要总经理和财务总监会签</text>
+              <text x="24" y="52" class="d-note">实心框是要处理的节点，虚线框是分支条件</text>
+
+              <g class="d-edges">
+                <path d="M380 120V144" marker-end="url(#arr-f)"/>
+                <path d="M380 192V212"/>
+                <path d="M220 224H540"/>
+                <path d="M220 224V252" marker-end="url(#arr-f)"/>
+                <path d="M540 224V252" marker-end="url(#arr-f)"/>
+                <path d="M220 300V324" marker-end="url(#arr-f)"/>
+                <path d="M220 372V400"/>
+                <path d="M540 300V400"/>
+                <path d="M220 400H540"/>
+                <path d="M380 400V428" marker-end="url(#arr-f)"/>
+                <path d="M380 476V500" marker-end="url(#arr-f)"/>
+              </g>
+
+              <rect x="280" y="72" width="200" height="48" rx="8" class="d-group"/>
+              <text x="380" y="90" text-anchor="middle" class="d-note">发起人</text>
+              <text x="380" y="110" text-anchor="middle" class="d-name">业务系统提交</text>
+              <text x="264" y="100" text-anchor="end" class="d-note">业务系统提交单据时进入流程</text>
+
+              <rect x="280" y="144" width="200" height="48" rx="8" class="d-accent"/>
+              <text x="380" y="162" text-anchor="middle" class="d-note">审批人 · 依次审批</text>
+              <text x="380" y="182" text-anchor="middle" class="d-name">直属上级 → 部门负责人</text>
+              <text x="500" y="162" class="d-note">审批人按规则自动算：上级、部门负责人、</text>
+              <text x="500" y="178" class="d-note">角色、审批矩阵、业务系统接口……</text>
+
+              <rect x="336" y="212" width="88" height="24" rx="12" class="d-box"/>
+              <text x="380" y="228" text-anchor="middle" class="d-sub">条件分支</text>
+              <text x="208" y="218" text-anchor="end" class="d-note">从左到右判断，</text>
+              <text x="208" y="234" text-anchor="end" class="d-note">走第一条满足的</text>
+
+              <rect x="120" y="252" width="200" height="48" rx="8" class="d-cond"/>
+              <text x="220" y="270" text-anchor="middle" class="d-note">条件 1</text>
+              <text x="220" y="290" text-anchor="middle" class="d-name">金额 ≥ 10000 元</text>
+              <rect x="440" y="252" width="200" height="48" rx="8" class="d-cond"/>
+              <text x="540" y="270" text-anchor="middle" class="d-note">条件 2（兜底，必须有）</text>
+              <text x="540" y="290" text-anchor="middle" class="d-name">其他情况</text>
+
+              <rect x="120" y="324" width="200" height="48" rx="8" class="d-accent"/>
+              <text x="220" y="342" text-anchor="middle" class="d-note">审批人 · 会签</text>
+              <text x="220" y="362" text-anchor="middle" class="d-name">总经理、财务总监都同意</text>
+              <text x="556" y="352" class="d-note">不满足条件 1 时直接往下走</text>
+              <text x="208" y="420" text-anchor="end" class="d-note">分支走完后汇合</text>
+
+              <rect x="280" y="428" width="200" height="48" rx="8" class="d-box"/>
+              <text x="380" y="446" text-anchor="middle" class="d-note">抄送人</text>
+              <text x="380" y="466" text-anchor="middle" class="d-name">采购部</text>
+              <text x="500" y="456" class="d-note">抄送只通知，不用处理</text>
+
+              <rect x="340" y="500" width="80" height="24" rx="12" class="d-box"/>
+              <text x="380" y="516" text-anchor="middle" class="d-sub">结束</text>
+            </svg>
+          </div>
+          <figcaption>钉钉式只能从上往下走，不会画出死循环，适合大多数审批。</figcaption>
+        </figure>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 320" role="img" aria-labelledby="canvas-t">
+              <title id="canvas-t">自由画布例子：质量异常处理，需要返工时返工后重新确认，不需要时质量经理和生产经理同时审批</title>
+              <defs><marker id="arr-c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">自由画布：能画回路和任意连线（例：质量异常处理）</text>
+              <text x="24" y="52" class="d-note">按 BPMN 2.0 的常用子集画：圆圈是开始和结束，菱形是网关（× 选一条走，+ 几条同时走）</text>
+
+              <g class="d-edges">
+                <path d="M62 210H96" marker-end="url(#arr-c)"/>
+                <path d="M208 210H244" marker-end="url(#arr-c)"/>
+                <path d="M264 190V122H304" marker-end="url(#arr-c)"/>
+                <path d="M360 98V80H152V186" marker-end="url(#arr-c)"/>
+                <path d="M284 210H360" marker-end="url(#arr-c)"/>
+                <path d="M380 190V160H440" marker-end="url(#arr-c)"/>
+                <path d="M380 230V260H440" marker-end="url(#arr-c)"/>
+                <path d="M564 160H624V190" marker-end="url(#arr-c)"/>
+                <path d="M564 260H624V230" marker-end="url(#arr-c)"/>
+                <path d="M644 210H692" marker-end="url(#arr-c)"/>
+              </g>
+
+              <circle cx="48" cy="210" r="14" class="d-group"/>
+              <text x="48" y="246" text-anchor="middle" class="d-note">开始</text>
+
+              <rect x="96" y="186" width="112" height="48" rx="8" class="d-accent"/>
+              <text x="152" y="204" text-anchor="middle" class="d-note">审批人</text>
+              <text x="152" y="224" text-anchor="middle" class="d-name">质检员确认</text>
+
+              <path d="M264 190L284 210L264 230L244 210Z" class="d-box"/>
+              <text x="264" y="215" text-anchor="middle" class="d-name">×</text>
+              <text x="264" y="252" text-anchor="middle" class="d-note">需要返工？</text>
+              <text x="272" y="160" class="d-sub">是</text>
+              <text x="322" y="202" text-anchor="middle" class="d-sub">否</text>
+
+              <rect x="304" y="98" width="112" height="48" rx="8" class="d-accent"/>
+              <text x="360" y="116" text-anchor="middle" class="d-note">办理人</text>
+              <text x="360" y="136" text-anchor="middle" class="d-name">生产返工</text>
+              <text x="256" y="74" text-anchor="middle" class="d-note">返工后重新确认</text>
+
+              <path d="M380 190L400 210L380 230L360 210Z" class="d-box"/>
+              <text x="380" y="215" text-anchor="middle" class="d-name">+</text>
+              <text x="380" y="300" text-anchor="middle" class="d-note">两边同时审</text>
+
+              <rect x="440" y="136" width="124" height="48" rx="8" class="d-accent"/>
+              <text x="502" y="154" text-anchor="middle" class="d-note">审批人</text>
+              <text x="502" y="174" text-anchor="middle" class="d-name">质量经理审批</text>
+              <rect x="440" y="236" width="124" height="48" rx="8" class="d-accent"/>
+              <text x="502" y="254" text-anchor="middle" class="d-note">审批人</text>
+              <text x="502" y="274" text-anchor="middle" class="d-name">生产经理审批</text>
+
+              <path d="M624 190L644 210L624 230L604 210Z" class="d-box"/>
+              <text x="624" y="215" text-anchor="middle" class="d-name">+</text>
+              <text x="624" y="300" text-anchor="middle" class="d-note">都完成才往下</text>
+
+              <circle cx="706" cy="210" r="14" class="d-end"/>
+              <text x="706" y="246" text-anchor="middle" class="d-note">结束</text>
+            </svg>
+          </div>
+          <figcaption>钉钉式画不出“返工后回到前面重新确认”这种回路，自由画布可以。发布时检查：每个节点都能从开始走到、也都能走到结束，并行网关的分叉和汇合成对出现，排他网关除了兜底的那条线，其他线都有条件。</figcaption>
+        </figure>
+        <h3>节点</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>节点</th><th>作用</th><th>主要设置</th></tr></thead>
+            <tbody>
+              <tr><td>发起人 / 开始</td><td>业务系统发起后从这里进入</td><td>哪些接入应用能用这个流程；可以再限定发起人的部门、角色</td></tr>
+              <tr><td>审批人</td><td>同意或拒绝</td><td>找审批人、多人审批方式、自动处理、能用哪些操作、能看能改哪些字段（第 4、5 节）</td></tr>
+              <tr><td>办理人</td><td>只办理、不能拒绝，如财务付款、仓库发货</td><td>和审批人一样，按钮是“提交”</td></tr>
+              <tr><td>抄送人</td><td>只通知，不用处理</td><td>抄送给谁；可以让发起人自己选；可以要求点“已阅”</td></tr>
+              <tr><td>条件分支 / 排他网关</td><td>按条件走一条路线</td><td>条件用审批数据（含明细合计、计算字段）、发起人的部门、角色、职级；钉钉式从左到右取第一条满足的，自由画布写在连线上；都要有“其他情况”兜底</td></tr>
+              <tr><td>包容分支 / 包容网关</td><td>满足条件的路线都走</td><td>如“金额超过 5 万要法务看”“涉及进口要关务看”，两个都满足就两条都走，全部走完再汇合</td></tr>
+              <tr><td>并行分支 / 并行网关</td><td>几条路线同时走，如技术、质量同时会审</td><td>全部走完才往下</td></tr>
+              <tr><td>子流程</td><td>调用另一个流程</td><td>如采购审批里调合同审批；把哪些字段带过去；等子流程结束再往下，或者不等</td></tr>
+              <tr><td>自动节点</td><td>不用人处理</td><td>调业务系统接口（如通过后生成采购订单）、发通知；失败自动重试，最后交给管理员（第 12 节）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>业务系统提交前可以<b>预览流程</b>：按单据数据算出会走哪些节点、每个节点的审批人是谁；发起人要自选审批人时，用选人组件在业务系统里选。流程发布前可以在<b>测试模式</b>里模拟发起，自己扮演每个审批人把整条流程点一遍。</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="rules">
+        <h2><span class="n">4</span>中国式审批规则</h2>
+        <p class="lead">下面按“找审批人、怎么审、自动处理、谁能做什么、意见签名、时限提醒、委托交接、可见范围”列出中国式审批的常见需求，初版全部做，标“二期”的除外。每一条都是流程或节点上的设置，有默认值，管理员可以改；每个节点还能单独设置允许哪些操作（比如某一步不许转交）。</p>
+
+        <h3>找审批人</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>来源</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>指定成员</td><td>写死的人，如“张明”</td></tr>
+              <tr><td>角色</td><td>如“财务总监”；可以限定在发起人所在部门里找，如“本部门的文员”</td></tr>
+              <tr><td>岗位、职级</td><td>如“经理级及以上”</td></tr>
+              <tr><td>直属上级</td><td>发起人的第 1 级、第 2 级……上级</td></tr>
+              <tr><td>连续多级上级</td><td>从直属上级逐级往上，直到第 N 级或某个职级为止</td></tr>
+              <tr><td>部门负责人</td><td>发起人所在部门的负责人，可以往上数第 N 级部门</td></tr>
+              <tr><td>业务数据里的部门</td><td>单据里的部门（如“费用承担部门”）的负责人</td></tr>
+              <tr><td>分管领导</td><td>按分管关系找，如“分管生产的副总”</td></tr>
+              <tr><td>业务数据里的人员</td><td>单据里的人员字段是谁就是谁，如“项目负责人”</td></tr>
+              <tr><td>审批矩阵</td><td>按金额区间、部门、物料类别等查一张表找人；表在管理后台维护，换人不用改流程</td></tr>
+              <tr><td>业务系统接口</td><td>调业务系统的接口取人，如“这个项目的项目经理”</td></tr>
+              <tr><td>上一步指定</td><td>由上一个审批人选下一步的审批人</td></tr>
+              <tr><td>发起人自选</td><td>发起时选，可以限定范围</td></tr>
+              <tr><td>发起人本人</td><td>用于“确认”类节点</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>发起人同时在几个部门时，业务系统发起时带上“以哪个部门发起”（不带就用主部门），上级、部门负责人都按这个部门找。</p>
+
+        <h3>怎么审、自动处理</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>设置</th><th>选项（加粗的是默认值）</th></tr></thead>
+            <tbody>
+              <tr><td>多人审批方式</td><td><b>依次审批</b>（按顺序一个一个审）；会签（全部同意才通过）；或签（一人同意就通过，其他人的任务自动取消）；票签（同意的达到设定比例就通过，可以给每人设权重；反对的多到已经不可能达到比例时按拒绝处理）</td></tr>
+              <tr><td>会签中有人拒绝</td><td><b>立即结束</b>；等所有人审完再按结果定</td></tr>
+              <tr><td>找不到审批人</td><td><b>不允许发起，提示原因</b>；自动通过；转交流程管理员；转交指定的人</td></tr>
+              <tr><td>审批人就是发起人</td><td><b>自动跳过</b>；由本人审批；转交直属上级</td></tr>
+              <tr><td>同一人多次出现</td><td><b>相邻的只审一次</b>；整个流程只审一次；每次都审</td></tr>
+              <tr><td>审批人离职或停用</td><td><b>转交他的直属上级</b>；转交流程管理员</td></tr>
+              <tr><td>审批人什么时候算</td><td>到这个节点时才算，组织调整后按新的算；发起时预览先算一遍给发起人看，到节点时和预览不一样会在记录里注明</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>审批人能做的</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>操作</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>同意、拒绝</td><td>拒绝时整个审批结束（票签时算一票反对）；可以设意见必填</td></tr>
+              <tr><td>退回</td><td>退回给发起人、上一步或之前任一处理过的节点；重新提交后<b>从头走</b>或直接回到退回的节点（流程里设置）；并行分支里只能退回到同一条分支或分叉之前</td></tr>
+              <tr><td>转交</td><td>把这一步交给别人处理</td></tr>
+              <tr><td>加签</td><td>在自己之前或之后加人，或者加一个人和自己一起审</td></tr>
+              <tr><td>减签</td><td>加签的人可以把自己加的人去掉（对方还没处理时）</td></tr>
+              <tr><td>征询意见</td><td>请别人给个意见，对方回复后自己再决定，不影响流程走向</td></tr>
+              <tr><td>要求补充</td><td>请发起人补材料：回调通知业务系统，发起人在业务系统里补完重新提交，回到自己这里继续审，不用重走流程</td></tr>
+              <tr><td>抄送</td><td>审批时顺手抄送给别人</td></tr>
+              <tr><td>撤销同意</td><td>自己点了同意、下一步还没人处理时，可以收回</td></tr>
+              <tr><td>评论、@人</td><td>留言、加附件，@到的人收到提醒</td></tr>
+              <tr><td>暂存</td><td>意见写一半先存着</td></tr>
+              <tr><td>批量同意</td><td>待办列表里勾选多条一起同意；流程可以设成不允许批量</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>发起人能做的（都在业务系统里，由业务系统调接口）</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>操作</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>发起</td><td>业务系统调接口发起，可以带上：加急、代发人（如秘书代领导）、发起部门、发起人自选的审批人和抄送人</td></tr>
+              <tr><td>撤回</td><td>审批结束前都能撤回；可以设成“第一个人处理前才能撤回”</td></tr>
+              <tr><td>催办</td><td>再提醒一次当前审批人，同一步每小时最多一次；审批中心“我发起的”里也能催</td></tr>
+              <tr><td>补充、重新提交</td><td>被要求补充或被退回时，回调通知业务系统；发起人在业务系统里改好单据，业务系统调接口带上新数据重新提交</td></tr>
+              <tr><td>撤销</td><td>已经通过的单据（如请假）要作废时，业务系统对它再发起一次撤销审批，通过后回调</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>管理员能做的</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>操作</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>修改审批人</td><td>改在途审批单当前或后面节点的审批人</td></tr>
+              <tr><td>跳转</td><td>把审批单跳到任意节点（如走错了分支）</td></tr>
+              <tr><td>终止</td><td>强制结束，结果是“已终止”</td></tr>
+              <tr><td>离职交接</td><td>一键把某人的待办、以及所有流程里写死的这个人，转给接手的人</td></tr>
+              <tr><td>重发</td><td>重发提醒、重发回调</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>管理员的每次干预都要填原因，记进操作记录。</p>
+
+        <h3>意见、签名和打印</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>需求</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>意见</td><td>常用语；按节点设是否必填；意见显示在审批详情和打印的“意见栏”里（如“部门意见”“财务意见”）</td></tr>
+              <tr><td>签名</td><td>手写签名（手机上直接写）、个人签名图片，签名跟着意见显示</td></tr>
+              <tr><td>打印审批单</td><td>生成 PDF，含业务数据、每一步的意见和签名；样式见第 7 节</td></tr>
+              <tr><td>电子签章</td><td>暂不考虑</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>时限与提醒</h3>
+        <ul>
+          <li>节点可以设处理时限，按<b>工作日</b>算（工作日历里维护节假日和调休）。</li>
+          <li>到期前提醒、超时提醒，通知审批人和发起人；每天早上发一封待办汇总邮件（可以关）。</li>
+          <li>超时后自动同意、自动转交：<b>二期</b>。</li>
+        </ul>
+
+        <h3>委托代理</h3>
+        <ul>
+          <li>本人或管理员设置：从什么时候到什么时候、委托给谁、范围（全部流程或指定流程）。</li>
+          <li>期间新到的任务直接给代理人，审批记录写成“王强（代张明）”；张明自己也能看到、也能处理。已经在手上的待办可以选择一并转给代理人。</li>
+          <li>不连环委托：张明委托王强、王强又委托了别人时，张明的任务只到王强，避免绕圈。</li>
+          <li>代理人恰好是发起人时，按“审批人就是发起人”的设置处理。</li>
+        </ul>
+
+        <h3>可见范围与分级管理</h3>
+        <ul>
+          <li>谁能用：每个流程设定哪些接入应用能用它发起，可以再限定发起人的部门、角色、岗位。</li>
+          <li>谁能看一张审批单：发起人、参与人、抄送人；另外可以按流程设查看人，如部门负责人能看本部门发起的。</li>
+          <li>保密流程：只有参与人能看，统计里只显示数量。</li>
+          <li>分级管理：各部门的流程管理员只管自己的流程。</li>
+        </ul>
+        <div class="callout"><b>留痕</b>每一次操作都记进操作记录（谁、代谁、什么时候、做了什么、意见、管理员干预的原因），只追加、不修改；每条记录带上一条的校验值，被人改过能查出来。</div>
+      </section>
+
+      <!-- 5 -->
+      <section id="form">
+        <h2><span class="n">5</span>审批数据与详情展示</h2>
+        <p class="lead">审批服务不产生业务单据，也不提供给发起人填的表单：单据在业务系统里创建、修改、保存，提交时把审批要用的数据传过来。审批服务这边只定义“要传哪些数据”和“审批人看到的样子”，做法和标签服务的“数据源定义”一样：只定义 key 和类型。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>能力</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>审批数据定义</td><td>每个流程定义业务系统要传的字段：key、名称、类型（文本、数字、金额、日期、人员、部门、附件、明细表）、是否必传。用来判断条件、找审批人、显示摘要和详情、打印</td></tr>
+              <tr><td>发起时校验</td><td>按定义检查业务系统传来的数据，缺字段、类型不对时拒绝发起，并说明是哪个字段（和标签服务的 FIELD_REQUIRED 一样）</td></tr>
+              <tr><td>计算字段</td><td>如“合计 = SUM(明细.金额)”，只用于判断条件和显示，不回写业务单据；业务系统已经算好的直接传</td></tr>
+              <tr><td>详情排版</td><td>审批人看到的样子：自动排版（按字段生成，零配置）；或者拖拽排版：分组、一行几列、明细表的列和列宽、金额旁显示人民币大写；也可以直接嵌入业务系统的原单页面（第 12 节）</td></tr>
+              <tr><td>摘要字段</td><td>选 3～5 个关键字段，在待办列表、角标弹出的列表、邮件里直接显示</td></tr>
+              <tr><td>审批人填写的字段</td><td>有的节点要审批人填一点东西，如财务审核填“核定金额”、出纳填“付款日期”；填的内容记在审批记录里，随回调带回业务系统，由业务系统决定怎么更新单据</td></tr>
+              <tr><td>节点字段权限</td><td>每个节点可以隐藏某些字段（如成本价只给财务看）</td></tr>
+              <tr><td>附件</td><td>业务系统发起时把附件一起传过来（如报销票据），审批服务存一份，审批人在线看、打印时附票据页；审批人在意见里也能加附件</td></tr>
+              <tr><td>审批编号</td><td>每次审批一个编号，如 SP-202610-0007，前缀、日期格式、流水号位数可以配；业务单号由业务系统自己管</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>发起时保存一份业务数据<b>快照</b>，审批人看到的是提交时的数据。业务系统确实要在审批中改数据时走接口，改动留痕并标给审批人看（第 12 节）。</li>
+          <li>计算字段用自己写的表达式解析，只支持四则运算、比较、常用函数（SUM、AVG、MAX、MIN、IF、日期差等），不执行任意代码。</li>
+          <li>这份设计里的“审批单”指一次审批的记录（流程实例），不是业务单据。</li>
+        </ul>
+      </section>
+
+      <!-- 6 -->
+      <section id="center">
+        <h2><span class="n">6</span>审批中心、手机端与提醒</h2>
+        <p class="lead">审批人在哪里方便就在哪里审：电脑上的审批中心、手机网页，或者业务系统里内嵌的审批窗口（第 12 节）；以后还有安卓、iOS App。几个入口用的是同一套接口。</p>
+        <h3>审批中心</h3>
+        <ul>
+          <li>列表：待我处理、我已处理、抄送我的、我发起的（只看进度）；按流程、时间、状态筛选，按标题、编号、字段内容搜索；加急的排前面，未读的加粗。</li>
+          <li>列表里直接显示每个流程的<b>摘要字段</b>（如金额、供应商、事由），不点开也能判断；可以勾选多条批量同意。</li>
+          <li>详情页：业务数据（按详情排版显示，或嵌入业务系统的原单）、意见栏、流程进度（时间线，加上流程图里标出走到哪一步、谁在处理），以及当前能做的操作按钮；附件里的图片、PDF 在线看。</li>
+          <li>打印审批单：一键生成 PDF（第 7 节）。</li>
+          <li>审批中心不能发起审批，也不能改业务数据；这里只做审批、看进度、设置委托代理、维护自己的签名和常用语。</li>
+        </ul>
+        <h3>手机端</h3>
+        <p>现在做手机网页；以后安卓、iOS 都要上线，做原生 App 还是把手机网页套一个壳（H5 套壳），到时候再定。不管选哪种，现在都按下面的方式把路铺好，到时候不用返工。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th></th><th>现在：手机网页</th><th>以后：安卓、iOS</th></tr></thead>
+            <tbody>
+              <tr><td>页面</td><td>按手机单独设计，不是把电脑页面挤成一列：底部四个标签（待办、已办、抄送、我的），列表是卡片、显示摘要字段，操作按钮固定在屏幕底部</td><td>H5 套壳直接用手机网页；原生 App 重做界面，接口照用</td></tr>
+              <tr><td>接口</td><td>手机网页只调审批中心 API，不走管理后台专用的接口</td><td>App 用同一套 API，不用另开</td></tr>
+              <tr><td>登录</td><td>工号和密码，可以记住登录；登录令牌按 App 也能用的方式发（短期访问令牌 + 刷新令牌），不只靠浏览器 Cookie</td><td>同一套令牌；以后可以加指纹、面容登录，接统一登录后跟着换</td></tr>
+              <tr><td>手机能力</td><td>审批意见里拍照加附件（上传前压缩）、手写签名、图片和 PDF 预览；这些调用收在一层“设备能力”里</td><td>套壳时把这一层换成壳提供的接口（相机、文件、推送），页面不用改</td></tr>
+              <tr><td>信号差时</td><td>提交时防止重复点；写了一半的意见自动存草稿；列表下拉刷新</td><td>同左</td></tr>
+              <tr><td>提醒</td><td>邮件、站内消息</td><td>加一个“App 推送”渠道（苹果的推送、安卓手机厂商的推送通道），引擎不动</td></tr>
+              <tr><td>链接</td><td>邮件、提醒里的链接统一用 <code>/m/approvals/{id}</code> 这种格式</td><td>装了 App 就直接在 App 里打开同一个地址（通用链接）</td></tr>
+              <tr><td>网络</td><td>手机在公司网络里（Wi-Fi 或 VPN）打开</td><td>App 主要在外面用，要给服务配一个公网入口（反向代理，只开放审批相关的地址）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>消息提醒</h3>
+        <ul>
+          <li>初版做<b>邮件</b>和<b>站内消息</b>（审批中心右上角的小铃铛）：新待办、被催办、快到期、超时、审批结果、被抄送、被 @。</li>
+          <li>邮件走 SMTP，公司邮箱或外部邮箱都行；邮件里的链接打开对应的审批单（要登录，链接可能被转发，不做免登录）。</li>
+          <li>每天早上一封待办汇总邮件；每个人可以设哪些提醒要、哪些不要。</li>
+          <li>发送渠道做成统一接口：以后加企业微信、钉钉、短信、App 推送，只加一个渠道实现，引擎不动。</li>
+        </ul>
+        <h3>企业微信、钉钉（预留）</h3>
+        <ul>
+          <li>接口先留好：消息渠道、身份对应（企业微信、钉钉的用户 ID 存在人员信息里）、应用内打开审批中心的免登录入口。</li>
+          <li>服务器在内网、能访问外网，正好用两家的“长连接”方式：钉钉的 Stream 模式由我们的服务主动连到钉钉，卡片按钮、事件回调都从这条连接回来，不需要公网地址；企业微信智能机器人也有类似的长连接方式（目前只查到第三方资料，接入前以官方文档核实）。</li>
+          <li>在企业微信、钉钉里打开审批中心时，手机同样要能访问到服务；在公司网络外面，需要上面“手机端”说的公网入口。</li>
+        </ul>
+      </section>
+
+      <!-- 7 -->
+      <section id="print">
+        <h2><span class="n">7</span>打印审批单</h2>
+        <p class="lead">打印出来要能直接当纸质凭证用：和财务报销、归档的习惯一致，一眼看清谁在什么时候批的。钉钉、飞书的打印样式查不到官方说明，华为 WeLink 提供自定义打印模板和水印；下面按国内纸质审批单的常见格式定了默认样式。</p>
+        <figure>
+          <div class="sheet-wrap">
+            <div class="sheet" role="img" aria-label="费用报销单打印样式示例：页眉、基本信息、报销明细、审批记录、页脚">
+              <div class="sh-head">
+                <div class="sh-brand"><span class="sh-logo">LOGO</span><span>示例科技有限公司</span></div>
+                <div class="sh-meta"><div>审批编号 SP-202610-0007</div><div>第 2 次打印</div></div>
+                <svg class="sh-qr" viewBox="0 0 21 21" aria-hidden="true" shape-rendering="crispEdges">
+                  <g fill="#111111" fill-rule="evenodd">
+                    <path d="M0 0h7v7H0z M1 1v5h5V1z M2 2h3v3H2z"/>
+                    <path d="M14 0h7v7h-7z M15 1v5h5V1z M16 2h3v3h-3z"/>
+                    <path d="M0 14h7v7H0z M1 15v5h5v-5z M2 16h3v3H2z"/>
+                    <path d="M8 0h1v1H8z M10 0h1v2h-1z M12 1h1v1h-1z M9 2h2v1H9z M8 4h1v2H8z M11 4h2v1h-2z M10 6h1v1h-1z M12 6h1v2h-1z M0 8h2v1H0z M3 8h1v1H3z M5 9h2v1H5z M1 10h1v2H1z M3 11h2v1H3z M6 12h1v1H6z M8 8h3v1H8z M9 10h1v2H9z M11 9h2v2h-2z M14 8h1v1h-1z M16 9h2v1h-2z M19 8h2v1h-2z M15 11h1v2h-1z M17 12h3v1h-3z M20 10h1v1h-1z M8 14h2v1H8z M11 13h1v2h-1z M9 16h1v2H9z M12 16h2v1h-2z M8 19h3v1H8z M14 14h1v1h-1z M16 15h2v2h-2z M19 14h2v1h-2z M14 18h1v3h-1z M17 18h2v1h-2z M20 17h1v2h-1z M16 20h3v1h-3z M12 19h1v2h-1z"/>
+                  </g>
+                </svg>
+              </div>
+              <div class="sh-title">费用报销审批单<span class="sh-status">已通过</span></div>
+              <table>
+                <tr><th>申请人</th><td>王强</td><th>所属部门</th><td>生产部</td></tr>
+                <tr><th>业务单号</th><td>FY20261013001</td><th>来源系统</th><td>示例业务系统</td></tr>
+                <tr><th>提交时间</th><td>2026-10-13 09:12</td><th>费用承担部门</th><td>生产部</td></tr>
+                <tr><th>报销事由</th><td colspan="3">10 月深圳客户现场服务差旅</td></tr>
+              </table>
+              <div class="sh-sub">报销明细</div>
+              <table>
+                <thead><tr><th>序号</th><th>日期</th><th>费用类型</th><th>说明</th><th>发票号码</th><th class="r">金额（元）</th></tr></thead>
+                <tbody>
+                  <tr><td>1</td><td>2026-10-08</td><td>交通</td><td>深圳往返高铁</td><td>26442000000123450118</td><td class="r">686.00</td></tr>
+                  <tr><td>2</td><td>2026-10-08</td><td>住宿</td><td>酒店 2 晚</td><td>26442000000123453307</td><td class="r">560.00</td></tr>
+                  <tr><td>3</td><td>2026-10-09</td><td>交通</td><td>市内打车</td><td>26442000000123457742</td><td class="r">88.50</td></tr>
+                </tbody>
+                <tfoot><tr><th colspan="4">合计（大写）壹仟叁佰叁拾肆元伍角整</th><th colspan="2" class="r">¥1,334.50</th></tr></tfoot>
+              </table>
+              <div class="sh-sub">审批记录</div>
+              <table>
+                <thead><tr><th>节点</th><th>处理人</th><th>结果</th><th>意见</th><th>时间</th><th>签名</th></tr></thead>
+                <tbody>
+                  <tr><td>发起</td><td>王强</td><td>提交</td><td></td><td>10-13 09:12</td><td><span class="sh-sign">王强</span></td></tr>
+                  <tr><td>直属上级</td><td>李娜</td><td>同意</td><td>情况属实</td><td>10-13 10:05</td><td><span class="sh-sign">李娜</span></td></tr>
+                  <tr><td>部门负责人</td><td>张明</td><td>同意</td><td>同意</td><td>10-13 14:20</td><td><span class="sh-sign">张明</span></td></tr>
+                  <tr><td>财务审核</td><td>赵敏</td><td>同意</td><td>票据齐全，核定 1,334.50</td><td>10-14 09:30</td><td><span class="sh-sign">赵敏</span></td></tr>
+                  <tr><td>出纳付款</td><td>刘洋</td><td>已付款</td><td>付款日期 10-14</td><td>10-14 15:00</td><td><span class="sh-sign">刘洋</span></td></tr>
+                </tbody>
+              </table>
+              <div class="sh-line">抄送：财务部　　附件：票据 3 张（见附票据页）</div>
+              <div class="sh-foot"><span>打印人 王强</span><span>打印时间 2026-10-15 08:40</span><span>第 1 页 共 2 页</span></div>
+            </div>
+          </div>
+          <figcaption>默认样式示意（A4 竖版，内容是假数据）。金额 5000 元以下，所以没有经过分管领导；第 2 页是票据页。</figcaption>
+        </figure>
+        <div class="tw">
+          <table>
+            <thead><tr><th>部分</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>页眉</td><td>公司 Logo、公司名称（取自系统信息）；右上角审批编号、第几次打印、二维码</td></tr>
+              <tr><td>标题和状态</td><td>审批单名称居中；旁边一个方框标出“已通过”“已拒绝”“审批中”。不做成圆形红章，避免被当成公章</td></tr>
+              <tr><td>基本信息</td><td>申请人、部门、提交时间、业务单号和来源系统，以及审批数据里的字段，两列排；字段名一格灰底</td></tr>
+              <tr><td>明细表</td><td>原样排成表格，最后一行合计和金额大写；跨页时每页重复表头</td></tr>
+              <tr><td>审批记录</td><td>每一步的节点、处理人、结果、意见、时间、签名（手写签名的图）；代审的写“王强（代张明）”</td></tr>
+              <tr><td>附件</td><td>附件清单；可以选“附票据页”：图片票据按每页 4 张排在后面，方便和纸质凭证一起归档</td></tr>
+              <tr><td>页脚</td><td>打印人、打印时间、页码</td></tr>
+              <tr><td>二维码</td><td>扫码打开线上的审批单（要登录、有权限才能看），核对纸质单有没有被改过</td></tr>
+              <tr><td>水印</td><td>可选：打印人和打印时间的浅色水印</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>服务端生成 PDF：A4 竖版，明细列多时可以选横版；浏览器里预览后打印，业务系统也能通过接口拿 PDF 归档。</li>
+          <li>每个流程可以调：显示哪些字段和顺序、要不要审批意见和签名、要不要附票据页、页眉用不用 Logo。</li>
+          <li>打印留痕：谁、什么时候打印了，记进操作记录，“第几次打印”就是从这里来的。</li>
+          <li>中文字体沿用标签服务的做法：发布包不带字体，使用单位在管理后台上传有授权的字体。</li>
+          <li>PDF 生成候选 PDFsharp + MigraDoc（MIT 协议，表格、分页、页眉页脚现成；QuestPDF 年营收超过 100 万美元的公司要买授权），二维码用标签服务已经在用的 ZXing.Net；选型时先验证中文字体嵌入和表格跨页。</li>
+          <li>完全自定义的打印模板（像设计标签一样自由排版）放二期，可以复用标签服务的 A4 设计器和渲染。</li>
+        </ul>
+      </section>
+
+      <!-- 8 -->
+      <section id="stats">
+        <h2><span class="n">8</span>统计报表</h2>
+        <p class="lead">回答三个问题：审批慢在哪个流程、卡在哪个节点、压在谁手上。报表按管理范围看数据：部门负责人看本部门，管理员看全部。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>角度</th><th>看什么</th></tr></thead>
+            <tbody>
+              <tr><td>流程</td><td>发起量、通过率、拒绝率、撤回率，平均耗时和 90% 的审批在多长时间内办完，按周、月的趋势</td></tr>
+              <tr><td>节点</td><td>每个节点平均停留多久、超时率，找出最慢的节点（瓶颈）</td></tr>
+              <tr><td>人员、部门</td><td>手上积压的待办、平均处理时长、超时次数、处理量</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>可以按时间段、流程、来源业务系统、部门筛选，导出 Excel；审批单列表也能按条件导出明细（含审批数据里的字段）。定时任务每小时把已结束的任务汇总进统计表，报表查汇总表，不扫明细；当天未汇总的部分实时算。</p>
+      </section>
+
+      <!-- 9 -->
+      <section id="engine">
+        <h2><span class="n">9</span>引擎、数据与文件</h2>
+        <p class="lead">两种画法发布时都编译成同一种执行图（节点、连线、网关），引擎只认执行图。审批人一操作，引擎判断当前节点是否完成、下一步去哪、新任务给谁，在一个数据库事务里写完。</p>
+        <h3>引擎内核（要做扎实的部分）</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>做法</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>执行图 + 令牌</td><td>运行时用“令牌”标记走到哪：并行分叉生出几个令牌，汇合时等齐；包容网关只等真正走了的分支；回路、子流程都用同一套机制。钉钉式、自由画布和以后加的节点都跑在这一套上</td></tr>
+              <tr><td>操作都是命令</td><td>同意、拒绝、退回、转交、加签、撤回、跳转……每个操作是一条命令：引擎检查能不能做 → 改状态 → 产生事件，一个事务写完。审批中心、开放接口、管理员干预、定时任务都走这一个入口，规则只写一处</td></tr>
+              <tr><td>事件留底</td><td>每条命令产生的事件写进操作记录（只追加、带校验值）；回调、消息、统计都从事件来，出了问题能按事件重放、核对状态对不对</td></tr>
+              <tr><td>幂等</td><td>命令带请求 ID，网络重试、连点造成的重复提交只生效一次</td></tr>
+              <tr><td>定时不丢</td><td>到期提醒、失败重试这类定时任务存在数据库里，服务重启不丢</td></tr>
+              <tr><td>引擎独立</td><td>引擎核心不依赖数据库和 Web 框架；预览流程、测试模式直接在内存里跑同一个引擎，结果和正式运行一致</td></tr>
+              <tr><td>测试</td><td>第 4 节需求清单每一条至少一个场景测试；另外随机生成流程图和操作顺序反复跑，专门找卡死（令牌永远等不齐）、重复推进这类问题</td></tr>
+              <tr><td>版本兼容</td><td>流程定义带格式版本号，老版本的流程一直能跑；以后可以把在途审批迁到新版本（节点对得上的才允许，二期）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>状态</h3>
+        <ul>
+          <li><b>审批单</b>：审批中 → 已通过 / 已拒绝 / 已撤回 / 已终止；被退回或被要求补充时是“待发起人处理”；已通过的单子撤销成功后是“已撤销”。</li>
+          <li><b>任务</b>（每个审批人一条）：待处理 → 已同意 / 已拒绝 / 已退回 / 已转交 / 已取消（比如或签时别人已经同意）。</li>
+        </ul>
+        <h3>几个关键做法</h3>
+        <ul>
+          <li><b>版本锁定</b>：发起时记住流程的版本号，这张审批单一直按这个版本（包括审批数据定义、详情排版和打印设置）走。改流程只影响以后发起的。</li>
+          <li><b>不重复发起</b>：“流程编码 + 业务单号”在进行中的审批里唯一，业务系统重复调用会拿到已有的那张。</li>
+          <li><b>并发</b>：会签、或签、票签时几个人同时点同意，用乐观锁保证节点只往下推一次。</li>
+          <li><b>不在事务里等外部系统</b>：校验钩子在写数据库之前同步调用（有超时）；自动节点、回调、消息都写进待发队列，由后台任务去调，业务系统慢或者挂了不会拖住审批。</li>
+          <li><b>防死循环</b>：自由画布允许回路，一张审批单累计推进超过上限（初定 200 步）就停下，标记异常交给管理员。</li>
+          <li><b>不丢</b>：回调、自动节点、消息失败按 1 分钟、5 分钟、30 分钟、2 小时……重试，管理后台能看发送记录、手动重发。</li>
+          <li><b>性能（初定）</b>：发起、审批接口 P95 ≤ 300 ms（不含业务系统钩子的耗时）；待办数量接口 P95 ≤ 50 ms（业务系统登录时调）；待办列表 P95 ≤ 500 ms；回调正常情况下 1 分钟内送达。</li>
+        </ul>
+        <h3>数据库</h3>
+        <ul>
+          <li>审批服务用自己独立的数据库，不和业务系统共用，也不连业务系统的库；业务数据只通过接口进出。</li>
+          <li>MVP 用 SQLite（单文件、免安装），沿用标签服务的每日备份和升级前快照。</li>
+          <li>和标签服务一样用 EF Core，SQLite、SQL Server、PostgreSQL 三种的迁移都生成，代码里不写某一种数据库特有的 SQL；切换只改配置。MVP 只在 SQLite 上测透，切换前补跑另外两种的检查。</li>
+        </ul>
+        <h3>附件存储</h3>
+        <ul>
+          <li>两种存储，改配置切换：<b>本地文件</b>（数据目录下按年月分文件夹）；<b>MinIO 或其他兼容 S3 的对象存储</b>（地址、桶、访问密钥）。另有一个迁移命令，把已有文件从本地搬到 MinIO。</li>
+          <li>数据库只存文件信息：文件名、大小、类型、SHA-256 校验值、存在哪里、属于哪张审批单；文件内容不进数据库。</li>
+          <li>上传：业务系统发起前先传附件拿到文件 ID，发起时在数据里引用；审批人在意见里加的附件也一样；限定类型和大小（默认单个 20 MB，可以改），按文件内容判断真实类型，不只看扩展名。</li>
+          <li>下载：先查权限，能看这张审批单的人才能下载。MinIO 能被浏览器直接访问时，签发几分钟有效的下载地址，否则由服务转发。</li>
+          <li>上传了但 24 小时内没被任何审批单用到的文件，自动清理。</li>
+          <li>备份：本地存储时附件目录和数据库一起备份；MinIO 用它自己的多副本和备份。</li>
+        </ul>
+        <h3>主要数据表</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>表</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>流程</td><td>流程编码、名称、分组、画法（钉钉式或自由画布）、管理员、当前发布的版本</td></tr>
+              <tr><td>流程版本</td><td>设计内容（钉钉式 JSON 或自由画布 JSON）、编译后的执行图、审批数据定义和详情排版、打印设置，发布后不能改</td></tr>
+              <tr><td>审批单</td><td>编号、流程编码、版本、业务单号、标题、发起人、发起部门、代发人、来源接入应用、业务数据快照、详情链接、加急、状态、父审批单（子流程）、发起和结束时间</td></tr>
+              <tr><td>任务</td><td>审批单、节点、处理人、代谁处理、状态、意见、签名、到期时间、处理时间</td></tr>
+              <tr><td>操作记录</td><td>每一次操作（含打印），只追加，带校验值</td></tr>
+              <tr><td>附件</td><td>文件 ID、名称、大小、类型、SHA-256、存储位置、所属审批单</td></tr>
+              <tr><td>组织架构</td><td>部门、人员、岗位、职级、角色、上下级、分管关系、变更记录（第 11 节）</td></tr>
+              <tr><td>绑定关系</td><td>接入应用、业务系统的用户 ID 或部门 ID、对应的人员或部门</td></tr>
+              <tr><td>账号</td><td>工号、密码哈希、状态；以后接统一登录时对应平台账号</td></tr>
+              <tr><td>审批矩阵</td><td>条件列（金额区间、部门、类别……）和对应的审批人</td></tr>
+              <tr><td>委托</td><td>委托人、代理人、起止时间、范围</td></tr>
+              <tr><td>工作日历</td><td>节假日、调休</td></tr>
+              <tr><td>接入应用</td><td>业务系统、API Key（只存 SHA-256）、回调和钩子地址、签名密钥、允许嵌入的网站、能用哪些流程</td></tr>
+              <tr><td>待发队列</td><td>要发的回调、自动节点调用、邮件和站内消息，状态、重试次数、下次重试时间</td></tr>
+              <tr><td>统计汇总</td><td>按小时、天汇总的流程和节点耗时、数量</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section id="platform">
+        <h2><span class="n">10</span>可扩展与平台化</h2>
+        <p class="lead">最终目标是公司的产品平台，审批流服务是平台里的一个微服务；统一登录、主数据、ESB 统一出口这些以后再做。现在不做，但设计上先把位置留好：扩展功能时只加实现、不改引擎核心，接入平台时只换配置和适配层。</p>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 410" role="img" aria-labelledby="platform-t">
+              <title id="platform-t">以后的产品平台：审批流服务是其中一个微服务，平台公共服务以后再做</title>
+              <defs><marker id="arr-p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">以后的产品平台：审批流服务是其中一个微服务</text>
+              <text x="24" y="52" class="d-note">实线框是现在要做的，虚线框是以后的；现在把接口和位置留好</text>
+
+              <rect x="24" y="72" width="712" height="44" rx="8" class="d-box"/>
+              <text x="380" y="99" text-anchor="middle" class="d-name">业务系统（Web、WinForms）、审批中心、以后的 App</text>
+
+              <rect x="24" y="136" width="712" height="44" rx="8" class="d-future"/>
+              <text x="380" y="163" text-anchor="middle" class="d-name">API 网关 / ESB 统一出入口（以后）</text>
+
+              <rect x="24" y="200" width="227" height="64" rx="8" class="d-accent"/>
+              <text x="137.5" y="226" text-anchor="middle" class="d-name">审批流服务</text>
+              <text x="137.5" y="246" text-anchor="middle" class="d-sub">流程、引擎、审批记录</text>
+              <rect x="267" y="200" width="227" height="64" rx="8" class="d-box"/>
+              <text x="380.5" y="226" text-anchor="middle" class="d-name">标签服务</text>
+              <text x="380.5" y="246" text-anchor="middle" class="d-sub">标签设计、生成、打印</text>
+              <rect x="510" y="200" width="226" height="64" rx="8" class="d-future"/>
+              <text x="623" y="226" text-anchor="middle" class="d-name">更多业务服务（以后）</text>
+              <text x="623" y="246" text-anchor="middle" class="d-sub">如自定义报表</text>
+
+              <rect x="24" y="288" width="712" height="100" rx="10" class="d-group"/>
+              <text x="40" y="310" class="d-name">平台公共服务（以后；现在是各服务里的模块，隔在接口后面）</text>
+              <rect x="40" y="322" width="126" height="52" rx="8" class="d-future"/>
+              <text x="103" y="342" text-anchor="middle" class="d-name">统一认证</text>
+              <text x="103" y="362" text-anchor="middle" class="d-sub">现在：本地账号</text>
+              <rect x="177" y="322" width="126" height="52" rx="8" class="d-future"/>
+              <text x="240" y="342" text-anchor="middle" class="d-name">主数据</text>
+              <text x="240" y="362" text-anchor="middle" class="d-sub">现在：自己维护</text>
+              <rect x="314" y="322" width="126" height="52" rx="8" class="d-future"/>
+              <text x="377" y="342" text-anchor="middle" class="d-name">消息中心</text>
+              <text x="377" y="362" text-anchor="middle" class="d-sub">现在：邮件、站内</text>
+              <rect x="451" y="322" width="126" height="52" rx="8" class="d-future"/>
+              <text x="514" y="342" text-anchor="middle" class="d-name">文件服务</text>
+              <text x="514" y="362" text-anchor="middle" class="d-sub">现在：本地、MinIO</text>
+              <rect x="588" y="322" width="132" height="52" rx="8" class="d-future"/>
+              <text x="654" y="342" text-anchor="middle" class="d-name">监控和链路追踪</text>
+              <text x="654" y="362" text-anchor="middle" class="d-sub">现在：指标、日志</text>
+
+              <g class="d-edges">
+                <path d="M380 116V136" marker-end="url(#arr-p)"/>
+                <path d="M137.5 180V200" marker-end="url(#arr-p)"/>
+                <path d="M380.5 180V200" marker-end="url(#arr-p)"/>
+                <path d="M623 180V200" marker-end="url(#arr-p)"/>
+                <path d="M380.5 264V288" marker-end="url(#arr-p)"/>
+              </g>
+            </svg>
+          </div>
+          <figcaption>平台还没有的时候，审批流服务自己带着账号、组织、消息、附件这些模块；平台公共服务上线后，把对应模块换成调用平台服务，审批核心不动。</figcaption>
+        </figure>
+
+        <h3>扩展点</h3>
+        <p>每个扩展点是一个接口：加新功能就是写一个新实现、在登记处加一行，引擎核心不动（和标签服务加新元素、新输出格式的方式一样）。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>扩展点</th><th>初版的实现</th><th>以后可以加</th></tr></thead>
+            <tbody>
+              <tr><td>节点类型</td><td>审批、办理、抄送、三种网关、子流程、自动节点</td><td>等待节点、新的自动处理节点</td></tr>
+              <tr><td>审批人来源</td><td>第 4 节的 14 种</td><td>新的人员规则，如项目成员、HR 系统</td></tr>
+              <tr><td>多人审批方式</td><td>依次、会签、或签、票签</td><td>新的通过规则</td></tr>
+              <tr><td>条件和计算函数</td><td>SUM、IF、日期差等</td><td>业务需要的新函数</td></tr>
+              <tr><td>自动节点动作</td><td>调业务系统的 HTTP 接口</td><td>经 ESB 调用、发到消息队列</td></tr>
+              <tr><td>消息渠道</td><td>邮件、站内消息</td><td>企业微信、钉钉、App 推送、短信、平台消息中心</td></tr>
+              <tr><td>事件发布</td><td>回调</td><td>消息总线（如 RabbitMQ、Kafka）、ESB</td></tr>
+              <tr><td>附件存储</td><td>本地、MinIO / S3</td><td>平台文件服务、其他对象存储</td></tr>
+              <tr><td>组织架构来源</td><td>自己维护 + 业务系统推送</td><td>主数据系统</td></tr>
+              <tr><td>登录</td><td>本地账号、嵌入令牌</td><td>公司统一登录（OIDC）、App 指纹和面容登录</td></tr>
+              <tr><td>打印</td><td>默认样式加配置</td><td>自定义打印模板（复用标签服务的设计和渲染）</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>作为平台里的一个微服务</h3>
+        <ul>
+          <li><b>边界清楚</b>：自己的库、自己的接口；别的服务不直接读审批库，审批服务也不读别人的库，只通过接口和事件交互。</li>
+          <li><b>接口规范统一</b>：<code>/api/v1</code> 带版本号、OpenAPI 文档、统一的错误格式和 traceId，和标签服务一致；以后整个平台按这一套定规范。不兼容的改动升版本号（v2），老版本保留一段时间。</li>
+          <li><b>出口统一</b>：所有调外部系统的地方（回调、钩子、自动节点、消息）都经过一个出站适配层。现在直接发 HTTP；以后有 ESB 统一出口，改配置走 ESB，引擎不动。</li>
+          <li><b>入口能放到网关后面</b>：现在自己验 API Key 和登录令牌；以后有 API 网关时，可以改成信任网关传来的身份，两种方式都支持。</li>
+          <li><b>事件能接消息总线</b>：审批事件现在用回调发给业务系统；事件发布做成可替换的，以后可以同时发到消息总线或 ESB，让平台里别的服务订阅。</li>
+          <li><b>链路追踪</b>：请求带进来的 traceId 一路传下去（回调、钩子、自动节点也带），以后平台能统一看一笔业务经过了哪些服务。</li>
+          <li><b>公共能力可以搬走</b>：账号、组织架构、消息、附件现在是服务里的模块，各自隔在接口后面；平台有了统一认证、主数据、消息中心、文件服务后，换成调用平台服务。</li>
+          <li><b>能横向扩展</b>：进程不保存状态；后台任务（发回调、发消息、定时提醒）按“抢锁”执行，同一件事只有一个实例在做。MVP 单实例加 SQLite；换成 SQL Server 或 PostgreSQL 后可以多开几个实例。</li>
+          <li><b>部署</b>：健康检查、指标（<code>/metrics</code>）、配置方式和标签服务一样，可以用 Docker 部署。</li>
+          <li><b>多租户</b>（现在不做）：以后真要做，优先一个租户一个库；现在不在表里加租户字段，不给眼下增加复杂度。</li>
+        </ul>
+
+        <h3>代码结构</h3>
+        <ul>
+          <li>沿用标签服务的四层结构（领域、应用、基础设施、接口），另外把<b>引擎核心</b>单独放一个项目：只有流程执行的逻辑，不依赖数据库、Web 框架和任何外部系统。</li>
+          <li>按业务分模块：流程设计、审批运行、组织架构、账号、消息、附件、对接（接入应用、回调、钩子）、统计。模块之间只通过接口调用，以后哪个模块要拆成独立服务（如消息中心、文件服务）都好拆。</li>
+          <li>契约（接口模型、错误码、事件格式）单独一个项目，SDK、组件按它同步，和标签服务的契约做法一样。</li>
+        </ul>
+      </section>
+
+      <!-- 11 -->
+      <section id="org">
+        <h2><span class="n">11</span>组织架构与账号</h2>
+        <p class="lead">长远看，组织架构由公司的主数据系统统一管理、登录由公司统一登录负责。现在这两样都还没有，业务系统里的组织数据也不全，所以审批服务先自己维护一套，业务系统通过“绑定”关联；接口按以后要接平台的方式留好。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th></th><th>现在</th><th>以后（产品平台）</th></tr></thead>
+            <tbody>
+              <tr><td>组织架构</td><td>审批服务自己维护：管理后台编辑、Excel 导入</td><td>主数据系统统一管理，审批服务改成只读同步</td></tr>
+              <tr><td>业务系统</td><td>把自己的用户、部门绑定到审批服务的人员、部门；有变更时调接口推送</td><td>和主数据对齐，不用再单独推送</td></tr>
+              <tr><td>账号登录</td><td>审批服务自己的账号（工号 + 密码）；从业务系统进来用嵌入令牌，不用再登录</td><td>公司统一登录，审批服务和标签服务一起接进去</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>组织架构</h3>
+        <ul>
+          <li>维护内容：部门树（负责人、分管领导）；人员（工号、姓名、手机、邮箱、岗位、职级、直属上级、在职状态，可以在多个部门）；角色。</li>
+          <li>初始化：用 Excel 模板导入部门、人员、上下级；导入前先检查（工号重复、上级不存在、上下级绕成圈），有问题列出来改完再导。</li>
+          <li><b>绑定</b>：每个接入应用一张对应表，业务系统的用户 ID 对应审批服务的人员，部门 ID 对应部门。绑定方式：按工号或手机号自动匹配、Excel 导入、接口推送、管理后台手工补。绑定后，业务系统调接口时直接用自己的用户 ID 和部门 ID。</li>
+          <li><b>推送变更</b>：业务系统（以后是主数据系统）调接口推送人员、部门的新增、修改、调岗、离职。离职时提醒管理员做离职交接，在途的待办按“审批人离职”的设置处理。</li>
+          <li>谁说了算：人员、部门这类数据指定一个可信来源（现在是审批服务自己），其他业务系统推送的只更新绑定关系和补充字段，不覆盖可信来源的数据，避免几个系统互相改乱。</li>
+          <li>组织架构的每次改动留记录（谁、哪个来源、改了什么），算审批人时有疑问能查当时的组织。</li>
+        </ul>
+        <h3>账号</h3>
+        <ul>
+          <li>现在独立：人员开通账号后用工号和密码登录审批中心，首次登录要改密码；登录、改密码、权限沿用标签服务的做法。</li>
+          <li>从业务系统进来不用再登录：业务系统后端用 SDK 签发嵌入令牌（几分钟有效，绑定用户和接入应用），打开待办、审批页面就是这个人。</li>
+          <li>手机网页和以后的 App 用同一套登录令牌：短期访问令牌加刷新令牌，可以记住登录；手机丢了，管理员可以在后台把这个人的令牌全部作废。</li>
+          <li>为统一登录预留：登录这一层按标准协议（OIDC）设计，公司统一登录上线后，审批服务和标签服务作为它的客户端接进去，账号按工号对上；到时候可以关掉本地密码登录。</li>
+        </ul>
+      </section>
+
+      <!-- 12 -->
+      <section id="integration">
+        <h2><span class="n">12</span>业务系统对接</h2>
+        <p class="lead">公司的业务系统都是 .NET：Web 系统是 Vue 前端加 .NET 10 后端，另外还有 WinForms 客户端。审批服务给业务系统只提供数据接口（开放接口和 .NET SDK），不提供界面组件：待办角标、审批窗口这类界面由业务系统自己做，或者直接跳转、内嵌审批中心的页面。示例业务系统把这些界面做了一遍，给业务系统照着改（第 14 节）。目标是业务系统改得越少越好。</p>
+        <div class="callout"><b>分工</b>业务系统管单据：创建、修改、保存、作废和单据状态都在业务系统里；审批服务管审批：流程、谁来审、审批记录。发起、撤回、重新提交都由业务系统调接口，审批服务不产生业务单据。</div>
+        <div class="callout"><b>库分开</b>审批服务用自己的数据库，不连业务系统的数据库；业务数据只通过接口进出（取数接口、回调、钩子），审批库里只存审批要用的快照。</div>
+        <div class="callout"><b>业务系统不用做</b>审批流程和规则、审批详情页面、待办列表、消息提醒、手机审批、审批记录、打印审批单、统计报表，都由审批服务提供。</div>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 440" role="img" aria-labelledby="seq-t">
+              <title id="seq-t">最省事的接法：业务系统加一个按钮、给一个查数据的接口</title>
+              <defs><marker id="arr-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">最省事的接法：业务系统加一个按钮、给一个查数据的接口</text>
+              <text x="24" y="52" class="d-note">前端只传单号，数据由审批服务回业务系统取，页面上改不了金额去绕过审批条件</text>
+
+              <rect x="60" y="72" width="160" height="40" rx="8" class="d-box"/>
+              <text x="140" y="97" text-anchor="middle" class="d-name">业务系统（页面、后端）</text>
+              <rect x="320" y="72" width="160" height="40" rx="8" class="d-accent"/>
+              <text x="400" y="97" text-anchor="middle" class="d-name">审批流服务</text>
+              <rect x="570" y="72" width="160" height="40" rx="8" class="d-box"/>
+              <text x="650" y="97" text-anchor="middle" class="d-name">审批人</text>
+
+              <line x1="140" y1="112" x2="140" y2="424" class="d-life"/>
+              <line x1="400" y1="112" x2="400" y2="424" class="d-life"/>
+              <line x1="650" y1="112" x2="650" y2="424" class="d-life"/>
+
+              <g class="d-edges">
+                <path d="M140 150H400" marker-end="url(#arr-s)"/>
+                <path d="M400 186H140" marker-end="url(#arr-s)"/>
+                <path d="M140 222H400" marker-end="url(#arr-s)"/>
+                <path d="M400 258H140" marker-end="url(#arr-s)"/>
+                <path d="M400 294H650" marker-end="url(#arr-s)"/>
+                <path d="M650 330H400" marker-end="url(#arr-s)"/>
+                <path d="M400 366H140" marker-end="url(#arr-s)"/>
+                <path d="M400 402H140" stroke-dasharray="4 4" marker-end="url(#arr-s)"/>
+              </g>
+              <text x="270" y="143" text-anchor="middle" class="d-sub">① 点“提交审批”：流程编码 + 单号</text>
+              <text x="270" y="179" text-anchor="middle" class="d-sub">② 按单号调业务系统的取数接口</text>
+              <text x="270" y="215" text-anchor="middle" class="d-sub">③ 单据数据，含明细</text>
+              <text x="270" y="251" text-anchor="middle" class="d-sub">④ 确认页：预览流程、选审批人</text>
+              <text x="525" y="287" text-anchor="middle" class="d-sub">⑤ 待办：邮件、业务系统角标</text>
+              <text x="525" y="323" text-anchor="middle" class="d-sub">⑥ 同意、拒绝、退回……</text>
+              <text x="270" y="359" text-anchor="middle" class="d-sub">⑦ 结果回调</text>
+              <text x="270" y="395" text-anchor="middle" class="d-sub">⑧ 业务系统查审批进度（接口）</text>
+            </svg>
+          </div>
+          <figcaption>业务系统要做的只有两件：单据上加一个“提交审批”按钮调发起接口；提供“按单号查单据”的接口（多数系统本来就有）。审批结果靠回调回到业务系统，也可以打开单据时调接口查。</figcaption>
+        </figure>
+
+        <h3>提供什么</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>提供</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>开放接口</td><td>HTTP 接口加在线文档（OpenAPI），任何语言都能调；接口清单见第 13 节</td></tr>
+              <tr><td>.NET SDK（ApprovalService.Client）</td><td>把开放接口包成 C# 方法：发起、查询、撤回、重新提交、催办、待办数量和列表、审批操作、免登录打开地址、推送组织架构、上传附件，外加回调验签方法；兼容 .NET Framework 4.6.1，不依赖第三方包；Web 后端和 WinForms 都能用</td></tr>
+              <tr><td>审批中心页面</td><td>审批中心的页面有固定地址，业务系统可以带免登录链接跳过去，或者内嵌（网页里用 iframe，WinForms 里用 WebView2）</td></tr>
+              <tr><td>示例业务系统（源码）</td><td>界面用 WinUI 3 写；对接代码（提交、撤回、待办、回调处理、取数接口）单独一个类库，不依赖界面，.NET Framework 4.8 也能编译，业务系统照着抄（第 14 节）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>不提供 Vue 组件、WinForms 控件、ASP.NET Core 扩展这类界面或框架组件，以后需要再讨论。公司暂时没有私有的 NuGet 源，SDK 先不发布：业务系统按接口文档直接调，或者把 SDK 的 DLL 拷进项目；示例业务系统直接引用 SDK 项目。接入向导按接入应用生成 C# 调用代码，复制就能用。</p>
+
+        <h3>三种接入方式，可以组合</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>方式</th><th>业务系统要做的</th><th>适合</th><th>粗估工作量</th></tr></thead>
+            <tbody>
+              <tr><td>① 接口 + 回调</td><td>单据上加“提交审批”“撤回”按钮，调接口；提供按单号查单据的取数接口；后端写一个回调接口改单据状态（没有后端的 C/S 系统打开单据时查一次状态）</td><td>所有单据</td><td>一到两天</td></tr>
+              <tr><td>② 待办和审批界面</td><td>三选一：带免登录链接跳到审批中心；内嵌审批中心页面（iframe 或 WebView2）；用待办、审批接口自己画</td><td>想在自己系统里审批的</td><td>跳转、内嵌半天；自己画两三天</td></tr>
+              <tr><td>③ 流程里调业务</td><td>按需提供校验、取人、业务动作接口（第 13 节）</td><td>要深度联动的流程</td><td>每个接口半天左右</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>工作量是粗估，按业务系统已有接口的情况会有出入。</p>
+
+        <h3>待办集成：登录就知道有几件要审</h3>
+        <ul>
+          <li>业务系统登录后调一次待办数量接口，拿到当前用户的待办数：待处理多少件、其中加急几件、超时几件；角标由业务系统自己画。</li>
+          <li>可以只看本系统流程的待办，也可以看这个人全部的待办（统一待办），按接入应用设置。</li>
+          <li>点开有三种做法：跳到审批中心（免登录链接，新窗口）；在业务系统里内嵌审批中心的页面（网页用 iframe，WinForms 用 WebView2）；或者用待办列表、审批操作接口自己画列表和审批窗口。</li>
+          <li>内嵌的审批页面审批完会发一条消息给外面（网页里是 postMessage，WebView2 里是 WebMessage），业务系统收到后刷新待办数和单据状态。</li>
+          <li>多久刷新一次由业务系统定（比如每分钟查一次）；要实时提醒时，订阅回调事件“新待办”“待办已处理”。</li>
+          <li>待办列表接口带摘要字段和免登录打开地址。</li>
+        </ul>
+
+        <h3>SDK 用法（示意，具体写法开发时定）</h3>
+<pre><code>var approval = new ApprovalClient(new ApprovalClientOptions
+{
+    BaseAddress = new Uri("http://approval.example.com/"),
+    ApiKey = Environment.GetEnvironmentVariable("APPROVAL_API_KEY"),
+});
+
+// 提交审批：只传单号，单据数据由审批服务回业务系统的取数接口取
+var instance = await approval.StartAsync(new StartRequest("PURCHASE_REQUEST", order.No) { Initiator = currentUser.Code });
+order.ApprovalId = instance.Id;
+
+// 登录后：当前用户的待办数，角标自己画
+var count = await approval.GetTaskCountAsync(currentUser.Code);
+todoBadge.Text = count.Pending.ToString();
+
+// 点开待办：拿免登录地址，用浏览器或 WebView2 打开审批中心的页面
+webView.Source = await approval.CreateOpenUrlAsync(taskId, currentUser.Code);
+
+// 回调（业务系统后端）：先验签，再改单据状态
+if (!ApprovalCallback.Verify(body, signatureHeader, callbackSecret)) return Results.Unauthorized();
+var e = ApprovalCallback.Parse(body);
+await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
+
+        <h3>审批人看得快</h3>
+        <ul>
+          <li><b>摘要字段</b>：每个流程选 3～5 个关键字段（如金额、供应商、事由），待办列表（审批中心和业务系统都能拿到）、邮件里直接显示。</li>
+          <li><b>三种详情展示</b>，按流程选：自动排版（按字段生成，零配置）；拖拽排版；<b>嵌入原单</b>（业务系统现成的单据详情页嵌在审批详情里，只读、免登录，不用在审批服务里重新排一遍）。</li>
+          <li>明细多时只显示前几行和合计，展开看全部，可以导出 Excel；附件图片、PDF 在线看。</li>
+          <li><b>变化高亮</b>：被退回后重新提交、被业务系统更新过的字段，标出改前改后。</li>
+          <li>显示业务系统相关单据的链接，点开直接看。</li>
+        </ul>
+
+        <h3>流程里和业务联动</h3>
+        <ul>
+          <li><b>校验钩子</b>：发起前、某个节点同意前问业务系统“能不能过”（如库存够不够、预算超没超），不通过时把原因提示给人，挡住不让过。</li>
+          <li><b>自动节点</b>：审批通过后自动调业务接口（生成采购订单、扣预算）。</li>
+          <li><b>取人</b>：审批人可以直接从业务系统取（如这个项目的项目经理），不在两边各维护一份。</li>
+          <li><b>审批中业务数据变了</b>：业务系统调接口更新允许更新的字段，改动留痕、标给审批人看；业务单据作废时调接口终止审批。</li>
+          <li><b>结果回到业务系统</b>：回调，或者业务系统自己调查询接口。</li>
+        </ul>
+
+        <h3>上线快的工具</h3>
+        <ul>
+          <li><b>接入向导</b>：建接入应用 → 生成 API Key 和签名密钥 → 选流程 → 生成 C# 调用代码 → 一键发测试回调。</li>
+          <li><b>流程模板库</b>：请假、加班、出差、费用报销、付款、采购、用印、合同、物品领用、质量异常等，复制后改改就能用（模板只有流程和审批数据定义，单据仍在业务系统里）。</li>
+          <li><b>测试模式</b>：发布前模拟发起，自己扮演每个审批人走完整条流程，不发真实提醒、不调业务接口（可以换成假数据）。</li>
+          <li><b>日志</b>：接口调用、回调、钩子的每次请求和结果都能查、能重发。</li>
+          <li><b>文档</b>：在线接口文档（OpenAPI），加上 SDK 的使用说明和示例业务系统（第 14 节）。</li>
+        </ul>
+        <div class="callout"><b>安全</b>回调、钩子都带签名，双方验签；嵌入令牌几分钟有效、只能用一次换登录；只有登记过的网站能嵌入审批页面。</div>
+      </section>
+
+      <!-- 13 -->
+      <section id="api">
+        <h2><span class="n">13</span>接口清单</h2>
+        <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。人员用工号，或者业务系统自己的用户 ID（绑定过的）。</p>
+        <h3>审批服务提供的接口</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>接口</th><th>用途</th></tr></thead>
+            <tbody>
+              <tr><td><code>GET /api/v1/flows</code></td><td>这个 Key 能用的流程</td></tr>
+              <tr><td><code>GET /api/v1/flows/{code}/schema</code></td><td>流程要传的审批数据（含明细表的列）和 JSON 样例</td></tr>
+              <tr><td><code>POST /api/v1/flows/{code}/preview</code></td><td>按单据数据预览会走哪些节点、审批人是谁</td></tr>
+              <tr><td><code>POST /api/v1/instances</code></td><td>发起审批（传数据，或只传单号让服务去取）</td></tr>
+              <tr><td><code>POST /api/v1/instances/batch</code></td><td>批量发起</td></tr>
+              <tr><td><code>GET /api/v1/instances/{id}</code></td><td>状态、当前节点、审批记录；也可以按流程编码和业务单号查</td></tr>
+              <tr><td><code>GET /api/v1/instances/{id}/print</code></td><td>审批单 PDF</td></tr>
+              <tr><td><code>PATCH /api/v1/instances/{id}/data</code></td><td>审批中更新允许更新的字段（留痕）</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/withdraw</code></td><td>撤回</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/resubmit</code></td><td>被退回或被要求补充后重新提交（带新数据）</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/remind</code></td><td>催办</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/terminate</code></td><td>业务单据作废时终止审批</td></tr>
+              <tr><td><code>GET /api/v1/tasks/count?user=</code></td><td>待办数量：待处理、加急、超时（业务系统登录时调）</td></tr>
+              <tr><td><code>GET /api/v1/tasks?user=</code></td><td>待办列表，带摘要字段和打开地址</td></tr>
+              <tr><td><code>POST /api/v1/tasks/{id}/actions</code></td><td>同意、拒绝、退回、转交、加签等（带意见和可编辑字段的值）</td></tr>
+              <tr><td><code>POST /api/v1/files</code></td><td>上传附件，返回文件 ID</td></tr>
+              <tr><td><code>GET /api/v1/files/{id}</code></td><td>下载附件（要权限）</td></tr>
+              <tr><td><code>POST /api/v1/embed-tokens</code></td><td>签发嵌入令牌，换成免登录打开地址（跳转、内嵌审批中心页面用）</td></tr>
+              <tr><td><code>POST /api/v1/org/changes</code></td><td>推送人员、部门变更（新增、修改、调岗、离职）</td></tr>
+              <tr><td><code>POST /api/v1/org/bindings</code></td><td>绑定业务系统的用户 ID、部门 ID</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>业务系统按需提供的接口</h3>
+        <p>都由审批服务的后端调用，带签名，默认 5 秒超时（可以设）。都不是必须的，用到哪个功能才提供哪个。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>接口</th><th>返回</th><th>什么时候用</th></tr></thead>
+            <tbody>
+              <tr><td>取数接口</td><td>单据数据（字段、明细）</td><td>只传单号发起时</td></tr>
+              <tr><td>校验钩子</td><td>能不能过，不能过的原因</td><td>发起前、某个节点同意前</td></tr>
+              <tr><td>取人接口</td><td>用户 ID 列表</td><td>审批人来源选“业务系统接口”时</td></tr>
+              <tr><td>业务动作接口</td><td>成功或失败</td><td>自动节点</td></tr>
+              <tr><td>结果回调</td><td>收到就返回 200</td><td>审批状态变化、待办变化时</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>发起审批</h3>
+<pre><code>POST /api/v1/instances
+X-Api-Key: …
+
+{
+  "flowCode": "PURCHASE_REQUEST",
+  "businessKey": "PR20261013001",
+  "title": "采购申请 · 电源适配器 500 个",
+  "initiator": "E10023",
+  "data": {
+    "supplier": "华强电子",
+    "reason": "产线备料",
+    "items": [
+      { "name": "电源适配器", "qty": 500, "price": 25.60 }
+    ]
+  },
+  "detailUrl": "https://mes.example.com/purchase/PR20261013001"
+}</code></pre>
+        <p>“金额”是公式字段（明细的数量 × 单价求和），不用传，服务端算出 12800.00 后再判断走哪条分支。配了取数接口时 <code>data</code> 可以不传。</p>
+        <h3>结果回调</h3>
+        <p>请求体用接入应用的签名密钥做 HMAC-SHA256 签名，业务系统先验签再处理（SDK 里有验签方法）；同一事件可能重发，按 <code>eventId</code> 去重。事件有：发起、每个节点完成（可选）、通过、拒绝、撤回、退回给发起人、终止、撤销、数据被更新，以及（可选订阅）新待办、待办已处理。</p>
+<pre><code>POST {业务系统登记的回调地址}
+X-Approval-Signature: sha256=…
+
+{
+  "eventId": "01JA6Q3T8Z…",
+  "event": "instance.approved",
+  "instanceId": "…",
+  "serialNo": "CG-202610-0001",
+  "flowCode": "PURCHASE_REQUEST",
+  "businessKey": "PR20261013001",
+  "status": "approved",
+  "data": { "amount": 12800.00, "payDate": "2026-10-20" },
+  "occurredAt": "2026-10-13T09:30:00+08:00"
+}</code></pre>
+      </section>
+
+      <!-- 14 -->
+      <section id="demo">
+        <h2><span class="n">14</span>示例业务系统与试点</h2>
+        <p class="lead">用一个示例业务系统把对接全流程跑一遍：界面用 WinUI 3 写，秀一下 Fluent 风格；对接代码单独放一个类库，业务系统照着抄。采购申请、费用报销两种单据都从它提交。它有两个用处：试点时当发起方；给其他业务系统看“接一个审批要改多少代码”。</p>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 312" role="img" aria-labelledby="demo-t">
+              <title id="demo-t">示例业务系统：单据界面用 SDK 调审批接口，本机业务后端接收回调、提供取数和钩子，业务数据和审批库完全分开</title>
+              <defs><marker id="arr-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
+              <text x="24" y="32" class="d-title">示例业务系统怎么和审批流服务配合</text>
+              <text x="24" y="50" class="d-note">业务数据存在示例系统自己的数据文件里，和审批库完全分开，只通过接口交互</text>
+
+              <rect x="24" y="84" width="400" height="208" rx="10" class="d-group"/>
+              <text x="40" y="108" class="d-name">示例业务系统（WinUI 3）</text>
+              <rect x="40" y="124" width="176" height="60" rx="8" class="d-box"/>
+              <text x="128" y="149" text-anchor="middle" class="d-name">单据界面</text>
+              <text x="128" y="168" text-anchor="middle" class="d-sub">WinUI 3：报销、采购、待办</text>
+              <rect x="232" y="124" width="176" height="60" rx="8" class="d-box"/>
+              <text x="320" y="149" text-anchor="middle" class="d-name">审批窗口</text>
+              <text x="320" y="168" text-anchor="middle" class="d-sub">自己画，或内嵌审批页面</text>
+              <rect x="40" y="216" width="176" height="60" rx="8" class="d-box"/>
+              <text x="128" y="241" text-anchor="middle" class="d-name">本机业务后端</text>
+              <text x="128" y="260" text-anchor="middle" class="d-sub">取数、取人、钩子、回调</text>
+              <rect x="232" y="216" width="176" height="60" rx="8" class="d-box"/>
+              <text x="320" y="241" text-anchor="middle" class="d-name">业务数据文件</text>
+              <text x="320" y="260" text-anchor="middle" class="d-sub">模拟业务库</text>
+
+              <rect x="520" y="124" width="216" height="60" rx="8" class="d-accent"/>
+              <text x="628" y="149" text-anchor="middle" class="d-name">审批流服务</text>
+              <text x="628" y="168" text-anchor="middle" class="d-sub">接口、审批页面、引擎</text>
+              <rect x="520" y="216" width="216" height="60" rx="8" class="d-box"/>
+              <text x="628" y="241" text-anchor="middle" class="d-name">审批库</text>
+              <text x="628" y="260" text-anchor="middle" class="d-sub">只存审批记录和数据快照</text>
+
+              <g class="d-edges">
+                <path d="M128 124V72H628V124" marker-end="url(#arr-d)"/>
+                <path d="M216 154H232" marker-end="url(#arr-d)"/>
+                <path d="M408 154H520" marker-end="url(#arr-d)"/>
+                <path d="M540 184V200H128V216" marker-end="url(#arr-d)"/>
+                <path d="M216 246H232" marker-end="url(#arr-d)"/>
+                <path d="M628 184V216" marker-end="url(#arr-d)"/>
+              </g>
+              <text x="380" y="67" text-anchor="middle" class="d-sub">SDK 调接口：预览、发起、撤回、待办数</text>
+              <text x="464" y="148" text-anchor="middle" class="d-sub">接口、页面</text>
+              <text x="330" y="212" text-anchor="middle" class="d-sub">取数、取人、钩子、回调</text>
+            </svg>
+          </div>
+          <figcaption>和审批有关的代码都在“对接类库”里，不依赖 WinUI；“对接改动”页按文件列出来，一眼看出业务系统要改多少。</figcaption>
+        </figure>
+
+        <h3>示例系统有什么</h3>
+        <ul>
+          <li><b>界面用 WinUI 3</b>（.NET 10，Windows 10 以上）：云母背景、导航栏、卡片式单据列表、彩色状态标签、自己画的审批进度时间线、跟随系统的深浅色、审批完的提示用通知条。打包成免安装的，自带运行时，拷过去就能跑。</li>
+          <li><b>对接代码和界面分开</b>：调审批接口、处理回调、取数、钩子这些代码放在一个单独的“对接类库”里，不依赖 WinUI，能在 .NET Framework 4.8 上编译。WinForms、Web 后端的业务系统直接照抄这个类库，界面换成自己的就行。</li>
+          <li>直接引用 SDK 项目，不经过包源。SDK 在 .NET Framework 上能不能用，由 SDK 的检查程序和对接类库在 net48 下编译、跑一遍来保证（WinUI 3 本身跑不了 .NET Framework）。</li>
+          <li>两种单据：费用报销单、采购申请单。列表、新建、编辑、提交审批、撤回、看进度、打印审批单；单据上显示审批状态和审批人填的字段（如核定金额、采购订单号）。</li>
+          <li><b>切换当前用户</b>：模拟不同员工登录（申请人、上级、财务……），一台电脑上就能把整条流程审完。</li>
+          <li>待办角标、待办列表和审批窗口都是示例系统自己画的（调数据接口）；另外演示内嵌审批中心页面（WinUI 3 自带的 WebView2），两种做法都能看到。切到谁，就显示谁的待办。</li>
+          <li><b>本机业务后端</b>：示例系统里带一个很小的本机 HTTP 服务，扮演业务系统的后端：取数接口、取人接口（项目经理）、校验钩子（预算够不够）、业务动作接口（生成采购订单）、接收回调。</li>
+          <li>两种状态同步都演示：有后端的系统用回调；没有后端的 C/S 系统关掉本机服务，改成打开单据时查一次状态、列表定时刷新。</li>
+          <li><b>一键准备演示环境</b>：推送演示用的组织架构和人员绑定，导入两个流程（本系统导出的流程文件）。</li>
+          <li><b>“对接改动”页</b>：列出对接类库里的每一处代码（哪个文件、干什么、多少行），也就是业务系统要加的东西。</li>
+          <li><b>自检</b>：带 <code>--smoke</code>，直接调对接类库把下面的演示场景自动跑一遍（不经过界面，方便放进验证脚本）；界面另外截图检查。</li>
+        </ul>
+        <div class="callout"><b>注意</b>示例里 API Key 放在客户端配置里，只是为了演示方便。正式的 C/S 系统建议经过自己的服务端调审批接口，或者给每个客户端单独发 Key、限定只能用哪些流程。</div>
+
+        <h3>业务系统要改的地方（对接类库会实际统计行数）</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>改动</th><th>示例系统里的做法</th><th>正式业务系统</th></tr></thead>
+            <tbody>
+              <tr><td>单据加字段</td><td>审批状态、审批单 ID、审批人填的字段</td><td>同样加几个字段</td></tr>
+              <tr><td>提交审批</td><td>提交按钮：先预览流程、选审批人，再发起</td><td>同</td></tr>
+              <tr><td>撤回、重新提交</td><td>单据上两个按钮，调接口</td><td>同</td></tr>
+              <tr><td>取数接口</td><td>本机后端按单号返回单据</td><td>把已有的查询包一层</td></tr>
+              <tr><td>状态同步</td><td>本机后端收回调改状态；或者打开时查询</td><td>有后端用回调；没后端用查询</td></tr>
+              <tr><td>待办和审批</td><td>自己画角标、待办列表、审批窗口（调接口）；或内嵌审批中心页面</td><td>同：自己画，或跳转、内嵌审批中心页面</td></tr>
+              <tr><td>钩子、取人、业务动作</td><td>预算校验、项目经理、生成采购订单</td><td>按需提供</td></tr>
+              <tr><td>人员绑定</td><td>一键推送</td><td>推一次组织架构和绑定，之后有变更再推</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>演示组织架构（虚构）</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>部门</th><th>人员</th></tr></thead>
+            <tbody>
+              <tr><td>总经办</td><td>周总（总经理）；刘副总（分管生产、行政）；陈副总（分管采购、财务）</td></tr>
+              <tr><td>生产部</td><td>张明（负责人）；马丽（计划员）。下设生产一部：李娜（主管）、王强、赵刚</td></tr>
+              <tr><td>研发部</td><td>孙磊（负责人）；李娜同时在研发部，兼项目经理（一人多部门）</td></tr>
+              <tr><td>采购部</td><td>吴芳（负责人、采购经理）；郑涛（采购员）</td></tr>
+              <tr><td>财务部</td><td>冯伟（财务总监）；何静（负责人、财务经理）；赵敏、钱丽（会计）；刘洋（出纳）</td></tr>
+              <tr><td>行政部</td><td>黄蕾（负责人）；林峰（资产管理员）；高远（法务）</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>采购委员会：吴芳（2 票）、孙磊、张明、何静。周总没有上级。下面两套规则是演示用的，故意做得复杂，好多暴露问题；正式上线时按公司实际的制度改。</p>
+
+        <h3>费用报销（EXPENSE）</h3>
+        <p>业务系统传：报销人、发起部门、费用承担部门、项目（可选）、报销事由、冲抵借款金额；明细（日期、费用类型、说明、发票号码、金额、票据附件）。费用类型：交通、住宿、餐费、招待费、办公用品、其他。合计是计算字段。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>步骤</th><th>节点</th><th>谁来审</th><th>什么时候走、规则</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>直属上级</td><td>报销人的直属上级</td><td>总要走；报销人没有上级（周总）时跳过</td></tr>
+              <tr><td>2</td><td>会审（包容分支，满足的都走、同时走）</td><td>项目经理（取人接口）；费用承担部门负责人；行政部负责人</td><td>填了项目；承担部门不是报销人的部门；明细里有招待费</td></tr>
+              <tr><td>3</td><td>部门负责人</td><td>报销人发起部门的负责人</td><td>总要走；和上一步是同一个人时自动通过</td></tr>
+              <tr><td>4</td><td>领导审批（排他分支）</td><td>分管领导；或分管领导 → 总经理</td><td>合计 5000～20000 元走分管领导；合计超过 20000 元，或者任一张招待费超过 2000 元，依次走分管领导、总经理；5000 元以下不走</td></tr>
+              <tr><td>5</td><td>财务审核</td><td>会计（赵敏、钱丽，或签）</td><td>填“核定金额”；票据不全时“要求补充”；时限 2 个工作日；不许批量同意</td></tr>
+              <tr><td>6</td><td>财务经理复核</td><td>财务经理</td><td>核定金额和申请金额不一样，或者合计超过 20000 元</td></tr>
+              <tr><td>7</td><td>出纳付款（办理）</td><td>出纳</td><td>填付款日期；付款金额 = 核定金额 − 冲抵借款</td></tr>
+              <tr><td>—</td><td>抄送</td><td>费用承担部门负责人</td><td>结束时</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>退回后重新提交：从头走。撤回：第一个人处理前才能撤回。</p>
+
+        <h3>采购申请（PURCHASE_REQUEST）</h3>
+        <p>业务系统传：申请人、申请部门、采购类型（生产物料、固定资产、办公用品、服务）、是否预算内、供应商、是否单一来源、期望交货日期、项目（可选）；明细（物料编码、名称、规格、数量、单位、预估单价、金额）。合计是计算字段。</p>
+        <div class="tw">
+          <table>
+            <thead><tr><th>步骤</th><th>节点</th><th>谁来审</th><th>什么时候走、规则</th></tr></thead>
+            <tbody>
+              <tr><td>0</td><td>发起前校验</td><td>示例系统的预算钩子</td><td>预算内采购、预算余额不够时不让提交，提示还差多少</td></tr>
+              <tr><td>1</td><td>部门负责人</td><td>申请部门的负责人</td><td>总要走</td></tr>
+              <tr><td>2</td><td>按类型确认（排他分支）</td><td>计划员（办理）；或资产管理员（办理）</td><td>生产物料由计划员确认需求；固定资产由资产管理员填资产编号；其他类型跳过</td></tr>
+              <tr><td>3</td><td>专项审核（包容分支，同时走）</td><td>采购委员会（票签）；财务经理；子流程“合同评审”</td><td>单一来源供应商：4 人投票，60% 通过，采购经理算 2 票；预算外采购：财务经理；合计 5 万元以上：子流程里法务、财务经理并行会审，等它结束</td></tr>
+              <tr><td>4</td><td>金额分档（排他分支）</td><td>采购经理；采购经理 → 分管领导；采购经理 → 分管领导 → 总经理、财务总监会签</td><td>1 万元以下；1 万～10 万元；10 万元以上</td></tr>
+              <tr><td>5</td><td>生成采购订单（自动节点）</td><td>调示例系统的业务动作接口</td><td>通过后生成订单号，随回调回写；接口失败自动重试，最后交给管理员</td></tr>
+              <tr><td>—</td><td>抄送</td><td>采购部</td><td>结束时</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>退回后重新提交：直接回到退回的那个节点（和报销故意设得不一样，两种设置都能试到）。采购经理可以前加签技术专家。</p>
+
+        <h3>演示场景（也是自检要跑的）</h3>
+        <div class="tw">
+          <table>
+            <thead><tr><th>场景</th><th>怎么走</th><th>验证的规则</th></tr></thead>
+            <tbody>
+              <tr><td>小额报销</td><td>王强报 860 元差旅：李娜 →（部门负责人还是李娜，自动通过）→ 会计 → 出纳</td><td>依次审批、相邻去重、办理节点</td></tr>
+              <tr><td>三路会审</td><td>报销填了项目、承担部门是研发部、含招待费：项目经理、研发部负责人、行政部负责人同时审，审完汇合</td><td>包容分支、取人接口</td></tr>
+              <tr><td>大额招待</td><td>一张招待费 2600 元：多走分管领导、总经理</td><td>明细条件（任一张）、“或”条件</td></tr>
+              <tr><td>补票据</td><td>会计要求补充，王强在示例系统里补上票据重新提交，回到会计继续</td><td>要求补充、回调、重新提交</td></tr>
+              <tr><td>核定金额</td><td>会计把 1334.50 核成 1200.00：多走财务经理复核，核定金额随回调回到单据</td><td>审批人填写的字段、条件</td></tr>
+              <tr><td>退回从头走</td><td>部门负责人退回，王强修改后重新提交，从直属上级重新开始</td><td>退回设置</td></tr>
+              <tr><td>撤回</td><td>第一个人处理前撤回成功；处理后再撤回被拒绝</td><td>撤回限制</td></tr>
+              <tr><td>委托</td><td>周总出差委托刘副总，大额报销到总经理时给刘副总，记录“刘副总（代周总）”</td><td>委托代理</td></tr>
+              <tr><td>一人多部门</td><td>李娜以研发部发起报销，按研发部找上级和负责人</td><td>发起部门</td></tr>
+              <tr><td>预算不足</td><td>预算内采购超预算，提交时被挡住并提示还差多少</td><td>校验钩子</td></tr>
+              <tr><td>单一来源</td><td>吴芳、孙磊同意（3 票）就通过；换成三个人反对，已经不可能到 60%，按拒绝处理</td><td>票签、权重</td></tr>
+              <tr><td>大额采购</td><td>12 万元：合同评审子流程（法务、财务并行）→ 采购经理 → 分管领导 → 总经理、财务总监会签 → 生成采购订单</td><td>子流程、并行、会签、自动节点</td></tr>
+              <tr><td>退回到节点</td><td>采购经理退回申请人，改完重新提交，直接回到采购经理</td><td>退回设置</td></tr>
+              <tr><td>接口失败</td><td>生成订单接口故意失败两次，第三次成功</td><td>自动重试</td></tr>
+              <tr><td>待办和内嵌审批</td><td>切到李娜，角标显示 1 件，在示例系统自己画的审批窗口里同意；再用内嵌的审批中心页面审一件；角标归零，单据状态刷新</td><td>待办集成</td></tr>
+              <tr><td>没有后端</td><td>关掉本机服务，回调收不到，单据状态靠查询同步；再打开本机服务，补发的回调去重</td><td>查询同步、回调重试和去重</td></tr>
+              <tr><td>打印</td><td>报销单打印审批单 PDF，含签名和票据页</td><td>打印</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 15 -->
+      <section id="plan">
+        <h2><span class="n">15</span>计划与待确认</h2>
+        <p class="lead">照标签服务的做法分六步走，每步结束有一个评审点。先出设计器原型看画的体验，再写引擎和规则，然后接业务系统，最后做两个试点。具体时间等下面的问题定下来再排。</p>
+        <figure>
+          <div class="fig">
+            <svg viewBox="0 0 760 340" role="img" aria-labelledby="plan-t">
+              <title id="plan-t">开发计划：六个阶段，先看设计器，再逐条演示规则，然后接业务系统</title>
+              <text x="24" y="32" class="d-title">六个阶段：先看设计器，再逐条演示规则，然后接业务系统</text>
+              <text x="24" y="52" class="d-note">每个阶段结束评审一次；时间待定</text>
+
+              <rect x="24" y="72" width="224" height="116" rx="8" class="d-accent"/>
+              <text x="40" y="98" class="d-name">M1 设计器原型</text>
+              <text x="40" y="116" class="d-note">评审：画流程、配审批数据的体验</text>
+              <text x="40" y="140" class="d-sub">钉钉式和自由画布</text>
+              <text x="40" y="158" class="d-sub">审批数据和详情排版</text>
+              <text x="40" y="176" class="d-sub">流程 JSON 定稿</text>
+
+              <rect x="268" y="72" width="224" height="116" rx="8" class="d-box"/>
+              <text x="284" y="98" class="d-name">M2 引擎与审批规则</text>
+              <text x="284" y="116" class="d-note">评审：规则逐条演示、引擎测试全过</text>
+              <text x="284" y="140" class="d-sub">节点、网关、子流程、自动节点</text>
+              <text x="284" y="158" class="d-sub">找审批人、多人审批、自动处理</text>
+              <text x="284" y="176" class="d-sub">退回、加签、委托等全部操作</text>
+
+              <rect x="512" y="72" width="224" height="116" rx="8" class="d-box"/>
+              <text x="528" y="98" class="d-name">M3 审批中心</text>
+              <text x="528" y="116" class="d-note">评审：电脑、手机上内部先用起来</text>
+              <text x="528" y="140" class="d-sub">待办、详情、批量审批、打印</text>
+              <text x="528" y="158" class="d-sub">附件（本地、MinIO）、手写签名</text>
+              <text x="528" y="176" class="d-sub">组织架构、账号、邮件提醒</text>
+
+              <rect x="24" y="208" width="224" height="116" rx="8" class="d-box"/>
+              <text x="40" y="234" class="d-name">M4 业务对接</text>
+              <text x="40" y="252" class="d-note">评审：示例系统把对接跑通</text>
+              <text x="40" y="276" class="d-sub">开放接口、.NET SDK</text>
+              <text x="40" y="294" class="d-sub">示例业务系统、待办、各种钩子</text>
+              <text x="40" y="312" class="d-sub">接入向导、流程模板库</text>
+
+              <rect x="268" y="208" width="224" height="116" rx="8" class="d-box"/>
+              <text x="284" y="234" class="d-name">M5 统计与上线准备</text>
+              <text x="284" y="252" class="d-note">评审：数据和性能过关</text>
+              <text x="284" y="276" class="d-sub">效率统计报表</text>
+              <text x="284" y="294" class="d-sub">压测、备份恢复演练</text>
+              <text x="284" y="312" class="d-sub">部署说明、接口文档</text>
+
+              <rect x="512" y="208" width="224" height="116" rx="8" class="d-box"/>
+              <text x="528" y="234" class="d-name">M6 试点</text>
+              <text x="528" y="252" class="d-note">评审：试点上线</text>
+              <text x="528" y="276" class="d-sub">示例系统提交费用报销</text>
+              <text x="528" y="294" class="d-sub">示例系统提交采购申请</text>
+              <text x="528" y="312" class="d-sub">按反馈调整</text>
+            </svg>
+          </div>
+          <figcaption>设计器先过老板这一关，再投入引擎；M2 结束时按第 4 节的需求清单逐条演示；接口要先和一个真实业务系统调通。</figcaption>
+        </figure>
+
+        <h3>两个试点</h3>
+        <p>费用报销、采购申请都从示例业务系统提交，规则和演示场景见第 14 节。</p>
+
+        <h3>待确认问题</h3>
+        <p>目前没有待回答的问题，下面是已经定下来的事项。</p>
+        <ul class="qs">
+          <li><span class="tag done">已定</span><span>范围：自由画布（BPMN）、审批数据与详情展示、委托和票签、统计报表进初版；中国式审批按第 4 节清单做全；对接提供接口加回调、待办和审批界面（跳转、内嵌或自己画）、流程里调业务三种方式。超时自动处理和多租户不做（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>最终目标是公司产品平台，审批流服务是其中一个微服务；引擎要做扎实、可扩展；ESB 统一出口等以后做，设计上预留（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>审批服务不产生业务单据、不提供发起：发起、撤回、重新提交都由业务系统调接口；审批服务只做流程绘制、审批流转、节点和审批记录（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>业务系统都是 .NET：Web 是 Vue + .NET 10，另有 WinForms。只出 .NET SDK（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>组织架构审批服务自己维护，业务系统绑定关联、接口推送变更；以后由主数据系统统一管理（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>账号先独立；公司以后做统一登录，审批服务和标签服务一起接进产品平台（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>消息先做邮件；企业微信、钉钉预留。要给业务系统待办数量、跳转和内嵌审批的接口（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>内网服务器，能访问外网（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>手机端：初版只做手机网页适配；App（原生或 H5 套壳）以后再讨论，现在把接口、登录、推送、设备能力预留好（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>审批库和业务库分开，审批服务独立部署，不直连业务库，只通过接口交互；去掉数据库连接器（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>电子签章暂不考虑（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>BPMN 不支持从其他工具导入，只导入本系统导出的文件（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>数据库支持多种，MVP 用 SQLite，需要时切换 SQL Server、PostgreSQL（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>要打印审批单，默认样式按第 7 节（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>试点做两个：多级费用报销（带票据）和采购申请，都从示例业务系统提交，演示对接全流程和业务系统要改多少；规则由我拟定、故意做复杂（第 14 节）；附件存储做本地文件和 MinIO / S3 两种（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>技术栈和代码结构沿用标签服务（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>只提供数据接口（开放接口和 .NET SDK），不提供 Vue 组件、WinForms 控件、ASP.NET Core 扩展，以后需要再讨论（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>示例业务系统的界面用 WinUI 3，秀一下界面；对接代码单独一个类库，不依赖界面、.NET Framework 4.8 也能编译，业务系统照着抄（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>公司没有私有的 NuGet、npm 源：SDK 和组件先不发布，业务系统按接口对接；示例业务系统直接引用 SDK 项目（2026-10-13）。</span></li>
+        </ul>
+      </section>
+
+      <footer>审批流服务设计书 · V0.7 · 2026-10-13 · 只提供数据接口和 .NET SDK，不提供界面组件；示例业务系统用 WinUI 3 自己画审批界面，对接代码单独一个类库（V0.6 加入示例业务系统和两个试点流程的规则，SDK 先不发布；V0.5 明确审批服务不产生业务单据、发起都来自业务系统，表单设计器改为审批数据与详情展示，加入引擎内核、可扩展与平台化；V0.4 按待确认问题的答复更新：组织架构和账号、待办集成、.NET 对接工具包、附件存储、打印样式、两个试点，第二个试点定为业务系统提交的采购申请，手机端现在做网页、为 App 预留；审批库和业务库分开、去掉数据库连接器，电子签章暂不考虑，BPMN 只导入本系统导出的；V0.3 补齐中国式审批规则和业务系统对接；V0.2 加入自由画布等）</footer>
+    </main>
+  </div>
+</div>
+</body>
+</html>

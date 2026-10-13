@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 基础设施层：EF Core 和三种数据库、仓储实现、附件存储、消息发送、出站适配层、后台任务。以后的包都加在这一层（AGENTS.md R2）。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApprovalService.Contracts\ApprovalService.Contracts.csproj" />
+    <ProjectReference Include="..\ApprovalService.Engine\ApprovalService.Engine.csproj" />
+    <ProjectReference Include="..\ApprovalService.Domain\ApprovalService.Domain.csproj" />
+    <ProjectReference Include="..\ApprovalService.Application\ApprovalService.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+  </ItemGroup>
+
+</Project>

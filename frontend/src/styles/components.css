@@ -1,0 +1,137 @@
+/* 公共图标和状态组件只消费全局设计变量，不绑定审批业务。 */
+.ui-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: currentColor;
+  vertical-align: middle;
+}
+
+.ui-empty-state {
+  display: flex;
+  min-height: 280px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.ui-empty-state__icon {
+  display: grid;
+  width: 60px;
+  height: 60px;
+  margin-bottom: 20px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--sidebar);
+  color: var(--blue);
+}
+
+.ui-empty-state__icon .ui-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.ui-empty-state__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.ui-empty-state__description {
+  max-width: 480px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.ui-empty-state__action {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+/* 原生 dialog 提供焦点约束和模态层，内部只负责排版。 */
+.ui-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(85dvh, 860px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 20px 70px #071f4630;
+}
+
+.ui-dialog::backdrop {
+  background: #071f4666;
+}
+
+.ui-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 17px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ui-dialog__header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ui-dialog__body {
+  padding: 22px;
+  overflow-wrap: anywhere;
+}
+
+.ui-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: var(--sidebar);
+}
+
+.ui-error-boundary {
+  margin: 20px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.ui-error-boundary .ui-empty-state__icon {
+  color: var(--danger);
+}
+
+.ui-error-boundary__content {
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .ui-empty-state {
+    min-height: 250px;
+    padding: 32px 18px;
+  }
+
+  .ui-dialog__header,
+  .ui-dialog__body,
+  .ui-dialog__footer {
+    padding: 16px;
+  }
+}

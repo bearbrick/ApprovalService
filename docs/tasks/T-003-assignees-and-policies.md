@@ -19,7 +19,7 @@
 - 自动处理：找不到审批人、审批人就是发起人、同一人多次出现（相邻 / 全流程 / 每次）、审批人离职或停用
 - `backend/tests/ApprovalService.Backend.Checks/AssigneeChecks.cs`、`ApprovalPolicyChecks.cs`（新建）
 - `backend/src/ApprovalService.Engine/Execution/EngineModels.cs`、`EngineWork.cs`、`EngineRuntime.cs`、`EngineStateCopy.cs`、`EngineNodeInputCopy.cs`：T-002 运行时只接受单人，需接入多人任务、逐票命令、节点到达时取人及持久化的处理记录；仅修改与这些规则直接相关的代码
-- `backend/src/ApprovalService.Contracts/Flows/FlowNodeSettings.cs`、`FlowApprovalKinds.cs`（新建）、`frontend/src/model/flow.ts`：补足设计书已定的角色本部门限定、连续上级截止职级、无处理人转指定人员配置，并统一来源/方式/异常行为编码
+- `backend/src/ApprovalService.Contracts/Flows/FlowNodeSettings.cs`、`FlowApprovalKinds.cs`（新建）、`frontend/src/model/flow.ts`、`flow-approval-kinds.ts`（新建）：补足设计书已定的角色本部门限定、连续上级截止职级、无处理人转指定人员配置，并统一来源/方式/异常行为编码；常量另放新文件以保持 `flow.ts` 少于 500 行
 - `backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：核对新增流程编码的跨端镜像
 - `docs/contracts.md`、`docs/design/approval-service-design.html`：同步兼容新增的流程配置字段和编码
 

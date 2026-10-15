@@ -1,7 +1,7 @@
 # T-010 审批数据定义、表达式与详情排版
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-15
 里程碑：M1
 依赖：T-001
 设计书：§form
@@ -18,12 +18,17 @@
 - 后端发起时的数据校验（必传、类型、明细表），错误带字段路径（`data.items[0].qty`）
 - 审批编号规则（前缀、日期、流水号）
 - `frontend/src/designer/data/`（新建）：字段定义、排版设计（分组、几列、明细列宽、摘要字段）
+- `backend/tests/ApprovalService.Backend.Checks/ApprovalDataChecks.cs`、`frontend/tests/data-checks.ts`：表达式、数据校验、排版场景检查
+- `backend/README.md`、`frontend/README.md`：表达式与排版使用说明
 
 ## 共享文件
 
 改这些文件前先在交接记录里写明改什么；改动尽量小，单独成一个提交：
 
 - `docs/contracts.md`
+- `backend/tests/ApprovalService.Backend.Checks/Program.cs`：登记审批数据检查
+- `frontend/tests/checks.ts`：登记纯数据模型检查
+- `docs/architecture.md`：说明表达式与排版模块落点
 
 ## 验收标准
 
@@ -40,4 +45,5 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · T-001 已独立验收，认领审批数据与表达式。会修改共享文件 `docs/contracts.md`、`docs/architecture.md`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`frontend/tests/checks.ts`，分别登记表达式语义、模块落点与检查入口；已预先登记。前端排版组件和后端表达式解析按不同目录并行，设计器完整工作台属于 T-008。从 `main` 建任务分支并纳入已验收的 T-001，未合并主分支或推送。
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

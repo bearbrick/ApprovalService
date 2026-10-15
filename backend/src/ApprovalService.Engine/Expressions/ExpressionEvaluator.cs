@@ -202,11 +202,18 @@ internal static class ExpressionEvaluator
             return ConvertValue(direct);
         }
 
-        // 明细表的 key 和子字段 key 都可能含点号；选择最长的顶层 key 前缀。
+        // 明细表的 key 和子字段 key 都可能含点号；只在数组型顶层 key 中选最长前缀。
         JsonProperty? table = null;
+        var hasPrefix = false;
         foreach (var property in data.EnumerateObject())
         {
-            if (path.StartsWith(property.Name + ".", StringComparison.Ordinal)
+            if (!path.StartsWith(property.Name + ".", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            hasPrefix = true;
+            if (property.Value.ValueKind == JsonValueKind.Array
                 && (!table.HasValue || property.Name.Length > table.Value.Name.Length))
             {
                 table = property;
@@ -215,12 +222,8 @@ internal static class ExpressionEvaluator
 
         if (!table.HasValue)
         {
-            throw new ApprovalExpressionException($"缺少审批字段 {path}。");
-        }
-
-        if (table.Value.Value.ValueKind != JsonValueKind.Array)
-        {
-            throw new ApprovalExpressionException($"审批字段 {path} 不是明细列。");
+            throw new ApprovalExpressionException(hasPrefix
+                ? $"审批字段 {path} 不是明细列。" : $"缺少审批字段 {path}。");
         }
 
         var childKey = path[(table.Value.Name.Length + 1)..];

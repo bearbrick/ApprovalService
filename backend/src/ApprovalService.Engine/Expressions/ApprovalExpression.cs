@@ -323,7 +323,31 @@ internal sealed class ExpressionParser
             while (true);
         }
 
-        return new ExpressionNode { Kind = "call", Name = word.ToUpperInvariant(), Children = arguments };
+        var function = word.ToUpperInvariant();
+        ValidateFunctionArity(function, arguments.Count);
+        return new ExpressionNode { Kind = "call", Name = function, Children = arguments };
+    }
+
+    /// <summary>
+    /// 在发布校验只解析表达式时也检查函数参数数量。
+    /// </summary>
+    /// <param name="function">白名单中的函数名。</param>
+    /// <param name="count">实参个数。</param>
+    private static void ValidateFunctionArity(string function, int count)
+    {
+        var valid = function switch
+        {
+            "IF" => count == 3,
+            "DATEDIFF" => count == 2,
+            "RMBUPPER" => count == 1,
+            "ANY" => count is 1 or 2,
+            "SUM" or "AVG" or "MAX" or "MIN" => count >= 1,
+            _ => false,
+        };
+        if (!valid)
+        {
+            throw new ApprovalExpressionException($"{function} 的参数数量不正确。");
+        }
     }
 
     /// <summary>

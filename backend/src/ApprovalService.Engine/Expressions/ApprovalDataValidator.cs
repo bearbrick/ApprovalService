@@ -109,9 +109,41 @@ public static class ApprovalDataValidator
             return;
         }
 
+        if (field.Type == FlowFieldTypes.Attachment && value.ValueKind == JsonValueKind.Array)
+        {
+            ValidateAttachments(field, value, path, issues);
+            return;
+        }
+
         if (!IsValidValue(field.Type, value) || field.Required && IsEmptyValue(field.Type, value))
         {
             issues.Add(new ApprovalDataIssue { Field = path, Message = $"{field.Name}的类型或格式不正确。" });
+        }
+    }
+
+    /// <summary>
+    /// 逐项检查附件数组中的文件 ID，返回带下标的错误路径。
+    /// </summary>
+    /// <param name="field">附件字段定义。</param>
+    /// <param name="value">附件数组。</param>
+    /// <param name="path">字段路径。</param>
+    /// <param name="issues">错误集合。</param>
+    private static void ValidateAttachments(FlowFieldDefinition field, JsonElement value, string path, List<ApprovalDataIssue> issues)
+    {
+        if (field.Required && value.GetArrayLength() == 0)
+        {
+            issues.Add(new ApprovalDataIssue { Field = path, Message = $"{field.Name}至少需要一个文件。" });
+        }
+
+        var index = 0;
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(item.GetString()))
+            {
+                issues.Add(new ApprovalDataIssue { Field = $"{path}[{index}]", Message = "附件文件 ID 不能为空。" });
+            }
+
+            index++;
         }
     }
 
@@ -173,8 +205,9 @@ public static class ApprovalDataValidator
             FlowFieldTypes.Number or FlowFieldTypes.Money => value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out _),
             FlowFieldTypes.Date => value.ValueKind == JsonValueKind.String
                 && DateOnly.TryParseExact(value.GetString(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _),
-            FlowFieldTypes.Attachment => value.ValueKind == JsonValueKind.String
-                || value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String),
+            FlowFieldTypes.Attachment => value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString())
+                || value.ValueKind == JsonValueKind.Array && value.EnumerateArray().All(item => item.ValueKind == JsonValueKind.String
+                    && !string.IsNullOrWhiteSpace(item.GetString())),
             _ => false,
         };
     }

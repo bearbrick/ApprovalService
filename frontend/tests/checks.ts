@@ -10,6 +10,7 @@ import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/f
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
+import { runCanvasChecks } from './canvas-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
 
 /**
@@ -91,5 +92,6 @@ checkRoutes()
 checkFlowModel()
 await runHttpChecks(check)
 await runUiChecks(check)
+await runCanvasChecks(check)
 checkSource()
 console.log(`前端检查全部通过：${passed} 项`)

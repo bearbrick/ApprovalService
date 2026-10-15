@@ -21,6 +21,8 @@
 
 正式自由画布流程定义的 TypeScript 副本位于 `src/model/flow.ts`，供后续设计器使用；字段与后端 Contracts 保持一致。当前页面尚未接入流程设计、发布或审批业务接口。
 
+自由画布组件位于 `src/designer/canvas/FlowCanvasEditor.vue`。工作台传入 `v-model: FlowDefinition`，可用 `issues` 标出服务端发布问题，监听 `select` 获取选中节点或连线，并通过 `inspector` 插槽接管属性面板；`check()`、`focusElement(id)` 等公开方法可用于检查列表定位。组件内可以拖节点、连任意有向线、编辑分支条件、撤销重做、缩放平移和网格吸附。BPMN 导出包含标准图形与本服务完整扩展，导入只接受版本兼容且图形、摘要都一致的本服务文件。前端静态检查仅辅助编辑，最终发布仍由后端再次校验；草稿持久化与完整审批属性由工作台负责。
+
 ## 命令
 
 ```powershell
@@ -35,6 +37,7 @@ npm run build     # vue-tsc 类型检查 + 打包
 | 目录 | 内容 |
 | --- | --- |
 | `src/model/` | 纯逻辑模块，Node 下能直接运行，在 `tests/checks.ts` 里检查 |
+| `src/designer/canvas/` | SVG 自由画布、图操作、发布静态校验镜像和 BPMN 文件处理 |
 | `src/api/` | 调后端接口 |
 | `src/pages/` | 页面 |
 | `src/components/layout/` | 桌面/手机外壳，不承载业务数据 |

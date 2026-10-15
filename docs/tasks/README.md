@@ -24,7 +24,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-005](T-005-persistence.md) | 持久化：数据库、仓储、待发队列 | 后端 | M2 | T-002 | Domain、Infrastructure/Persistence、Infrastructure/Jobs |
 | [T-006](T-006-open-api.md) | 开放接口、接入应用、回调和钩子 | 后端 + 调用端副本 | M4 | T-004、T-005 | Api/Endpoints/OpenApi、Application/Integration、Infrastructure/Integration |
 | [T-007](T-007-organization-and-identity.md) | 组织架构、账号与嵌入令牌 | 后端 | M3 | T-005 | Organization、Identity 模块 |
-| [T-008](T-008-tree-designer.md) | 钉钉式流程设计器 | 前端 | M1 | T-001 | src/designer/tree、src/model |
+| [T-008](T-008-tree-designer.md) | 自由画布工作台与审批节点配置 | 前端 | M1 | T-001 | src/designer/workbench、src/model |
 | [T-009](T-009-canvas-designer.md) | 自由画布设计器（BPMN 子集） | 前端 | M1 | T-001 | src/designer/canvas |
 | [T-010](T-010-approval-data-and-layout.md) | 审批数据定义、表达式与详情排版 | 前端 + 后端 | M1 | T-001 | Engine/Expressions；frontend：src/designer/data |
 | [T-011](T-011-approval-center.md) | 审批中心（电脑网页） | 后端 + 前端 | M3 | T-004、T-005、T-007 | Api/Endpoints/Center；frontend：src/pages/center |
@@ -40,6 +40,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-021](T-021-deploy-and-load-test.md) | 部署、监控、备份与压测 | 后端 | M5 | T-005、T-006 | backend/deploy、backend/tests/load |
 | [T-022](T-022-templates-test-mode-wizard.md) | 流程模板库、测试模式与接入向导 | 后端 + 前端 | M4 | T-006、T-008、T-010 | Flows、Integration 模块；frontend：src/pages/admin |
 | [T-023](T-023-pilot.md) | 试点：费用报销和采购申请 | 全部 | M6 | T-006～T-022 | 全部 |
+| [T-024](T-024-high-fidelity-prototypes.md) | 全功能高保真交互原型 | 原型文档 | M1 | T-000 | docs/prototypes |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

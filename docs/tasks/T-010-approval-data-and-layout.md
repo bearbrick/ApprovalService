@@ -16,7 +16,7 @@
 
 - `backend/src/ApprovalService.Engine/Expressions/`（新建）：自己写的表达式解析（四则运算、比较、且或、SUM、AVG、MAX、MIN、IF、ANY、日期差、人民币大写），不执行任意代码
 - 后端发起时的数据校验（必传、类型、明细表），错误带字段路径（`data.items[0].qty`）
-- 审批编号规则（前缀、日期、流水号）
+- `backend/src/ApprovalService.Domain/Runtime/ApprovalSerialNumber.cs`：审批编号规则（前缀、日期、流水号）；序号由调用方分配
 - `frontend/src/designer/data/`（新建）：字段定义、排版设计（分组、几列、明细列宽、摘要字段）
 - `backend/tests/ApprovalService.Backend.Checks/ApprovalDataChecks.cs`、`frontend/tests/data-checks.ts`：表达式、数据校验、排版场景检查
 - `backend/README.md`、`frontend/README.md`：表达式与排版使用说明

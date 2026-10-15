@@ -1,5 +1,7 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Engine.Abstractions;
+using ApprovalService.Engine.Assignees;
+using ApprovalService.Engine.Policies;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -47,6 +49,10 @@ public static class EngineInstanceStatuses
 /// </summary>
 public static class EngineTaskStatuses
 {
+    /// <summary>
+    /// 依次审批中等待前一人处理。
+    /// </summary>
+    public const string Queued = "queued";
     /// <summary>
     /// 待处理。
     /// </summary>
@@ -185,6 +191,29 @@ public sealed class EngineContext
     /// 人工节点的已解析单人处理人；多人规则在后续任务接入。
     /// </summary>
     public IReadOnlyDictionary<string, string> Assignees { get; set; } = new Dictionary<string, string>();
+    /// <summary>
+    /// 当前命令到达节点时的组织、业务数据和外部取人结果快照。
+    /// </summary>
+    public AssigneeSnapshot? AssigneeSnapshot
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 发起时预览的节点人员，用于记录运行时取人变化。
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> PreviewAssignees
+    {
+        get; set;
+    } =
+        new Dictionary<string, IReadOnlyList<string>>();
+    /// <summary>
+    /// 本次额外注册的纯审批人来源。
+    /// </summary>
+    public IReadOnlyList<IAssigneeResolver> AssigneeResolvers { get; set; } = [];
+    /// <summary>
+    /// 本次额外注册的纯多人策略。
+    /// </summary>
+    public IReadOnlyList<IApprovalPolicy> ApprovalPolicies { get; set; } = [];
     /// <summary>
     /// 当前流程在子流程链中的层级，顶层为零。
     /// </summary>
@@ -327,6 +356,17 @@ public sealed class EngineState
     /// 已处理的请求 ID；应用层应与状态同事务持久化。
     /// </summary>
     public HashSet<string> ProcessedRequestIds { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>
+    /// 全流程已同意的人员，用于只审一次设置。
+    /// </summary>
+    public HashSet<string> ApprovedAssigneeIds { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>
+    /// 最近一名已同意的审批人，用于相邻只审一次设置。
+    /// </summary>
+    public string? LastApprovedAssigneeId
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -377,6 +417,14 @@ public sealed class EngineEvent
     {
         get; set;
     }
+    /// <summary>
+    /// 预览时的人员，仅人员变化事件填入。
+    /// </summary>
+    public List<string> PreviewAssigneeIds { get; set; } = [];
+    /// <summary>
+    /// 到节点时重新解析的人员，仅人员变化事件填入。
+    /// </summary>
+    public List<string> ResolvedAssigneeIds { get; set; } = [];
 }
 
 /// <summary>

@@ -1,7 +1,9 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Abstractions;
+using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Execution.Behaviors;
+using ApprovalService.Engine.Policies;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -161,7 +163,71 @@ internal sealed class EngineWork
     }
 
     /// <summary>
-    /// 建立单人任务；处理人查询结果由调用方提前传入。
+    /// 记录一人的投票并应用节点多人策略；节点未决时继续等待其余人员。
+    /// </summary>
+    /// <param name="task">本次处理的任务。</param>
+    /// <param name="token">对应令牌。</param>
+    /// <param name="node">当前人工节点。</param>
+    /// <param name="commandKind">同意、办理完成、已阅或拒绝。</param>
+    public void CompleteTask(EngineTask task, EngineToken token, FlowExecutionNode node, string commandKind)
+    {
+        task.Status = commandKind == EngineCommandKinds.Reject ? EngineTaskStatuses.Rejected : EngineTaskStatuses.Approved;
+        if (task.Status == EngineTaskStatuses.Approved && node.Type == FlowNodeTypes.Approval)
+        {
+            state.ApprovedAssigneeIds.Add(task.AssigneeId);
+            state.LastApprovedAssigneeId = task.AssigneeId;
+        }
+
+        Emit("taskCompleted", node.Id, token.Id, task.Id);
+        var ballots = state.Tasks.Where(item => item.TokenId == token.Id)
+            .Select(item => new ApprovalBallot
+            {
+                TaskId = item.Id,
+                AssigneeId = item.AssigneeId,
+                Status = item.Status,
+            }).ToArray();
+        var decision = node.Type == FlowNodeTypes.Approval
+            ? ApprovalPolicyRegistry.Evaluate(node.Approval ?? new FlowApprovalSettings(), ballots, context.ApprovalPolicies)
+            : new ApprovalPolicyDecision { Outcome = commandKind == EngineCommandKinds.Reject ? "rejected" : "approved" };
+        if (decision.ActivateTaskId is not null)
+        {
+            var next = state.Tasks.Single(item => item.Id == decision.ActivateTaskId);
+            next.Status = EngineTaskStatuses.Pending;
+            Emit("taskActivated", node.Id, token.Id, next.Id);
+        }
+
+        if (decision.Outcome == "pending")
+        {
+            return;
+        }
+
+        foreach (var pending in state.Tasks.Where(item => item.TokenId == token.Id &&
+            item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued))
+        {
+            pending.Status = EngineTaskStatuses.Cancelled;
+            Emit("taskCancelled", node.Id, token.Id, pending.Id);
+        }
+
+        if (decision.Outcome == "rejected")
+        {
+            foreach (var pending in state.Tasks.Where(item => item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued))
+            {
+                pending.Status = EngineTaskStatuses.Cancelled;
+            }
+
+            state.Tokens.Clear();
+            state.Status = EngineInstanceStatuses.Rejected;
+            Emit("instanceRejected", node.Id, token.Id, task.Id);
+            return;
+        }
+
+        token.WaitingFor = null;
+        MoveSingle(token);
+        Advance();
+    }
+
+    /// <summary>
+    /// 到达节点时按最新快照找人并建立单人或多人任务。
     /// </summary>
     /// <param name="token">任务令牌。</param>
     /// <param name="node">人工节点。</param>
@@ -173,23 +239,55 @@ internal sealed class EngineWork
             throw new EngineException(ErrorCodes.ValidationFailed, "任务节点缺少受支持的完成命令。");
         }
 
-        if (!context.Assignees.TryGetValue(node.Id, out var assignee) || string.IsNullOrWhiteSpace(assignee))
+        AssigneePlan plan;
+        if (context.AssigneeSnapshot is not null && node.Assignee is not null)
+        {
+            plan = AssigneeRuleEngine.Resolve(node, state, context.AssigneeSnapshot, context.AssigneeResolvers);
+        }
+        else if (context.Assignees.TryGetValue(node.Id, out var assignee) && !string.IsNullOrWhiteSpace(assignee))
+        {
+            // 兼容最小链路：调用方直接提供单人处理人。
+            plan = new AssigneePlan { AssigneeIds = [assignee] };
+        }
+        else
         {
             throw new EngineException(ErrorCodes.ValidationFailed, "人工节点缺少已解析的处理人。");
         }
 
-        var task = new EngineTask
+        if (context.PreviewAssignees.TryGetValue(node.Id, out var preview) &&
+            !preview.SequenceEqual(plan.AssigneeIds, StringComparer.Ordinal))
         {
-            Id = NewId("task"),
-            TokenId = token.Id,
-            NodeId = node.Id,
-            AssigneeId = assignee,
-            CompletionKind = decision.TaskCompletionKind,
-            CanReject = decision.CanReject,
-        };
-        state.Tasks.Add(task);
+            Emit("assigneesChangedSincePreview", node.Id, token.Id);
+            Events[^1].PreviewAssigneeIds = [.. preview];
+            Events[^1].ResolvedAssigneeIds = [.. plan.AssigneeIds];
+        }
+
+        if (plan.AutoApproveReason is not null)
+        {
+            Emit(plan.AutoApproveReason, node.Id, token.Id);
+            MoveSingle(token);
+            return;
+        }
+
+        var sequential = node.Type == FlowNodeTypes.Approval &&
+            (node.Approval?.Mode ?? FlowApprovalModes.Sequential) == FlowApprovalModes.Sequential;
+        for (var index = 0; index < plan.AssigneeIds.Count; index++)
+        {
+            var task = new EngineTask
+            {
+                Id = NewId("task"),
+                TokenId = token.Id,
+                NodeId = node.Id,
+                AssigneeId = plan.AssigneeIds[index],
+                Status = sequential && index > 0 ? EngineTaskStatuses.Queued : EngineTaskStatuses.Pending,
+                CompletionKind = decision.TaskCompletionKind,
+                CanReject = decision.CanReject,
+            };
+            state.Tasks.Add(task);
+            Emit("taskCreated", node.Id, token.Id, task.Id);
+        }
+
         token.WaitingFor = "task";
-        Emit("taskCreated", node.Id, token.Id, task.Id);
     }
 
     /// <summary>

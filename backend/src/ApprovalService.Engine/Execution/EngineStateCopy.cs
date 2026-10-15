@@ -16,6 +16,8 @@ internal static class EngineStateCopy
         Status = source.Status,
         StepCount = source.StepCount,
         ProcessedRequestIds = new HashSet<string>(source.ProcessedRequestIds, StringComparer.Ordinal),
+        ApprovedAssigneeIds = new HashSet<string>(source.ApprovedAssigneeIds, StringComparer.Ordinal),
+        LastApprovedAssigneeId = source.LastApprovedAssigneeId,
         Tasks = source.Tasks.Select(task => new EngineTask
         {
             Id = task.Id,

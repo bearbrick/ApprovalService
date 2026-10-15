@@ -42,6 +42,7 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · 用户额度接近上限，按主 agent 要求暂停。工作台基础已提交：正式示例模板与本地草稿、流程元信息与范围、全部节点属性和字段权限、连线条件构建、打印设置、撤销重做、发布预检及问题定位；App 已路由到 DesignerPage。正式前端设计器重复左栏已移除，顶栏入口保留。T-009 最终版 `151ce6a` 已由主 agent 合入本任务分支（合并提交 `fcb3372`），但 `DesignerPage.vue` 尚未把临时元素列表替换为 `FlowCanvasEditor` 的唯一 `inspector` 插槽；这是下一个必做步骤。表达式静态预检应统一复用 T-009 `validateCanvasDefinition`，删除 T-008 里重复的 `publication-check.ts` 逻辑，避免漂移。合入前本任务前端 `npm run check` 77 项、`npm run build` 通过；Chrome 已验证设计器全宽布局、人工节点面板、跨页签草稿状态，并发现和修复了示例字段缺少 `children` 的运行错误。画布合入后尚未重新验证或截图。任务仍“进行中”，尚未跑本任务最终全量 `verify.ps1`，也未合并主分支或推送。
 - 2026-10-15 · Codex · 用户此前要求移除与顶栏重复的导航；正式页面预览确认设计器仍有左栏。按主 agent 协调，范围增加桌面布局、布局样式及对应 UI 检查，只在设计器工作区取消左栏，其余页面保持原布局。
 - 2026-10-15 · Codex · 共享文件登记：`frontend/src/App.vue` 只把设计器路由交给 DesignerPage；`frontend/tests/checks.ts` 只登记工作台纯逻辑检查。`frontend/src/model/routes.ts` 无需改动。两个共享文件各自单独提交。
 

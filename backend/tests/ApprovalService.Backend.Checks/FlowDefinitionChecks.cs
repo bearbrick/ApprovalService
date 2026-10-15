@@ -142,6 +142,19 @@ internal static class FlowDefinitionChecks
         inclusiveSplit.GatewayPairId = null;
         check("包容分支缺少汇合配对时拒绝发布",
             FlowCompiler.Compile(inclusive).Issues.Any(issue => issue.ElementId == inclusiveSplit.Id));
+
+        var inclusiveCondition = Copy(flows.First(flow => flow.Canvas.Nodes.Any(node => node.Type == FlowNodeTypes.InclusiveGateway)));
+        var conditionSplit = inclusiveCondition.Canvas.Nodes.First(node => node.Type == FlowNodeTypes.InclusiveGateway && node.GatewayDirection == FlowGatewayDirections.Split);
+        var conditionEdge = inclusiveCondition.Canvas.Edges.First(edge => edge.SourceId == conditionSplit.Id && !edge.IsDefault);
+        conditionEdge.Condition = null;
+        check("包容分支的非兜底连线也必须设置条件",
+            FlowCompiler.Compile(inclusiveCondition).Issues.Any(issue => issue.ElementId == conditionEdge.Id));
+
+        var disconnected = Copy(baseline);
+        var disconnectedEdge = disconnected.Canvas.Edges.First();
+        disconnectedEdge.TargetId = "missing-target";
+        check("连线端点不存在时报告连线与失去路径的节点",
+            FlowCompiler.Compile(disconnected).Issues.Any(issue => issue.ElementId == disconnectedEdge.Id));
     }
 
     /// <summary>

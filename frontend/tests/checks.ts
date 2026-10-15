@@ -10,6 +10,7 @@ import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/f
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
+import { runWorkbenchChecks } from './workbench-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
 
@@ -91,6 +92,7 @@ function checkSource(): void {
 checkRoutes()
 checkFlowModel()
 runDataChecks(check)
+runWorkbenchChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
 checkSource()

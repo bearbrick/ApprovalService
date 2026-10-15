@@ -1,4 +1,5 @@
 using ApprovalService.Contracts.Flows;
+using ApprovalService.Engine.Abstractions;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -191,6 +192,11 @@ public sealed class EngineContext
     {
         get; set;
     }
+
+    /// <summary>
+    /// 本次执行额外注册的纯节点行为；相同类型最多一个，可覆盖内置行为。
+    /// </summary>
+    public IReadOnlyList<INodeBehavior> NodeBehaviors { get; set; } = [];
 }
 
 /// <summary>

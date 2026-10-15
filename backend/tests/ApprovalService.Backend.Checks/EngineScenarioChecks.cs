@@ -1,5 +1,6 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Engine.Abstractions;
 using ApprovalService.Engine.Execution;
 
 namespace ApprovalService.Backend.Checks;
@@ -18,6 +19,7 @@ internal static class EngineScenarioChecks
         CheckHumanNodes(check);
         CheckGateways(check);
         CheckExternalNodes(check);
+        CheckNodeExtensions(check);
         CheckLimits(check);
     }
 
@@ -53,6 +55,8 @@ internal static class EngineScenarioChecks
         var cancel = EngineRuntime.Execute(third.State, Command(EngineCommandKinds.Cancel, "c"), context);
         check("已通过审批单可撤销且撤销重复命令幂等", cancel.State.Status == EngineInstanceStatuses.Cancelled &&
             EngineRuntime.Execute(cancel.State, Command(EngineCommandKinds.Cancel, "c"), context).IsReplay);
+        check("审批中的单据不能直接撤销", ThrowsConflict(() =>
+            EngineRuntime.Execute(first.State, Command(EngineCommandKinds.Cancel, "premature-cancel"), context)));
 
         var ccGraph = Chain(FlowNodeTypes.Cc);
         ccGraph.Nodes.Single(item => item.Id == "n1").Approval = new FlowApprovalSettings { ReadReceiptRequired = true };
@@ -169,6 +173,28 @@ internal static class EngineScenarioChecks
         var detached = EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "detached"), Context(child));
         check("不等待型子流程发出创建事件后继续推进", detached.State.Status == EngineInstanceStatuses.Approved &&
             detached.Events.Any(item => item.Kind == "subprocessRequested"));
+    }
+
+    /// <summary>
+    /// 检查新节点只注册纯行为即可由现有运行时推进。
+    /// </summary>
+    /// <param name="check">记录检查结果。</param>
+    private static void CheckNodeExtensions(Action<string, bool> check)
+    {
+        var graph = Chain("auditMarker");
+        var context = Context(graph);
+        context.NodeBehaviors = [new MarkerNodeBehavior()];
+        var result = EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "marker"), context);
+        check("自定义节点行为无需改运行时即可推进并产生日志事件",
+            result.State.Status == EngineInstanceStatuses.Approved &&
+            result.Events.Any(item => item.Kind == "markerVisited"));
+
+        var duplicate = Context(graph);
+        duplicate.NodeBehaviors = [new MarkerNodeBehavior(), new MarkerNodeBehavior()];
+        check("重复注册同一节点行为会明确报错", ThrowsValidation(() =>
+            EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "duplicate-marker"), duplicate)));
+        check("未注册的节点类型会明确报错", ThrowsValidation(() =>
+            EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "missing-marker"), Context(graph))));
     }
 
     /// <summary>
@@ -396,5 +422,21 @@ internal static class EngineScenarioChecks
         {
             return error.Code == ErrorCodes.ValidationFailed;
         }
+    }
+
+    /// <summary>
+    /// 检查用的纯扩展节点，实际产品代码未登记此类型。
+    /// </summary>
+    private sealed class MarkerNodeBehavior : INodeBehavior
+    {
+        /// <inheritdoc />
+        public string NodeType => "auditMarker";
+
+        /// <inheritdoc />
+        public EngineNodeDecision Decide(EngineNodeInput input) => new()
+        {
+            Action = EngineNodeAction.Move,
+            EventKind = "markerVisited",
+        };
     }
 }

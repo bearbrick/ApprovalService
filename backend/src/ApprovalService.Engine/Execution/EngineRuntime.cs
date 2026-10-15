@@ -56,8 +56,13 @@ public static class EngineRuntime
         }
         else if (command.Kind is EngineCommandKinds.Withdraw or EngineCommandKinds.Terminate or EngineCommandKinds.Cancel)
         {
-            if (command.Kind == EngineCommandKinds.Cancel && state.Status == EngineInstanceStatuses.Approved)
+            if (command.Kind == EngineCommandKinds.Cancel)
             {
+                if (state.Status != EngineInstanceStatuses.Approved)
+                {
+                    throw new EngineException(ErrorCodes.Conflict, "只有已通过的审批单可以撤销。");
+                }
+
                 state.Status = EngineInstanceStatuses.Cancelled;
                 work.Emit("instanceCancelled");
                 state.ProcessedRequestIds.Add(command.RequestId);
@@ -68,8 +73,7 @@ public static class EngineRuntime
             state.Status = command.Kind switch
             {
                 EngineCommandKinds.Withdraw => EngineInstanceStatuses.Withdrawn,
-                EngineCommandKinds.Terminate => EngineInstanceStatuses.Terminated,
-                _ => EngineInstanceStatuses.Cancelled,
+                _ => EngineInstanceStatuses.Terminated,
             };
             foreach (var task in state.Tasks.Where(item => item.Status == EngineTaskStatuses.Pending))
             {

@@ -1,5 +1,7 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Engine.Abstractions;
+using ApprovalService.Engine.Execution.Behaviors;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -105,12 +107,25 @@ internal sealed class EngineWork
             var node = context.Graph.Nodes.SingleOrDefault(item => item.Id == token.NodeId)
                 ?? throw new EngineException(ErrorCodes.ValidationFailed, "令牌所指的节点不存在。");
             Emit("nodeEntered", node.Id, token.Id);
-            switch (node.Type)
+            var stateSnapshot = EngineStateCopy.Copy(state);
+            var decision = NodeBehaviorRegistry.Resolve(node.Type, context).Decide(new EngineNodeInput
             {
-                case FlowNodeTypes.Start:
+                Node = node,
+                Token = stateSnapshot.Tokens.Single(item => item.Id == token.Id),
+                State = stateSnapshot,
+                Context = context,
+            });
+            if (decision.EventKind is not null)
+            {
+                Emit(decision.EventKind, node.Id, token.Id, targetCode: decision.TargetCode);
+            }
+
+            switch (decision.Action)
+            {
+                case EngineNodeAction.Move:
                     MoveSingle(token);
                     break;
-                case FlowNodeTypes.End:
+                case EngineNodeAction.Complete:
                     state.Tokens.Remove(token);
                     if (state.Tokens.Count == 0)
                     {
@@ -119,62 +134,23 @@ internal sealed class EngineWork
                     }
 
                     break;
-                case FlowNodeTypes.Approval:
-                case FlowNodeTypes.Handling:
+                case EngineNodeAction.CreateTask:
                     CreateTask(token, node);
                     break;
-                case FlowNodeTypes.Cc:
-                    if (node.Approval?.ReadReceiptRequired == true)
-                    {
-                        CreateTask(token, node);
-                    }
-                    else
-                    {
-                        Emit("ccDelivered", node.Id, token.Id);
-                        MoveSingle(token);
-                    }
-
+                case EngineNodeAction.Split:
+                    Split(token, node, decision);
                     break;
-                case FlowNodeTypes.ExclusiveGateway:
-                case FlowNodeTypes.InclusiveGateway:
-                case FlowNodeTypes.ParallelGateway:
-                    if (node.GatewayDirection == FlowGatewayDirections.Split)
-                    {
-                        Split(token, node);
-                    }
-                    else if (node.Type == FlowNodeTypes.ExclusiveGateway)
-                    {
-                        MoveSingle(token);
-                    }
-                    else
-                    {
-                        Join(token, node);
-                    }
-
+                case EngineNodeAction.Join:
+                    Join(token, node);
                     break;
-                case FlowNodeTypes.Automatic:
+                case EngineNodeAction.WaitForAction:
                     token.WaitingFor = "action";
-                    Emit("actionPending", node.Id, token.Id, targetCode: node.Automation?.ActionCode);
                     break;
-                case FlowNodeTypes.Subprocess:
-                    if (context.SubprocessDepth >= EngineLimits.MaxSubprocessDepth)
-                    {
-                        throw new EngineException(ErrorCodes.ValidationFailed, "子流程嵌套超过上限。");
-                    }
-
-                    Emit("subprocessRequested", node.Id, token.Id, targetCode: node.Subprocess?.FlowCode);
-                    if (node.Subprocess?.WaitForCompletion != false)
-                    {
-                        token.WaitingFor = "subprocess";
-                    }
-                    else
-                    {
-                        MoveSingle(token);
-                    }
-
+                case EngineNodeAction.WaitForSubprocess:
+                    token.WaitingFor = "subprocess";
                     break;
                 default:
-                    throw new EngineException(ErrorCodes.ValidationFailed, "执行图含不支持的节点类型。");
+                    throw new EngineException(ErrorCodes.ValidationFailed, "节点行为返回了不支持的动作。");
             }
         }
     }
@@ -215,50 +191,23 @@ internal sealed class EngineWork
     }
 
     /// <summary>
-    /// 条件分叉选择满足的边；包容分叉仅在没有条件命中时使用兜底边。
+    /// 按节点行为选中的连线分叉，必要时记录本次分叉的汇合范围。
     /// </summary>
     /// <param name="token">抵达分叉的令牌。</param>
     /// <param name="node">分叉网关。</param>
-    private void Split(EngineToken token, FlowExecutionNode node)
+    /// <param name="decision">节点行为的选线决定。</param>
+    private void Split(EngineToken token, FlowExecutionNode node, EngineNodeDecision decision)
     {
-        var edges = context.Graph.Edges.Where(item => item.SourceId == node.Id)
-            .OrderBy(item => item.Priority).ThenBy(item => item.Id, StringComparer.Ordinal).ToList();
-        if (edges.Count < 2)
+        var outgoing = context.Graph.Edges.Where(item => item.SourceId == node.Id)
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        if (decision.SelectedEdgeIds.Count == 0 ||
+            decision.SelectedEdgeIds.Distinct(StringComparer.Ordinal).Count() != decision.SelectedEdgeIds.Count ||
+            decision.SelectedEdgeIds.Any(edgeId => !outgoing.ContainsKey(edgeId)))
         {
-            throw new EngineException(ErrorCodes.ValidationFailed, "分叉网关至少需要两条出线。");
+            throw new EngineException(ErrorCodes.ValidationFailed, "节点行为选择了无效的分叉连线。");
         }
 
-        List<FlowExecutionEdge> selected;
-        if (node.Type == FlowNodeTypes.ParallelGateway)
-        {
-            selected = edges;
-        }
-        else
-        {
-            // 缺少求值结果不能默认为不命中，否则会误走兜底审批路径。
-            foreach (var edge in edges.Where(item => !item.IsDefault))
-            {
-                if (!context.Conditions.ContainsKey(edge.Id))
-                {
-                    throw new EngineException(ErrorCodes.ValidationFailed, "条件网关缺少连线求值结果。");
-                }
-            }
-
-            selected = edges.Where(edge => !edge.IsDefault && context.Conditions[edge.Id]).ToList();
-            if (selected.Count == 0)
-            {
-                selected = edges.Where(edge => edge.IsDefault).ToList();
-            }
-            else if (node.Type == FlowNodeTypes.ExclusiveGateway)
-            {
-                selected = [selected[0]];
-            }
-        }
-
-        if (selected.Count == 0)
-        {
-            throw new EngineException(ErrorCodes.ValidationFailed, "条件网关没有可走的分支。");
-        }
+        var selected = decision.SelectedEdgeIds.Select(edgeId => outgoing[edgeId]).ToArray();
 
         state.Tokens.Remove(token);
         var forkId = NewId("fork");
@@ -277,12 +226,12 @@ internal sealed class EngineWork
                     ExpectedEdgeIds = [.. frame.ExpectedEdgeIds],
                 }).ToList(),
             };
-            if (node.Type != FlowNodeTypes.ExclusiveGateway)
+            if (decision.JoinPairId is not null)
             {
                 branch.Forks.Add(new EngineForkFrame
                 {
                     ForkId = forkId,
-                    PairId = node.GatewayPairId ?? string.Empty,
+                    PairId = decision.JoinPairId,
                     BranchEdgeId = edge.Id,
                     ExpectedEdgeIds = selected.Select(item => item.Id).ToList(),
                 });

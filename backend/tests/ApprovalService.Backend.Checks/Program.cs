@@ -39,6 +39,7 @@ internal static class Program
 
         ContractChecks.Run(repositoryRoot, Check);
         FlowDefinitionChecks.Run(backendRoot, Check);
+        ApprovalDataChecks.Run(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

@@ -12,6 +12,7 @@ import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runWorkbenchChecks } from './workbench-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
+import { runCanvasChecks } from './canvas-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
 
 /**
@@ -95,5 +96,6 @@ runDataChecks(check)
 runWorkbenchChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
+await runCanvasChecks(check)
 checkSource()
 console.log(`前端检查全部通过：${passed} 项`)

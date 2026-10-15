@@ -34,6 +34,10 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
+## 流程定义
+
+正式流程定义模型位于 `src/ApprovalService.Contracts/Flows/`，只接受统一自由画布的 JSON；`schemaVersion` 标识格式版本。`src/ApprovalService.Engine/Definitions/` 负责在发布前检查设计内容并生成不含画布坐标的执行图。可导入的 BPMN 文件必须由本服务导出且携带本服务扩展信息。开发样例放在 `samples/flows/`，完整字段约定见 [docs/contracts.md](../docs/contracts.md)。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：
@@ -43,3 +47,5 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Provider` | `Sqlite` | 数据库：Sqlite、SqlServer、PostgreSql（MVP 用 SQLite） |
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
+
+服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。当前 `/health/ready` 只确认服务已启动；数据库连通性检查随持久化功能接入。

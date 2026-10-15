@@ -278,6 +278,25 @@ async function checkDialog(dialog: Component, check: Check): Promise<void> {
 }
 
 /**
+ * 设计器在顶栏保留主导航，取消与其重复的左侧导航。
+ * @param shell 正式桌面外壳组件。
+ * @param check 主检查程序的断言回调。
+ */
+function checkDesignerShell(shell: Component, check: Check): void {
+  const route = { page: 'designer', hash: '#/designer/EXPENSE/design', section: 'flows', tab: 'design', resourceId: 'EXPENSE', title: '流程工作区', description: '', mobile: false }
+  const host = createHost()
+  const root = host.createNode('root')
+  const app = host.renderer.createApp({ render: () => Vue.h(shell, { route, serviceLabel: '已连接' }, { default: () => Vue.h('p', '设计器正文') }) })
+  try {
+    app.mount(root)
+    check('设计器保留顶栏入口并移除重复左侧导航', host.nodes.some(node => node.type === 'nav' && node.props['aria-label'] === '主导航') && !host.nodes.some(node => node.type === 'aside' && node.props['aria-label'] === '工作区导航'))
+    check('设计器正文取得无左栏的工作区布局标记', host.nodes.some(node => node.type === 'main' && String(node.props.class).includes('designer-workspace-shell')))
+  } finally {
+    app.unmount()
+  }
+}
+
+/**
  * 运行公共组件的恢复与对话框交互场景。
  * @param check 主检查程序的断言回调。
  * @returns 所有组件场景完成的通知。
@@ -287,4 +306,5 @@ export async function runUiChecks(check: Check): Promise<void> {
   const cache = new Map<string, Record<string, unknown>>()
   await checkBoundary(loadModule(new URL('UiErrorBoundary.vue', directory), cache).default as Component, check)
   await checkDialog(loadModule(new URL('UiDialog.vue', directory), cache).default as Component, check)
+  checkDesignerShell(loadModule(new URL('../layout/DesktopShell.vue', directory), cache).default as Component, check)
 }

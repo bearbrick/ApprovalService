@@ -16,6 +16,7 @@
 
 - `frontend/src/designer/workbench/`（新建）、`frontend/src/model/` 的纯逻辑（节点配置、条件编辑、发布检查反馈），`frontend/tests/checks.ts` 补检查
 - `frontend/src/pages/DesignerPage.vue`
+- `frontend/src/components/layout/DesktopShell.vue`、`frontend/src/styles/layout.css`、`frontend/tests/ui-checks.ts`（设计器工作区移除重复左栏，其余工作区保持现有导航）
 - 后端管理接口还没有时，先读写本地示例流程（`backend/samples/flows` 的副本放在前端测试数据里），接口好了再接
 
 ## 共享文件
@@ -41,6 +42,7 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · 用户此前要求移除与顶栏重复的导航；正式页面预览确认设计器仍有左栏。按主 agent 协调，范围增加桌面布局、布局样式及对应 UI 检查，只在设计器工作区取消左栏，其余页面保持原布局。
 - 2026-10-15 · Codex · 共享文件登记：`frontend/src/App.vue` 只把设计器路由交给 DesignerPage；`frontend/tests/checks.ts` 只登记工作台纯逻辑检查。`frontend/src/model/routes.ts` 无需改动。两个共享文件各自单独提交。
 
 - 2026-10-15 · Codex · T-001 和 T-010 已独立验收，从主分支建立任务分支并纳入两项成果；认领自由画布工作台和节点属性配置。T-009 图形底层正在独立分支实现，先只修改本任务范围内工作台与页面，待画布组件验收后接入。若需修改共享 `frontend/src/App.vue`、`frontend/src/model/routes.ts` 或 `frontend/tests/checks.ts`，先在此登记并单独提交。

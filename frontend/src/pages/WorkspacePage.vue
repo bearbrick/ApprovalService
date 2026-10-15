@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
-import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS, TAB_TITLES } from '../model/navigation.ts'
+import { ADMIN_TABS, DESIGNER_TABS, TAB_TITLES } from '../model/navigation.ts'
 import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import UiIcon from '../components/ui/UiIcon.vue'
 
@@ -27,7 +27,6 @@ defineEmits<{
  * 当前工作区的页签。
  */
 const tabs = computed(() => {
-  if (props.route.page === 'center' && !props.route.resourceId) return SECTION_ITEMS.center
   const keys = props.route.page === 'admin' ? ADMIN_TABS[props.route.section] ?? [] : props.route.page === 'designer' && props.route.resourceId ? DESIGNER_TABS : []
   const prefix = props.route.page === 'designer' ? `#/designer/${encodeURIComponent(props.route.resourceId)}` : `#/admin/${props.route.section}`
   return keys.map(key => ({ key, title: TAB_TITLES[key], hash: `${prefix}/${key}` }))

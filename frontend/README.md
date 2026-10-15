@@ -9,15 +9,15 @@
 | 地址 | 页面 |
 | --- | --- |
 | `#/` | 审批中心（给审批人用；不能发起审批、不能改业务数据） |
-| `#/designer` | 流程设计：钉钉式、自由画布，审批数据定义和详情排版 |
+| `#/designer` | 流程设计：统一自由画布，审批数据定义和详情排版 |
 | `#/admin` | 管理后台：流程、组织架构、接入应用、日志、统计、系统信息 |
 | `#/m` | 手机端审批中心：按手机单独设计的布局，底部四个标签 |
 
-公共框架已具备桌面顶栏/侧栏、手机底部导航、二级页签、空状态、对话框、错误恢复和服务连接状态。当前业务页面明确显示“功能尚未接入”，不读取审批业务数据，不提供假登录、假统计或原型样例。
+公共框架已具备桌面顶栏/侧栏、手机底部导航、二级页签、空状态、对话框、错误恢复和服务连接状态。顶栏切换工作区，侧栏展示当前工作区的子入口；审批中心不在正文重复列出侧栏入口。当前业务页面明确显示“功能尚未接入”，不读取审批业务数据，不提供假登录、假统计或原型样例。
 
 中心子页面使用 `#/center/done`、`#/center/cc`、`#/center/started`、`#/center/settings`；手机使用 `#/m/done`、`#/m/cc`、`#/m/me`。详情地址预留为 `#/center/approvals/{id}` 和 `#/m/approvals/{id}`，只解析参数，不查询审批单。
 
-管理入口见 `src/model/navigation.ts`，例如 `#/admin/org/roles`、`#/admin/outbound/queue`。设计器工作区预留 `#/designer/{flowCode}/{tab}`，支持 design、fields、layout、rules、print、versions。未知页面显示明确的返回入口，手机未知路径仍使用手机外壳。
+管理入口见 `src/model/navigation.ts`，例如 `#/admin/org/roles`、`#/admin/outbound/queue`。设计器工作区预留 `#/designer/{flowCode}/{tab}`，支持 design（自由画布）、fields、layout、rules、print、versions。未知页面显示明确的返回入口，手机未知路径仍使用手机外壳。
 
 ## 命令
 

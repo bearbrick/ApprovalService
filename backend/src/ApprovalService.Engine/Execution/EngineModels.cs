@@ -280,6 +280,19 @@ public sealed class EngineTask
     /// 任务状态。
     /// </summary>
     public string Status { get; set; } = EngineTaskStatuses.Pending;
+
+    /// <summary>
+    /// 此任务创建时固定的完成命令。
+    /// </summary>
+    public string CompletionKind { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 此任务是否允许拒绝。
+    /// </summary>
+    public bool CanReject
+    {
+        get; set;
+    }
 }
 
 /// <summary>

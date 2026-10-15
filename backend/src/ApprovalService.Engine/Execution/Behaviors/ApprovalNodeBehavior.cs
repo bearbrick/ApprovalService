@@ -12,5 +12,10 @@ internal sealed class ApprovalNodeBehavior : INodeBehavior
     public string NodeType => FlowNodeTypes.Approval;
 
     /// <inheritdoc />
-    public EngineNodeDecision Decide(EngineNodeInput input) => new() { Action = EngineNodeAction.CreateTask };
+    public EngineNodeDecision Decide(EngineNodeInput input) => new()
+    {
+        Action = EngineNodeAction.CreateTask,
+        TaskCompletionKind = EngineCommandKinds.Approve,
+        CanReject = true,
+    };
 }

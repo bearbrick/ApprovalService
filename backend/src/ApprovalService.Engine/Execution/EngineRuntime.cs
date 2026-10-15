@@ -92,14 +92,7 @@ public static class EngineRuntime
             var token = state.Tokens.SingleOrDefault(item => item.Id == task.TokenId && item.WaitingFor == "task")
                 ?? throw new EngineException(ErrorCodes.Conflict, "任务的执行令牌已失效。");
             var node = context.Graph.Nodes.Single(item => item.Id == task.NodeId);
-            var expected = node.Type switch
-            {
-                FlowNodeTypes.Approval => EngineCommandKinds.Approve,
-                FlowNodeTypes.Handling => EngineCommandKinds.Handle,
-                FlowNodeTypes.Cc => EngineCommandKinds.Acknowledge,
-                _ => string.Empty,
-            };
-            if (command.Kind != expected && !(node.Type == FlowNodeTypes.Approval && command.Kind == EngineCommandKinds.Reject))
+            if (command.Kind != task.CompletionKind && !(task.CanReject && command.Kind == EngineCommandKinds.Reject))
             {
                 throw new EngineException(ErrorCodes.Conflict, "操作与任务节点类型不匹配。");
             }

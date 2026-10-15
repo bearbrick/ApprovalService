@@ -188,13 +188,33 @@ internal static class EngineScenarioChecks
         check("自定义节点行为无需改运行时即可推进并产生日志事件",
             result.State.Status == EngineInstanceStatuses.Approved &&
             result.Events.Any(item => item.Kind == "markerVisited"));
-
         var duplicate = Context(graph);
         duplicate.NodeBehaviors = [new MarkerNodeBehavior(), new MarkerNodeBehavior()];
         check("重复注册同一节点行为会明确报错", ThrowsValidation(() =>
             EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "duplicate-marker"), duplicate)));
         check("未注册的节点类型会明确报错", ThrowsValidation(() =>
             EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "missing-marker"), Context(graph))));
+        var isolatedGraph = Chain("auditMarker");
+        var isolatedContext = Context(isolatedGraph);
+        isolatedContext.Conditions = new Dictionary<string, bool> { ["safe"] = true };
+        isolatedContext.Assignees = new Dictionary<string, string> { ["n1"] = "original" };
+        isolatedContext.NodeBehaviors = [new MutatingMarkerBehavior()];
+        var isolated = EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "mutating-marker"), isolatedContext);
+        check("扩展行为篡改输入不会污染真实执行图、上下文和令牌", isolated.State.Status == EngineInstanceStatuses.Approved &&
+            isolatedGraph.Nodes.Single(item => item.Id == "n1").Type == "auditMarker" &&
+            isolatedGraph.Edges.Single(item => item.SourceId == "n1").TargetId == "end" &&
+            isolatedContext.Conditions["safe"] && isolatedContext.Assignees["n1"] == "original");
+        var taskGraph = Chain("auditTask");
+        var taskContext = Context(taskGraph);
+        taskContext.Assignees = new Dictionary<string, string> { ["n1"] = "reviewer" };
+        taskContext.NodeBehaviors = [new CustomTaskBehavior()];
+        var taskStart = EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "custom-task"), taskContext);
+        check("扩展人工节点能创建指定完成命令的任务", taskStart.State.Tasks.Single().CompletionKind == EngineCommandKinds.Handle);
+        check("扩展任务未声明拒绝时不能拒绝", ThrowsConflict(() => EngineRuntime.Execute(taskStart.State,
+            Command(EngineCommandKinds.Reject, "custom-reject", taskStart.State.Tasks[0].Id), taskContext)));
+        var taskDone = EngineRuntime.Execute(taskStart.State,
+            Command(EngineCommandKinds.Handle, "custom-handle", taskStart.State.Tasks[0].Id), taskContext);
+        check("扩展人工任务可通过统一命令完成", taskDone.State.Status == EngineInstanceStatuses.Approved);
     }
 
     /// <summary>
@@ -437,6 +457,43 @@ internal static class EngineScenarioChecks
         {
             Action = EngineNodeAction.Move,
             EventKind = "markerVisited",
+        };
+    }
+
+    /// <summary>
+    /// 故意修改所有可变输入的节点行为，用于验证真正的输入隔离。
+    /// </summary>
+    private sealed class MutatingMarkerBehavior : INodeBehavior
+    {
+        /// <inheritdoc />
+        public string NodeType => "auditMarker";
+
+        /// <inheritdoc />
+        public EngineNodeDecision Decide(EngineNodeInput input)
+        {
+            input.Node.Type = FlowNodeTypes.End;
+            input.Context.Graph.Edges.Single(item => item.SourceId == "n1").TargetId = "wrong";
+            ((Dictionary<string, bool>)input.Context.Conditions)["safe"] = false;
+            ((Dictionary<string, string>)input.Context.Assignees)["n1"] = "changed";
+            input.State.Status = EngineInstanceStatuses.Faulted;
+            input.Token.NodeId = "wrong";
+            return new EngineNodeDecision { Action = EngineNodeAction.Move, EventKind = "markerVisited" };
+        }
+    }
+
+    /// <summary>
+    /// 通过通用办理命令完成的扩展人工节点。
+    /// </summary>
+    private sealed class CustomTaskBehavior : INodeBehavior
+    {
+        /// <inheritdoc />
+        public string NodeType => "auditTask";
+
+        /// <inheritdoc />
+        public EngineNodeDecision Decide(EngineNodeInput input) => new()
+        {
+            Action = EngineNodeAction.CreateTask,
+            TaskCompletionKind = EngineCommandKinds.Handle,
         };
     }
 }

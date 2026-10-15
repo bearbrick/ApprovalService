@@ -107,14 +107,8 @@ internal sealed class EngineWork
             var node = context.Graph.Nodes.SingleOrDefault(item => item.Id == token.NodeId)
                 ?? throw new EngineException(ErrorCodes.ValidationFailed, "令牌所指的节点不存在。");
             Emit("nodeEntered", node.Id, token.Id);
-            var stateSnapshot = EngineStateCopy.Copy(state);
-            var decision = NodeBehaviorRegistry.Resolve(node.Type, context).Decide(new EngineNodeInput
-            {
-                Node = node,
-                Token = stateSnapshot.Tokens.Single(item => item.Id == token.Id),
-                State = stateSnapshot,
-                Context = context,
-            });
+            var decision = NodeBehaviorRegistry.Resolve(node.Type, context)
+                .Decide(EngineNodeInputCopy.Create(state, token, context));
             if (decision.EventKind is not null)
             {
                 Emit(decision.EventKind, node.Id, token.Id, targetCode: decision.TargetCode);
@@ -135,7 +129,7 @@ internal sealed class EngineWork
 
                     break;
                 case EngineNodeAction.CreateTask:
-                    CreateTask(token, node);
+                    CreateTask(token, node, decision);
                     break;
                 case EngineNodeAction.Split:
                     Split(token, node, decision);
@@ -171,8 +165,14 @@ internal sealed class EngineWork
     /// </summary>
     /// <param name="token">任务令牌。</param>
     /// <param name="node">人工节点。</param>
-    private void CreateTask(EngineToken token, FlowExecutionNode node)
+    /// <param name="decision">节点行为指定的完成命令与拒绝权限。</param>
+    private void CreateTask(EngineToken token, FlowExecutionNode node, EngineNodeDecision decision)
     {
+        if (decision.TaskCompletionKind is not (EngineCommandKinds.Approve or EngineCommandKinds.Handle or EngineCommandKinds.Acknowledge))
+        {
+            throw new EngineException(ErrorCodes.ValidationFailed, "任务节点缺少受支持的完成命令。");
+        }
+
         if (!context.Assignees.TryGetValue(node.Id, out var assignee) || string.IsNullOrWhiteSpace(assignee))
         {
             throw new EngineException(ErrorCodes.ValidationFailed, "人工节点缺少已解析的处理人。");
@@ -184,6 +184,8 @@ internal sealed class EngineWork
             TokenId = token.Id,
             NodeId = node.Id,
             AssigneeId = assignee,
+            CompletionKind = decision.TaskCompletionKind,
+            CanReject = decision.CanReject,
         };
         state.Tasks.Add(task);
         token.WaitingFor = "task";

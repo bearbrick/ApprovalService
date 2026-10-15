@@ -23,6 +23,8 @@ internal static class EngineStateCopy
             NodeId = task.NodeId,
             AssigneeId = task.AssigneeId,
             Status = task.Status,
+            CompletionKind = task.CompletionKind,
+            CanReject = task.CanReject,
         }).ToList(),
         Tokens = source.Tokens.Select(token => new EngineToken
         {

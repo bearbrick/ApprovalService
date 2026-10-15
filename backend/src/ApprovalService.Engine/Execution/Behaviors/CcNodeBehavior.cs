@@ -13,6 +13,10 @@ internal sealed class CcNodeBehavior : INodeBehavior
 
     /// <inheritdoc />
     public EngineNodeDecision Decide(EngineNodeInput input) => input.Node.Approval?.ReadReceiptRequired == true
-        ? new EngineNodeDecision { Action = EngineNodeAction.CreateTask }
+        ? new EngineNodeDecision
+        {
+            Action = EngineNodeAction.CreateTask,
+            TaskCompletionKind = EngineCommandKinds.Acknowledge,
+        }
         : new EngineNodeDecision { Action = EngineNodeAction.Move, EventKind = "ccDelivered" };
 }

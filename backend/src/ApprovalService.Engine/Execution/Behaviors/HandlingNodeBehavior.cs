@@ -12,5 +12,9 @@ internal sealed class HandlingNodeBehavior : INodeBehavior
     public string NodeType => FlowNodeTypes.Handling;
 
     /// <inheritdoc />
-    public EngineNodeDecision Decide(EngineNodeInput input) => new() { Action = EngineNodeAction.CreateTask };
+    public EngineNodeDecision Decide(EngineNodeInput input) => new()
+    {
+        Action = EngineNodeAction.CreateTask,
+        TaskCompletionKind = EngineCommandKinds.Handle,
+    };
 }

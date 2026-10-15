@@ -132,4 +132,20 @@ public sealed class EngineNodeDecision
     {
         get; init;
     }
+
+    /// <summary>
+    /// 建立人工任务时允许的完成命令，只能是同意、办理完成或确认已阅。
+    /// </summary>
+    public string? TaskCompletionKind
+    {
+        get; init;
+    }
+
+    /// <summary>
+    /// 人工任务是否允许拒绝。
+    /// </summary>
+    public bool CanReject
+    {
+        get; init;
+    }
 }

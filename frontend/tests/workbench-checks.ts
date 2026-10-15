@@ -1,4 +1,5 @@
 import { buildCondition } from '../src/designer/workbench/condition-model.ts'
+import { fieldReferences } from '../src/designer/data/data-model.ts'
 import type { ConditionGroup } from '../src/designer/workbench/condition-model.ts'
 import { checkPublication } from '../src/designer/workbench/publication-check.ts'
 import { copyFlow, createEmptyFlow, flowTemplates, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
@@ -11,6 +12,7 @@ export function runWorkbenchChecks(check: (name: string, value: boolean) => void
   const blank = createEmptyFlow('DEMO')
   check('空白自由画布具有唯一开始和结束且能通过结构预检', blank.canvas.nodes.length === 2 && checkPublication(blank).length === 0)
   check('三个正式示例模板覆盖采购、费用与质量异常且均能通过发布预检', flowTemplates.length === 3 && flowTemplates.every(template => checkPublication(template.definition).length === 0))
+  check('正式示例可展开明细字段并显示节点字段权限', flowTemplates.every(template => fieldReferences(template.definition.data).length >= template.definition.data.fields.length))
   const duplicate = copyFlow(blank)
   duplicate.canvas.nodes.push({ ...duplicate.canvas.nodes[0]! })
   check('发布预检能把重复节点定位到节点 ID', checkPublication(duplicate).some(issue => issue.elementId === 'start' && issue.message.includes('重复')))

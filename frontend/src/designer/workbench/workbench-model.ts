@@ -87,7 +87,17 @@ export function normalizeSample(source: FlowDefinition): FlowDefinition {
   next.allowedInitiatorDepartments ??= []
   next.allowedInitiatorRoles ??= []
   next.data ??= { fields: [], summaryFields: [] }
+  next.data.fields ??= []
   next.data.summaryFields ??= []
+  const normalizeFields = (fields: FlowDefinition['data']['fields']): void => {
+    for (const field of fields) {
+      field.children ??= []
+      field.approverInput ??= false
+      field.required ??= false
+      normalizeFields(field.children)
+    }
+  }
+  normalizeFields(next.data.fields)
   next.detailLayout ??= { mode: 'auto', groups: [] }
   next.detailLayout.groups ??= []
   next.printSettings = { ...createEmptyFlow().printSettings, ...next.printSettings }

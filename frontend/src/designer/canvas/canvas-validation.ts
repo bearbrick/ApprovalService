@@ -3,6 +3,8 @@
  */
 import { flowFieldTypes, flowGatewayDirections, flowNodeTypes, flowSchemaVersion } from '../../model/flow.ts'
 import type { FlowCanvas, FlowDefinition, FlowEdge, FlowFieldDefinition, FlowNode } from '../../model/flow.ts'
+import { parseStaticExpression } from './expression-static.ts'
+import { evaluateConstantExpression } from './expression-constant.ts'
 
 /**
  * 可定位到节点、连线或字段的发布问题。
@@ -77,10 +79,17 @@ function collectFields(fields: FlowFieldDefinition[], issues: CanvasIssue[], pre
  */
 function checkReferences(expression: string | null | undefined, elementId: string, paths: Set<string>, issues: CanvasIssue[]): void {
   if (!expression?.trim()) return
-  const matches = [...expression.matchAll(/\$\{([^{}]*)\}/g)]
-  if ((expression.match(/\$\{/g) ?? []).length !== matches.length) issues.push({ elementId, message: `表达式“${elementId}”存在未闭合或嵌套的字段引用。` })
-  for (const match of matches) {
-    const key = match[1]!
+  let references: string[]
+  try {
+    const result = parseStaticExpression(expression)
+    references = result.references
+    if (references.length === 0) evaluateConstantExpression(result.tree)
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : '语法无效。'
+    issues.push({ elementId, message: `表达式“${elementId}”无效：${detail}` })
+    return
+  }
+  for (const key of references) {
     if (!paths.has(key) && !['initiator.department', 'initiator.role', 'initiator.level'].includes(key)) {
       issues.push({ elementId, message: `表达式“${elementId}”引用了不存在的字段“${key}”。` })
     }

@@ -7,6 +7,7 @@ import { addCanvasNode, canvasBounds, connectCanvasNodes, createCanvasNode, move
 import { edgeGeometry, screenToCanvas } from '../src/designer/canvas/canvas-geometry.ts'
 import { validateCanvasDefinition } from '../src/designer/canvas/canvas-validation.ts'
 import { exportBpmn } from '../src/designer/canvas/bpmn-codec.ts'
+import { parseStaticExpression } from '../src/designer/canvas/expression-static.ts'
 
 /**
  * 一条完整的简单顺序审批，全部属性使用正式契约。
@@ -46,6 +47,12 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
   check('不能直接自连或连接不存在的节点', ['handling', 'missing'].every(target => { try { connectCanvasNodes(added, 'handling', target); return false } catch { return true } }))
   const conditioned = updateCanvasEdge(simpleFlow.canvas, 'edge_1', '${amount} > 50000', false, 2)
   check('连线条件和优先级可修改，发布校验定位不存在字段', conditioned.edges[0]?.priority === 2 && validateCanvasDefinition({ ...simpleFlow, canvas: conditioned }).some(issue => issue.elementId === 'edge_1' && issue.message.includes('amount')))
+  const withCondition = (condition: string): FlowDefinition => ({ ...simpleFlow, canvas: { ...simpleFlow.canvas, edges: [{ ...simpleFlow.canvas.edges[0]!, condition }, simpleFlow.canvas.edges[1]!] } })
+  check('受限表达式支持字段引用、函数及中文字段路径', parseStaticExpression('IF(${金额} > 50000, SUM(${items.amount}), 0)').references.join(',') === '金额,items.amount')
+  check('发布预检拒绝未知函数和函数参数数量错误', ['EXEC("bad")', 'IF(${amount})', 'SUM()'].every(expression => validateCanvasDefinition(withCondition(expression)).some(issue => issue.elementId === 'edge_1' && issue.message.includes('无效'))))
+  check('发布预检拒绝纯常量除零但遵循 IF 短路', validateCanvasDefinition(withCondition('1 / 0')).some(issue => issue.message.includes('除数不能为零')) && validateCanvasDefinition(withCondition('IF(TRUE, 1, 1 / 0)')).length === 0)
+  check('人民币大写参与常量条件时仍检查实际执行分支', validateCanvasDefinition(withCondition("IF(RMBUPPER(0) == '零元整', 1 / 0, 1)")).some(issue => issue.message.includes('除数不能为零')))
+  check('发布预检拒绝超长与深嵌套表达式', ['1'.repeat(2049), '('.repeat(33) + '1' + ')'.repeat(33)].every(expression => validateCanvasDefinition(withCondition(expression)).some(issue => issue.message.includes('无效'))))
   const defaulted = updateCanvasEdge(conditioned, 'edge_1', '${amount} > 50000', true, 2)
   check('兜底线会清理条件，删除节点同时删除关联连线', defaulted.edges[0]?.condition === null && removeCanvasElement(simpleFlow.canvas, 'manager').edges.length === 0)
   check('缺少结束路径和错误网关可定位到对应元素', validateCanvasDefinition({ ...simpleFlow, canvas: { nodes: [...simpleFlow.canvas.nodes, createCanvasNode(flowNodeTypes.ParallelGateway, 'split', 700, 160)], edges: [...simpleFlow.canvas.edges] } }).some(issue => issue.elementId === 'split'))

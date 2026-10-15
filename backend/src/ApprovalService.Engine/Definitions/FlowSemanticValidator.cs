@@ -1,10 +1,11 @@
-using System.Text.RegularExpressions;
+using System.Text.Json;
 using ApprovalService.Contracts.Flows;
+using ApprovalService.Engine.Expressions;
 
 namespace ApprovalService.Engine.Definitions;
 
 /// <summary>
-/// 检查数据字段、条件引用和人工节点的发布配置，不执行表达式。
+/// 检查数据字段、条件表达式和人工节点的发布配置。
 /// </summary>
 internal static class FlowSemanticValidator
 {
@@ -138,7 +139,7 @@ internal static class FlowSemanticValidator
     }
 
     /// <summary>
-    /// 只检查表达式中的显式字段引用，不在定义编译阶段求值表达式。
+    /// 解析受限表达式并检查显式字段引用；常量表达式也检查可否求值。
     /// </summary>
     /// <param name="expression">条件或计算表达式。</param>
     /// <param name="elementId">连线或字段定位。</param>
@@ -151,16 +152,25 @@ internal static class FlowSemanticValidator
             return;
         }
 
-        var matches = Regex.Matches(expression, @"\$\{([^{}]*)\}");
-        var openingCount = Regex.Matches(expression, @"\$\{").Count;
-        if (openingCount != matches.Count)
+        IReadOnlyList<string> references;
+        try
         {
-            Add(issues, elementId, $"表达式“{elementId}”存在未闭合或嵌套的字段引用。");
+            references = ApprovalExpression.Validate(expression);
+            if (references.Count == 0)
+            {
+                // 无字段引用的常量表达式可在发布阶段确定，及早拒绝除零等错误。
+                using var emptyData = JsonDocument.Parse("{}");
+                ApprovalExpression.Evaluate(expression, emptyData.RootElement);
+            }
+        }
+        catch (ApprovalExpressionException error)
+        {
+            Add(issues, elementId, $"表达式“{elementId}”无效：{error.Message}");
+            return;
         }
 
-        foreach (Match match in matches)
+        foreach (var key in references)
         {
-            var key = match.Groups[1].Value;
             if (!fields.Contains(key) && key is not ("initiator.department" or "initiator.role" or "initiator.level"))
             {
                 Add(issues, elementId, $"表达式“{elementId}”引用了不存在的字段“{key}”。");

@@ -38,6 +38,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 正式流程定义模型位于 `src/ApprovalService.Contracts/Flows/`，只接受统一自由画布的 JSON；`schemaVersion` 标识格式版本。`src/ApprovalService.Engine/Definitions/` 负责在发布前检查设计内容并生成不含画布坐标的执行图。可导入的 BPMN 文件必须由本服务导出且携带本服务扩展信息。开发样例放在 `samples/flows/`，完整字段约定见 [docs/contracts.md](../docs/contracts.md)。
 
+`src/ApprovalService.Engine/Execution/EngineRuntime` 是运行时的统一命令入口：输入已发布执行图、当前状态、命令和固定时间、连线条件结果、单人处理人，返回新状态与只追加事件。入口不修改传入状态；请求 ID 用于幂等及确定性生成令牌、任务、事件 ID。自动动作和子流程只产生待发事件，外部执行结果再以命令送回。包容网关按本次分叉实际选中的边汇合，回路累计推进超过 200 步后标记异常。当前只处理单人节点，人员来源与多人审批规则由后续任务接入。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：

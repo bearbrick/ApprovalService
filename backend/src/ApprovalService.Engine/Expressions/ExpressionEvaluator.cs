@@ -181,7 +181,7 @@ internal static class ExpressionEvaluator
         if (path.StartsWith("initiator.", StringComparison.Ordinal))
         {
             return context is not null && context.TryGetValue(path, out var value)
-                ? value : throw new ApprovalExpressionException($"缺少上下文字段 {path}。");
+                ? NormalizeContext(value) : throw new ApprovalExpressionException($"缺少上下文字段 {path}。");
         }
 
         var parts = path.Split('.');
@@ -217,6 +217,28 @@ internal static class ExpressionEvaluator
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// 将组织上下文中的常见整数或浮点数规范化为十进制数。
+    /// </summary>
+    /// <param name="value">调用方提供的上下文值。</param>
+    /// <returns>受限求值类型。</returns>
+    private static object? NormalizeContext(object? value)
+    {
+        try
+        {
+            return value switch
+            {
+                byte or short or int or long or float or double => Convert.ToDecimal(value, CultureInfo.InvariantCulture),
+                decimal or bool or string or null => value,
+                _ => throw new ApprovalExpressionException("上下文字段类型不受支持。"),
+            };
+        }
+        catch (OverflowException)
+        {
+            throw new ApprovalExpressionException("上下文数字超出范围。");
+        }
     }
 
     /// <summary>

@@ -34,7 +34,7 @@ internal static class ApprovalDataChecks
             Equals(ApprovalExpression.Evaluate("IF(${amount} > 10, DATEDIFF(${start}, ${end}), 1 / 0)", data), 3m));
         check("发起人上下文可参与条件且不从快照取值",
             Equals(ApprovalExpression.Evaluate("${initiator.level} >= 3", data,
-                new Dictionary<string, object?> { ["initiator.level"] = 4m }), true));
+                new Dictionary<string, object?> { ["initiator.level"] = 4 }), true));
         check("表达式字段引用返回去重路径",
             ApprovalExpression.Validate("${items.amount} + ${items.amount}").SequenceEqual(["items.amount"]));
         check("超长、深嵌套和未知函数会给中文可纠正错误",

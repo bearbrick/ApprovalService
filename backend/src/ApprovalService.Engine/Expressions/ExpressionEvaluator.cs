@@ -43,7 +43,14 @@ internal static class ExpressionEvaluator
     private static object EvaluateUnary(ExpressionNode node, JsonElement data, IReadOnlyDictionary<string, object?>? context)
     {
         var value = Evaluate(node.Children[0], data, context);
-        return node.Name == "-" ? -Number(value) : !Boolean(value);
+        try
+        {
+            return node.Name == "-" ? -Number(value) : !Boolean(value);
+        }
+        catch (OverflowException)
+        {
+            throw new ApprovalExpressionException("数字计算超出范围。");
+        }
     }
 
     /// <summary>

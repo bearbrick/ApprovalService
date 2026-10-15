@@ -85,6 +85,7 @@ internal static class ApprovalDataChecks
             RmbUppercase.Format(1334.50m) == "壹仟叁佰叁拾肆元伍角整"
             && RmbUppercase.Format(10001.01m) == "壹万零壹元零壹分"
             && RmbUppercase.Format(-0.05m) == "负零元伍分");
+        check("超范围人民币金额明确拒绝", Fails(() => RmbUppercase.Format(decimal.MinValue)));
         check("审批编号由调用方提供日期和流水号，并校验位数",
             ApprovalSerialNumber.Format("SP", "yyyyMM", 4, 7, new DateTimeOffset(2026, 10, 15, 8, 0, 0, TimeSpan.FromHours(8))) == "SP-202610-0007"
             && NumberFails(() => ApprovalSerialNumber.Format("SP", "yyyyMM", 2, 100, DateTimeOffset.UnixEpoch)));

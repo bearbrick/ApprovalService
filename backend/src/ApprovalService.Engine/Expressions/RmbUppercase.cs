@@ -28,7 +28,7 @@ public static class RmbUppercase
     public static string Format(decimal amount)
     {
         var rounded = decimal.Round(amount, 2, MidpointRounding.AwayFromZero);
-        if (Math.Abs(rounded) >= 10000000000000000m)
+        if (rounded <= -10000000000000000m || rounded >= 10000000000000000m)
         {
             throw new ApprovalExpressionException("金额超出人民币大写支持范围。");
         }

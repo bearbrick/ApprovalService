@@ -38,6 +38,9 @@ internal static class EngineScenarioChecks
         var replay = EngineRuntime.Execute(first.State, startCommand, context);
         check("同一请求 ID 幂等且不修改输入状态", replay.IsReplay && replay.Events.Count == 0 &&
             replay.State.Tasks.Count == 1 && !ReferenceEquals(replay.State, first.State));
+        var otherInstance = EngineRuntime.Execute(null,
+            new EngineCommand { Kind = EngineCommandKinds.Start, RequestId = "s", InstanceId = "other" }, context);
+        check("不同审批单复用请求 ID 不产生相同事件 ID", first.Events[0].Id != otherInstance.Events[0].Id);
 
         var second = EngineRuntime.Execute(first.State, Command(EngineCommandKinds.Approve, "a", first.State.Tasks[0].Id), context);
         check("审批同意后转到办理且原状态不变", second.State.Tasks.Count == 2 &&

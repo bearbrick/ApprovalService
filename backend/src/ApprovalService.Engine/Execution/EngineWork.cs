@@ -48,7 +48,7 @@ internal sealed class EngineWork
     /// </summary>
     /// <param name="kind">ID 用途。</param>
     /// <returns>本命令内唯一的 ID。</returns>
-    public string NewId(string kind) => command.RequestId + "/" + kind + "/" + sequence++;
+    public string NewId(string kind) => command.InstanceId + "/" + command.RequestId + "/" + kind + "/" + sequence++;
 
     /// <summary>
     /// 追加一条带调用方时间的事件。

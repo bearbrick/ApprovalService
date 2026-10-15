@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NAV_ITEMS, parseRoute, resolveRoute } from '../src/model/routes.ts'
+import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/flow.ts'
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
@@ -54,6 +55,21 @@ function checkRoutes(): void {
 }
 
 /**
+ * 核对正式流程模型的基础约束，避免设计器以后误用旧树形模型或重复的种类编码。
+ */
+function checkFlowModel(): void {
+  const nodes = Object.values(flowNodeTypes)
+  const fields = Object.values(flowFieldTypes)
+  check('正式流程格式版本已登记且节点种类各不相同',
+    flowSchemaVersion === 1 && nodes.length === new Set(nodes).size)
+  check('自由画布包含审批、办理、抄送、三类网关和自动节点',
+    ['approval', 'handling', 'cc', 'exclusiveGateway', 'inclusiveGateway', 'parallelGateway', 'automatic'].every(type => nodes.includes(type as typeof nodes[number])))
+  check('审批数据支持明细表、金额、人员、部门与附件且字段编码唯一',
+    ['detailTable', 'money', 'person', 'department', 'attachment'].every(type => fields.includes(type as typeof fields[number]))
+    && fields.length === new Set(fields).size)
+}
+
+/**
  * 源码规范：注释完整（tests/docs.ts）、文件不超过 500 行。
  */
 function checkSource(): void {
@@ -72,6 +88,7 @@ function checkSource(): void {
 }
 
 checkRoutes()
+checkFlowModel()
 await runHttpChecks(check)
 await runUiChecks(check)
 checkSource()

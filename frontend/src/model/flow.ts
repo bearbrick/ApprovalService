@@ -224,6 +224,14 @@ export interface FlowAssignee {
    * 上级或上级部门级数。
    */
   level?: number | null;
+  /**
+   * 角色来源是否限定在发起部门内。
+   */
+  limitToInitiatingDepartment?: boolean;
+  /**
+   * 连续多级上级查找的截止职级编码。
+   */
+  stopAtGrade?: string | null;
 }
 /**
  * 人工节点的多人审批和异常处理。
@@ -249,6 +257,10 @@ export interface FlowApprovalSettings {
    * 无处理人时：block、approve、administrator 或 specified。
    */
   missingAssigneeBehavior: string;
+  /**
+   * 无处理人转交指定人员时的人员 ID。
+   */
+  missingAssigneeUserId?: string | null;
   /**
    * 处理人是发起人时：skip、self 或 manager。
    */

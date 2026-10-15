@@ -33,6 +33,19 @@ public sealed class FlowAssignee
     {
         get; set;
     }
+
+    /// <summary>
+    /// 角色来源是否只在发起部门内找人。
+    /// </summary>
+    public bool LimitToInitiatingDepartment { get; set; }
+
+    /// <summary>
+    /// 连续多级上级查找的截止职级编码；空值表示只按级数截止。
+    /// </summary>
+    public string? StopAtGrade
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -43,7 +56,7 @@ public sealed class FlowApprovalSettings
     /// <summary>
     /// 多人方式：sequential、all、any、vote。
     /// </summary>
-    public string Mode { get; set; } = "sequential";
+    public string Mode { get; set; } = FlowApprovalModes.Sequential;
 
     /// <summary>
     /// 票签通过比例，取值范围为 0 到 1；仅 vote 使用。
@@ -61,27 +74,35 @@ public sealed class FlowApprovalSettings
     /// <summary>
     /// 会签有人拒绝后的处理：immediate 或 waitAll。
     /// </summary>
-    public string RejectBehavior { get; set; } = "immediate";
+    public string RejectBehavior { get; set; } = FlowRejectBehaviors.Immediate;
 
     /// <summary>
     /// 找不到处理人时的处理：block、approve、administrator 或 specified。
     /// </summary>
-    public string MissingAssigneeBehavior { get; set; } = "block";
+    public string MissingAssigneeBehavior { get; set; } = FlowMissingAssigneeBehaviors.Block;
+
+    /// <summary>
+    /// 找不到处理人且选择转交指定人员时的人员 ID。
+    /// </summary>
+    public string? MissingAssigneeUserId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 处理人是发起人时的处理：skip、self 或 manager。
     /// </summary>
-    public string SelfApprovalBehavior { get; set; } = "skip";
+    public string SelfApprovalBehavior { get; set; } = FlowSelfApprovalBehaviors.Skip;
 
     /// <summary>
     /// 同一人重复出现时的处理：adjacentOnce、once 或 everyTime。
     /// </summary>
-    public string DuplicateAssigneeBehavior { get; set; } = "adjacentOnce";
+    public string DuplicateAssigneeBehavior { get; set; } = FlowDuplicateAssigneeBehaviors.AdjacentOnce;
 
     /// <summary>
     /// 处理人离职时的处理：manager 或 administrator。
     /// </summary>
-    public string InactiveAssigneeBehavior { get; set; } = "manager";
+    public string InactiveAssigneeBehavior { get; set; } = FlowInactiveAssigneeBehaviors.Manager;
 
     /// <summary>
     /// 当前节点允许的操作编码，如 approve、reject、return、transfer、addSigner。

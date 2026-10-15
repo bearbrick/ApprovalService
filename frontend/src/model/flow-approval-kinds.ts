@@ -66,7 +66,7 @@ export const flowAssigneeSources = {
    * 发起人本人。
    */
   Initiator: 'initiator',
-} as const
+} as const;
 
 /**
  * 多人审批方式。
@@ -88,7 +88,7 @@ export const flowApprovalModes = {
    * 票签。
    */
   Vote: 'vote',
-} as const
+} as const;
 
 /**
  * 会签拒绝后的处理。
@@ -102,7 +102,7 @@ export const flowRejectBehaviors = {
    * 等全部人员处理。
    */
   WaitAll: 'waitAll',
-} as const
+} as const;
 
 /**
  * 找不到审批人时的处理。
@@ -124,7 +124,7 @@ export const flowMissingAssigneeBehaviors = {
    * 转交指定人员。
    */
   Specified: 'specified',
-} as const
+} as const;
 
 /**
  * 审批人即发起人时的处理。
@@ -142,7 +142,7 @@ export const flowSelfApprovalBehaviors = {
    * 转交直属上级。
    */
   Manager: 'manager',
-} as const
+} as const;
 
 /**
  * 同一人重复出现时的处理。
@@ -160,7 +160,7 @@ export const flowDuplicateAssigneeBehaviors = {
    * 每次都审。
    */
   EveryTime: 'everyTime',
-} as const
+} as const;
 
 /**
  * 审批人离职或停用时的处理。
@@ -174,4 +174,4 @@ export const flowInactiveAssigneeBehaviors = {
    * 转交管理员。
    */
   Administrator: 'administrator',
-} as const
+} as const;

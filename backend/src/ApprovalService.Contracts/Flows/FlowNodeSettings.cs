@@ -37,7 +37,10 @@ public sealed class FlowAssignee
     /// <summary>
     /// 角色来源是否只在发起部门内找人。
     /// </summary>
-    public bool LimitToInitiatingDepartment { get; set; }
+    public bool LimitToInitiatingDepartment
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 连续多级上级查找的截止职级编码；空值表示只按级数截止。

@@ -9,6 +9,7 @@ import { NAV_ITEMS, parseRoute, resolveRoute } from '../src/model/routes.ts'
 import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/flow.ts'
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
+import { runDataChecks } from './data-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
 
@@ -89,6 +90,7 @@ function checkSource(): void {
 
 checkRoutes()
 checkFlowModel()
+runDataChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
 checkSource()

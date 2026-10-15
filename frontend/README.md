@@ -19,6 +19,8 @@
 
 管理入口见 `src/model/navigation.ts`，例如 `#/admin/org/roles`、`#/admin/outbound/queue`。设计器工作区预留 `#/designer/{flowCode}/{tab}`，支持 design（自由画布）、fields、layout、rules、print、versions。未知页面显示明确的返回入口，手机未知路径仍使用手机外壳。
 
+正式自由画布流程定义的 TypeScript 副本位于 `src/model/flow.ts`，供后续设计器使用；字段与后端 Contracts 保持一致。当前页面尚未接入流程设计、发布或审批业务接口。
+
 ## 命令
 
 ```powershell

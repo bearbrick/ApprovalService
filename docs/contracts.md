@@ -87,13 +87,67 @@
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
 
-## 流程定义 JSON（待定）
+## 流程定义 JSON
 
-流程版本里保存的设计内容、编译后的执行图、审批数据定义、详情排版和打印设置，格式在 T-001 里定，定下后写进本节。原则：
+权威模型在 `backend/src/ApprovalService.Contracts/Flows/`，前端镜像在 `frontend/src/model/flow.ts`。当前 `schemaVersion` 为 `1`。流程版本保存一份 `FlowDefinition`，其 `canvas` 是唯一设计方式；发布时编译成独立的 `FlowExecutionGraph`，运行图不含 `x`、`y`。发布后的版本锁定，已运行审批单始终使用发起时的版本。接口开放时仍按上文 `/api/v1` 约定，不在本节预设尚未实现的请求路径。
 
-- 带格式版本号（`schemaVersion`），老版本的流程一直能跑。
-- 仅自由画布设计 JSON，发布时编译成执行图（节点、连线、网关）；不再定义树形设计或转换协议（ADR 0007）。此处仍为规划，已实现接口不变。
-- 自由画布导出为 BPMN 2.0 文件，加本系统的扩展信息；只导入本系统导出的文件。
+顶层属性如下，JSON 属性名一律小驼峰；可空属性为 `null` 时按通用约定省略，集合默认为空集合。
+
+| 属性 | 类型 | 含义 |
+| --- | --- | --- |
+| `schemaVersion` | 整数 | 当前为 `1`；读取方必须按版本解释，不静默猜测未来版本 |
+| `code`、`name` | 字符串 | 业务系统使用的流程编码、显示名称 |
+| `canvas` | 对象 | `nodes`、`edges` 组成的自由画布 |
+| `data` | 对象 | `fields` 与 `summaryFields`，只定义审批数据，不创建业务单据 |
+| `detailLayout` | 对象 | 只读详情的自动、拖拽或原单嵌入排版 |
+| `printSettings` | 对象 | A4 审批单的打印配置 |
+| `allowedClientApps`、`allowedInitiatorDepartments`、`allowedInitiatorRoles` | 字符串数组 | 接入应用与发起人范围限制；空数组表示不额外限制，接入授权仍单独校验 |
+
+`canvas.nodes[]` 每项有 `id`、`type`、`name`、`x`、`y`；位置仅供设计器使用。可选的 `gatewayPairId`、`gatewayDirection`、`assignee`、`approval`、`subprocess`、`automation` 承载语义；`fieldPermissions` 是当前节点的字段权限数组。`canvas.edges[]` 每项有 `id`、`sourceId`、`targetId`、`priority`、`isDefault`，可选 `condition`。条件分支按 `priority` 从小到大尝试，兜底线的 `isDefault` 为 `true` 且不写条件。网关方向为 `split` 或 `join`，分叉与汇合共用 `gatewayPairId`。
+
+| `type` | 用途 |
+| --- | --- |
+| `start`、`end` | 开始、结束 |
+| `approval`、`handling`、`cc` | 审批、办理、抄送 |
+| `exclusiveGateway`、`inclusiveGateway`、`parallelGateway` | 排他、包容、并行网关 |
+| `subprocess`、`automatic` | 子流程、自动节点 |
+
+条件与计算字段使用受限表达式，不执行任意代码。审批数据字段引用 `${fieldKey}`，明细子字段如 `${items.amount}`；`${initiator.department}`、`${initiator.role}`、`${initiator.level}` 保留给发起人上下文，不是审批数据字段。表达式可使用四则运算、比较、SUM、AVG、MAX、MIN、IF 和日期差等受支持函数；具体求值规则由引擎提供，发布校验至少核对字段引用是否存在。
+
+`data.fields[]` 的字段包含 `key`、`name`、`type`、`required`、可选 `formula`、`approverInput` 与 `children`。`type` 可为 `text`、`number`、`money`、`date`、`person`、`department`、`attachment`、`detailTable`；明细表的子字段放在 `children`。计算字段仅供审批判断与展示，不回写业务单据；`approverInput` 表示由获授权节点的审批人填写。`summaryFields` 存字段 key，通常选三至五个。节点 `fieldPermissions[]` 的每项包含 `fieldKey` 和 `access`（`hidden`、`readOnly`、`editable`）；明细子字段 key 写成 `tableKey.childKey`。
+
+人工节点的 `assignee` 至少有 `source`；可选 `value`、`fieldKey`、`level` 分别存人员/角色/矩阵/接口等编码、数据字段和上级层级。来源覆盖指定成员、角色、岗位职级、上下级、部门负责人、业务数据人员/部门、分管领导、审批矩阵、业务接口、上一步指定、发起人自选和发起人本人。`approval` 存多人方式（`sequential`、`all`、`any`、`vote`）、票签门槛与权重、拒绝/缺人/本人/重复/离职处理、允许的操作、意见及已阅要求、时限；属性及默认值以 Contracts 模型为准。`subprocess` 存目标 `flowCode`、`waitForCompletion` 与 `dataMappings`；`automation` 存由出站适配层执行的 `actionCode` 和失败后交管理员的设置。
+
+`detailLayout.mode` 为 `auto`、`custom` 或 `embed`。自定义排版的 `groups` 包含标题、列数与字段项；字段项可指定跨列、明细子列宽及金额大写。嵌入原单仅保存 `embedPageCode`，实际只读地址由业务系统提供。`printSettings` 指定 A4 方向、字段顺序、意见、签名、票据页、Logo、二维码与水印；打印用的中文字体由使用单位上传，不放入流程 JSON。
+
+例如一条最小顺序审批的设计片段：
+
+```json
+{
+  "schemaVersion": 1,
+  "code": "SIMPLE_APPROVAL",
+  "name": "简单审批",
+  "canvas": {
+    "nodes": [
+      { "id": "start", "type": "start", "name": "开始", "x": 0, "y": 0, "fieldPermissions": [] },
+      { "id": "manager", "type": "approval", "name": "主管审批", "x": 200, "y": 0, "assignee": { "source": "manager", "level": 1 }, "fieldPermissions": [] },
+      { "id": "end", "type": "end", "name": "结束", "x": 400, "y": 0, "fieldPermissions": [] }
+    ],
+    "edges": [
+      { "id": "e1", "sourceId": "start", "targetId": "manager", "priority": 0, "isDefault": false },
+      { "id": "e2", "sourceId": "manager", "targetId": "end", "priority": 0, "isDefault": false }
+    ]
+  },
+  "data": { "fields": [], "summaryFields": [] },
+  "detailLayout": { "mode": "auto", "groups": [] },
+  "printSettings": { "orientation": "portrait", "fieldKeys": [], "showComments": true, "showSignatures": true, "includeReceiptPages": false, "showLogo": true, "showQrCode": true, "showWatermark": false },
+  "allowedClientApps": [],
+  "allowedInitiatorDepartments": [],
+  "allowedInitiatorRoles": []
+}
+```
+
+自由画布导出为带本系统扩展信息的 BPMN 2.0 文件，仅导入本系统导出的文件；其他来源会给出明确错误。完整示例流程存放在 `backend/samples/flows/`。
 
 ## 骨架阶段补充的约定
 

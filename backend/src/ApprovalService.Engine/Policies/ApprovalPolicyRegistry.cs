@@ -1,3 +1,5 @@
+using System.Text.Json;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Execution;
@@ -35,6 +37,16 @@ public static class ApprovalPolicyRegistry
 
         var policy = policies.SingleOrDefault(item => item.Mode == settings.Mode)
             ?? throw new EngineException(ErrorCodes.ValidationFailed, "不支持的多人审批方式。");
-        return policy.Evaluate(settings, ballots);
+        // 自定义策略也只能看到当前节点配置和票据的隔离副本。
+        var settingsCopy = JsonSerializer.Deserialize<FlowApprovalSettings>(
+            JsonSerializer.Serialize(settings, ApprovalJson.Options), ApprovalJson.Options)
+            ?? throw new InvalidOperationException("多人审批设置复制失败。");
+        var ballotCopy = ballots.Select(item => new ApprovalBallot
+        {
+            TaskId = item.TaskId,
+            AssigneeId = item.AssigneeId,
+            Status = item.Status,
+        }).ToArray();
+        return policy.Evaluate(settingsCopy, ballotCopy);
     }
 }

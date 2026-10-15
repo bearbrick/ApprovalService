@@ -1,3 +1,5 @@
+using System.Text.Json;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Execution;
 
@@ -41,6 +43,13 @@ public static class AssigneeResolverRegistry
 
         var resolver = resolvers.SingleOrDefault(item => item.Source == request.Configuration.Source)
             ?? throw new EngineException(ErrorCodes.ValidationFailed, "不支持的审批人来源。");
-        return new AssigneeResolution { AssigneeIds = AssigneeLookup.Distinct(resolver.Resolve(request, snapshot)).ToList() };
+        // 扩展解析器只接收隔离副本，不能改变引擎后续使用的组织快照。
+        var requestCopy = JsonSerializer.Deserialize<AssigneeRequest>(
+            JsonSerializer.Serialize(request, ApprovalJson.Options), ApprovalJson.Options)
+            ?? throw new InvalidOperationException("审批人请求复制失败。");
+        var snapshotCopy = JsonSerializer.Deserialize<AssigneeSnapshot>(
+            JsonSerializer.Serialize(snapshot, ApprovalJson.Options), ApprovalJson.Options)
+            ?? throw new InvalidOperationException("组织快照复制失败。");
+        return new AssigneeResolution { AssigneeIds = AssigneeLookup.Distinct(resolver.Resolve(requestCopy, snapshotCopy)).ToList() };
     }
 }

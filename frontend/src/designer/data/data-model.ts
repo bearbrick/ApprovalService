@@ -144,27 +144,31 @@ export function sampleSubmission(data: FlowDataDefinition): Record<string, unkno
   const sample: Record<string, unknown> = {}
   for (const field of data.fields) {
     if (field.approverInput || field.formula?.trim()) continue
-    if (field.type === 'detailTable') {
-      const row: Record<string, unknown> = {}
-      for (const child of field.children) {
-        if (!child.approverInput && !child.formula?.trim()) row[child.key] = sampleValue(child)
-      }
-      sample[field.key] = [row]
-    } else sample[field.key] = sampleValue(field)
+    sample[field.key] = sampleValue(field)
   }
   return sample
 }
 
 /**
- * 返回一种字段类型的无业务含义样例。
+ * 返回一种字段类型的无业务含义样例；必传文本和附件不能给出空值。
  * @param field 字段定义。
  * @returns 可序列化样例值。
  */
-function sampleValue(field: FlowFieldDefinition): string | number | string[] {
-  if (field.type === 'number' || field.type === 'money') return 0
-  if (field.type === 'date') return '2026-10-15'
-  if (field.type === 'attachment') return []
-  return field.type === 'person' ? 'USER_ID' : field.type === 'department' ? 'DEPT_ID' : ''
+function sampleValue(field: FlowFieldDefinition): unknown {
+  if (field.type === 'number') return 1
+  if (field.type === 'money') return 100
+  if (field.type === 'date') return '2026-01-01'
+  if (field.type === 'attachment') return ['FILE_ID']
+  if (field.type === 'person') return 'EMP001'
+  if (field.type === 'department') return 'DEP001'
+  if (field.type === 'detailTable') {
+    const row: Record<string, unknown> = {}
+    for (const child of field.children) {
+      if (!child.approverInput && !child.formula?.trim()) row[child.key] = sampleValue(child)
+    }
+    return [row]
+  }
+  return '示例文本'
 }
 
 /**

@@ -29,7 +29,25 @@ export function runDataChecks(check: Check): void {
   const data: FlowDataDefinition = { fields: [amount, items, approved, calculated], summaryFields: ['amount'] }
 
   check('合法审批字段可生成不含审批填写和计算字段的接口 JSON 样例',
-    JSON.stringify(sampleSubmission(data)) === JSON.stringify({ amount: 0, items: [{ name: '', price: 0 }] }))
+    JSON.stringify(sampleSubmission(data)) === JSON.stringify({ amount: 100, items: [{ name: '示例文本', price: 100 }] }))
+  const requiredText = createField('reason', '申请原因')
+  requiredText.required = true
+  const requiredAttachment = createField('receipt', '票据')
+  requiredAttachment.type = 'attachment'
+  requiredAttachment.required = true
+  const requiredDetail = createField('lines', '明细')
+  requiredDetail.type = 'detailTable'
+  requiredDetail.required = true
+  const requiredChild = createField('evidence', '明细附件')
+  requiredChild.type = 'attachment'
+  requiredChild.required = true
+  requiredDetail.children = [requiredChild]
+  const requiredSample = sampleSubmission({ fields: [requiredText, requiredAttachment, requiredDetail], summaryFields: [] })
+  check('必传文本、附件和明细子附件的 JSON 样例均非空',
+    requiredSample.reason === '示例文本'
+    && Array.isArray(requiredSample.receipt) && requiredSample.receipt.length === 1
+    && Array.isArray(requiredSample.lines) && requiredSample.lines.length === 1
+    && Array.isArray(requiredSample.lines[0]?.evidence) && requiredSample.lines[0].evidence.length === 1)
   check('明细子字段可作为节点权限引用，且路径带表 key',
     fieldReferences(data).some(reference => reference.key === 'items.price' && reference.label === '采购明细 · 价格'))
   check('合法数据定义没有编辑问题', validateDataDefinition(data).length === 0)

@@ -18,7 +18,9 @@
 - `backend/src/ApprovalService.Engine/Definitions/`（新建）：自由画布 → 执行图、发布校验、BPMN 2.0 导出和导入
 - `backend/samples/flows/`（新建）：示例流程（采购申请、费用报销、质量异常），开发环境可以导入
 - `frontend/src/model/flow.ts`（新建）：流程定义的前端副本
+- `frontend/tests/checks.ts`：纯模型的 Node 场景检查
 - `backend/tests/ApprovalService.Backend.Checks/FlowDefinitionChecks.cs`（新建）
+- `backend/README.md`、`frontend/README.md`：补正式模型的使用说明
 
 ## 共享文件
 
@@ -28,6 +30,7 @@
 - `backend/src/ApprovalService.Contracts/**`
 - `backend/tests/ApprovalService.Backend.Checks/Program.cs`：加一行调用
 - `ContractChecks.cs`：核对前端副本的节点类型、字段类型和后端一致
+- `docs/architecture.md`：补设计坐标与执行图分离的具体落点
 
 ## 验收标准
 
@@ -47,7 +50,7 @@
 
 ## 交接记录
 
-- 2026-10-15 · Codex · 认领并行开发。本任务会修改共享文件 `docs/contracts.md`、`backend/src/ApprovalService.Contracts/Flows/**`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`，分别用于登记正式 JSON 契约、接入场景检查和核对前端副本；修改会单独提交。以 `main` 建任务分支并纳入已验证的框架评审结果，尚未合并主分支或推送。
+- 2026-10-15 · Codex · 认领并行开发。本任务会修改共享文件 `docs/contracts.md`、`docs/architecture.md`、`backend/src/ApprovalService.Contracts/Flows/**`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`，分别用于登记正式 JSON 契约和架构落点、接入场景检查、核对前端副本；修改会单独提交。以 `main` 建任务分支并纳入已验证的框架评审结果，尚未合并主分支或推送。
 - 2026-10-13 · Codex · 按用户明确决定和 ADR 0007，将尚未认领的双设计器计划调整为统一自由画布；任务状态仍待认领。本轮只同步规划，不实现业务代码。
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

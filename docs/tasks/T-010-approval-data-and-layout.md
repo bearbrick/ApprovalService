@@ -16,9 +16,10 @@
 
 - `backend/src/ApprovalService.Engine/Expressions/`（新建）：自己写的表达式解析（四则运算、比较、且或、SUM、AVG、MAX、MIN、IF、ANY、日期差、人民币大写），不执行任意代码
 - 后端发起时的数据校验（必传、类型、明细表），错误带字段路径（`data.items[0].qty`）
+- `backend/src/ApprovalService.Engine/Definitions/FlowSemanticValidator.cs`：发布时调用受限表达式解析器，不能让无效条件或公式进入运行时
 - `backend/src/ApprovalService.Domain/Runtime/ApprovalSerialNumber.cs`：审批编号规则（前缀、日期、流水号）；序号由调用方分配
 - `frontend/src/designer/data/`（新建）：字段定义、排版设计（分组、几列、明细列宽、摘要字段）
-- `backend/tests/ApprovalService.Backend.Checks/ApprovalDataChecks.cs`、`frontend/tests/data-checks.ts`：表达式、数据校验、排版场景检查
+- `backend/tests/ApprovalService.Backend.Checks/ApprovalDataChecks.cs`、`frontend/tests/data-checks.ts`：表达式、数据校验、发布前解析与排版场景检查
 - `backend/README.md`、`frontend/README.md`：表达式与排版使用说明
 
 ## 共享文件
@@ -45,5 +46,6 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · 独立验收发现发布校验仅核字段引用而不解析受限表达式，会使未知函数等无效条件通过发布。将 `FlowSemanticValidator.cs` 与回归场景明确纳入本任务范围；同时修复样例与求值语义后串行复验。此次扩围只接通已定义的受限表达式，不改流程契约。
 - 2026-10-15 · Codex · T-001 已独立验收，认领审批数据与表达式。会修改共享文件 `docs/contracts.md`、`docs/architecture.md`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`frontend/tests/checks.ts`，分别登记表达式语义、模块落点与检查入口；已预先登记。前端排版组件和后端表达式解析按不同目录并行，设计器完整工作台属于 T-008。从 `main` 建任务分支并纳入已验收的 T-001，未合并主分支或推送。
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

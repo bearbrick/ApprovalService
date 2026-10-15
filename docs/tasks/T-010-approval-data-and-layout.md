@@ -20,6 +20,7 @@
 - `backend/src/ApprovalService.Domain/Runtime/ApprovalSerialNumber.cs`：审批编号规则（前缀、日期、流水号）；序号由调用方分配
 - `frontend/src/designer/data/`（新建）：字段定义、排版设计（分组、几列、明细列宽、摘要字段）
 - `backend/tests/ApprovalService.Backend.Checks/ApprovalDataChecks.cs`、`frontend/tests/data-checks.ts`：表达式、数据校验、发布前解析与排版场景检查
+- `backend/tests/ApprovalService.Backend.Checks/FlowDefinitionChecks.cs`：补发布阶段的无效表达式回归
 - `backend/README.md`、`frontend/README.md`：表达式与排版使用说明
 
 ## 共享文件

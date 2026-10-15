@@ -211,7 +211,7 @@ public static class ApprovalDataValidator
             FlowFieldTypes.Date => "2026-01-01",
             FlowFieldTypes.Person => "EMP001",
             FlowFieldTypes.Department => "DEP001",
-            FlowFieldTypes.Attachment => Array.Empty<string>(),
+            FlowFieldTypes.Attachment => field.Required ? new[] { "FILE_EXAMPLE" } : Array.Empty<string>(),
             FlowFieldTypes.DetailTable => new[]
             {
                 field.Children.Where(child => !child.ApproverInput && string.IsNullOrWhiteSpace(child.Formula))

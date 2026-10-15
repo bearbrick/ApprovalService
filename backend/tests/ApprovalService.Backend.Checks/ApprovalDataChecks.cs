@@ -19,12 +19,18 @@ internal static class ApprovalDataChecks
     public static void Run(Action<string, bool> check)
     {
         using var document = JsonDocument.Parse("""
-            {"amount":12.5,"items":[{"qty":2,"amount":10},{"qty":3,"amount":20}],"start":"2026-10-01","end":"2026-10-04"}
+            {"amount":12.5,"items":[{"qty":2,"amount":10},{"qty":3,"amount":20}],"采购.金额":25,"成本-金额":5,"明细.表":[{"单价.含税":20}],"start":"2026-10-01","end":"2026-10-04"}
             """);
         var data = document.RootElement;
         check("表达式按优先级求四则运算", Equals(ApprovalExpression.Evaluate("2 + 3 * 4", data), 14m));
         check("表达式读取快照并对明细列求和及平均值",
             Equals(ApprovalExpression.Evaluate("SUM(${items.amount}) + AVG(${items.amount})", data), 45m));
+        check("顶层含点字段优先于明细路径，明细表和子字段的 key 也可含点",
+            Equals(ApprovalExpression.Evaluate("${采购.金额} + SUM(${明细.表.单价.含税})", data), 45m));
+        check("带连字符的合法字段 key 可直接引用",
+            Equals(ApprovalExpression.Evaluate("${成本-金额} * 2", data), 10m));
+        check("平铺的三十三项加法不算深层嵌套",
+            Equals(ApprovalExpression.Evaluate(string.Join(" + ", Enumerable.Repeat("1", 33)), data), 33m));
         check("表达式支持最大最小值、比较、且或",
             Equals(ApprovalExpression.Evaluate("MAX(${items.qty}) == 3 AND MIN(${items.qty}) < 3 OR FALSE", data), true));
         check("ANY 支持集合非空真值和集合包含指定值",
@@ -41,6 +47,9 @@ internal static class ApprovalDataChecks
             Fails(() => ApprovalExpression.Validate(new string('1', ApprovalExpression.MaxLength + 1)))
             && Fails(() => ApprovalExpression.Validate(new string('(', ApprovalExpression.MaxDepth + 1) + "1" + new string(')', ApprovalExpression.MaxDepth + 1)))
             && Fails(() => ApprovalExpression.Validate("EXEC('bad')")));
+        check("三十二层括号在深度上限内",
+            Equals(ApprovalExpression.Evaluate(new string('(', ApprovalExpression.MaxDepth) + "1"
+                + new string(')', ApprovalExpression.MaxDepth), data), 1m));
         check("除零和缺字段在求值时明确失败",
             Fails(() => ApprovalExpression.Evaluate("1 / 0", data))
             && Fails(() => ApprovalExpression.Evaluate("${missing}", data)));
@@ -81,6 +90,14 @@ internal static class ApprovalDataChecks
             ApprovalDataValidator.Validate(definition, sample.RootElement).Count == 0
             && !sample.RootElement.TryGetProperty("total", out _)
             && !sample.RootElement.TryGetProperty("audit", out _));
+        var attachmentDefinition = new FlowDataDefinition
+        {
+            Fields = [new FlowFieldDefinition { Key = "receipts", Name = "票据", Type = FlowFieldTypes.Attachment, Required = true }],
+        };
+        using var attachmentSample = JsonDocument.Parse(ApprovalDataValidator.CreateExampleJson(attachmentDefinition));
+        check("必传附件样例包含文件 ID 且能通过同一校验器",
+            ApprovalDataValidator.Validate(attachmentDefinition, attachmentSample.RootElement).Count == 0
+            && attachmentSample.RootElement.GetProperty("receipts").GetArrayLength() == 1);
         check("人民币金额大写处理角分、跨组零和负数",
             RmbUppercase.Format(1334.50m) == "壹仟叁佰叁拾肆元伍角整"
             && RmbUppercase.Format(10001.01m) == "壹万零壹元零壹分"

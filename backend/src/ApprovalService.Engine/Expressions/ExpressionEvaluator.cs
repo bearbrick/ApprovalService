@@ -191,31 +191,48 @@ internal static class ExpressionEvaluator
                 ? NormalizeContext(value) : throw new ApprovalExpressionException($"缺少上下文字段 {path}。");
         }
 
-        var parts = path.Split('.');
-        if (data.ValueKind != JsonValueKind.Object || !data.TryGetProperty(parts[0], out var current))
+        if (data.ValueKind != JsonValueKind.Object)
         {
             throw new ApprovalExpressionException($"缺少审批字段 {path}。");
         }
 
-        if (parts.Length == 1)
+        // 完整 key 优先，避免把合法的顶层 key 中的点号误认成明细分隔符。
+        if (data.TryGetProperty(path, out var direct))
         {
-            return ConvertValue(current);
+            return ConvertValue(direct);
         }
 
-        if (parts.Length != 2 || current.ValueKind != JsonValueKind.Array)
+        // 明细表的 key 和子字段 key 都可能含点号；选择最长的顶层 key 前缀。
+        JsonProperty? table = null;
+        foreach (var property in data.EnumerateObject())
+        {
+            if (path.StartsWith(property.Name + ".", StringComparison.Ordinal)
+                && (!table.HasValue || property.Name.Length > table.Value.Name.Length))
+            {
+                table = property;
+            }
+        }
+
+        if (!table.HasValue)
+        {
+            throw new ApprovalExpressionException($"缺少审批字段 {path}。");
+        }
+
+        if (table.Value.Value.ValueKind != JsonValueKind.Array)
         {
             throw new ApprovalExpressionException($"审批字段 {path} 不是明细列。");
         }
 
+        var childKey = path[(table.Value.Name.Length + 1)..];
         var results = new List<object?>();
-        foreach (var item in current.EnumerateArray())
+        foreach (var item in table.Value.Value.EnumerateArray())
         {
             if (results.Count == MaxItems)
             {
                 throw new ApprovalExpressionException("明细行超过表达式计算上限。");
             }
 
-            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(parts[1], out var cell))
+            if (item.ValueKind != JsonValueKind.Object || !item.TryGetProperty(childKey, out var cell))
             {
                 throw new ApprovalExpressionException($"明细字段 {path} 缺失。");
             }

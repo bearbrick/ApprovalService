@@ -172,7 +172,7 @@ internal sealed class ExpressionParser
             throw new ApprovalExpressionException("表达式嵌套过深。");
         }
 
-        var left = ParsePrimary(depth + 1);
+        var left = ParsePrimary(depth);
         while (true)
         {
             SkipSpace();
@@ -184,7 +184,8 @@ internal sealed class ExpressionParser
 
             offset += width;
             CountToken();
-            var right = ParseExpression(priority + 1, depth + 1);
+            // 运算符连接同一层的表达式，不占用括号或函数嵌套预算。
+            var right = ParseExpression(priority + 1, depth);
             left = new ExpressionNode { Kind = "binary", Name = name, Children = [left, right] };
         }
     }
@@ -348,12 +349,11 @@ internal sealed class ExpressionParser
     }
 
     /// <summary>
-    /// 检查字段路径仅含安全标识符及点号。
+    /// 检查字段引用不为空；字段 key 由流程定义约束，可包含中文和符号。
     /// </summary>
     /// <param name="path">字段路径。</param>
     /// <returns>路径是否有效。</returns>
-    private static bool IsPath(string path) => path.Split('.').All(part => part.Length is > 0 and <= 64
-        && (char.IsLetter(part[0]) || part[0] == '_') && part.All(character => char.IsLetterOrDigit(character) || character == '_'));
+    private static bool IsPath(string path) => !string.IsNullOrWhiteSpace(path);
 
     /// <summary>
     /// 消费指定文本。

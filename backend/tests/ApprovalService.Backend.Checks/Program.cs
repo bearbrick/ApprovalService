@@ -41,6 +41,8 @@ internal static class Program
         FlowDefinitionChecks.Run(backendRoot, Check);
         EngineScenarioChecks.Run(Check);
         EngineFuzzChecks.Run(Check);
+        AssigneeChecks.Run(Check);
+        ApprovalPolicyChecks.Run(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

@@ -18,9 +18,14 @@ public sealed class ApprovalServiceClient : IDisposable
     private readonly HttpClient http;
 
     /// <summary>
-    /// 客户端设置。
+    /// 创建客户端时固定下来的 API Key，防止共享客户端运行期间配置对象被修改。
     /// </summary>
-    private readonly ApprovalServiceClientOptions options;
+    private readonly string? apiKey;
+
+    /// <summary>
+    /// 创建客户端时固定下来的超时时间。
+    /// </summary>
+    private readonly TimeSpan timeout;
 
     /// <summary>
     /// 创建客户端。
@@ -40,17 +45,46 @@ public sealed class ApprovalServiceClient : IDisposable
     /// <exception cref="ArgumentException">没有服务地址。</exception>
     public ApprovalServiceClient(ApprovalServiceClientOptions options, HttpMessageHandler? handler)
     {
-        this.options = options ?? throw new ArgumentNullException(nameof(options));
-        if (options.BaseAddress == null)
+        if (options == null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+        var baseAddress = options.BaseAddress;
+        var configuredTimeout = options.Timeout;
+        var configuredApiKey = options.ApiKey;
+        if (baseAddress == null)
         {
             throw new ArgumentException("必须指定服务地址 BaseAddress。", nameof(options));
         }
 
+        if (!baseAddress.IsAbsoluteUri ||
+            (baseAddress.Scheme != Uri.UriSchemeHttp && baseAddress.Scheme != Uri.UriSchemeHttps) ||
+            !string.IsNullOrEmpty(baseAddress.UserInfo) ||
+            !string.IsNullOrEmpty(baseAddress.Query) ||
+            !string.IsNullOrEmpty(baseAddress.Fragment))
+        {
+            throw new ArgumentException("服务地址必须是完整的 HTTP 或 HTTPS 地址，且不能包含账号、查询参数或片段。", nameof(options));
+        }
+
+        if (configuredTimeout != System.Threading.Timeout.InfiniteTimeSpan && configuredTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), "等待响应的超时时间必须大于零，或使用无限超时。");
+        }
+
+        if (configuredApiKey != null && (string.IsNullOrWhiteSpace(configuredApiKey) || configuredApiKey.IndexOfAny(new[] { '\r', '\n' }) >= 0))
+        {
+            throw new ArgumentException("API Key 不能为空白，也不能包含换行符。", nameof(options));
+        }
+
+        // 客户端可以跨线程复用，因此不保留可变的设置对象作为请求时的依据。
+        apiKey = configuredApiKey;
+        timeout = configuredTimeout;
+
         http = handler == null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         // 地址末尾补上斜杠，相对路径才会拼在后面而不是替换最后一段。
-        var address = options.BaseAddress.ToString();
+        var address = baseAddress.ToString();
         http.BaseAddress = new Uri(address.EndsWith("/", StringComparison.Ordinal) ? address : address + "/");
-        http.Timeout = options.Timeout;
+        http.Timeout = timeout;
     }
 
     /// <summary>
@@ -81,9 +115,9 @@ public sealed class ApprovalServiceClient : IDisposable
     {
         using (var request = new HttpRequestMessage(method, path))
         {
-            if (!string.IsNullOrEmpty(options.ApiKey))
+            if (!string.IsNullOrEmpty(apiKey))
             {
-                request.Headers.TryAddWithoutValidation(Protocol.ApiKey, options.ApiKey);
+                request.Headers.TryAddWithoutValidation(Protocol.ApiKey, apiKey);
             }
 
             request.Headers.TryAddWithoutValidation(Protocol.RequestId, Guid.NewGuid().ToString("N"));
@@ -92,10 +126,10 @@ public sealed class ApprovalServiceClient : IDisposable
             {
                 response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
             {
                 // 调用方没取消却被取消，是 HttpClient 的超时。
-                throw new ApprovalServiceException(ApprovalErrorCodes.Timeout, $"等待审批流服务响应超过 {options.Timeout.TotalSeconds:0} 秒。", innerException: ex);
+                throw new ApprovalServiceException(ApprovalErrorCodes.Timeout, $"等待审批流服务响应超过 {timeout.TotalSeconds:0.###} 秒。", innerException: ex);
             }
             catch (HttpRequestException ex)
             {
@@ -155,6 +189,8 @@ public sealed class ApprovalServiceClient : IDisposable
             401 => ApprovalErrorCodes.Unauthorized,
             403 => ApprovalErrorCodes.Forbidden,
             404 => ApprovalErrorCodes.NotFound,
+            405 => ApprovalErrorCodes.NotFound,
+            400 => ApprovalErrorCodes.ValidationFailed,
             409 => ApprovalErrorCodes.Conflict,
             _ => ApprovalErrorCodes.InternalError,
         };
@@ -166,7 +202,15 @@ public sealed class ApprovalServiceClient : IDisposable
     /// </summary>
     /// <param name="root">JSON 对象。</param>
     /// <param name="name">属性名。</param>
-    /// <returns>属性值；没有或不是字符串时为空字符串。</returns>
-    private static string Text(Dictionary<string, object?> root, string name) =>
-        root.TryGetValue(name, out var value) && value is string text ? text : "";
+    /// <returns>非空的属性值。</returns>
+    /// <exception cref="ApprovalServiceException">服务没有按契约返回必填属性。</exception>
+    private static string Text(Dictionary<string, object?> root, string name)
+    {
+        if (root.TryGetValue(name, out var value) && value is string text && !string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        throw new ApprovalServiceException(ApprovalErrorCodes.InternalError, "服务信息缺少必填字段 " + name + "，请确认服务地址和接口版本。");
+    }
 }

@@ -28,6 +28,10 @@ var info = await client.GetInfoAsync();   // ApprovalService 0.1.0，接口 v1
 
 出错时抛 `ApprovalServiceException`，`ErrorCode` 是服务端的错误码，或者 SDK 自己的 `NETWORK_ERROR`（连不上）、`TIMEOUT`（超时）。
 
+创建客户端时，服务地址必须是完整的 HTTP 或 HTTPS 地址，可以带路径前缀，不能带账号、查询参数或片段；超时默认 30 秒，可设置为正数或 `Timeout.InfiniteTimeSpan`。API Key 可以不填（只查服务信息），填了就不能是空白或包含换行符。客户端会固定创建时的地址、Key 和超时，修改原来的 `ApprovalServiceClientOptions` 不影响已有客户端；一个客户端可供多个调用共享，使用完释放。
+
+调用方主动取消 `GetInfoAsync(cancellationToken)` 时保留 `OperationCanceledException`；客户端自身超时返回 `TIMEOUT`。若代理返回非 JSON 错误页，SDK 仍按 HTTP 状态归类常见的 400、401、403、404、405、409；服务信息缺少必填字段会报 `INTERNAL_ERROR`，便于发现地址指错或服务协议不匹配。
+
 ## 命令
 
 ```powershell

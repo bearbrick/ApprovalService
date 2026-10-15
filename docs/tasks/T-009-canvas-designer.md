@@ -15,6 +15,8 @@
 可以新建、修改的文件：
 
 - `frontend/src/designer/canvas/`（新建）；提供给 T-008 工作台的图形组件和操作接口，双方通过模型交互，不重复修改对方目录
+- `frontend/tests/canvas-checks.ts`、`frontend/tests/checks.ts`：画布纯图操作、静态校验、BPMN 导出检查及入口登记
+- `frontend/README.md`：说明组件的工作台接入方式与浏览器内 BPMN 操作
 - 流程图库：候选 LogicFlow（Apache-2.0，选型时核对协议）；bpmn-js 要求保留 bpmn.io 标志，不用。新增依赖按 R8 写 ADR、征得同意再下载
 
 ## 共享文件
@@ -22,6 +24,7 @@
 改这些文件前先在交接记录里写明改什么；改动尽量小，单独成一个提交：
 
 - `frontend/package.json`、`frontend/package-lock.json`
+- `docs/architecture.md`：把“以后加设计器”改为已经落地的画布组件与工作台接入边界；不改后端架构
 
 ## 验收标准
 
@@ -39,6 +42,7 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · 登记共享文件 `docs/architecture.md` 的最小同步修改：自由画布组件现已落在 `frontend/src/designer/canvas/`，工作台通过完整流程模型、选择事件和属性插槽接入。新文件均在任务范围；不新增依赖。
 - 2026-10-15 · Codex · T-001 已独立验收。从主分支建立任务分支并纳入 T-001，认领统一自由画布组件；优先使用浏览器原生 SVG 实现，以免新增未获批准的流程图库依赖。若任务实现中需要改共享文件，先在本节登记再修改。
 - 2026-10-13 · Codex · 按用户明确决定和 ADR 0007，将尚未认领的双设计器计划调整为统一自由画布；任务状态仍待认领。本轮只同步规划，不实现业务代码。
 

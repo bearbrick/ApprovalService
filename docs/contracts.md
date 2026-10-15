@@ -114,6 +114,10 @@
 
 条件与计算字段使用受限表达式，不执行任意代码。审批数据字段引用 `${fieldKey}`，明细子字段如 `${items.amount}`；`${initiator.department}`、`${initiator.role}`、`${initiator.level}` 保留给发起人上下文，不是审批数据字段。表达式可使用四则运算、比较、SUM、AVG、MAX、MIN、IF 和日期差等受支持函数；具体求值规则由引擎提供，发布校验至少核对字段引用是否存在。
 
+表达式的确定语义：数字为十进制数，不隐式转换字符串；字段缺失、类型不符、除零和数字溢出都会返回可纠正的中文错误。支持括号、一元负号与非、`* / + -`、`> >= < <= == !=`、`AND`/`OR`（也可写 `&&`/`||`），优先级按上述顺序递减；布尔运算和 `IF` 未选中分支短路。字符串用单引号或双引号包围，日期字段用 `yyyy-MM-dd` 字符串。`SUM`、`AVG`、`MAX`、`MIN` 接受数字或明细列数组；空集合报错。`ANY(集合)` 在集合内有布尔真值时为真，`ANY(集合, 值)` 在集合内有同类型相等值时为真。`DATEDIFF(起始日期, 结束日期)` 返回后者减前者的自然日数；`RMBUPPER(金额)` 返回人民币财务大写。只接受这些函数，不执行脚本或任意方法。表达式最多 2048 字符、32 层嵌套、512 个语法单元、每次聚合最多 1000 行；超过限制时拒绝。
+
+发起时数据快照是 JSON 对象；必传字段和明细子字段按类型检查，必传文本不能只含空白，明细错误路径带零起始行号，例如 `data.items[0].qty`。计算字段和审批人填写字段无需业务系统在发起时提交。`number` 和 `money` 必须是 JSON 数字，日期必须是 `yyyy-MM-dd`，人员和部门是字符串 ID，附件为一个文件 ID 字符串或文件 ID 字符串数组；必传明细表至少一行，单表最多 1000 行。`flows/{code}/schema` 可按同一字段定义生成 JSON 样例，样例不包含计算字段和审批人填写字段。审批编号由服务分配序号后按 `前缀-日期-流水号` 格式生成；日期格式支持 `yyyy`、`yyyyMM`、`yyyyMMdd`，流水号按配置位数补零，发号的并发唯一性由持久化层保证。
+
 `data.fields[]` 的字段包含 `key`、`name`、`type`、`required`、可选 `formula`、`approverInput` 与 `children`。`type` 可为 `text`、`number`、`money`、`date`、`person`、`department`、`attachment`、`detailTable`；明细表的子字段放在 `children`。计算字段仅供审批判断与展示，不回写业务单据；`approverInput` 表示由获授权节点的审批人填写。`summaryFields` 存字段 key，通常选三至五个。节点 `fieldPermissions[]` 的每项包含 `fieldKey` 和 `access`（`hidden`、`readOnly`、`editable`）；明细子字段 key 写成 `tableKey.childKey`。
 
 人工节点的 `assignee` 至少有 `source`；可选 `value`、`fieldKey`、`level` 分别存人员/角色/矩阵/接口等编码、数据字段和上级层级。来源覆盖指定成员、角色、岗位职级、上下级、部门负责人、业务数据人员/部门、分管领导、审批矩阵、业务接口、上一步指定、发起人自选和发起人本人。`approval` 存多人方式（`sequential`、`all`、`any`、`vote`）、票签门槛与权重、拒绝/缺人/本人/重复/离职处理、允许的操作、意见及已阅要求、时限；属性及默认值以 Contracts 模型为准。`subprocess` 存目标 `flowCode`、`waitForCompletion` 与 `dataMappings`；`automation` 存由出站适配层执行的 `actionCode` 和失败后交管理员的设置。

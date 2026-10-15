@@ -1,7 +1,7 @@
 # T-001 流程定义 JSON 与执行图编译
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-15
 里程碑：M1
 依赖：—
 设计书：§designer、§form、§engine
@@ -47,6 +47,7 @@
 
 ## 交接记录
 
+- 2026-10-15 · Codex · 认领并行开发。本任务会修改共享文件 `docs/contracts.md`、`backend/src/ApprovalService.Contracts/Flows/**`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`，分别用于登记正式 JSON 契约、接入场景检查和核对前端副本；修改会单独提交。以 `main` 建任务分支并纳入已验证的框架评审结果，尚未合并主分支或推送。
 - 2026-10-13 · Codex · 按用户明确决定和 ADR 0007，将尚未认领的双设计器计划调整为统一自由画布；任务状态仍待认领。本轮只同步规划，不实现业务代码。
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

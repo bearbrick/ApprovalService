@@ -10,7 +10,7 @@ namespace ApprovalService.Client;
 /// 骨架阶段只有 <see cref="GetInfoAsync"/>；发起、查询、撤回、重新提交、待办、审批操作、免登录地址、推送组织架构、上传附件、回调验签
 /// 按接口清单（设计书第 13 节）在 SDK 任务里补齐。
 /// </remarks>
-public sealed class ApprovalServiceClient : IDisposable
+public sealed partial class ApprovalServiceClient : IDisposable
 {
     /// <summary>
     /// 发请求用的 HttpClient。
@@ -111,10 +111,17 @@ public sealed class ApprovalServiceClient : IDisposable
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>解析后的 JSON（对象是字典，数组是列表）；响应体为空时为 null。</returns>
     /// <exception cref="ApprovalServiceException">服务返回错误、连不上或超时。</exception>
-    private async Task<object?> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken)
+    /// <param name="payload">可选的 JSON 请求体。</param>
+    private async Task<object?> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken, object? payload = null)
     {
         using (var request = new HttpRequestMessage(method, path))
         {
+            if (payload != null)
+            {
+                request.Content = new ByteArrayContent(JsonText.Serialize(payload));
+                request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            }
+
             if (!string.IsNullOrEmpty(apiKey))
             {
                 request.Headers.TryAddWithoutValidation(Protocol.ApiKey, apiKey);

@@ -21,7 +21,7 @@
 
 正式自由画布流程定义的 TypeScript 副本位于 `src/model/flow.ts`，供后续设计器使用；字段与后端 Contracts 保持一致。当前页面尚未接入流程设计、发布或审批业务接口。
 
-自由画布组件位于 `src/designer/canvas/FlowCanvasEditor.vue`。工作台传入 `v-model: FlowDefinition`，可用 `issues` 标出服务端发布问题，监听 `select` 获取选中节点或连线，并通过 `inspector` 插槽接管属性面板；`check()`、`focusElement(id)` 等公开方法可用于检查列表定位。组件内可以拖节点、连任意有向线、编辑分支条件、撤销重做、缩放平移和网格吸附。BPMN 导出包含标准图形与本服务完整扩展，导入只接受版本兼容且图形、摘要都一致的本服务文件。前端静态检查镜像后端的图结构、字段引用和受限表达式语法规则，并对纯常量表达式提前检查除零等可求值错误；最终发布仍由后端再次校验。草稿持久化与完整审批属性由工作台负责。
+自由画布组件位于 `src/designer/canvas/FlowCanvasEditor.vue`。工作台传入 `v-model: FlowDefinition`，可用 `issues` 标出服务端发布问题，监听 `select` 获取选中节点或连线，并通过 `inspector` 插槽接管属性面板；`check()`、`focusElement(id)` 等公开方法可用于检查列表定位。独立使用时组件自己维护撤销栈；工作台传入 `history-mode="external"` 后，每次完整编辑通过 `editCommitted(previousDefinition)` 提交旧快照，撤销与重做按钮和快捷键分别发 `undo`、`redo` 事件，由工作台统一管理历史。节点拖动只在松开时提交一次历史，拖动中的 `update:modelValue` 只更新当前画面。组件内可以拖节点、连任意有向线、编辑分支条件、撤销重做、缩放平移和网格吸附。BPMN 导出包含标准图形与本服务完整扩展，导入只接受版本兼容且图形、摘要都一致的本服务文件。前端静态检查镜像后端的图结构、字段引用和受限表达式语法规则，并对纯常量表达式提前检查除零等可求值错误；最终发布仍由后端再次校验。草稿持久化与完整审批属性由工作台负责。
 
 ## 命令
 

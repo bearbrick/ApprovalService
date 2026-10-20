@@ -8,6 +8,7 @@ import UiIcon from './components/ui/UiIcon.vue'
 import WorkspacePage from './pages/WorkspacePage.vue'
 import DesignerPage from './pages/DesignerPage.vue'
 import CenterPage from './pages/CenterPage.vue'
+import AdminPage from './pages/AdminPage.vue'
 import { useRouteNavigation } from './composables/useRouteNavigation.ts'
 import { useServiceConnection } from './composables/useServiceConnection.ts'
 
@@ -31,7 +32,7 @@ const serviceLabel = computed(() => state.value === 'loading' ? '正在连接' :
 
 <template>
   <component :is="route.mobile ? MobileShell : DesktopShell" :route="route" :service-label="serviceLabel" @service="serviceOpen = true">
-    <UiErrorBoundary :key="route.page === 'designer' ? `designer:${route.resourceId}` : route.hash"><DesignerPage v-if="route.page === 'designer'" :route="route" /><CenterPage v-else-if="route.page === 'center'" :route="route" /><WorkspacePage v-else :route="route" @service="serviceOpen = true" /></UiErrorBoundary>
+    <UiErrorBoundary :key="route.page === 'designer' ? `designer:${route.resourceId}` : route.hash"><DesignerPage v-if="route.page === 'designer'" :route="route" /><CenterPage v-else-if="route.page === 'center'" :route="route" /><AdminPage v-else-if="route.page === 'admin'" :route="route" /><WorkspacePage v-else :route="route" @service="serviceOpen = true" /></UiErrorBoundary>
   </component>
   <UiDialog :open="serviceOpen" title="服务连接" @close="serviceOpen = false">
     <div class="connection-status" :class="state" role="status" aria-live="polite"><UiIcon :name="state === 'connected' ? 'check' : state === 'error' ? 'alert' : 'refresh'" /><strong>{{ serviceLabel }}</strong></div>

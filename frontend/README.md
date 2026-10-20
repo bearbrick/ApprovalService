@@ -21,6 +21,8 @@
 
 管理入口见 `src/model/navigation.ts`，例如 `#/admin/org/roles`、`#/admin/outbound/queue`。设计器工作区预留 `#/designer/{flowCode}/{tab}`，支持 design（自由画布）、fields、layout、rules、print、versions。未知页面显示明确的返回入口，手机未知路径仍使用手机外壳。
 
+管理后台的 `AdminPage.vue`、`pages/admin/` 和 `model/admin.ts` 已覆盖管理工作台、流程、组织与绑定、应用接入、运行干预、出站、统计占位及系统信息/操作日志等入口；系统信息可直接打开 `#/admin/system/info`。页面只对服务端已授权的列做本地搜索，工作台无真实数据时显示“—”而不是虚构指标。`api/admin-adapter.ts` 当前明确报告“权限与数据接口未接入”；所有管理写入、管理员干预和密钥操作均禁用，不显示示例密钥或保存假配置。T-020 接入正式鉴权、逐页权限与审计接口后再启用这些操作；报表真实数据由 T-019 负责。
+
 正式自由画布流程定义的 TypeScript 副本位于 `src/model/flow.ts`，字段与后端 Contracts 保持一致。流程工作台现已接入自由画布、模板、节点与路线属性、审批数据及排版、打印设置、本地草稿和发布预检。正式发布接口及审批业务接口尚未接入；预检通过仅代表前端静态检查通过。
 
 ## 审批数据与详情排版模块

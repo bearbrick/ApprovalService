@@ -22,6 +22,8 @@
 - `backend/src/ApprovalService.Domain/Runtime/ActiveInstanceKeyEntity.cs`：跨三种数据库保证在途“流程编码 + 业务单号”唯一的独立键
 - `backend/src/ApprovalService.Domain/Runtime/InstanceEntity.cs`：保存发起时规范化的自选审批/抄送人与审批数据找人标识；后续节点到达重新读取最新组织与矩阵时仍保留业务选择
 - `backend/src/ApprovalService.Application/Runtime/`：现有运行应用服务的发起、查询和更新数据接入
+- `backend/src/ApprovalService.Engine/Commands/OperationModels.cs`、`OperationGuard.cs`：审批人填写字段的纯命令/事件审计承载，不改变引擎流转规则
+- `backend/src/ApprovalService.Application/Integration/OpenActionFieldValidator.cs`：节点可写字段白名单和类型校验，复用已有审批字段验证器
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`Migrations/`：接入应用实体、索引和出站记录的三种数据库迁移
 - `backend/src/ApprovalService.Infrastructure/Options/`：签名密钥加密主密钥等接入配置
 - `client/src/ApprovalService.Client/ApprovalErrorCodes.cs`：新错误码的副本
@@ -64,6 +66,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：审批人填写字段按已评审设计 §form605 只入操作记录和结果回调，由业务系统决定是否回写原单；审批数据快照保持不变。为实现该明确能力，先登记 T-006 范围扩展到 `OperationModels.cs`、`OperationGuard.cs` 和新 `OpenActionFieldValidator.cs`，共享 Contracts 请求/回调载体、`docs/contracts.md`、设计书 §api 将以同一契约提交同步。仅支持顶层 `ApproverInput`，明细子字段缺行索引协议将明确拒绝并交接；T-034 并行修改 Flows 契约和相同文档，合并时须保留双方条款。必填字段在不同人工命令中的生效边界待主任务确认，先实现已提交字段的严格权限与类型校验。
 - 2026-10-20 · Codex：增加无外部钩子的真实 HTTP + SQLite 本机性能基线，预热 4 次、每项测量 20 次并用最近秩法计算 P95；本次发起 22.4 ms、审批 17.7 ms、待办数量 3.0 ms，前一次独立运行分别 52.2/41.3/7.2 ms，均低于 300/300/50 ms 初定目标。该基线包含本机 TestServer 和 SQLite，不代表生产网络、数据库或钩子耗时。回调场景补齐九类外部事件编码、内部事件不外发、开始事件状态/数据快照稳定，以及待发项与正文身份不一致时拒绝出站；原有签名、失败重试、手动重发同正文同事件 ID、发送日志和停用应用隔离场景继续通过。完整 `verify.ps1` 通过：后端 498、调用端 33、前端 65 项，构建零警告。
 - 2026-10-20 · Codex：运行时重提/补充可把经应用层校验的审批数据和可信找人映射与状态、任务、事件、回调快照在同一事务提交，非重提命令拒绝替换；组织绑定变更后的数据人员/部门找人标识可重新解析，并保留发起时自选人员。真实 SQLite 场景覆盖无效命令不改数据、退回重提原子保存及本应用人员映射；`verify.ps1 -Part backend` 通过 492 项，零构建警告。这里只是内部基础，开放 PATCH/重新提交路由仍待用户确认字段级更新权限和 ApproverInput 保留规则；未把它们标成完成。
 - 2026-10-20 · Codex：开放撤回、催办、人工任务操作已接入统一命令入口；先以 API Key 核对审批单/任务来源应用，再严格解析实际操作人、目标人员及提及人员的本应用绑定。任务 ID 含斜杠，路由尾部捕获并兼容百分号编码；真实 HTTP 检查覆盖跨应用、未绑定工号、错误任务人、一小时催办限制、撤回和同意。发起自选审批/抄送人与审批数据找人标识已入审批单路由快照，后续节点按最新组织和矩阵重算；新增三库 `AddRoutingInputs` 迁移，HTTP 场景覆盖自选抄送跨节点与组织变更后部门负责人变化。完整 `verify.ps1` 通过：后端 489、调用端 33、前端 65 项，构建零警告。尚待实现的数据更新必须与路由映射同事务重算；开放终止管理员语义仍待用户确认。

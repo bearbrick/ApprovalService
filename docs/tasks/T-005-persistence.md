@@ -1,7 +1,7 @@
 # T-005 持久化：数据库、仓储、待发队列
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-20
 里程碑：M2
 依赖：T-002
 设计书：§engine
@@ -45,5 +45,7 @@
 - 每日备份（T-021）
 
 ## 交接记录
+
+- 2026-10-20 · Codex · 认领任务，基于 main 创建独立任务分支并引入已完成的 T-002 分支。计划使用本机已缓存、与标签服务同版本的 EF Core SQLite 10.0.12、SQL Server 10.0.12、PostgreSQL 10.0.3 及 Design 10.0.12；在新增依赖的 ADR 中记录选型。修改共享文件 `backend/Directory.Packages.props`、`InfrastructureServiceCollectionExtensions.cs`、`ApplicationServiceCollectionExtensions.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`docs/architecture.md`、`docs/adr/README.md` 前已登记；另需同步 `backend/README.md`。本轮先完成持久化核心与迁移，再验证并交接。
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

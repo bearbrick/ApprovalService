@@ -31,6 +31,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /health/live` | 存活检查 |
 | `GET /health/ready` | 数据库可连接时返回 `ready`；不可连接时返回 503 |
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
+| `POST /api/v1/files?fileName=...` | 原始字节上传附件；需可信身份，当前默认拒绝未认证调用 |
+| `GET /api/v1/files/{id}` | 验权下载或短时跳转；当前默认拒绝未认证调用 |
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
@@ -53,6 +55,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Provider` | `Sqlite` | 数据库：Sqlite、SqlServer、PostgreSql（MVP 用 SQLite） |
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
+| `Files:Provider` | `Local` | 新上传附件的存储：`Local` 或 `Minio`；历史文件按元数据读取 |
+| `Files:MaxUploadBytes` | `20971520` | 单文件大小限制，默认 20 MB |
+| `Files:Endpoint`、`Files:Bucket` | — | 使用 MinIO 时的绝对服务地址和私有桶名 |
+| `Files:AccessKey`、`Files:SecretKey` | — | 仅从部署环境提供的对象存储凭据，不要写入仓库 |
+| `Files:BrowserAccessible` | `false` | 浏览器可直连时签发短时地址，否则服务转发 |
+| `Files:PresignedUrlSeconds` | `300` | 预签名地址有效秒数 |
 
 ## 持久化与后台任务
 
@@ -61,5 +69,9 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试。出站回调等具体发送器由后续集成任务登记。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
+
+附件的文件字节不入数据库，`StoredFiles` 只保存名称、大小、内容类型、SHA-256、存储位置、所属审批单和清理租约。本地内容在数据目录的 `files/年/月/` 下，上传临时文件同目录原子转正。每小时扫描一次，清理上传超过 24 小时仍未关联的内容；多实例通过数据库条件更新抢租约。切换到 MinIO 时，先配置 `ApprovalService__Files__Provider=Minio` 和对象存储凭据，再运行 `powershell -NoProfile -ExecutionPolicy Bypass -File backend/tools/migrate-files.ps1` 搬运旧本地文件；中断后重跑会继续。真实对象存储检查需要设置 `APPROVAL_TEST_MINIO`（服务 URL）、`APPROVAL_TEST_MINIO_BUCKET`、`APPROVAL_TEST_MINIO_ACCESS_KEY`、`APPROVAL_TEST_MINIO_SECRET_KEY`，桶需事先存在。
+
+上传白名单是 PDF、PNG、JPEG、GIF、WebP、DOCX、XLSX、PPTX；Office 文件按 ZIP 结构识别，只下载查看，不做在线预览。OFD 和旧版 Office 文件的下载范围尚待单独确认。
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。`/health/ready` 会检查数据库连通性；数据库不可连接时返回 503。

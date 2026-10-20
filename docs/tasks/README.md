@@ -44,6 +44,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-025](T-025-frontend-foundation.md) | 完善前端公共框架 | 前端 | M1 | T-000 | frontend/src、frontend/tests |
 | [T-026](T-026-backend-configuration-validation.md) | 后端数据配置启动校验 | 后端 | 框架完善 | T-000 | Infrastructure 配置、后端检查 |
 | [T-027](T-027-client-foundation.md) | 调用端基础连接与错误边界 | 调用端 | M4 前置框架 | T-000 | src/ApprovalService.Client、tests/ApprovalService.Client.Checks |
+| [T-030](T-030-notification-channels.md) | 消息渠道与持久发送基础 | 后端 | M3 | T-005 | Notifications 模块 |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

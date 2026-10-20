@@ -17,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddApprovalApplication(this IServiceCollection services)
     {
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
+        services.AddScoped<IServiceReadinessAppService, ServiceReadinessAppService>();
         services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
         return services;
     }

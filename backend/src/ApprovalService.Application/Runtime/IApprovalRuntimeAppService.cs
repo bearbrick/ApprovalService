@@ -47,4 +47,20 @@ public sealed class RuntimeCommandInput
     {
         get; set;
     }
+
+    /// <summary>
+    /// 重新提交时由应用层校验并计算后的审批数据；与状态事件在同一事务保存。
+    /// </summary>
+    public string? UpdatedApprovalDataJson
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 审批数据人员/部门标识的可信内部映射；与数据一同更新。
+    /// </summary>
+    public string? UpdatedRoutingInputsJson
+    {
+        get; set;
+    }
 }

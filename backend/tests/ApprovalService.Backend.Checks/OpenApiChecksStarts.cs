@@ -271,6 +271,7 @@ internal static partial class OpenApiChecksStarts
                 ApprovalJson.Options);
             check("多部门发起选择已绑定所属部门且记录本应用已绑定代发人", multiResponse.StatusCode == HttpStatusCode.OK &&
                 multi is { InitiatorDepartmentId: "department-2", SubmittedById: "proxy" });
+            await RunDataUpdateStorageAsync(scope.ServiceProvider, multi!, multiDefinition, graph, check);
 
             using var spoofedScopeRequest = Request(new OpenStartRequest
             {

@@ -66,6 +66,20 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         // 每张审批单始终使用发起时锁定版本的执行图，调用方不能替换它。
         input.Context.Graph = JsonSerializer.Deserialize<FlowExecutionGraph>(flowVersion.GraphJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布的执行图为空。");
+        if (input.UpdatedApprovalDataJson is not null || input.UpdatedRoutingInputsJson is not null)
+        {
+            if (command.Kind is not (ApprovalService.Engine.Commands.OperationKinds.Resubmit or
+                    ApprovalService.Engine.Commands.OperationKinds.Supplement) ||
+                input.UpdatedApprovalDataJson is null || input.UpdatedRoutingInputsJson is null)
+            {
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批数据与找人映射必须在重新提交时一起更新。");
+            }
+
+            // 数据只在引擎命令成功后随同状态、事件和回调快照进入同一事务。
+            instance.ApprovalDataJson = input.UpdatedApprovalDataJson;
+            instance.RoutingInputsJson = input.UpdatedRoutingInputsJson;
+        }
+
         EngineResult result;
         try
         {

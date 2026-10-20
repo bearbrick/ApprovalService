@@ -173,6 +173,49 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
     }
 
     /// <summary>
+    /// 重新提交新业务数据时重新核对找人字段的本应用绑定，保留发起时自选人员。
+    /// </summary>
+    /// <param name="appCode">审批单来源接入应用。</param>
+    /// <param name="graph">锁定的执行图。</param>
+    /// <param name="data">重新校验后的审批数据。</param>
+    /// <param name="previousJson">发起时的路由输入。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>更新后的可信路由输入。</returns>
+    public async Task<OpenRoutingInputs> RefreshRoutingInputsAsync(string appCode, FlowExecutionGraph graph,
+        JsonElement data, string previousJson, CancellationToken cancellationToken = default)
+    {
+        var previous = JsonSerializer.Deserialize<OpenRoutingInputs>(previousJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("审批单发起路由快照为空。");
+        var result = new OpenRoutingInputs { InitiatorSelections = previous.InitiatorSelections };
+        foreach (var node in graph.Nodes)
+        {
+            var assignee = node.Assignee;
+            if (assignee?.Source == FlowAssigneeSources.DataPerson)
+            {
+                var externalId = ReadField(data, assignee.FieldKey);
+                if (externalId is not null)
+                {
+                    result.DataValues[assignee.FieldKey!] = await RequireBoundPersonAsync(appCode, externalId,
+                        cancellationToken);
+                }
+            }
+            else if (assignee?.Source == FlowAssigneeSources.DataDepartmentHead)
+            {
+                var externalId = ReadField(data, assignee.FieldKey);
+                if (externalId is not null)
+                {
+                    result.DataValues[assignee.FieldKey!] = await organization.ResolveBoundDepartmentAsync(appCode,
+                        externalId, cancellationToken)
+                        ?? throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                            $"部门 {externalId} 未在当前接入应用绑定，请先维护部门绑定。");
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// 将可信组织与数据快照中的条件统一计算成引擎输入。
     /// </summary>
     /// <param name="definition">锁定的流程定义。</param>

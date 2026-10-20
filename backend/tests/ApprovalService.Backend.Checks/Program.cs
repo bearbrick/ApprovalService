@@ -43,6 +43,7 @@ internal static class Program
         EngineFuzzChecks.Run(Check);
         AssigneeChecks.Run(Check);
         ApprovalPolicyChecks.Run(Check);
+        WorkCalendarChecks.Run(Check);
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
         await EventAnchorChecks.RunAsync(Check);

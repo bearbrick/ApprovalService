@@ -128,6 +128,15 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 ## 流程定义 JSON
 
+流程顶层新增两个可省略的流程级审批操作策略，`schemaVersion` 仍为 `1`，旧定义与旧执行图不需要迁移：
+
+| JSON 属性 | 值 | 省略时的行为 |
+| --- | --- | --- |
+| `withdrawBeforeFirstDecision` | `false` / `true` | `false`：发起人可在审批结束前撤回；`true`：仅首位人工处理人操作前可撤回 |
+| `returnMode` | `restart` / `returnNode` | `restart`：退回后重新提交从头推进；`returnNode`：回到发起退回的节点 |
+
+发布编译后的执行图保留这两个值。业务系统发起时，应用层须把已发布值固定到审批单操作状态，后续流程版本修改不影响在途单据；开放接口接线由 T-006 完成。
+
 权威模型在 `backend/src/ApprovalService.Contracts/Flows/`，前端镜像在 `frontend/src/model/flow.ts`。当前 `schemaVersion` 为 `1`。流程版本保存一份 `FlowDefinition`，其 `canvas` 是唯一设计方式；发布时编译成独立的 `FlowExecutionGraph`，运行图不含 `x`、`y`。发布后的版本锁定，已运行审批单始终使用发起时的版本。接口开放时仍按上文 `/api/v1` 约定，不在本节预设尚未实现的请求路径。
 
 顶层属性如下，JSON 属性名一律小驼峰；可空属性为 `null` 时按通用约定省略，集合默认为空集合。

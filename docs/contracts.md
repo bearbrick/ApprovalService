@@ -52,7 +52,7 @@
 | 接口 | 鉴权 | 说明 |
 | --- | --- | --- |
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
-| `GET /health/ready` | 无 | 就绪检查，返回 `ready`（以后加上数据库连通性） |
+| `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
 | `GET /api/v1/info` | 无 | 服务信息 |
 
 `GET /api/v1/info` 的响应：

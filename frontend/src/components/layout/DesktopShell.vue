@@ -70,7 +70,7 @@ watch(() => props.route.hash, () => { menuOpen.value = false; search.value = '' 
     </nav>
     <button class="service-trigger" aria-label="查看服务连接状态" @click="emit('service')"><UiIcon name="info" /><span>{{ serviceLabel }}</span></button>
   </header>
-  <aside class="desktop-sidebar" aria-label="工作区导航">
+  <aside v-if="route.page !== 'designer'" class="desktop-sidebar" aria-label="工作区导航">
     <div class="sidebar-title"><h2>{{ workspaceTitle }}</h2><span class="badge">框架阶段</span></div>
     <label class="nav-search"><UiIcon name="search" /><input v-model="search" aria-label="搜索工作区导航" placeholder="搜索功能"></label>
     <nav class="side-navigation" :aria-label="workspaceTitle + '功能'">
@@ -79,7 +79,7 @@ watch(() => props.route.hash, () => { menuOpen.value = false; search.value = '' 
     </nav>
     <div class="sidebar-footer"><span>审批服务 · 独立工作区</span><button class="btn" @click="emit('service')"><UiIcon name="info" />服务连接</button></div>
   </aside>
-  <main id="workspace-content" class="workspace" tabindex="-1"><slot /></main>
+  <main id="workspace-content" class="workspace" :class="{ 'designer-workspace-shell': route.page === 'designer' }" tabindex="-1"><slot /></main>
   <UiDialog :open="menuOpen" title="工作区导航" @close="menuOpen = false">
     <nav class="drawer-navigation" aria-label="窄屏主导航"><a v-for="item in NAV_ITEMS" :key="item.key" :href="item.hash" @click="menuOpen = false">{{ item.title }}</a><a href="#/m" @click="menuOpen = false">手机审批</a></nav>
     <nav class="side-navigation" :aria-label="workspaceTitle + '功能'"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined" @click="menuOpen = false">{{ item.title }}</a></nav>

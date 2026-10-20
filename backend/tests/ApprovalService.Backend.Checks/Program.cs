@@ -50,6 +50,7 @@ internal static class Program
         await JobChecks.RunAsync(Check);
         OperationChecks.Run(Check);
         OperationChecksBoundaries.Run(Check);
+        ApprovalDataChecks.Run(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

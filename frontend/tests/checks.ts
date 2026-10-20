@@ -9,7 +9,10 @@ import { NAV_ITEMS, parseRoute, resolveRoute } from '../src/model/routes.ts'
 import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/flow.ts'
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
+import { runDataChecks } from './data-checks.ts'
+import { runWorkbenchChecks } from './workbench-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
+import { runCanvasChecks } from './canvas-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
 
 /**
@@ -89,7 +92,10 @@ function checkSource(): void {
 
 checkRoutes()
 checkFlowModel()
+runDataChecks(check)
+runWorkbenchChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
+await runCanvasChecks(check)
 checkSource()
 console.log(`前端检查全部通过：${passed} 项`)

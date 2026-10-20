@@ -47,6 +47,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 `Commands/` 扩充同一个 `EngineRuntime.Execute` 入口：人工决定、退回和重新提交、转交、前后及并行加签、减签、征询回复、补充、评论与 @、暂存、抄送、催办、管理员干预都先校验状态、操作人、节点许可与意见要求，再修改状态并发事件。管理员不能直接跳到并行或包容汇合网关。事件的 `Audit` 带实际操作人、代谁处理、意见和干预原因；`EngineState.Operations` 与任务代理人信息必须随运行状态一起持久化。委托在节点到达时按固定时间和流程范围生效，旧待办可单独转给代理人；只解析一层，原审批人仍可处理。退回方式和撤回限制在发起时固定，不能靠后续请求临时更改。
 
 应用层必须从已认证身份填入 `OperationInput.ActorId`，独立核实管理员身份后才设置 `IsAdministrator`，核实另一起撤销审批已通过后才设置 `OperationContext.CancellationApproved`。批量同意的纯计算结果须由应用层在一个事务中保存；跨审批单的离职交接和修改流程定义里的指定人员也由应用层协调。引擎只生成催办、抄送、重发和撤销审批申请的待发事件，不直接调用外部系统。
+`src/ApprovalService.Engine/Expressions/` 提供纯逻辑的表达式解析、审批快照逐字段校验、JSON 样例生成和人民币大写。条件与计算字段用 `${fieldKey}` 引用快照，例如 `SUM(${items.amount}) >= 1000 AND ${initiator.level} >= 3`；明细列聚合、`IF`、`ANY` 和 `DATEDIFF` 的边界见契约文档。发起时可调用 `ApprovalDataValidator.Validate(definition, data)` 获得 `data.items[0].qty` 这样的错误路径，调用 `CreateExampleJson(definition)` 为 schema 接口生成示例。审批编号格式规则在领域层 `ApprovalSerialNumber.Format`，调用方必须先分配唯一流水号并传入时间；纯规则本身不抢号、不访问数据库。
 
 ## 配置
 

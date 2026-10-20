@@ -52,6 +52,10 @@ internal static class Program
         OperationChecksBoundaries.Run(Check);
         DepartureChecks.Run(Check);
         await DeparturePersistenceChecks.RunAsync(Check);
+        await OpenApiChecksClientApps.RunAsync(Check);
+        await IdentityAppServiceChecks.RunAsync(Check);
+        await OrganizationChecks.RunAsync(Check);
+        await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

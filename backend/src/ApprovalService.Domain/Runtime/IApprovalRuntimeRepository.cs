@@ -37,12 +37,36 @@ public interface IApprovalRuntimeRepository
     Task<bool> CommitAsync(RuntimeCommit commit, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 顺序读取只追加的操作记录，用于校验篡改。
+    /// 在同一数据库快照中读取审批单事件锚点与全部操作记录。
     /// </summary>
     /// <param name="instanceId">审批单 ID。</param>
     /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>按顺序号升序排列的记录。</returns>
-    Task<IReadOnlyList<OperationEventEntity>> LoadEventsAsync(string instanceId, CancellationToken cancellationToken = default);
+    /// <returns>事件链快照；审批单不存在时为空。</returns>
+    Task<EventChainSnapshot?> LoadEventChainAsync(string instanceId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// 审批单事件锚点和操作记录的一致读取结果。
+/// </summary>
+public sealed class EventChainSnapshot
+{
+    /// <summary>
+    /// 审批单最后一条事件的顺序号。
+    /// </summary>
+    public long LastEventSequence
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 审批单最后一条事件的校验值。
+    /// </summary>
+    public string LastEventHash { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 同一数据库快照内按顺序号升序读取的全部操作记录。
+    /// </summary>
+    public IReadOnlyList<OperationEventEntity> Events { get; set; } = [];
 }
 
 /// <summary>

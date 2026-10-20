@@ -450,7 +450,7 @@ internal static class PersistenceChecks
             inner.CommitAsync(commit, cancellationToken);
 
         /// <inheritdoc />
-        public Task<IReadOnlyList<OperationEventEntity>> LoadEventsAsync(string instanceId,
-            CancellationToken cancellationToken = default) => inner.LoadEventsAsync(instanceId, cancellationToken);
+        public Task<EventChainSnapshot?> LoadEventChainAsync(string instanceId,
+            CancellationToken cancellationToken = default) => inner.LoadEventChainAsync(instanceId, cancellationToken);
     }
 }

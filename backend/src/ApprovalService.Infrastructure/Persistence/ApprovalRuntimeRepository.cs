@@ -1,3 +1,4 @@
+using System.Data;
 using ApprovalService.Domain.Runtime;
 using Microsoft.EntityFrameworkCore;
 
@@ -115,11 +116,28 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<OperationEventEntity>> LoadEventsAsync(string instanceId, CancellationToken cancellationToken = default)
+    public async Task<EventChainSnapshot?> LoadEventChainAsync(string instanceId, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        return await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
+        // 两次查询放在可重复读的事务快照内，避免并发提交夹在锚点与事件读取之间。
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var anchor = await db.Instances.AsNoTracking().Where(item => item.Id == instanceId)
+            .Select(item => new { item.LastEventSequence, item.LastEventHash })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (anchor is null)
+        {
+            return null;
+        }
+
+        var events = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderBy(item => item.Sequence).ToListAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new EventChainSnapshot
+        {
+            LastEventSequence = anchor.LastEventSequence,
+            LastEventHash = anchor.LastEventHash,
+            Events = events,
+        };
     }
 
     /// <inheritdoc />

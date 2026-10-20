@@ -55,6 +55,7 @@ internal static class Program
         await OpenApiChecksFlows.RunAsync(Check);
         await OpenApiChecksCallbacks.RunAsync(Check);
         await OpenApiChecksActiveKeys.RunAsync(Check);
+        await OpenApiChecksQueries.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

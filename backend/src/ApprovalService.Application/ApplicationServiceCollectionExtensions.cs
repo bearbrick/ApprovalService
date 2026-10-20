@@ -23,6 +23,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ClientAppAppService>();
         services.AddScoped<FlowCatalogAppService>();
         services.AddScoped<CallbackDeliveryAppService>();
+        services.AddScoped<OpenApprovalQueryAppService>();
         return services;
     }
 }

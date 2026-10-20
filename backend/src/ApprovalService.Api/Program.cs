@@ -21,6 +21,7 @@ app.UseStatusCodePages(context => ApiErrors.WriteStatusAsync(context.HttpContext
 
 app.MapSystemEndpoints();
 app.MapOpenFlowEndpoints();
+app.MapOpenInstanceQueryEndpoints();
 
 app.Run();
 

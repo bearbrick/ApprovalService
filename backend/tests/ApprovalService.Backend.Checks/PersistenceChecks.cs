@@ -155,7 +155,7 @@ internal static class PersistenceChecks
                     FlowVersionId = "parallel-version",
                     FlowCode = "PURCHASE",
                     BusinessKey = "PO-002",
-                    Title = "会签场景",
+                    Title = "并行分支场景",
                     InitiatorId = "requester",
                     ClientAppCode = "demo",
                 },
@@ -190,7 +190,7 @@ internal static class PersistenceChecks
             var parallelDone = await service.ExecuteAsync(ApprovalInput(retryCommand, parallelGraph));
             await using (var context = await factory.CreateDbContextAsync())
             {
-                check("冲突方刷新重试后并行会签仅汇合一次",
+                check("冲突方刷新重试后并行分支仅汇合一次",
                     parallelDone.State.Status == EngineInstanceStatuses.Approved &&
                     await context.OperationEvents.CountAsync(item => item.InstanceId == "parallel-instance" &&
                         item.Kind == "instanceApproved") == 1);

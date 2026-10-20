@@ -233,11 +233,23 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
     {
         var definition = JsonSerializer.Deserialize<FlowDefinition>(record.FlowVersion.DefinitionJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布流程定义为空。");
+        var graph = JsonSerializer.Deserialize<FlowExecutionGraph>(record.FlowVersion.GraphJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("已发布执行图为空。");
+        var node = graph.Nodes.SingleOrDefault(item => item.Id == record.Task.NodeId)
+            ?? throw new InvalidOperationException("待办引用的已发布节点不存在。");
+        if (node.FieldPermissions.GroupBy(item => item.FieldKey, StringComparer.Ordinal).Any(group => group.Count() > 1))
+        {
+            throw new InvalidOperationException("已发布节点存在重复字段权限。");
+        }
+
+        var hidden = node.FieldPermissions.Where(item => item.Access == FlowFieldAccess.Hidden)
+            .Select(item => item.FieldKey).ToHashSet(StringComparer.Ordinal);
         using var data = JsonDocument.Parse(record.Instance.ApprovalDataJson);
         var summary = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
         foreach (var key in definition.Data.SummaryFields)
         {
-            if (data.RootElement.TryGetProperty(key, out var value))
+            // 未配置权限的摘要按既有默认可见语义处理，显式隐藏的字段绝不进入开放待办。
+            if (!hidden.Contains(key) && data.RootElement.TryGetProperty(key, out var value))
             {
                 summary[key] = value.Clone();
             }

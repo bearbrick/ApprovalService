@@ -97,6 +97,18 @@ internal static class FlowDefinitionChecks
         check("BPMN 往返保留流程级撤回和重提策略",
             imported.WithdrawBeforeFirstDecision && imported.ReturnMode == FlowReturnModes.ReturnNode
             && FlowCompiler.Compile(imported).Graph is { WithdrawBeforeFirstDecision: true, ReturnMode: FlowReturnModes.ReturnNode });
+
+        var duplicatePermissions = Copy(flows[0]);
+        var permissionNode = duplicatePermissions.Canvas.Nodes.First(node => node.FieldPermissions.Count > 0);
+        var permission = permissionNode.FieldPermissions.First();
+        permissionNode.FieldPermissions.Add(new FlowFieldPermission
+        {
+            FieldKey = permission.FieldKey,
+            Access = FlowFieldAccess.Hidden,
+        });
+        check("同一节点重复配置字段权限时拒绝发布",
+            FlowCompiler.Compile(duplicatePermissions).Issues.Any(issue =>
+                issue.ElementId == permissionNode.Id && issue.Message.Contains("重复权限", StringComparison.Ordinal)));
     }
 
     /// <summary>

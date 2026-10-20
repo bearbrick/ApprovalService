@@ -34,6 +34,10 @@ internal static class OpenApiChecksQueries
                 .UseSqlite("Data Source=" + Path.Combine(directory, "query.db")).Options;
             var factory = new QueryContextFactory(options);
             var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+            graph.Nodes.Single(node => node.Id == "n1").FieldPermissions =
+            [
+                new FlowFieldPermission { FieldKey = "secret", Access = FlowFieldAccess.Hidden },
+            ];
             await using (var db = await factory.CreateDbContextAsync())
             {
                 await db.Database.EnsureCreatedAsync();
@@ -46,7 +50,15 @@ internal static class OpenApiChecksQueries
                     SchemaVersion = 1,
                     DefinitionJson = JsonSerializer.Serialize(new FlowDefinition
                     {
-                        Data = new FlowDataDefinition { SummaryFields = ["amount"] },
+                        Data = new FlowDataDefinition
+                        {
+                            Fields =
+                            [
+                                new FlowFieldDefinition { Key = "amount", Name = "金额", Type = FlowFieldTypes.Number },
+                                new FlowFieldDefinition { Key = "secret", Name = "隐藏成本", Type = FlowFieldTypes.Text },
+                            ],
+                            SummaryFields = ["amount", "secret"],
+                        },
                     }, ApprovalJson.Options),
                     GraphJson = JsonSerializer.Serialize(graph, ApprovalJson.Options),
                 });
@@ -92,6 +104,8 @@ internal static class OpenApiChecksQueries
             check("待办数量与列表默认只统计本接入应用", ownCount.Pending == 1 && ownTasks.Count == 1 &&
                 ownTasks[0].InstanceId == "own" && ownTasks[0].Summary.GetProperty("amount").GetInt32() == 100 &&
                 ownTasks[0].OpenPath.Contains("own", StringComparison.Ordinal));
+            check("开放待办摘要不泄露当前节点显式隐藏的成本字段",
+                !ownTasks[0].Summary.TryGetProperty("secret", out _));
 
             var allDenied = false;
             try
@@ -160,7 +174,7 @@ internal static class OpenApiChecksQueries
                 Title = "采购",
                 InitiatorId = "requester",
                 ClientAppCode = appCode,
-                ApprovalDataJson = "{\"amount\":100}",
+                ApprovalDataJson = "{\"amount\":100,\"secret\":\"private\"}",
             },
         };
 

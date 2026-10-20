@@ -109,6 +109,11 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
                 {
                     task.CompletedAt = existing.CompletedAt;
                 }
+                if (task.Opinion is null && existing.Opinion is not null)
+                {
+                    // 后续节点命令会重建全部任务投影，已完成任务的意见必须持续保留。
+                    task.Opinion = existing.Opinion;
+                }
                 db.Entry(existing).CurrentValues.SetValues(task);
             }
             else

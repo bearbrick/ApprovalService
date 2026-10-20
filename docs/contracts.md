@@ -73,9 +73,14 @@
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=`、`POST /api/v1/tasks/{id}/actions` | 待办数量、待办列表、审批操作 | T-006 |
-| `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
 | `POST /api/v1/embed-tokens` | 签发嵌入令牌，换成免登录打开地址 | T-007 |
 | `POST /api/v1/org/changes`、`POST /api/v1/org/bindings` | 推送组织架构变更、绑定业务系统的用户和部门 | T-007 |
+
+## 附件接口
+
+`POST /api/v1/files?fileName=票据.png` 的请求体是文件原始字节，不是 JSON 或 multipart；返回 JSON：`{ "id": "...", "fileName": "票据.png", "size": 123, "contentType": "image/png", "sha256": "..." }`。服务按内容签名核对扩展名，默认单文件上限 20 MB。当前接受 PDF、PNG、JPEG、GIF、WebP，以及通过 ZIP 容器主部件识别的 DOCX、XLSX、PPTX；Office 文件只提供下载，不在线预览。其他类型返回 `VALIDATION_FAILED`。上传得到的文件 ID 可供审批数据引用；审批实例创建或审批意见保存时关联文件的业务入口由 T-006 接入。
+
+`GET /api/v1/files/{id}` 先校验可信身份及审批单可见性。本地文件与浏览器不可直连的 MinIO 由服务转发，浏览器可直连的 MinIO 返回短时预签名地址的 302 跳转。未关联审批单的附件只允许上传人下载；上传 24 小时后若仍未关联则自动清理。当前用户登录与接入应用鉴权尚未由 T-007、T-006 接入，公开路由默认返回 `UNAUTHORIZED`；客户端参数中的 `userId` 从不用于授权。
 
 ## 回调和业务系统提供的接口（规划中）
 

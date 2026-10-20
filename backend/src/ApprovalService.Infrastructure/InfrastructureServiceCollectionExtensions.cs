@@ -37,8 +37,9 @@ public static class InfrastructureServiceCollectionExtensions
             .Bind(configuration.GetSection(FileStorageOptions.SectionName))
             .Validate(options => options.Provider is "Local" or "Minio", "附件存储提供者必须是 Local 或 Minio。")
             .Validate(options => options.MaxUploadBytes > 0, "附件大小限制必须是正数。")
-            .Validate(options => options.PresignedUrlSeconds is >= 1 and <= 604800,
-                "附件预签名地址有效期必须为 1 秒到 7 天。")
+            .Validate(options => options.PresignedUrlSeconds >= 1 &&
+                options.PresignedUrlSeconds <= FileStorageOptions.MaxPresignedUrlSeconds,
+                "附件预签名地址有效期必须为 1 秒到 5 分钟。")
             .Validate(options => options.Provider != "Minio" ||
                 (Uri.TryCreate(options.Endpoint, UriKind.Absolute, out var endpoint) &&
                     endpoint.Scheme is "http" or "https" && endpoint.AbsolutePath == "/" &&

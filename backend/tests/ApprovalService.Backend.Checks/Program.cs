@@ -58,6 +58,10 @@ internal static class Program
         await OpenApiChecksQueries.RunAsync(Check);
         await OpenApiChecksQueryHttp.RunAsync(backendRoot, Check);
         OpenApiChecksData.Run(Check);
+        await IdentityAppServiceChecks.RunAsync(Check);
+        await OrganizationChecks.RunAsync(Check);
+        await IdentityEndpointChecks.RunAsync(backendRoot, Check);
+
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

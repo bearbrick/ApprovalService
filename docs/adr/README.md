@@ -46,3 +46,6 @@
 | [0007](0007-single-canvas-designer.md) | 流程设计统一使用自由画布 | 已采纳 |
 | [0008](0008-ef-core-providers.md) | 运行库使用 EF Core 和三种独立迁移 | 已采纳 |
 | [0010](0010-outbound-hook-protocol.md) | 明确业务系统四类出站钩子的 HTTP 协议 | 提议 |
+| [0011](0011-local-jwt-identity.md) | 本地账号使用短期 JWT 与可轮换刷新令牌 | 已采纳 |
+| [0012](0012-miniexcel-organization-import.md) | 组织 Excel 导入导出使用 MiniExcel | 已采纳 |
+| [0013](0013-bound-user-id-for-open-api.md) | 开放接口只接受接入应用已绑定的人员 ID | 提议 |

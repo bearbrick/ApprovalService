@@ -1,4 +1,6 @@
+using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
+using ApprovalService.Application.Organization;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<FlowCatalogAppService>();
         services.AddScoped<CallbackDeliveryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
+        services.AddScoped<IOrganizationAppService, OrganizationAppService>();
+        services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
+        services.AddScoped<IIdentityAppService, IdentityAppService>();
         return services;
     }
 }

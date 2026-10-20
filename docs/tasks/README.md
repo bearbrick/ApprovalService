@@ -48,6 +48,8 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-030](T-030-notification-channels.md) | 消息渠道与持久发送基础 | 后端 | M3 | T-005 | Notifications 模块 |
 | [T-031](T-031-center-frontend.md) | 审批中心电脑前端基础 | 前端 | M3 | T-025、T-008、T-009、T-010 | frontend/src/pages/center、frontend/src/model/center.ts |
 | [T-032](T-032-integration-baseline.md) | 已验收功能的可验证集成基线 | 全部 | M2～M4 | T-001～T-005、T-008～T-010、T-025～T-028、T-030、T-031 | backend、frontend、client、docs |
+| [T-033](T-033-admin-frontend.md) | 管理后台前端基础 | 前端 | M3 | T-025、T-008、T-031 | frontend/src/pages/admin、frontend/src/model/admin.ts |
+| [T-035](T-035-mobile-frontend.md) | 手机审批中心前端基础 | 前端 | M3 | T-032、T-033 | frontend/src/pages/mobile、frontend/src/model/mobile.ts |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

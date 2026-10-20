@@ -38,6 +38,27 @@ internal static class Program
         }
 
         ContractChecks.Run(repositoryRoot, Check);
+        FlowDefinitionChecks.Run(backendRoot, Check);
+        EngineScenarioChecks.Run(Check);
+        EngineFuzzChecks.Run(Check);
+        AssigneeChecks.Run(Check);
+        ApprovalPolicyChecks.Run(Check);
+        await DatabaseProviderChecks.RunAsync(Check);
+        await PersistenceChecks.RunAsync(Check);
+        await EventAnchorChecks.RunAsync(Check);
+        await EventChainConsistencyChecks.RunAsync(Check);
+        await JobChecks.RunAsync(Check);
+        OperationChecks.Run(Check);
+        OperationChecksBoundaries.Run(Check);
+        ApprovalDataChecks.Run(Check);
+        DepartureChecks.Run(Check);
+        await DeparturePersistenceChecks.RunAsync(Check);
+        await DepartureJobChecks.RunAsync(Check);
+        await OpenApiChecksClientApps.RunAsync(Check);
+        await IdentityAppServiceChecks.RunAsync(Check);
+        await OrganizationChecks.RunAsync(Check);
+        await IdentityEndpointChecks.RunAsync(backendRoot, Check);
+        await NotificationChecks.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

@@ -1,7 +1,7 @@
 # T-013 附件存储：本地文件和 MinIO / S3
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-20
 里程碑：M3
 依赖：T-005
 设计书：§engine
@@ -41,5 +41,7 @@
 - Office、OFD 在线预览（二期）
 
 ## 交接记录
+
+- 2026-10-20 · Codex · 从 main 建立独立工作树并认领；依赖 T-005 已验收，将其合入本任务分支作为数据库基础。预计共享文件包括 `backend/Directory.Packages.props`（S3 客户端版本，如获准下载）、`backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`（模块登记）、`docs/contracts.md`（上传下载协议）、`docs/architecture.md` 与 `docs/adr/README.md`（架构和新依赖 ADR）；若需开放接口契约，还须按 §6.4 同步 Contracts 和调用端副本。先做无需新包的元数据、本地存储、权限与清理骨架；未缓存依赖未经同意不下载。
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

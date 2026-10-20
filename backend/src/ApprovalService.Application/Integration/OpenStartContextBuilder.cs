@@ -256,7 +256,13 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
             OccurredAt = now,
             Conditions = conditions,
             AssigneeSnapshot = snapshot,
-            Operations = new OperationContext { InitiatorId = snapshot.InitiatorId, FlowCode = definition.Code },
+            Operations = new OperationContext
+            {
+                InitiatorId = snapshot.InitiatorId,
+                FlowCode = definition.Code,
+                WithdrawBeforeFirstDecision = graph.WithdrawBeforeFirstDecision,
+                ReturnMode = graph.ReturnMode,
+            },
         };
     }
 

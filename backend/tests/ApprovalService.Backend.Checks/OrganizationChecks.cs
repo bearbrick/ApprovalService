@@ -157,6 +157,25 @@ internal static class OrganizationChecks
             check("工号自动绑定后业务人员和部门 ID 可解析", personId == "p1" &&
                 await lookup.ResolvePersonAsync("demo", "external-1") == "p1" &&
                 await lookup.ResolveDepartmentAsync("demo", "external-d1") == "d1");
+            check("严格部门解析仅接受本应用绑定，不回退全局部门 ID 或编码",
+                await lookup.ResolveBoundDepartmentAsync("demo", "external-d1") == "d1" &&
+                await lookup.ResolveBoundDepartmentAsync("other", "external-d1") is null &&
+                await lookup.ResolveBoundDepartmentAsync("demo", "d1") is null &&
+                await lookup.ResolveBoundDepartmentAsync("demo", "D1") is null &&
+                await lookup.ResolveDepartmentAsync("demo", "D1") == "d1");
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                db.ExternalDepartmentBindings.Add(new ExternalDepartmentBindingEntity
+                {
+                    ClientAppCode = "demo",
+                    ExternalDepartmentId = "removed-department",
+                    DepartmentId = "no-such-department",
+                    Method = "import",
+                });
+                await db.SaveChangesAsync();
+            }
+            check("严格部门解析拒绝已失效的孤儿绑定",
+                await lookup.ResolveBoundDepartmentAsync("demo", "removed-department") is null);
             check("手机号唯一匹配可手工补绑定", await service.BindPersonAsync(new PersonBindingInput
             {
                 ClientAppCode = "demo",

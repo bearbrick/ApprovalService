@@ -185,6 +185,8 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
             BusinessKey = instance.BusinessKey,
             Title = instance.Title,
             InitiatorId = instance.InitiatorId,
+            InitiatorDepartmentId = instance.InitiatorDepartmentId,
+            SubmittedById = instance.SubmittedById,
             ClientAppCode = instance.ClientAppCode,
             Status = instance.Status,
             Data = data.RootElement.Clone(),

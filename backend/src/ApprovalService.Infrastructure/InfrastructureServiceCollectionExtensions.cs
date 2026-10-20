@@ -42,9 +42,16 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
+        services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
         services.AddSingleton(new IntegrationTransportPolicy
         {
             AllowHttpUrls = configuration.GetValue<bool>("ApprovalService:Integration:AllowHttpUrls"),
+        });
+        services.AddSingleton(new OpenStartSerialOptions
+        {
+            Prefix = configuration["ApprovalService:Integration:SerialPrefix"] ?? "SP",
+            DatePattern = configuration["ApprovalService:Integration:SerialDatePattern"] ?? "yyyyMM",
+            Digits = configuration.GetValue<int?>("ApprovalService:Integration:SerialDigits") ?? 6,
         });
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton(TimeProvider.System);

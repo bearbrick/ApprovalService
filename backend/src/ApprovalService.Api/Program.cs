@@ -81,6 +81,7 @@ app.MapSystemEndpoints();
 app.MapOpenFlowEndpoints();
 app.MapOpenInstanceQueryEndpoints();
 app.MapOpenTaskEndpoints();
+app.MapOpenStartEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
 

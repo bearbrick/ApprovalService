@@ -135,6 +135,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
 
     /// <summary>
+    /// 审批编号的持久流水号。
+    /// </summary>
+    public DbSet<SerialNumberCounterEntity> SerialNumberCounters => Set<SerialNumberCounterEntity>();
+
+    /// <summary>
     /// 每次回调发送的结果日志。
     /// </summary>
     public DbSet<OutboundSendLogEntity> OutboundSendLogs => Set<OutboundSendLogEntity>();
@@ -175,6 +180,15 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<SerialNumberCounterEntity>(entity =>
+        {
+            entity.ToTable("SerialNumberCounters");
+            entity.HasKey(item => new { item.Prefix, item.DateBucket });
+            entity.Property(item => item.Prefix).HasMaxLength(16);
+            entity.Property(item => item.DateBucket).HasMaxLength(8);
+            entity.Property(item => item.Version).IsConcurrencyToken();
+        });
+
         modelBuilder.Entity<ActiveInstanceKeyEntity>(entity =>
         {
             entity.ToTable("ActiveInstanceKeys");

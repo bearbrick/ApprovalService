@@ -38,6 +38,22 @@ public sealed class OpenInstanceResponse
     public string InitiatorId { get; set; } = string.Empty;
 
     /// <summary>
+    /// 本次选定的内部发起部门 ID。
+    /// </summary>
+    public string? InitiatorDepartmentId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 实际代发人的内部人员 ID；本人发起时为空。
+    /// </summary>
+    public string? SubmittedById
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 发起时的来源接入应用。
     /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;

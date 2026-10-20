@@ -237,6 +237,28 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("OutboundSendLogs", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Integration.SerialNumberCounterEntity", b =>
+                {
+                    b.Property<string>("Prefix")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("DateBucket")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<long>("NextSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Prefix", "DateBucket");
+
+                    b.ToTable("SerialNumberCounters", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
                 {
                     b.Property<string>("Id")

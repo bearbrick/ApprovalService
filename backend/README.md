@@ -33,6 +33,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
+| `POST /api/v1/instances` | 传审批数据快照发起；已在途同号返回原审批单，需 API Key |
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=` | 按本应用已绑定人员读取待办数量和列表，需 API Key |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/identity/change-password` | 工号密码登录、刷新令牌轮换、首次或日常改密 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地组织管理员开通账号、作废人员全部令牌 |
@@ -71,6 +72,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
 | `Integration:AllowHttpUrls` | `false` | 仅受信任内网部署显式开启；默认回调与钩子地址必须用 HTTPS |
+| `Integration:SerialPrefix`、`SerialDatePattern`、`SerialDigits` | `SP`、`yyyyMM`、`6` | 部署级审批编号默认格式；流程级配置由管理后台后续接入 |
 | `Identity:SigningKey` | 数据目录内随机密钥文件 | 可选的 Base64 JWT 签名密钥；多实例部署须配置同一密钥 |
 | `Integration:MasterKey` | — | 接入应用签名密钥加密所需的 32 字节 Base64 主密钥；不要提交仓库 |
 
@@ -82,6 +84,10 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试。接入应用的 API Key 只存 SHA-256 摘要，回调签名密钥使用部署主密钥加密。回调正文在审批事务中固定，后台发送器用 HMAC-SHA256 签名、5 秒超时；每次发送留不含正文的结果日志，管理用例可重排原事件且不改变 `eventId`。四类业务钩子的精确协议待 ADR 0010 确认。
 
 在途业务单号按全局 `(flowCode, businessKey)` 唯一，接入应用不能把其他应用占用的单据当作幂等结果。审批详情在同一数据库快照读取状态、任务和事件。出站地址默认要求 HTTPS，回调应用停用时保留待发项并记录原因；HTTP 重定向不会把签名正文转发到其他地址。
+
+开放发起要求本应用已绑定的在职发起人；可选的代发人、发起部门和自选审批/抄送人员也须先绑定。指定发起部门必须是发起人的所属部门，流程配置的允许部门只以可信组织主数据判断。流水号按部署级默认格式持久分配，流程级格式后续由管理后台接入。
+
+发起接口只接受当前应用已有人员/部门绑定，由服务端加载组织快照、重算公式和分支条件；编号以数据库唯一键和乐观版本分配，同日同前缀并发不会重号。编号先分配再提交审批，发起校验或并发冲突后允许留空号。业务取数、校验、业务取人和自动动作钩子的精确协议仍待 ADR 0010 确认；在此之前不接受只传单号，相关流程给出可纠正错误。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
 

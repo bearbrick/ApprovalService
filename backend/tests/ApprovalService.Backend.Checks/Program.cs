@@ -52,6 +52,7 @@ internal static class Program
         OperationChecksBoundaries.Run(Check);
         DepartureChecks.Run(Check);
         await DeparturePersistenceChecks.RunAsync(Check);
+        await DepartureJobChecks.RunAsync(Check);
         await OpenApiChecksClientApps.RunAsync(Check);
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);

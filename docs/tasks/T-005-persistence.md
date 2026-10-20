@@ -18,7 +18,7 @@
 - `backend/src/ApprovalService.Infrastructure/Persistence/`：EF Core 上下文、配置、三种数据库的迁移；`backend/tools/add-migration.ps1`（参照标签服务）
 - `backend/src/ApprovalService.Infrastructure/Jobs/`：待发队列的发送器（抢锁）、定时任务
 - `backend/src/ApprovalService.Application/Runtime/`：加载状态 → 调引擎 → 在一个事务里存状态和事件
-- 就绪检查加上数据库连通性；检查程序 `PersistenceChecks.cs`、`DatabaseProviderChecks.cs`
+- 就绪检查加上数据库连通性；检查程序 `PersistenceChecks.cs`、`DatabaseProviderChecks.cs`、`EventAnchorChecks.cs`、`EventChainConsistencyChecks.cs`、`JobChecks.cs`、`JobReadbackRaceChecks.cs`
 - `backend/src/ApprovalService.Infrastructure/ApprovalService.Infrastructure.csproj`：引用本任务已指定的数据库提供程序
 - `backend/src/ApprovalService.Api/Endpoints/SystemEndpoints.cs`：就绪检查调用数据库探针
 - `backend/tests/ApprovalService.Backend.Checks/ServerChecks.cs`、`ServerFactory.cs`：更新就绪语义并在删除临时 SQLite 库前清空连接池

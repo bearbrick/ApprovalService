@@ -1,4 +1,6 @@
+using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Options;
+using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,6 +29,10 @@ public static class InfrastructureServiceCollectionExtensions
             .Validate(options => options.Provider is not ("SqlServer" or "PostgreSql") || !string.IsNullOrWhiteSpace(options.ConnectionString),
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
+        services.AddApprovalPersistence(configuration);
+        services.AddSingleton<OutboxQueue>();
+        services.AddSingleton<ScheduledJobQueue>();
+        services.AddHostedService<DurableJobWorker>();
         return services;
     }
 }

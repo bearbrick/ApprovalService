@@ -113,6 +113,11 @@ public sealed class OpenApprovalStartAppService(
                     SubmittedById = submittedById,
                     ClientAppCode = app.Code,
                     ApprovalDataJson = data.GetRawText(),
+                    RoutingInputsJson = JsonSerializer.Serialize(new OpenRoutingInputs
+                    {
+                        InitiatorSelections = context.AssigneeSnapshot?.InitiatorSelections ?? new(StringComparer.Ordinal),
+                        DataValues = context.AssigneeSnapshot?.DataValues ?? new(StringComparer.Ordinal),
+                    }, ApprovalJson.Options),
                     DetailUrl = request.DetailUrl,
                     IsUrgent = request.IsUrgent,
                 },

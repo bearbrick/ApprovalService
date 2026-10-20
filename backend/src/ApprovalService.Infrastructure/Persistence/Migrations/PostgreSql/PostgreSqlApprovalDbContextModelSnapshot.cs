@@ -754,6 +754,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("RoutingInputsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("SerialNo")
                         .IsRequired()
                         .HasMaxLength(64)

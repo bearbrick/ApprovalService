@@ -56,6 +56,14 @@ public interface IApprovalOpenQueryRepository
         int skip, int take, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 按任务 ID 读取所属审批单与锁定流程版本，供开放操作检查应用归属。
+    /// </summary>
+    /// <param name="taskId">任务 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>任务及归属；不存在时为空。</returns>
+    Task<OpenTaskRecord?> LoadTaskAsync(string taskId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 直接在数据库统计待办、加急和超时数量。
     /// </summary>
     /// <param name="personId">已解析的内部人员 ID。</param>

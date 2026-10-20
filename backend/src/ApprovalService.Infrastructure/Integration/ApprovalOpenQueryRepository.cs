@@ -77,6 +77,18 @@ public sealed class ApprovalOpenQueryRepository(IDbContextFactory<ApprovalDbCont
     }
 
     /// <inheritdoc />
+    public async Task<OpenTaskRecord?> LoadTaskAsync(string taskId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await (from task in db.ApprovalTasks.AsNoTracking()
+                      join instance in db.Instances.AsNoTracking() on task.InstanceId equals instance.Id
+                      join version in db.FlowVersions.AsNoTracking() on instance.FlowVersionId equals version.Id
+                      where task.Id == taskId
+                      select new OpenTaskRecord { Task = task, Instance = instance, FlowVersion = version })
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<OpenTaskCounts> CountPendingTasksAsync(string personId, string? clientAppCode, DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {

@@ -27,6 +27,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CallbackDeliveryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
+        services.AddScoped<OpenInstanceCommandAppService>();
+        services.AddScoped<OpenTaskActionAppService>();
         services.AddScoped<OpenStartContextBuilder>();
         services.AddSingleton<IMatrixMatchProvider, UnconfiguredMatrixMatchProvider>();
         services.AddScoped<IOrganizationAppService, OrganizationAppService>();

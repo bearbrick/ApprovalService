@@ -212,6 +212,10 @@ internal static class OpenApiChecksQueries
             inner.ListPendingTasksAsync(personId, clientAppCode, skip, take, cancellationToken);
 
         /// <inheritdoc />
+        public Task<OpenTaskRecord?> LoadTaskAsync(string taskId, CancellationToken cancellationToken = default) =>
+            inner.LoadTaskAsync(taskId, cancellationToken);
+
+        /// <inheritdoc />
         public Task<OpenTaskCounts> CountPendingTasksAsync(string personId, string? clientAppCode, DateTimeOffset now,
             CancellationToken cancellationToken = default) =>
             inner.CountPendingTasksAsync(personId, clientAppCode, now, cancellationToken);

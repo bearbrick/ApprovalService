@@ -20,6 +20,7 @@
 - `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
 - `backend/src/ApprovalService.Domain/Runtime/IApprovalRuntimeRepository.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalRuntimeRepository.cs`：审批单和任务查询、在途唯一性与数据更新所需仓储能力
 - `backend/src/ApprovalService.Domain/Runtime/ActiveInstanceKeyEntity.cs`：跨三种数据库保证在途“流程编码 + 业务单号”唯一的独立键
+- `backend/src/ApprovalService.Domain/Runtime/InstanceEntity.cs`：保存发起时规范化的自选审批/抄送人与审批数据找人标识；后续节点到达重新读取最新组织与矩阵时仍保留业务选择
 - `backend/src/ApprovalService.Application/Runtime/`：现有运行应用服务的发起、查询和更新数据接入
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`Migrations/`：接入应用实体、索引和出站记录的三种数据库迁移
 - `backend/src/ApprovalService.Infrastructure/Options/`：签名密钥加密主密钥等接入配置
@@ -63,6 +64,8 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：开放撤回、催办、人工任务操作已接入统一命令入口；先以 API Key 核对审批单/任务来源应用，再严格解析实际操作人、目标人员及提及人员的本应用绑定。任务 ID 含斜杠，路由尾部捕获并兼容百分号编码；真实 HTTP 检查覆盖跨应用、未绑定工号、错误任务人、一小时催办限制、撤回和同意。发起自选审批/抄送人与审批数据找人标识已入审批单路由快照，后续节点按最新组织和矩阵重算；新增三库 `AddRoutingInputs` 迁移，HTTP 场景覆盖自选抄送跨节点与组织变更后部门负责人变化。完整 `verify.ps1` 通过：后端 489、调用端 33、前端 65 项，构建零警告。尚待实现的数据更新必须与路由映射同事务重算；开放终止管理员语义仍待用户确认。
+- 2026-10-20 · Codex：审批操作接入前核对设计书 #rules：审批人到达节点时按最新组织/矩阵求值，但发起自选人员、发起部门和业务数据保持发起快照。因此在本任务范围登记 `InstanceEntity.cs`，计划持久化发起时规范化的路由输入，后续人工命令用最新组织快照重算并复用这些输入，三库迁移由 EF 工具生成。设计 §api 的开放终止与现有引擎“仅管理员、必填原因”权限不一致，已向主任务报告，确认前暂不接该路由；先完成撤回/催办及明确的审批操作。
 - 2026-10-20 · Codex：开放发起 POST 已接入已发布流程、可信组织快照、审批数据校验与公式重算、分支条件、自选审批/抄送人员、持久流水号和运行时原子在途键。请求新增本应用严格绑定的选定发起部门与代发人；发起部门核对人员归属，管理员配置的流程允许部门只用可信组织主数据解析，避免应用伪造同名绑定绕过。新增三库 `AddSerialNumberCounters` 迁移、HTTP 场景和契约/设计同步；流程级编号配置仍由 T-020 管理后台接入，当前为部署级默认 `SP-yyyyMM-六位`。取数/校验/取人/动作钩子仍待 ADR 0010 确认，附件引用在同应用归属与原子关联接通前拒绝；矩阵命中依赖可信提供者，未配置即明确报错。完整 `verify.ps1` 已通过：后端 477、调用端 33、前端 65 项。其余更新数据、撤回、重提、催办、终止、审批操作与批量发起继续实现。
 - 2026-10-20 · Codex：待办数量和列表 HTTP 路由已接入现有数据库聚合与摘要投影；`user` 仅以本接入应用既有绑定解析，默认只看本应用，获授权才可传 `scope=all`。共享的 Contracts 路径、Api/检查 Program、`docs/contracts.md` 同步登记和更新，真实 HTTP 场景覆盖跨应用、未绑定工号及无效分页。完整 `verify.ps1` 后端 465、调用端 33、前端 65 项通过。发起审批的编号格式遵循设计 §form 的可配置方向；本任务不把示例前缀/日期/位数写死为最终规则。
 - 2026-10-20 · Codex：局部合入 T-007 已提交基线 `04045e2`，保留双方的开放路由、身份/组织路由、DI、模型配置及契约说明。三库 `AddOrganizationIdentity` 迁移通过 EF 工具基于合并后模型重新生成；SQLite 从空库迁移和模型快照检查、后端 460 项、调用端 33 项、前端 65 项及完整 `verify.ps1` 均通过。发起和待办人员身份只使用 `ResolveBoundPersonAsync`，不能使用全局工号回退；未获确认的四类钩子协议和附件绑定仍保持隔离，后续继续实现明确的开放接口。

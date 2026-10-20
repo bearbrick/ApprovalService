@@ -18,7 +18,7 @@ namespace ApprovalService.Backend.Checks;
 /// <summary>
 /// 以真实 HTTP、组织绑定和迁移数据库检查开放发起的权限、公式与在途幂等。
 /// </summary>
-internal static class OpenApiChecksStarts
+internal static partial class OpenApiChecksStarts
 {
     /// <summary>
     /// 执行两个接入应用的发起场景。
@@ -44,7 +44,7 @@ internal static class OpenApiChecksStarts
             {
                 Code = "demo",
                 Name = "示例",
-                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE"],
+                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC"],
             });
             var other = await clients.CreateAsync(new CreateClientAppInput
             {
@@ -143,6 +143,13 @@ internal static class OpenApiChecksStarts
                     PersonId = "proxy",
                     Method = "manual",
                 });
+                db.ExternalPersonBindings.Add(new ExternalPersonBindingEntity
+                {
+                    ClientAppCode = "demo",
+                    ExternalUserId = "bob",
+                    PersonId = "approver",
+                    Method = "manual",
+                });
                 db.ExternalDepartmentBindings.AddRange(
                     new ExternalDepartmentBindingEntity
                     {
@@ -229,6 +236,27 @@ internal static class OpenApiChecksStarts
                 first is not null && second is not null && first.SerialNo.StartsWith("SP-") &&
                 first.SerialNo.EndsWith("-000001") && second.SerialNo.EndsWith("-000002"));
 
+            using var wrongActorRequest = ActionRequest(second!.Tasks.Single().Id,
+                new OpenTaskActionRequest { User = "alice", Action = EngineCommandKinds.Approve }, demo.ApiKey,
+                "action-wrong-actor");
+            using var wrongActorResponse = await http.SendAsync(wrongActorRequest);
+            check("非任务处理人不能借本应用 Key 同意", wrongActorResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var foreignActionRequest = ActionRequest(second.Tasks.Single().Id,
+                new OpenTaskActionRequest { User = "bob", Action = EngineCommandKinds.Approve }, other.ApiKey,
+                "action-foreign");
+            using var foreignActionResponse = await http.SendAsync(foreignActionRequest);
+            check("另一接入应用不能审批本应用任务", foreignActionResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var approveRequest = ActionRequest(second.Tasks.Single().Id,
+                new OpenTaskActionRequest { User = "bob", Action = EngineCommandKinds.Approve }, demo.ApiKey,
+                "action-approve");
+            using var approveResponse = await http.SendAsync(approveRequest);
+            var approved = JsonSerializer.Deserialize<OpenInstanceResponse>(await approveResponse.Content.ReadAsStringAsync(),
+                ApprovalJson.Options);
+            check("已绑定审批人经统一引擎入口同意并完成审批单", approveResponse.StatusCode == HttpStatusCode.OK &&
+                approved is { Status: EngineInstanceStatuses.Approved });
+
             using var multiRequest = Request(new OpenStartRequest
             {
                 FlowCode = "MULTI",
@@ -279,6 +307,38 @@ internal static class OpenApiChecksStarts
             }, demo.ApiKey, "start-unbound-proxy");
             using var unboundProxyResponse = await http.SendAsync(unboundProxyRequest);
             check("代发人不能绕过本应用既有绑定", unboundProxyResponse.StatusCode == HttpStatusCode.BadRequest);
+
+            using var foreignRemindRequest = CommandRequest(OpenApiRoutes.InstanceRemind.Replace("{id}", first!.Id),
+                "alice", other.ApiKey, "remind-foreign");
+            using var foreignRemindResponse = await http.SendAsync(foreignRemindRequest);
+            check("另一应用不能催办本应用审批单", foreignRemindResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var unboundRemindRequest = CommandRequest(OpenApiRoutes.InstanceRemind.Replace("{id}", first.Id),
+                "E001", demo.ApiKey, "remind-unbound");
+            using var unboundRemindResponse = await http.SendAsync(unboundRemindRequest);
+            check("催办不能以未绑定全局工号冒用发起人", unboundRemindResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var remindRequest = CommandRequest(OpenApiRoutes.InstanceRemind.Replace("{id}", first.Id),
+                "alice", demo.ApiKey, "remind-one");
+            using var remindResponse = await http.SendAsync(remindRequest);
+            check("发起人可催办当前任务并留下事件", remindResponse.StatusCode == HttpStatusCode.OK &&
+                (await remindResponse.Content.ReadAsStringAsync()).Contains("reminderRequested", StringComparison.Ordinal));
+
+            using var earlyRemindRequest = CommandRequest(OpenApiRoutes.InstanceRemind.Replace("{id}", first.Id),
+                "alice", demo.ApiKey, "remind-two");
+            using var earlyRemindResponse = await http.SendAsync(earlyRemindRequest);
+            check("同一步一小时内不能重复催办", earlyRemindResponse.StatusCode == HttpStatusCode.Conflict);
+
+            using var withdrawRequest = CommandRequest(OpenApiRoutes.InstanceWithdraw.Replace("{id}", first.Id),
+                "alice", demo.ApiKey, "withdraw-one");
+            using var withdrawResponse = await http.SendAsync(withdrawRequest);
+            var withdrawn = JsonSerializer.Deserialize<OpenInstanceResponse>(await withdrawResponse.Content.ReadAsStringAsync(),
+                ApprovalJson.Options);
+            check("发起人可撤回在途单且任务被取消", withdrawResponse.StatusCode == HttpStatusCode.OK &&
+                withdrawn is { Status: EngineInstanceStatuses.Withdrawn } &&
+                withdrawn.Tasks.All(task => task.Status == EngineTaskStatuses.Cancelled));
+
+            await RunRoutingAsync(scope.ServiceProvider, http, demo.ApiKey, check);
         }
         finally
         {
@@ -296,6 +356,46 @@ internal static class OpenApiChecksStarts
     private static HttpRequestMessage Request(OpenStartRequest input, string apiKey, string requestId)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, OpenApiRoutes.Instances)
+        {
+            Content = JsonContent.Create(input),
+        };
+        request.Headers.Add(HeaderNames.ApiKey, apiKey);
+        request.Headers.Add(HeaderNames.RequestId, requestId);
+        return request;
+    }
+
+    /// <summary>
+    /// 构造实例级操作请求，身份仍由服务端按 API Key 的应用绑定核对。
+    /// </summary>
+    /// <param name="route">目标路径。</param>
+    /// <param name="user">外部人员 ID。</param>
+    /// <param name="apiKey">接入应用 Key。</param>
+    /// <param name="requestId">请求 ID。</param>
+    /// <returns>HTTP 请求。</returns>
+    private static HttpRequestMessage CommandRequest(string route, string user, string apiKey, string requestId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, route)
+        {
+            Content = JsonContent.Create(new OpenInstanceCommandRequest { User = user }),
+        };
+        request.Headers.Add(HeaderNames.ApiKey, apiKey);
+        request.Headers.Add(HeaderNames.RequestId, requestId);
+        return request;
+    }
+
+    /// <summary>
+    /// 构造人工任务操作请求。
+    /// </summary>
+    /// <param name="taskId">任务 ID。</param>
+    /// <param name="input">操作参数。</param>
+    /// <param name="apiKey">接入应用 Key。</param>
+    /// <param name="requestId">请求 ID。</param>
+    /// <returns>HTTP 请求。</returns>
+    private static HttpRequestMessage ActionRequest(string taskId, OpenTaskActionRequest input, string apiKey,
+        string requestId)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post,
+            OpenApiRoutes.TaskActions.Replace("{id}", Uri.EscapeDataString(taskId)))
         {
             Content = JsonContent.Create(input),
         };

@@ -1,8 +1,10 @@
 using System.Text.Json;
 using ApprovalService.Application.Organization;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Commands;
@@ -112,19 +114,8 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
             }
             else if (assignee.Source == FlowAssigneeSources.Matrix)
             {
-                var matrixCode = assignee.Value ?? string.Empty;
-                var matches = await matrices.MatchAsync(matrixCode, initiatorId, data, cancellationToken);
-                if (matches.Any(id => !snapshot.People.Any(person => person.Id == id && person.IsActive)))
-                {
-                    throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                        $"审批矩阵 {matrixCode} 返回了组织中不存在或已停用的人员。");
-                }
-
-                snapshot.MatrixMatches.Add(new AssigneeMatrixMatch
-                {
-                    MatrixCode = matrixCode,
-                    AssigneeIds = matches.Distinct(StringComparer.Ordinal).ToList(),
-                });
+                await AddMatrixMatchAsync(snapshot, assignee.Value ?? string.Empty, initiatorId, data,
+                    cancellationToken);
             }
             else if (assignee.Source == FlowAssigneeSources.BusinessApi)
             {
@@ -139,6 +130,61 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
                 "该流程含业务自动动作；动作钩子协议确认并配置前暂不能发起。");
         }
 
+        return BuildEngineContext(definition, graph, snapshot, initiator, data, now);
+    }
+
+    /// <summary>
+    /// 后续节点以最新组织和矩阵重算路由，复用发起时保存的部门、人员选择和审批数据。
+    /// </summary>
+    /// <param name="instance">当前审批单。</param>
+    /// <param name="definition">锁定的流程定义。</param>
+    /// <param name="graph">锁定的执行图。</param>
+    /// <param name="now">本次操作时间。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>已更新组织与矩阵的纯引擎输入。</returns>
+    public async Task<EngineContext> BuildContinuationAsync(InstanceEntity instance, FlowDefinition definition,
+        FlowExecutionGraph graph, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        var snapshot = await organization.LoadAssigneeSnapshotAsync(instance.InitiatorId, cancellationToken);
+        var initiator = snapshot.People.SingleOrDefault(person => person.Id == instance.InitiatorId)
+            ?? throw new UserFriendlyException(ErrorCodes.Conflict, "发起人已不在组织主数据中，无法继续审批。");
+        snapshot.InitiatingDepartmentId = instance.InitiatorDepartmentId ?? string.Empty;
+        var inputs = JsonSerializer.Deserialize<OpenRoutingInputs>(instance.RoutingInputsJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("审批单发起路由快照为空。");
+        snapshot.InitiatorSelections = inputs.InitiatorSelections;
+        snapshot.DataValues = inputs.DataValues;
+        using var dataDocument = JsonDocument.Parse(instance.ApprovalDataJson);
+        var data = dataDocument.RootElement;
+        foreach (var node in graph.Nodes)
+        {
+            if (node.Assignee?.Source == FlowAssigneeSources.Matrix)
+            {
+                await AddMatrixMatchAsync(snapshot, node.Assignee.Value ?? string.Empty,
+                    instance.InitiatorId, data, cancellationToken);
+            }
+            else if (node.Assignee?.Source == FlowAssigneeSources.BusinessApi)
+            {
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                    "该流程使用业务系统取人接口；取人钩子协议确认并配置前暂不能继续。");
+            }
+        }
+
+        return BuildEngineContext(definition, graph, snapshot, initiator, data, now);
+    }
+
+    /// <summary>
+    /// 将可信组织与数据快照中的条件统一计算成引擎输入。
+    /// </summary>
+    /// <param name="definition">锁定的流程定义。</param>
+    /// <param name="graph">锁定的执行图。</param>
+    /// <param name="snapshot">当前组织与发起选择。</param>
+    /// <param name="initiator">发起人当前主数据。</param>
+    /// <param name="data">已保存的审批数据。</param>
+    /// <param name="now">操作时间。</param>
+    /// <returns>引擎输入。</returns>
+    private static EngineContext BuildEngineContext(FlowDefinition definition, FlowExecutionGraph graph,
+        AssigneeSnapshot snapshot, AssigneePerson initiator, JsonElement data, DateTimeOffset now)
+    {
         var expressionContext = new Dictionary<string, object?>(StringComparer.Ordinal)
         {
             ["initiator.department"] = snapshot.InitiatingDepartmentId,
@@ -167,8 +213,34 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
             OccurredAt = now,
             Conditions = conditions,
             AssigneeSnapshot = snapshot,
-            Operations = new OperationContext { InitiatorId = initiatorId, FlowCode = definition.Code },
+            Operations = new OperationContext { InitiatorId = snapshot.InitiatorId, FlowCode = definition.Code },
         };
+    }
+
+    /// <summary>
+    /// 从可信配置查询矩阵命中，并校验结果只包含组织中在职人员。
+    /// </summary>
+    /// <param name="snapshot">当前组织快照。</param>
+    /// <param name="matrixCode">矩阵编码。</param>
+    /// <param name="initiatorId">内部发起人 ID。</param>
+    /// <param name="data">业务数据快照。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>异步操作。</returns>
+    private async Task AddMatrixMatchAsync(AssigneeSnapshot snapshot, string matrixCode, string initiatorId,
+        JsonElement data, CancellationToken cancellationToken)
+    {
+        var matches = await matrices.MatchAsync(matrixCode, initiatorId, data, cancellationToken);
+        if (matches.Any(id => !snapshot.People.Any(person => person.Id == id && person.IsActive)))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                $"审批矩阵 {matrixCode} 返回了组织中不存在或已停用的人员。");
+        }
+
+        snapshot.MatrixMatches.Add(new AssigneeMatrixMatch
+        {
+            MatrixCode = matrixCode,
+            AssigneeIds = matches.Distinct(StringComparer.Ordinal).ToList(),
+        });
     }
 
     /// <summary>

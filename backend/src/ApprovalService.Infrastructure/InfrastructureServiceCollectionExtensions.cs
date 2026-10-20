@@ -37,9 +37,14 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
+        services.AddSingleton(new IntegrationTransportPolicy
+        {
+            AllowHttpUrls = configuration.GetValue<bool>("ApprovalService:Integration:AllowHttpUrls"),
+        });
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton<HttpClient>();
+        // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
+        services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
         services.AddSingleton<SignedHttpOutboundAdapter>();
         services.AddScoped<IOutboxHandler, CallbackOutboxHandler>();
         services.AddScoped<IOutboxHandler, EngineEventOutboxHandler>();

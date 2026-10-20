@@ -65,6 +65,8 @@
 
 `GET /api/v1/instances/{id}` 与 `GET /api/v1/instances?flowCode=PURCHASE&businessKey=PR001` 也需要 `X-Api-Key`，只能读取由该接入应用发起的审批单；前者返回一张审批单，后者按发起时间倒序返回同业务单号的历史数组。审批单响应包含 `id`、`serialNo`、`flowCode`、`businessKey`、`title`、`initiatorId`、`clientAppCode`、`status`、`data`、`startedAt`、`endedAt`、`tasks`、`events`。详情中的任务包含 `id`、`nodeId`、`assigneeId`、`status`、`opinion`、`dueAt`、`completedAt`；操作记录包含 `eventId`、`sequence`、`event`、`detail`、`occurredAt`。按业务单号返回的历史摘要把 `tasks`、`events` 留空。缺少任一查询参数返回 `VALIDATION_FAILED`；用其他应用的 Key 查详情返回 `FORBIDDEN`，历史查询不会列出其他应用的记录。
 
+在途审批仍按全局的 `(flowCode, businessKey)` 唯一。相同单号已由其他接入应用占用时，发起用例只能返回 `CONFLICT`，不能把对方的审批单当作幂等结果；本应用同号才可复用本应用现有在途审批单。
+
 ## 规划中的接口
 
 按设计书第 13 节，在对应任务里实现，实现时把请求和响应的格式补进本文：
@@ -83,9 +85,10 @@
 
 ## 回调和业务系统提供的接口
 
-审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。
+审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。回调和钩子地址默认只能是 HTTPS；仅可信内网部署显式设置 `ApprovalService:Integration:AllowHttpUrls=true` 时接受 HTTP。签名只防篡改，不提供传输保密。出站客户端不跟随 HTTP 重定向，避免把审批数据和签名转发至未登记的地址。
 
 - **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`，以及 `task.created`、`task.completed`、`task.cancelled`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
+  接入应用被停用后，已有待发回调暂停发送并记录 `CLIENT_APP_DISABLED`，仍留在队列等待后续重试；重新启用后可送达同一事件。
 - **取数接口**：只传单号发起时，审批服务按单号回业务系统取审批数据。
 - **校验钩子**：发起前、某个节点同意前问业务系统能不能过，不能过时返回原因。
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。

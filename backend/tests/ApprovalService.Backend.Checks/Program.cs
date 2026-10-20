@@ -45,6 +45,7 @@ internal static class Program
         ApprovalPolicyChecks.Run(Check);
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
+        await EventAnchorChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);

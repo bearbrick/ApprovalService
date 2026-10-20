@@ -141,8 +141,14 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
     public async Task<bool> VerifyEventChainAsync(string instanceId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(instanceId);
+        var snapshot = await repository.LoadAsync(instanceId, cancellationToken);
+        if (snapshot is null)
+        {
+            return false;
+        }
+
         var events = await repository.LoadEventsAsync(instanceId, cancellationToken);
-        return OperationHash.Verify(events);
+        return OperationHash.Verify(events, snapshot.Instance.LastEventSequence, snapshot.Instance.LastEventHash);
     }
 
     /// <summary>

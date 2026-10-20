@@ -23,22 +23,34 @@ public sealed class FlowEntity
     /// <summary>
     /// 流程分组。
     /// </summary>
-    public string? Group { get; set; }
+    public string? Group
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 流程管理员的工号。
     /// </summary>
-    public string? AdministratorId { get; set; }
+    public string? AdministratorId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 当前发布版本 ID；尚未发布时为空。
     /// </summary>
-    public string? PublishedVersionId { get; set; }
+    public string? PublishedVersionId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 创建时间。
     /// </summary>
-    public DateTimeOffset CreatedAt { get; set; }
+    public DateTimeOffset CreatedAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -59,12 +71,18 @@ public sealed class FlowVersionEntity
     /// <summary>
     /// 流程内递增的版本号。
     /// </summary>
-    public int Version { get; set; }
+    public int Version
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 设计格式版本号。
     /// </summary>
-    public int SchemaVersion { get; set; }
+    public int SchemaVersion
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 自由画布和审批数据定义的 JSON 快照。
@@ -79,5 +97,8 @@ public sealed class FlowVersionEntity
     /// <summary>
     /// 发布时间。
     /// </summary>
-    public DateTimeOffset PublishedAt { get; set; }
+    public DateTimeOffset PublishedAt
+    {
+        get; set;
+    }
 }

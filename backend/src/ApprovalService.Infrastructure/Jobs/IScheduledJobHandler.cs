@@ -10,7 +10,10 @@ public interface IScheduledJobHandler
     /// <summary>
     /// 可处理的定时任务种类。
     /// </summary>
-    string Kind { get; }
+    string Kind
+    {
+        get;
+    }
 
     /// <summary>
     /// 执行到期任务；重启或租约过期后可能重试，处理逻辑应幂等。

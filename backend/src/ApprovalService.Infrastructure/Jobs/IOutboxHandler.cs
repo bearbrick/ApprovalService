@@ -10,7 +10,10 @@ public interface IOutboxHandler
     /// <summary>
     /// 可处理的待发项种类。
     /// </summary>
-    string Kind { get; }
+    string Kind
+    {
+        get;
+    }
 
     /// <summary>
     /// 执行外部发送；数据库租约之外调用，不占用审批事务。

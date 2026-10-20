@@ -43,5 +43,8 @@ public sealed class RuntimeCommandInput
     /// <summary>
     /// 开始命令的新审批单元数据；其他命令留空。
     /// </summary>
-    public InstanceEntity? StartInstance { get; set; }
+    public InstanceEntity? StartInstance
+    {
+        get; set;
+    }
 }

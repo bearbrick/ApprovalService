@@ -63,7 +63,10 @@ public sealed class RuntimeSnapshot
     /// <summary>
     /// 最新操作记录；审批单尚无事件时为空。
     /// </summary>
-    public OperationEventEntity? LastEvent { get; set; }
+    public OperationEventEntity? LastEvent
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -79,7 +82,10 @@ public sealed class RuntimeCommit
     /// <summary>
     /// 读取时的乐观锁版本；新建审批单时为空。
     /// </summary>
-    public long? ExpectedVersion { get; set; }
+    public long? ExpectedVersion
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 命令执行后的所有任务投影。

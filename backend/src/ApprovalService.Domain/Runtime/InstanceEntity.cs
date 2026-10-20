@@ -48,12 +48,18 @@ public sealed class InstanceEntity
     /// <summary>
     /// 发起部门编码。
     /// </summary>
-    public string? InitiatorDepartmentId { get; set; }
+    public string? InitiatorDepartmentId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 代发人的工号。
     /// </summary>
-    public string? SubmittedById { get; set; }
+    public string? SubmittedById
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 来源接入应用编码。
@@ -68,12 +74,18 @@ public sealed class InstanceEntity
     /// <summary>
     /// 业务详情地址。
     /// </summary>
-    public string? DetailUrl { get; set; }
+    public string? DetailUrl
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 是否加急。
     /// </summary>
-    public bool IsUrgent { get; set; }
+    public bool IsUrgent
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 审批单状态编码。
@@ -88,22 +100,34 @@ public sealed class InstanceEntity
     /// <summary>
     /// 乐观锁版本，每次命令提交加一。
     /// </summary>
-    public long Version { get; set; }
+    public long Version
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 所属父审批单 ID。
     /// </summary>
-    public string? ParentInstanceId { get; set; }
+    public string? ParentInstanceId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 发起时间。
     /// </summary>
-    public DateTimeOffset StartedAt { get; set; }
+    public DateTimeOffset StartedAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 结束时间；未结束时为空。
     /// </summary>
-    public DateTimeOffset? EndedAt { get; set; }
+    public DateTimeOffset? EndedAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -134,7 +158,10 @@ public sealed class ApprovalTaskEntity
     /// <summary>
     /// 代理时原审批人工号。
     /// </summary>
-    public string? DelegatedForId { get; set; }
+    public string? DelegatedForId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 任务状态编码。
@@ -144,20 +171,32 @@ public sealed class ApprovalTaskEntity
     /// <summary>
     /// 审批意见。
     /// </summary>
-    public string? Opinion { get; set; }
+    public string? Opinion
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 签名文件 ID。
     /// </summary>
-    public string? SignatureFileId { get; set; }
+    public string? SignatureFileId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 到期时间。
     /// </summary>
-    public DateTimeOffset? DueAt { get; set; }
+    public DateTimeOffset? DueAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 处理时间。
     /// </summary>
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? CompletedAt
+    {
+        get; set;
+    }
 }

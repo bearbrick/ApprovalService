@@ -18,7 +18,10 @@ public sealed class OperationEventEntity
     /// <summary>
     /// 审批单内从一开始的顺序号。
     /// </summary>
-    public long Sequence { get; set; }
+    public long Sequence
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 请求 ID，用于追踪与幂等处理。
@@ -48,7 +51,10 @@ public sealed class OperationEventEntity
     /// <summary>
     /// 事件发生时间。
     /// </summary>
-    public DateTimeOffset OccurredAt { get; set; }
+    public DateTimeOffset OccurredAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -89,37 +95,58 @@ public sealed class OutboxItemEntity
     /// <summary>
     /// 已尝试次数。
     /// </summary>
-    public int Attempts { get; set; }
+    public int Attempts
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 下次可发送时间。
     /// </summary>
-    public DateTimeOffset AvailableAt { get; set; }
+    public DateTimeOffset AvailableAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 当前租约持有者。
     /// </summary>
-    public string? LeaseOwner { get; set; }
+    public string? LeaseOwner
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 租约失效时间。
     /// </summary>
-    public DateTimeOffset? LeaseUntil { get; set; }
+    public DateTimeOffset? LeaseUntil
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 发送完成时间。
     /// </summary>
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? CompletedAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 最近一次错误摘要。
     /// </summary>
-    public string? LastError { get; set; }
+    public string? LastError
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 乐观锁版本。
     /// </summary>
-    public long Version { get; set; }
+    public long Version
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -135,7 +162,10 @@ public sealed class ScheduledJobEntity
     /// <summary>
     /// 相关审批单 ID；全局任务可以为空。
     /// </summary>
-    public string? InstanceId { get; set; }
+    public string? InstanceId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 任务类型。
@@ -155,25 +185,40 @@ public sealed class ScheduledJobEntity
     /// <summary>
     /// 到期时间。
     /// </summary>
-    public DateTimeOffset DueAt { get; set; }
+    public DateTimeOffset DueAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 当前租约持有者。
     /// </summary>
-    public string? LeaseOwner { get; set; }
+    public string? LeaseOwner
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 租约失效时间。
     /// </summary>
-    public DateTimeOffset? LeaseUntil { get; set; }
+    public DateTimeOffset? LeaseUntil
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 执行次数。
     /// </summary>
-    public int Attempts { get; set; }
+    public int Attempts
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 乐观锁版本。
     /// </summary>
-    public long Version { get; set; }
+    public long Version
+    {
+        get; set;
+    }
 }

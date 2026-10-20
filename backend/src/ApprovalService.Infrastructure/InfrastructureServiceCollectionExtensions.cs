@@ -1,4 +1,7 @@
+using ApprovalService.Application.Integration;
+using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Organization;
 using ApprovalService.Infrastructure.Options;
@@ -33,6 +36,8 @@ public static class InfrastructureServiceCollectionExtensions
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<IClientAppRepository, ClientAppRepository>();
+        services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddHostedService<DurableJobWorker>();

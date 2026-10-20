@@ -24,6 +24,7 @@ public static class AssigneeRuleEngine
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(snapshot);
         var settings = node.Approval ?? new FlowApprovalSettings();
+        ValidateSettings(settings);
         var request = new AssigneeRequest
         {
             NodeId = node.Id,
@@ -80,6 +81,26 @@ public static class AssigneeRuleEngine
         }
 
         return skipped ? new AssigneePlan { AutoApproveReason = "assigneeSkipped" } : Missing(settings, snapshot);
+    }
+
+    /// <summary>
+    /// 拒绝未知的异常处理编码，避免把配置错误当成默认行为执行。
+    /// </summary>
+    /// <param name="settings">节点规则。</param>
+    private static void ValidateSettings(FlowApprovalSettings settings)
+    {
+        if (settings.MissingAssigneeBehavior is not (FlowMissingAssigneeBehaviors.Block or
+            FlowMissingAssigneeBehaviors.Approve or FlowMissingAssigneeBehaviors.Administrator or
+            FlowMissingAssigneeBehaviors.Specified) ||
+            settings.SelfApprovalBehavior is not (FlowSelfApprovalBehaviors.Skip or
+                FlowSelfApprovalBehaviors.Self or FlowSelfApprovalBehaviors.Manager) ||
+            settings.DuplicateAssigneeBehavior is not (FlowDuplicateAssigneeBehaviors.AdjacentOnce or
+                FlowDuplicateAssigneeBehaviors.Once or FlowDuplicateAssigneeBehaviors.EveryTime) ||
+            settings.InactiveAssigneeBehavior is not (FlowInactiveAssigneeBehaviors.Manager or
+                FlowInactiveAssigneeBehaviors.Administrator))
+        {
+            throw new EngineException(ErrorCodes.ValidationFailed, "审批人异常处理设置无效。");
+        }
     }
 
     /// <summary>

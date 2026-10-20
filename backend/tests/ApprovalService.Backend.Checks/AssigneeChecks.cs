@@ -42,6 +42,17 @@ internal static class AssigneeChecks
         snapshot.InitiatingDepartmentId = "d1";
         check("多部门发起人切换发起部门后重新找人", Find("role", snapshot, value: "clerk", scoped: true)
             .SequenceEqual(["clerk1"]));
+
+        var extensionSnapshot = Snapshot();
+        var extensionRequest = new AssigneeRequest
+        {
+            NodeId = "approval",
+            Configuration = new FlowAssignee { Source = "custom" },
+        };
+        var extensionResult = AssigneeResolverRegistry.Resolve(extensionRequest, extensionSnapshot,
+            [new MutatingResolver()]);
+        check("自定义找人来源不能修改原组织和配置输入", extensionResult.AssigneeIds.SequenceEqual(["m1"]) &&
+            extensionSnapshot.InitiatingDepartmentId == "d2" && extensionRequest.Configuration.Source == "custom");
     }
 
     /// <summary>
@@ -103,4 +114,21 @@ internal static class AssigneeChecks
         PreviousSelections = new Dictionary<string, List<string>> { ["approval"] = ["m1"] },
         InitiatorSelections = new Dictionary<string, List<string>> { ["approval"] = ["vp"] },
     };
+
+    /// <summary>
+    /// 故意修改输入以检验扩展隔离。
+    /// </summary>
+    private sealed class MutatingResolver : IAssigneeResolver
+    {
+        /// <inheritdoc />
+        public string Source => "custom";
+
+        /// <inheritdoc />
+        public IReadOnlyList<string> Resolve(AssigneeRequest request, AssigneeSnapshot snapshot)
+        {
+            request.Configuration.Source = "changed";
+            snapshot.InitiatingDepartmentId = "changed";
+            return ["m1"];
+        }
+    }
 }

@@ -2,6 +2,7 @@ using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Execution;
+using ApprovalService.Engine.Policies;
 
 namespace ApprovalService.Backend.Checks;
 
@@ -20,6 +21,8 @@ internal static class ApprovalPolicyChecks
         CheckMissingAndSelf(check);
         CheckDuplicateAndInactive(check);
         CheckArrivalResolution(check);
+        CheckInvalidSettings(check);
+        CheckExtensionIsolation(check);
     }
 
     /// <summary>
@@ -178,6 +181,64 @@ internal static class ApprovalPolicyChecks
         check("审批人到节点才重算，预览差异写事件", reached.State.Tasks[^1].AssigneeId == "p3" &&
             change is not null && change.PreviewAssigneeIds.SequenceEqual(["p2"]) &&
             change.ResolvedAssigneeIds.SequenceEqual(["p3"]));
+    }
+
+    /// <summary>
+    /// 无效编码须明确报错，不能默认为其他审批行为。
+    /// </summary>
+    /// <param name="check">结果记录器。</param>
+    private static void CheckInvalidSettings(Action<string, bool> check)
+    {
+        check("无效缺人设置不会被当作默认阻止", ThrowsValidation(() => Start(Chain(
+            Node("a", "member", "p1", new FlowApprovalSettings { MissingAssigneeBehavior = "unknown" })))));
+        check("无效本人设置不会被当作本人审批", ThrowsValidation(() => Start(Chain(
+            Node("a", "member", "p1", new FlowApprovalSettings { SelfApprovalBehavior = "unknown" })))));
+        check("无效重复设置不会被当作每次审批", ThrowsValidation(() => Start(Chain(
+            Node("a", "member", "p1", new FlowApprovalSettings { DuplicateAssigneeBehavior = "unknown" })))));
+        check("无效停用设置不会被当作转上级", ThrowsValidation(() => Start(Chain(
+            Node("a", "member", "p1", new FlowApprovalSettings { InactiveAssigneeBehavior = "unknown" })))));
+        var all = Start(Chain(Node("a", "member", "p1,p2", new FlowApprovalSettings
+        {
+            Mode = "all",
+            RejectBehavior = "unknown",
+        })));
+        check("无效会签拒绝设置不会被当成立即结束", ThrowsValidation(() => Act(all,
+            EngineCommandKinds.Reject, 0, "bad-reject-setting")));
+    }
+
+    /// <summary>
+    /// 扩展策略只能修改自己的副本，不能改变调用方设置和票据。
+    /// </summary>
+    /// <param name="check">结果记录器。</param>
+    private static void CheckExtensionIsolation(Action<string, bool> check)
+    {
+        var settings = new FlowApprovalSettings { Mode = "custom" };
+        var ballots = new[] { new ApprovalBallot
+        {
+            TaskId = "task",
+            AssigneeId = "p1",
+            Status = EngineTaskStatuses.Pending,
+        } };
+        var result = ApprovalPolicyRegistry.Evaluate(settings, ballots, [new MutatingPolicy()]);
+        check("自定义多人策略不能修改原设置和任务票据", result.Outcome == "approved" &&
+            settings.Mode == "custom" && ballots[0].Status == EngineTaskStatuses.Pending);
+    }
+
+    /// <summary>
+    /// 故意修改策略输入以检查副本隔离。
+    /// </summary>
+    private sealed class MutatingPolicy : IApprovalPolicy
+    {
+        /// <inheritdoc />
+        public string Mode => "custom";
+
+        /// <inheritdoc />
+        public ApprovalPolicyDecision Evaluate(FlowApprovalSettings settings, IReadOnlyList<ApprovalBallot> ballots)
+        {
+            settings.Mode = "changed";
+            ballots[0].Status = EngineTaskStatuses.Approved;
+            return new ApprovalPolicyDecision { Outcome = "approved" };
+        }
     }
 
     /// <summary>

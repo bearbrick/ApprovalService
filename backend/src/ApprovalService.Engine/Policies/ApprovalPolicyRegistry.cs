@@ -29,6 +29,10 @@ public static class ApprovalPolicyRegistry
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(ballots);
+        if (settings.RejectBehavior is not (FlowRejectBehaviors.Immediate or FlowRejectBehaviors.WaitAll))
+        {
+            throw new EngineException(ErrorCodes.ValidationFailed, "会签拒绝处理设置无效。");
+        }
         var policies = BuiltIns.Concat(extensions ?? []).ToArray();
         if (policies.GroupBy(item => item.Mode, StringComparer.Ordinal).Any(group => group.Count() > 1))
         {
@@ -47,6 +51,14 @@ public static class ApprovalPolicyRegistry
             AssigneeId = item.AssigneeId,
             Status = item.Status,
         }).ToArray();
-        return policy.Evaluate(settingsCopy, ballotCopy);
+        var decision = policy.Evaluate(settingsCopy, ballotCopy);
+        if (decision.Outcome is not ("pending" or "approved" or "rejected") ||
+            decision.ActivateTaskId is not null && !ballots.Any(item => item.TaskId == decision.ActivateTaskId &&
+                item.Status == EngineTaskStatuses.Queued))
+        {
+            throw new EngineException(ErrorCodes.ValidationFailed, "多人审批方式返回了无效结果。");
+        }
+
+        return decision;
     }
 }

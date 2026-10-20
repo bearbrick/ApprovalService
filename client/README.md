@@ -15,7 +15,7 @@
 
 公司暂时没有私有的 NuGet 源，SDK 先不发布：业务系统按接口文档直接调，或者把 SDK 的 DLL 拷进项目引用。
 
-## 用法（现在只有服务信息）
+## 用法（首批开放接口）
 
 ```csharp
 using var client = new ApprovalServiceClient(new ApprovalServiceClientOptions
@@ -24,7 +24,31 @@ using var client = new ApprovalServiceClient(new ApprovalServiceClientOptions
     ApiKey = Environment.GetEnvironmentVariable("APPROVAL_API_KEY"),
 });
 var info = await client.GetInfoAsync();   // ApprovalService 0.1.0，接口 v1
+var flows = await client.GetFlowsAsync();
+var schema = await client.GetFlowSchemaAsync("PURCHASE_REQUEST");
+var instance = await client.StartAsync(new StartApprovalRequest
+{
+    FlowCode = "PURCHASE_REQUEST", BusinessKey = order.No,
+    Title = order.Title, Initiator = currentUser.Code,
+    Data = new Dictionary<string, object?> { ["amount"] = order.Amount },
+});
+var current = await client.GetInstanceAsync(instance.Id);
+var history = await client.FindInstancesAsync("PURCHASE_REQUEST", order.No);
+var count = await client.GetTaskCountAsync(currentUser.Code);
+var tasks = await client.GetTasksAsync(currentUser.Code, skip: 0, take: 20);
+// 下列操作按业务需要分别调用；示例不表示要顺序执行。
+await client.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
+{
+    User = currentUser.Code, Action = "approve", Opinion = "同意",
+    FieldValues = new Dictionary<string, object?> { ["approvalNote"] = "已核对" },
+});
+await client.RemindAsync(instance.Id, currentUser.Code);
+await client.WithdrawAsync(instance.Id, currentUser.Code);
 ```
+
+以上为各方法的独立用法示例；催办、撤回和审批操作仍受服务端当前状态与人员权限限制。`StartAsync` 当前必须提供 `Data` 快照，只传单号取数的钩子协议尚待确认。`GetTaskCountAsync` 与 `GetTasksAsync` 默认只看本应用，接入应用获授权时可传 `allApps: true`。任务 ID 可能包含斜杠，SDK 会正确编码。`FieldValues` 仅提交当前节点允许审批人填写的顶层字段，不修改原业务数据快照。错误响应统一抛 `ApprovalServiceException`。
+
+尚未确认的更新数据、重新提交、终止、批量、预览与钩子等接口由后续 SDK 任务补齐；本批方法不包含界面组件。
 
 出错时抛 `ApprovalServiceException`，`ErrorCode` 是服务端的错误码，或者 SDK 自己的 `NETWORK_ERROR`（连不上）、`TIMEOUT`（超时）。
 

@@ -41,6 +41,7 @@
 
 ## 交接记录
 
+- 2026-10-20 · Codex · 四个指定 HEAD 已成为当前分支祖先，T-006、T-007、T-037 的任务状态均保留“阻塞”。T-006 合入冲突为后端 README、DbContext、三份 EF 快照、ContractChecks、FlowDefinitionChecks、检查入口和 architecture；保留双方独立内容，检查入口去重。T-007 仅后端 README 冲突，保留较新的身份生命周期说明和原有开放接口说明；T-037 无冲突。三库 EF 工具生成的模型差异仅为 `ScheduledJobs.LastError` 和 `InAppNotifications`，与 T-036 已有迁移重复；只删除本次生成的六个重复迁移文件，保留工具生成的最终快照。三库 `has-pending-model-changes` 均报告无差异。
 - 2026-10-20 · Codex · 合入 T-006 时发现其重生的三库 `AddOrganizationIdentity` 与 T-036 已验收的旧 ID 重复。逐库比较原始 `.cs` 完整内容（含 `Up`、`Down`）的 Git 对象哈希：SQLite 均为 `91e8ffb`、SQL Server 均为 `60a6426`、PostgreSQL 均为 `365cfad`，三库完全相同。依协调确认保留 T-036 的旧迁移 ID，弃用 T-006 的同义新 ID，保留 T-006 其余独立迁移；最终模型快照用 EF 工具重建，并验证空库及旧迁移升级路径。
 - 2026-10-20 · Codex · 从 `main` 新建独立工作树，预登记所有跨部分共享文件和指定提交边界；先合入 T-036 已验收基线，再按序合入三个已验证但仍阻塞的任务 HEAD。5289 端口须在全量验证前协调使用。
 

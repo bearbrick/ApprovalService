@@ -53,6 +53,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-034](T-034-flow-operation-policies.md) | 流程级撤回与退回重提策略 | 后端 + 前端 | M2 / M1 | T-001、T-004、T-008～T-010、T-032 | Contracts/Flows、Engine/Definitions、frontend/src/designer/workbench |
 | [T-035](T-035-mobile-frontend.md) | 手机审批中心前端基础 | 前端 | M3 | T-032、T-033 | frontend/src/pages/mobile、frontend/src/model/mobile.ts |
 | [T-036](T-036-ui-integration.md) | 已验收前端成果的可验证集成基线 | 全部 | M2～M4 | T-032、T-034、T-035 | backend、frontend、client、docs |
+| [T-038](T-038-verified-integration.md) | 已验证稳定分支整合快照 | 全部 | M2～M4 | T-036、T-006/T-007/T-037 稳定提交 | backend、frontend、client、docs |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

@@ -11,6 +11,19 @@ public sealed class FlowExecutionGraph
     public int SchemaVersion { get; set; } = FlowSchema.CurrentVersion;
 
     /// <summary>
+    /// 发布时固定的撤回限制；省略时审批结束前均可撤回。
+    /// </summary>
+    public bool WithdrawBeforeFirstDecision
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 发布时固定的退回后重提交走法；省略时从头开始。
+    /// </summary>
+    public string ReturnMode { get; set; } = FlowReturnModes.Restart;
+
+    /// <summary>
     /// 可执行的节点。
     /// </summary>
     public List<FlowExecutionNode> Nodes { get; set; } = [];

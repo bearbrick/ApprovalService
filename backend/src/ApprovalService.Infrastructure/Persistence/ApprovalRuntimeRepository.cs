@@ -1,5 +1,6 @@
 using System.Data;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Engine.Execution;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApprovalService.Infrastructure.Persistence;
@@ -65,6 +66,15 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
         if (commit.ExpectedVersion is null)
         {
             db.Instances.Add(commit.Instance);
+            if (IsActive(commit.Instance.Status))
+            {
+                db.ActiveInstanceKeys.Add(new ActiveInstanceKeyEntity
+                {
+                    FlowCode = commit.Instance.FlowCode,
+                    BusinessKey = commit.Instance.BusinessKey,
+                    InstanceId = commit.Instance.Id,
+                });
+            }
         }
         else
         {
@@ -73,6 +83,17 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             var entry = db.Entry(commit.Instance);
             entry.State = EntityState.Modified;
             entry.Property(item => item.Version).OriginalValue = commit.ExpectedVersion.Value;
+            if (!IsActive(commit.Instance.Status))
+            {
+                var activeKey = await db.ActiveInstanceKeys.SingleOrDefaultAsync(item =>
+                    item.FlowCode == commit.Instance.FlowCode && item.BusinessKey == commit.Instance.BusinessKey &&
+                    item.InstanceId == commit.Instance.Id, cancellationToken);
+                if (activeKey is not null)
+                {
+                    // 结束与状态、事件同事务提交，历史审批单随后可以用同一业务单号再发起。
+                    db.ActiveInstanceKeys.Remove(activeKey);
+                }
+            }
         }
 
         var existingTasks = await db.ApprovalTasks.Where(item => item.InstanceId == commit.Instance.Id)
@@ -113,6 +134,19 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
         {
             return false;
         }
+        catch (DbUpdateException) when (commit.ExpectedVersion is null && IsActive(commit.Instance.Status))
+        {
+            // 只有确认另一审批单已占用在途键时才转成可恢复的冲突；其他数据库错误原样暴露。
+            await using var check = await factory.CreateDbContextAsync(cancellationToken);
+            if (await check.ActiveInstanceKeys.AsNoTracking().AnyAsync(item =>
+                item.FlowCode == commit.Instance.FlowCode && item.BusinessKey == commit.Instance.BusinessKey,
+                cancellationToken))
+            {
+                return false;
+            }
+
+            throw;
+        }
     }
 
     /// <inheritdoc />
@@ -146,4 +180,11 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         return await db.Database.CanConnectAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// 退回发起人也属于在途；其他状态释放业务单号占用。
+    /// </summary>
+    /// <param name="status">引擎状态。</param>
+    /// <returns>仍占用业务单号为真。</returns>
+    private static bool IsActive(string status) => status is EngineInstanceStatuses.Running or EngineInstanceStatuses.AwaitingInitiator;
 }

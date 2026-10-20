@@ -119,6 +119,29 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("OutboundSendLogs", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.ActiveInstanceKeyEntity", b =>
+                {
+                    b.Property<string>("FlowCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BusinessKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FlowCode", "BusinessKey");
+
+                    b.HasIndex("InstanceId")
+                        .IsUnique();
+
+                    b.ToTable("ActiveInstanceKeys", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -348,8 +371,7 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasIndex("SerialNo")
                         .IsUnique();
 
-                    b.HasIndex("FlowCode", "BusinessKey")
-                        .IsUnique();
+                    b.HasIndex("FlowCode", "BusinessKey");
 
                     b.HasIndex("Status", "StartedAt");
 

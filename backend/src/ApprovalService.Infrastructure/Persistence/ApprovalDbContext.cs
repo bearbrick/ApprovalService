@@ -41,6 +41,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<InstanceEntity> Instances => Set<InstanceEntity>();
 
     /// <summary>
+    /// 仅在进行中保留的流程与业务单号唯一键。
+    /// </summary>
+    public DbSet<ActiveInstanceKeyEntity> ActiveInstanceKeys => Set<ActiveInstanceKeyEntity>();
+
+    /// <summary>
     /// 待办任务投影。
     /// </summary>
     public DbSet<ApprovalTaskEntity> ApprovalTasks => Set<ApprovalTaskEntity>();
@@ -106,6 +111,16 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ActiveInstanceKeyEntity>(entity =>
+        {
+            entity.ToTable("ActiveInstanceKeys");
+            entity.HasKey(item => new { item.FlowCode, item.BusinessKey });
+            entity.Property(item => item.FlowCode).HasMaxLength(128);
+            entity.Property(item => item.BusinessKey).HasMaxLength(200);
+            entity.Property(item => item.InstanceId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(item => item.InstanceId).IsUnique();
+        });
+
         modelBuilder.Entity<OutboundSendLogEntity>(entity =>
         {
             entity.ToTable("OutboundSendLogs");
@@ -181,7 +196,7 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.ParentInstanceId).HasMaxLength(64);
             entity.HasOne<FlowVersionEntity>().WithMany().HasForeignKey(item => item.FlowVersionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.SerialNo).IsUnique();
-            entity.HasIndex(item => new { item.FlowCode, item.BusinessKey }).IsUnique();
+            entity.HasIndex(item => new { item.FlowCode, item.BusinessKey });
             entity.HasIndex(item => new { item.Status, item.StartedAt });
         });
 

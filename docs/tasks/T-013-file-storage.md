@@ -1,6 +1,6 @@
 # T-013 附件存储：本地文件和 MinIO / S3
 
-状态：进行中
+状态：阻塞
 负责人：Codex 2026-10-20
 里程碑：M3
 依赖：T-005
@@ -47,6 +47,7 @@
 
 ## 交接记录
 
+- 2026-10-20 · Codex · 按 AGENTS.md R13 暂停 T-013：设计未定义发起前附件的接入应用主体与绑定授权，而 T-006 用 `X-Api-Key` 发起、T-007 用 JWT 内部人员 ID 授权，当前文件路由只能安全处理 JWT 用户上传。建议确认：接入应用能否用自己的 API Key 先上传、元数据记录应用编码；发起时只允许同一应用引用并在审批单提交事务内（或用可恢复待发机制）绑定文件；未绑定文件仅原应用/上传用户可读取。主代理已把方案发给用户；确认后续接本分支实现并复跑全量验证。当前分支 `ai/codex/T-013-file-storage` HEAD `8c82ab1`，实现与设计书已提交，未合入主分支、未推送。全量 verify 曾通过（后端当时 258 项），最近后端 verify 260 项通过；真实 MinIO 测试环境未提供。OFD、旧版 Office 仅记录白名单待确认，不影响现有安全默认拒绝。
 - 2026-10-20 · Codex · 恢复后完成本地/MinIO 存储、三套附件迁移、ZIP 结构辨识 DOCX/XLSX/PPTX（仅下载、不在线预览）、真实 SQLite 清理与本地转 MinIO 失败恢复/幂等/并发检查、可信身份 HTTP 上传下载检查，并把 §api 附件两行同步为实际协议。已提交 `46e015f`（契约）、`4047f69`（实现与迁移）、`22d2c82`（共享登记）、`d72d823`（README/架构）、`968a464`（身份与清理修正）；全量 `verify.ps1` 在 258 项后端检查时通过，后续新增两项迁移检查及 HTTP 端点复核后 `verify.ps1 -Part backend` 通过 260 项、0 警告。真实 MinIO 测试环境变量未提供，外部对象存储场景尚未执行。**当前未完成的集成决策**：设计要求业务系统发起前上传附件，但本任务公开上传路由只接受已验证用户 JWT；T-006 发起使用 X-Api-Key，需确定接入应用作为上传主体、同一应用关联文件及发起事务/可恢复绑定语义。主代理已向用户请求确认，收到后再实现；本任务继续保持“进行中”，未合并 main、未推送。OFD 与旧版 Office 的下载白名单也尚未由设计明确，当前拒绝并记录待确认。
 - 2026-10-20 · Codex · 用户要求暂停以节省额度，本任务保持“进行中”，未合并 main、未推送。工作树 `C:/Users/dukun/.codex/worktrees/file-storage/ApprovalService`，分支 `ai/codex/T-013-file-storage`；已提交认领 `e858c5c`、合入 T-005 基线 `8f8ecd6`、范围登记 `16b461d`、缓存 Minio 7.0.0 与 ADR 0009 `59852b9`。当前有大量已暂存及未暂存的 T-013 源码、三套 AddStoredFiles 迁移、文件场景检查、README/契约/架构文档，**尚未提交实现**；不要丢弃工作区。已实现附件元数据、本地与 MinIO 存储、类型/大小验证、上传下载路由（当前无 T-006/T-007 可信身份接入，匿名默认 401）、实例可见性检查、24 小时孤儿清理、同数据库租约、本地到 MinIO 的迁移命令。上次 `verify.ps1 -Part backend` 通过 250 项检查；其后又将上传和迁移缓冲改成自动删除的临时文件、复用 MinIO 客户端，`dotnet build` 0 警告通过，但**尚未重新运行格式、后端或全量 verify**。恢复后先检查这些未提交改动并补测大文件流、迁移中断/重复运行和三套迁移；确认文件类型范围是否应补 Office 下载（目前仅 PDF/PNG/JPEG/GIF/WebP）；还需 MinIO 真实环境检查（设置 `APPROVAL_TEST_MINIO` 及桶/凭据）、确认下载流临时文件的响应生命周期、完善配置校验、运行完整 `verify.ps1`、提交实现与共享文件、勾选验收项。T-006/T-007 的 API Key/用户身份和实例关联业务入口仍待后续任务接入；公开路由不接受自报 userId。
 - 2026-10-20 · Codex · 从 main 建立独立工作树并认领；依赖 T-005 已验收，已合入本任务分支作为数据库基础。原范围未列出完成元数据和三套迁移必需的 Domain/Files、Infrastructure/Persistence，也未列出上传下载的 Contracts、API、检查和迁移命令，已在上方补全。预计共享文件包括 `backend/Directory.Packages.props`（S3 客户端版本）、`backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`（模块登记）、`docs/contracts.md`（上传下载协议）、`docs/architecture.md` 与 `docs/adr/README.md`（架构和新依赖 ADR）。本机已缓存 Minio 7.0.0 及所需依赖，官方 NuGet 显示于 2025-11-05 发布，约 611 KB，无需下载；新增依赖的理由和取舍将写 ADR。T-006 接入应用鉴权、T-007 用户登录尚未实现；本任务的公开下载路径必须先拒绝未认证请求，不能从客户端参数信任用户身份。

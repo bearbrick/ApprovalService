@@ -1,70 +1,46 @@
 <script setup lang="ts">
-/**
- * 应用外壳：按地址的 # 部分切换页面；电脑端有顶栏（导航和服务连接状态），手机端（#/m）用自己的布局。
- */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { getServiceInfo } from './api/http.ts'
-import { NAV_ITEMS, parseRoute } from './model/routes.ts'
-import AdminPage from './pages/AdminPage.vue'
-import CenterPage from './pages/CenterPage.vue'
+import { computed, ref } from 'vue'
+import DesktopShell from './components/layout/DesktopShell.vue'
+import MobileShell from './components/layout/MobileShell.vue'
+import UiDialog from './components/ui/UiDialog.vue'
+import UiErrorBoundary from './components/ui/UiErrorBoundary.vue'
+import UiIcon from './components/ui/UiIcon.vue'
+import WorkspacePage from './pages/WorkspacePage.vue'
 import DesignerPage from './pages/DesignerPage.vue'
-import MobilePage from './pages/MobilePage.vue'
+import CenterPage from './pages/CenterPage.vue'
+import { useRouteNavigation } from './composables/useRouteNavigation.ts'
+import { useServiceConnection } from './composables/useServiceConnection.ts'
 
 /**
- * 当前地址的 # 部分。
+ * 公共路由和浏览器历史的单一状态来源。
  */
-const hash = ref(location.hash)
-
+const route = useRouteNavigation()
 /**
- * 当前页面。
+ * 服务连接独立于业务页面，不因导航重复请求。
  */
-const page = computed(() => parseRoute(hash.value))
-
+const { state, info, error, refresh } = useServiceConnection()
 /**
- * 顶栏右侧的连接状态文字。
+ * 服务信息对话框是否打开。
  */
-const status = ref('正在连接服务…')
-
+const serviceOpen = ref(false)
 /**
- * 是否连上了服务。
+ * 简短的连接状态，不推断任何业务模块是否就绪。
  */
-const connected = ref(false)
-
-/**
- * 地址的 # 部分变化时切换页面。
- */
-function onHashChange(): void {
-  hash.value = location.hash
-}
-
-onMounted(async () => {
-  window.addEventListener('hashchange', onHashChange)
-  try {
-    const info = await getServiceInfo()
-    status.value = `服务 ${info.version} · 接口 ${info.apiVersion}`
-    connected.value = true
-  } catch (error) {
-    status.value = '连不上服务：' + (error instanceof Error ? error.message : String(error))
-  }
-})
-
-onBeforeUnmount(() => window.removeEventListener('hashchange', onHashChange))
+const serviceLabel = computed(() => state.value === 'loading' ? '正在连接' : state.value === 'connected' ? '服务已连接' : '连接失败')
 </script>
 
 <template>
-  <MobilePage v-if="page === 'mobile'" />
-  <template v-else>
-    <header class="topbar">
-      <span class="brand">审批流服务</span>
-      <nav>
-        <a v-for="item in NAV_ITEMS" :key="item.key" :href="item.hash" :class="{ active: page === item.key }">{{ item.title }}</a>
-      </nav>
-      <span class="status" :class="connected ? 'ok' : 'bad'">{{ status }}</span>
-    </header>
-    <main class="page">
-      <DesignerPage v-if="page === 'designer'" />
-      <AdminPage v-else-if="page === 'admin'" />
-      <CenterPage v-else />
-    </main>
-  </template>
+  <component :is="route.mobile ? MobileShell : DesktopShell" :route="route" :service-label="serviceLabel" @service="serviceOpen = true">
+    <UiErrorBoundary :key="route.page === 'designer' ? `designer:${route.resourceId}` : route.hash"><DesignerPage v-if="route.page === 'designer'" :route="route" /><CenterPage v-else-if="route.page === 'center'" :route="route" /><WorkspacePage v-else :route="route" @service="serviceOpen = true" /></UiErrorBoundary>
+  </component>
+  <UiDialog :open="serviceOpen" title="服务连接" @close="serviceOpen = false">
+    <div class="connection-status" :class="state" role="status" aria-live="polite"><UiIcon :name="state === 'connected' ? 'check' : state === 'error' ? 'alert' : 'refresh'" /><strong>{{ serviceLabel }}</strong></div>
+    <p v-if="state === 'loading'" class="connection-description">正在读取服务信息，请稍候。</p>
+    <template v-else-if="info">
+      <p class="connection-description">已读取服务信息。业务模块的可用状态将在后续接入时单独检查。</p>
+      <dl class="service-details"><dt>服务名称</dt><dd>{{ info.name }}</dd><dt>程序版本</dt><dd>{{ info.version }}</dd><dt>接口版本</dt><dd>{{ info.apiVersion }}</dd></dl>
+    </template>
+    <div v-else-if="error" class="connection-error" role="alert"><p>{{ error.message }}</p><dl class="service-details"><dt>错误标记</dt><dd>{{ error.code }}</dd><template v-if="error.traceId"><dt>链路编号</dt><dd>{{ error.traceId }}</dd></template></dl><p class="muted">请确认审批服务已启动且网络可用，然后重新连接。</p></div>
+    <template #footer><button class="btn" @click="serviceOpen = false">关闭</button><button class="btn btn-primary" :disabled="state === 'loading'" @click="refresh"><UiIcon name="refresh" />{{ state === 'loading' ? '连接中…' : '重新连接' }}</button></template>
+  </UiDialog>
 </template>

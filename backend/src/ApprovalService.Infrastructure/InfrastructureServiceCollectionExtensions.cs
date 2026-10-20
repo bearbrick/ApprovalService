@@ -1,4 +1,17 @@
+using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
+using ApprovalService.Domain.Identity;
+using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Notifications;
+using ApprovalService.Domain.Organization;
+using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Integration;
+using ApprovalService.Infrastructure.Jobs;
+using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Options;
+using ApprovalService.Infrastructure.Organization;
+using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,7 +30,35 @@ public static class InfrastructureServiceCollectionExtensions
     /// <returns>同一个服务集合，便于链式调用。</returns>
     public static IServiceCollection AddApprovalInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<DataOptions>(configuration.GetSection(DataOptions.SectionName));
+        // 在监听请求前拒绝错误配置，避免健康检查误报就绪；数据库连通性由持久化任务接入后另行检查。
+        services.AddOptions<DataOptions>()
+            .Bind(configuration.GetSection(DataOptions.SectionName))
+            .Validate(options => options.Provider is "Sqlite" or "SqlServer" or "PostgreSql",
+                "配置 ApprovalService:Data:Provider 必须是 Sqlite、SqlServer 或 PostgreSql。")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Directory),
+                "配置 ApprovalService:Data:Directory 不能为空。")
+            .Validate(options => options.Provider is not ("SqlServer" or "PostgreSql") || !string.IsNullOrWhiteSpace(options.ConnectionString),
+                "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
+            .ValidateOnStart();
+        services.AddApprovalPersistence(configuration);
+        services.Configure<IdentityTokenOptions>(configuration.GetSection(IdentityTokenOptions.SectionName));
+        services.AddSingleton<JwtIdentityTokenService>();
+        services.AddSingleton<IIdentityAccessTokenService>(provider => provider.GetRequiredService<JwtIdentityTokenService>());
+        services.AddSingleton<IIdentityPasswordService, Pbkdf2IdentityPasswordService>();
+        services.AddScoped<IIdentityRepository, IdentityRepository>();
+        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<IClientAppRepository, ClientAppRepository>();
+        services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
+        services.AddSingleton<OutboxQueue>();
+        services.AddSingleton<ScheduledJobQueue>();
+        services.AddScoped<IScheduledJobHandler, DepartureJobHandler>();
+        services.AddHostedService<DurableJobWorker>();
+        services.AddOptions<SmtpNotificationOptions>()
+            .Bind(configuration.GetSection(SmtpNotificationOptions.SectionName));
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
+        services.AddScoped<INotificationChannel, InAppNotificationChannel>();
+        services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();
         return services;
     }
 }

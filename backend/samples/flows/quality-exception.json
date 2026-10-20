@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "code": "QUALITY_EXCEPTION",
+  "name": "质量异常处理",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "start",
+        "name": "业务系统上报异常",
+        "x": 80,
+        "y": 250
+      },
+      {
+        "id": "inspection",
+        "type": "approval",
+        "name": "质检员确认",
+        "x": 300,
+        "y": 250,
+        "assignee": {
+          "source": "role",
+          "value": "INSPECTOR"
+        },
+        "approval": {
+          "allowedActions": [
+            "approve",
+            "reject",
+            "return"
+          ],
+          "commentRequired": true
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "reworkDecision",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "reworkSplit",
+        "type": "exclusiveGateway",
+        "name": "是否返工",
+        "x": 530,
+        "y": 250,
+        "gatewayDirection": "split"
+      },
+      {
+        "id": "rework",
+        "type": "handling",
+        "name": "生产返工",
+        "x": 740,
+        "y": 90,
+        "assignee": {
+          "source": "role",
+          "value": "PRODUCTION_OPERATOR"
+        },
+        "approval": {
+          "allowedActions": [
+            "submit"
+          ]
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "repairSummary",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "reviewSplit",
+        "type": "parallelGateway",
+        "name": "双经理会审",
+        "x": 760,
+        "y": 380,
+        "gatewayPairId": "reviews",
+        "gatewayDirection": "split"
+      },
+      {
+        "id": "qualityManager",
+        "type": "approval",
+        "name": "质量经理审批",
+        "x": 980,
+        "y": 280,
+        "assignee": {
+          "source": "role",
+          "value": "QUALITY_MANAGER"
+        },
+        "approval": {
+          "allowedActions": [
+            "approve",
+            "reject"
+          ]
+        }
+      },
+      {
+        "id": "productionManager",
+        "type": "approval",
+        "name": "生产经理审批",
+        "x": 980,
+        "y": 480,
+        "assignee": {
+          "source": "role",
+          "value": "PRODUCTION_MANAGER"
+        },
+        "approval": {
+          "allowedActions": [
+            "approve",
+            "reject"
+          ]
+        }
+      },
+      {
+        "id": "reviewJoin",
+        "type": "parallelGateway",
+        "name": "会审汇合",
+        "x": 1220,
+        "y": 380,
+        "gatewayPairId": "reviews",
+        "gatewayDirection": "join"
+      },
+      {
+        "id": "notify",
+        "type": "automatic",
+        "name": "通知业务系统关闭异常",
+        "x": 1440,
+        "y": 380,
+        "automation": {
+          "actionCode": "closeQualityException"
+        }
+      },
+      {
+        "id": "cc",
+        "type": "cc",
+        "name": "抄送质量负责人",
+        "x": 1660,
+        "y": 380,
+        "assignee": {
+          "source": "role",
+          "value": "QUALITY_OWNER"
+        },
+        "approval": {
+          "readReceiptRequired": true
+        }
+      },
+      {
+        "id": "end",
+        "type": "end",
+        "name": "结束",
+        "x": 1880,
+        "y": 380
+      }
+    ],
+    "edges": [
+      {
+        "id": "q01",
+        "sourceId": "start",
+        "targetId": "inspection"
+      },
+      {
+        "id": "q02",
+        "sourceId": "inspection",
+        "targetId": "reworkSplit"
+      },
+      {
+        "id": "q03",
+        "sourceId": "reworkSplit",
+        "targetId": "rework",
+        "priority": 1,
+        "condition": "${reworkDecision} == \"yes\""
+      },
+      {
+        "id": "q04",
+        "sourceId": "rework",
+        "targetId": "inspection"
+      },
+      {
+        "id": "q05",
+        "sourceId": "reworkSplit",
+        "targetId": "reviewSplit",
+        "priority": 2,
+        "isDefault": true
+      },
+      {
+        "id": "q06",
+        "sourceId": "reviewSplit",
+        "targetId": "qualityManager"
+      },
+      {
+        "id": "q07",
+        "sourceId": "reviewSplit",
+        "targetId": "productionManager"
+      },
+      {
+        "id": "q08",
+        "sourceId": "qualityManager",
+        "targetId": "reviewJoin"
+      },
+      {
+        "id": "q09",
+        "sourceId": "productionManager",
+        "targetId": "reviewJoin"
+      },
+      {
+        "id": "q10",
+        "sourceId": "reviewJoin",
+        "targetId": "notify"
+      },
+      {
+        "id": "q11",
+        "sourceId": "notify",
+        "targetId": "cc"
+      },
+      {
+        "id": "q12",
+        "sourceId": "cc",
+        "targetId": "end"
+      }
+    ]
+  },
+  "data": {
+    "fields": [
+      {
+        "key": "title",
+        "name": "异常标题",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "lotNumber",
+        "name": "批次号",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "defectDescription",
+        "name": "异常描述",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "reworkDecision",
+        "name": "是否需要返工",
+        "type": "text",
+        "approverInput": true
+      },
+      {
+        "key": "repairSummary",
+        "name": "返工说明",
+        "type": "text",
+        "approverInput": true
+      },
+      {
+        "key": "evidence",
+        "name": "现场照片",
+        "type": "attachment"
+      }
+    ],
+    "summaryFields": [
+      "title",
+      "lotNumber",
+      "reworkDecision"
+    ]
+  },
+  "detailLayout": {
+    "mode": "custom",
+    "groups": [
+      {
+        "title": "异常信息",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "title"
+          },
+          {
+            "fieldKey": "lotNumber"
+          },
+          {
+            "fieldKey": "defectDescription"
+          },
+          {
+            "fieldKey": "evidence"
+          }
+        ]
+      },
+      {
+        "title": "处置结论",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "reworkDecision"
+          },
+          {
+            "fieldKey": "repairSummary"
+          }
+        ]
+      }
+    ]
+  },
+  "printSettings": {
+    "orientation": "portrait",
+    "fieldKeys": [
+      "title",
+      "lotNumber",
+      "defectDescription",
+      "evidence",
+      "reworkDecision",
+      "repairSummary"
+    ],
+    "showComments": true,
+    "showSignatures": true,
+    "showQrCode": true
+  },
+  "allowedClientApps": [
+    "QUALITY_SYSTEM"
+  ]
+}

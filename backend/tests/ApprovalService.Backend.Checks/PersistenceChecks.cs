@@ -33,6 +33,7 @@ internal static class PersistenceChecks
                 .Options;
             var factory = new TestContextFactory(options);
             var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+            var parallelGraph = EngineScenarioChecks.GatewayGraph(FlowNodeTypes.ParallelGateway);
             await using (var context = await factory.CreateDbContextAsync())
             {
                 await context.Database.EnsureCreatedAsync();
@@ -51,6 +52,15 @@ internal static class PersistenceChecks
                     SchemaVersion = FlowSchema.CurrentVersion,
                     DefinitionJson = "{}",
                     GraphJson = JsonSerializer.Serialize(graph, ApprovalJson.Options),
+                });
+                context.FlowVersions.Add(new FlowVersionEntity
+                {
+                    Id = "parallel-version",
+                    FlowId = "flow",
+                    Version = 2,
+                    SchemaVersion = FlowSchema.CurrentVersion,
+                    DefinitionJson = "{}",
+                    GraphJson = JsonSerializer.Serialize(parallelGraph, ApprovalJson.Options),
                 });
                 await context.SaveChangesAsync();
             }
@@ -105,6 +115,63 @@ internal static class PersistenceChecks
                 check("乐观锁版本只增加一次且审批单只结束一次", instance.Version == 2 &&
                     instance.Status == EngineInstanceStatuses.Approved &&
                     await context.OperationEvents.CountAsync(item => item.InstanceId == "instance" &&
+                        item.Kind == "instanceApproved") == 1);
+            }
+
+            var parallelStart = await service.ExecuteAsync(new RuntimeCommandInput
+            {
+                Command = new EngineCommand
+                {
+                    Kind = EngineCommandKinds.Start,
+                    RequestId = "parallel-start",
+                    InstanceId = "parallel-instance",
+                },
+                Context = EngineScenarioChecks.Context(parallelGraph),
+                StartInstance = new InstanceEntity
+                {
+                    Id = "parallel-instance",
+                    SerialNo = "AP-0002",
+                    FlowVersionId = "parallel-version",
+                    FlowCode = "PURCHASE",
+                    BusinessKey = "PO-002",
+                    Title = "会签场景",
+                    InitiatorId = "requester",
+                    ClientAppCode = "demo",
+                },
+            });
+            check("并行分支为两个人各创建一个待办", parallelStart.State.Tasks.Count == 2);
+            var firstParallelCommand = new EngineCommand
+            {
+                Kind = EngineCommandKinds.Approve,
+                RequestId = "parallel-approve-a",
+                InstanceId = "parallel-instance",
+                TaskId = parallelStart.State.Tasks[0].Id,
+            };
+            var secondParallelCommand = new EngineCommand
+            {
+                Kind = EngineCommandKinds.Approve,
+                RequestId = "parallel-approve-b",
+                InstanceId = "parallel-instance",
+                TaskId = parallelStart.State.Tasks[1].Id,
+            };
+            var parallelGate = new LoadGate();
+            var parallelServiceA = new ApprovalRuntimeAppService(
+                new GatedRepository(new ApprovalRuntimeRepository(factory), parallelGate));
+            var parallelServiceB = new ApprovalRuntimeAppService(
+                new GatedRepository(new ApprovalRuntimeRepository(factory), parallelGate));
+            var parallelOutcomes = await Task.WhenAll(
+                CaptureAsync(() => parallelServiceA.ExecuteAsync(ApprovalInput(firstParallelCommand, parallelGraph))),
+                CaptureAsync(() => parallelServiceB.ExecuteAsync(ApprovalInput(secondParallelCommand, parallelGraph))));
+            check("两位审批人并发同意时只接受一份旧版本提交",
+                parallelOutcomes.Count(error => error is null) == 1 &&
+                parallelOutcomes.Count(error => error is UserFriendlyException { Code: ErrorCodes.Conflict }) == 1);
+            var retryCommand = parallelOutcomes[0] is null ? secondParallelCommand : firstParallelCommand;
+            var parallelDone = await service.ExecuteAsync(ApprovalInput(retryCommand, parallelGraph));
+            await using (var context = await factory.CreateDbContextAsync())
+            {
+                check("冲突方刷新重试后并行会签仅汇合一次",
+                    parallelDone.State.Status == EngineInstanceStatuses.Approved &&
+                    await context.OperationEvents.CountAsync(item => item.InstanceId == "parallel-instance" &&
                         item.Kind == "instanceApproved") == 1);
             }
 

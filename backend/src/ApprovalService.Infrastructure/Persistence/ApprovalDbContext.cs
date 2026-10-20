@@ -137,6 +137,7 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.ClientAppCode).HasMaxLength(128).IsRequired();
             entity.Property(item => item.Status).HasMaxLength(48).IsRequired();
             entity.Property(item => item.Version).IsConcurrencyToken();
+            entity.Property(item => item.LastEventHash).HasMaxLength(64).IsRequired();
             entity.Property(item => item.ParentInstanceId).HasMaxLength(64);
             entity.HasOne<FlowVersionEntity>().WithMany().HasForeignKey(item => item.FlowVersionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.SerialNo).IsUnique();

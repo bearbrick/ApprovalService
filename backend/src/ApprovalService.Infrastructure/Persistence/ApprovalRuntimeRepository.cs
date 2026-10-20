@@ -40,6 +40,26 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             throw new InvalidOperationException("审批单提交版本必须比读取版本增加一。");
         }
 
+        var lastSequence = commit.Instance.LastEventSequence;
+        var lastHash = commit.Instance.LastEventHash;
+        foreach (var operationEvent in commit.Events)
+        {
+            // 锚点必须连续推进，不能让丢失尾部记录后的命令接在错误位置。
+            if (operationEvent.InstanceId != commit.Instance.Id ||
+                operationEvent.Sequence != lastSequence + 1 ||
+                !string.Equals(operationEvent.PreviousHash, lastHash, StringComparison.Ordinal) ||
+                !string.Equals(operationEvent.Hash, OperationHash.Compute(operationEvent), StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("操作记录与审批单事件锚点不一致。");
+            }
+
+            lastSequence = operationEvent.Sequence;
+            lastHash = operationEvent.Hash;
+        }
+
+        commit.Instance.LastEventSequence = lastSequence;
+        commit.Instance.LastEventHash = lastHash;
+
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         if (commit.ExpectedVersion is null)
         {

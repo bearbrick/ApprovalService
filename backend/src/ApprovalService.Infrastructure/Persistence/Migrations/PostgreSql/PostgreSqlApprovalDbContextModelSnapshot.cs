@@ -202,6 +202,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.Property<bool>("IsUrgent")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("LastEventHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("LastEventSequence")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ParentInstanceId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");

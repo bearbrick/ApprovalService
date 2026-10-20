@@ -106,6 +106,19 @@ public sealed class InstanceEntity
     }
 
     /// <summary>
+    /// 已提交的最后一条操作记录序号；与状态和事件在同一事务中更新。
+    /// </summary>
+    public long LastEventSequence
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 已提交的最后一条操作记录校验值，用于发现尾部记录被删除。
+    /// </summary>
+    public string LastEventHash { get; set; } = string.Empty;
+
+    /// <summary>
     /// 所属父审批单 ID。
     /// </summary>
     public string? ParentInstanceId

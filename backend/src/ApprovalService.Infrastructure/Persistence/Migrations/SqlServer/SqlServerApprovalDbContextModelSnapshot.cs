@@ -202,6 +202,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.Property<bool>("IsUrgent")
                         .HasColumnType("bit");
 
+                    b.Property<string>("LastEventHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long>("LastEventSequence")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ParentInstanceId")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");

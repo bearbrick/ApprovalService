@@ -55,4 +55,24 @@ public static class OperationHash
 
         return true;
     }
+
+    /// <summary>
+    /// 同时核对审批单上的最终锚点，检测链尾记录被删除的情况。
+    /// </summary>
+    /// <param name="entries">按序读取的操作记录。</param>
+    /// <param name="lastSequence">审批单持久化的最后事件序号。</param>
+    /// <param name="lastHash">审批单持久化的最后事件校验值。</param>
+    /// <returns>每条记录和最终锚点都完整且未被改写为真。</returns>
+    public static bool Verify(IReadOnlyList<OperationEventEntity> entries, long lastSequence, string lastHash)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        ArgumentNullException.ThrowIfNull(lastHash);
+        if (lastSequence < 0 || entries.Count != lastSequence || !Verify(entries))
+        {
+            return false;
+        }
+
+        var actualHash = entries.Count == 0 ? string.Empty : entries[^1].Hash;
+        return string.Equals(actualHash, lastHash, StringComparison.Ordinal);
+    }
 }

@@ -197,6 +197,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<bool>("IsUrgent")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("LastEventHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("LastEventSequence")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ParentInstanceId")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");

@@ -6,6 +6,7 @@ using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Persistence;
@@ -110,11 +111,13 @@ internal static class OpenApiChecksCallbacks
                 ["instanceWithdrawn"] = "instance.withdrawn",
                 ["instanceTerminated"] = "instance.terminated",
                 ["instanceCancelled"] = "instance.cancelled",
+                ["returnedToInitiator"] = "instance.returnedToInitiator",
+                ["supplementRequested"] = "instance.supplementRequested",
                 ["taskCreated"] = "task.created",
                 ["taskCompleted"] = "task.completed",
                 ["taskCancelled"] = "task.cancelled",
             };
-            check("实例与任务的九类回调事件有稳定外部编码，内部事件不外发",
+            check("退回补充与实例任务事件有稳定外部编码，内部事件不外发",
                 mappedEvents.All(pair => CallbackNotifications.Create(new EngineEvent
                 {
                     Id = "mapped-event",
@@ -130,6 +133,27 @@ internal static class OpenApiChecksCallbacks
             check("同一命令立刻完成时开始回调仍保存发起状态和当时数据快照",
                 startedNotification.Status == EngineInstanceStatuses.Running &&
                 startedNotification.Data.GetProperty("amount").GetInt32() == 1);
+            source.Status = EngineInstanceStatuses.AwaitingInitiator;
+            var pauseEvent = new EngineEvent
+            {
+                Id = "pause-event",
+                Kind = "returnedToInitiator",
+                Audit = new OperationAudit
+                {
+                    FieldValues = JsonSerializer.SerializeToElement(new { approvedAmount = 12000 }),
+                },
+            };
+            var pauseNotification = CallbackNotifications.Create(pauseEvent, source)!;
+            var pauseBody = CallbackNotifications.Serialize(pauseNotification);
+            source.ApprovalDataJson = "{\"amount\":3}";
+            using (var pauseDocument = JsonDocument.Parse(pauseBody))
+            {
+                check("退回发起人回调固定待处理状态、审批人填写值与原数据快照",
+                    pauseDocument.RootElement.GetProperty("event").GetString() == "instance.returnedToInitiator" &&
+                    pauseDocument.RootElement.GetProperty("status").GetString() == EngineInstanceStatuses.AwaitingInitiator &&
+                    pauseDocument.RootElement.GetProperty("fieldValues").GetProperty("approvedAmount").GetInt32() == 12000 &&
+                    pauseDocument.RootElement.GetProperty("data").GetProperty("amount").GetInt32() == 2);
+            }
             var item = new OutboxItemEntity
             {
                 Id = "event-1:callback",

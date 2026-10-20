@@ -21,15 +21,17 @@ public static class CallbackNotifications
     {
         var eventCode = item.Kind switch
         {
-            "instanceStarted" => "instance.started",
-            "instanceApproved" => "instance.approved",
-            "instanceRejected" => "instance.rejected",
-            "instanceWithdrawn" => "instance.withdrawn",
-            "instanceTerminated" => "instance.terminated",
-            "instanceCancelled" => "instance.cancelled",
-            "taskCreated" => "task.created",
-            "taskCompleted" => "task.completed",
-            "taskCancelled" => "task.cancelled",
+            "instanceStarted" => CallbackEventCodes.InstanceStarted,
+            "instanceApproved" => CallbackEventCodes.InstanceApproved,
+            "instanceRejected" => CallbackEventCodes.InstanceRejected,
+            "instanceWithdrawn" => CallbackEventCodes.InstanceWithdrawn,
+            "instanceTerminated" => CallbackEventCodes.InstanceTerminated,
+            "instanceCancelled" => CallbackEventCodes.InstanceCancelled,
+            "returnedToInitiator" => CallbackEventCodes.InstanceReturnedToInitiator,
+            "supplementRequested" => CallbackEventCodes.InstanceSupplementRequested,
+            "taskCreated" => CallbackEventCodes.TaskCreated,
+            "taskCompleted" => CallbackEventCodes.TaskCompleted,
+            "taskCancelled" => CallbackEventCodes.TaskCancelled,
             _ => null,
         };
         if (eventCode is null)
@@ -50,7 +52,8 @@ public static class CallbackNotifications
             BusinessKey = instance.BusinessKey,
             Status = status,
             Data = data.RootElement.Clone(),
-            FieldValues = item.Kind is "taskCompleted" or "instanceApproved" or "instanceRejected"
+            FieldValues = item.Kind is "taskCompleted" or "instanceApproved" or "instanceRejected" or
+                "returnedToInitiator" or "supplementRequested"
                 ? item.Audit?.FieldValues?.Clone() : null,
             OccurredAt = item.OccurredAt,
         };

@@ -80,6 +80,7 @@ app.UseAuthorization();
 app.MapSystemEndpoints();
 app.MapOpenFlowEndpoints();
 app.MapOpenInstanceQueryEndpoints();
+app.MapOpenTaskEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
 

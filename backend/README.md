@@ -33,6 +33,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
+| `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=` | 按本应用已绑定人员读取待办数量和列表，需 API Key |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/identity/change-password` | 工号密码登录、刷新令牌轮换、首次或日常改密 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地组织管理员开通账号、作废人员全部令牌 |
 | `POST /api/v1/embed-tokens`、`/embed-tokens/exchange` | 已认证接入应用为已绑定人员签发一次性嵌入令牌并交换登录态 |

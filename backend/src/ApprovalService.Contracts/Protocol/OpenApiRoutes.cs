@@ -25,4 +25,13 @@ public static class OpenApiRoutes
     /// </summary>
     public const string Instance = "/api/v1/instances/{id}";
 
+    /// <summary>
+    /// 按已绑定人员查询待办数量。
+    /// </summary>
+    public const string TaskCount = "/api/v1/tasks/count";
+
+    /// <summary>
+    /// 按已绑定人员分页查询待办。
+    /// </summary>
+    public const string Tasks = "/api/v1/tasks";
 }

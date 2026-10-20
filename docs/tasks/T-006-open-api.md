@@ -63,6 +63,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：待办数量和列表 HTTP 路由已接入现有数据库聚合与摘要投影；`user` 仅以本接入应用既有绑定解析，默认只看本应用，获授权才可传 `scope=all`。共享的 Contracts 路径、Api/检查 Program、`docs/contracts.md` 同步登记和更新，真实 HTTP 场景覆盖跨应用、未绑定工号及无效分页。完整 `verify.ps1` 后端 465、调用端 33、前端 65 项通过。发起审批的编号格式遵循设计 §form 的可配置方向；本任务不把示例前缀/日期/位数写死为最终规则。
 - 2026-10-20 · Codex：局部合入 T-007 已提交基线 `04045e2`，保留双方的开放路由、身份/组织路由、DI、模型配置及契约说明。三库 `AddOrganizationIdentity` 迁移通过 EF 工具基于合并后模型重新生成；SQLite 从空库迁移和模型快照检查、后端 460 项、调用端 33 项、前端 65 项及完整 `verify.ps1` 均通过。发起和待办人员身份只使用 `ResolveBoundPersonAsync`，不能使用全局工号回退；未获确认的四类钩子协议和附件绑定仍保持隔离，后续继续实现明确的开放接口。
 - 2026-10-20 · Codex：为继续发起/待办接口，计划局部合入 T-007 已提交基线 `04045e2`，只使用严格本应用绑定的 `ResolveBoundPersonAsync`，不调用待确认的全局工号回退。合并预计涉及共享 `Program.cs`、应用/基础设施 DI、`ApprovalDbContext.cs`、三库模型快照、`docs/contracts.md`、`docs/architecture.md` 与设计书；冲突只保留两任务的登记和已确认条款。离职在途重分配由独立任务处理，T-006 不修改其 Engine/Runtime/Persistence 文件。
 - 2026-10-20 · Codex：共享文件增量登记：`InfrastructureServiceCollectionExtensions.cs` 增加部署级 HTTPS/内网 HTTP 策略并关闭 HTTP 自动重定向，`docs/contracts.md` 和 `docs/architecture.md` 同步全局在途键的跨应用冲突、回调停用与传输边界；这些共享改动单独提交。审批单查询产品与 HTTP 隔离场景已提交 `eba0029`、`f5a65a7`、`00728fe`、`7ca8835`；全量验证后端 392、调用端 33、前端 65 项通过。审阅修复 `3dfcec2` 补了跨应用同号只报 409、HTTPS 默认、停用应用不发送回调、审批详情一致快照；新场景后端 401 项通过，待 T-007 释放 5289 后重跑全量。

@@ -73,6 +73,8 @@
 
 在途审批仍按全局的 `(flowCode, businessKey)` 唯一。相同单号已由其他接入应用占用时，发起用例只能返回 `CONFLICT`，不能把对方的审批单当作幂等结果；本应用同号才可复用本应用现有在途审批单。
 
+`GET /api/v1/tasks/count?user=alice` 和 `GET /api/v1/tasks?user=alice&skip=0&take=20` 需要 `X-Api-Key`，`user` 必须是当前接入应用已绑定的在职业务人员 ID，不按全局工号回退。默认只统计或列出本应用的待办；`scope=all` 要求该接入应用已获跨应用待办权限，否则返回 `FORBIDDEN`。数量响应为 `{pending, urgent, overdue}`；列表为任务数组，每项有 `id, instanceId, flowCode, businessKey, title, nodeId, isUrgent, dueAt, summary, openPath`。摘要仅取锁定流程版本指定的字段；`skip` 默认 0，`take` 默认 20、上限 100。
+
 ## 组织和身份接口
 
 `POST /api/v1/identity/login` 接受 `{ "employeeNumber": "E001", "password": "..." }`；
@@ -102,7 +104,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 | `PATCH /api/v1/instances/{id}/data` | 审批中更新允许更新的字段 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
-| `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=`、`POST /api/v1/tasks/{id}/actions` | 待办数量、待办列表、审批操作 | T-006 |
+| `POST /api/v1/tasks/{id}/actions` | 审批操作 | T-006 |
 | `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
 
 ## 回调和业务系统提供的接口

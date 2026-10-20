@@ -123,6 +123,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 - **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`；人工操作已填写字段另在可选 `fieldValues` 中，绝不覆盖 `data`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`、`instance.returnedToInitiator`、`instance.supplementRequested`，以及 `task.created`、`task.completed`、`task.cancelled`。后两种实例事件表示已退回发起人或正等待发起人补充，`status` 为 `awaitingInitiator`；退回历史审批节点不使用 `instance.returnedToInitiator`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。停用接入应用期间保留待发项且不出站；尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
   接入应用被停用后，已有待发回调暂停发送并记录 `CLIENT_APP_DISABLED`，仍留在队列等待后续重试；重新启用后可送达同一事件。
+
+撤销同意成功后，原审批任务从已处理恢复为待办，服务发兼容新增的 `task.restored` 回调；该回调独有可选 `taskId`，值为恢复的原任务 ID，`status` 为 `running`。待办订阅方收到它时须刷新原任务/待办列表；撤销期间被取消的下一步任务仍按既有 `task.cancelled` 通知。`task.restored` 与其他回调一样在审批事务中固定 `eventId` 和完整正文，失败重试及手动重发不生成新任务 ID 或事件 ID。审批单详情中恢复为 `pending` 的原任务清空 `opinion` 与 `completedAt`，此前的同意意见和撤销动作仍保留在只追加操作记录里。其他回调不新增 `taskId` 字段。
 - **取数接口**：只传单号发起时，审批服务按单号回业务系统取审批数据。
 - **校验钩子**：发起前、某个节点同意前问业务系统能不能过，不能过时返回原因。
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。

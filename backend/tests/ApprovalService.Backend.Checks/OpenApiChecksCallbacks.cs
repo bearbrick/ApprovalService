@@ -115,6 +115,7 @@ internal static class OpenApiChecksCallbacks
                 ["supplementRequested"] = "instance.supplementRequested",
                 ["taskCreated"] = "task.created",
                 ["taskCompleted"] = "task.completed",
+                ["approvalRevoked"] = "task.restored",
                 ["taskCancelled"] = "task.cancelled",
             };
             check("退回补充与实例任务事件有稳定外部编码，内部事件不外发",
@@ -122,6 +123,7 @@ internal static class OpenApiChecksCallbacks
                 {
                     Id = "mapped-event",
                     Kind = pair.Key,
+                    TaskId = "original-task",
                 }, source)?.Event == pair.Value) &&
                 CallbackNotifications.Create(new EngineEvent { Kind = "gatewayJoined" }, source) is null);
             var startedNotification = CallbackNotifications.Create(new EngineEvent
@@ -220,6 +222,51 @@ internal static class OpenApiChecksCallbacks
                 check("管理员重发保留原事件 ID 与原始正文", queued.Status == "pending" &&
                     queued.EventId == "event-1" && queued.PayloadJson == body && queued.CompletedAt is null);
             }
+
+            source.Id = "instance";
+            source.Status = EngineInstanceStatuses.Running;
+            var restoredNotification = CallbackNotifications.Create(new EngineEvent
+            {
+                Id = "restore-event",
+                Kind = "approvalRevoked",
+                TaskId = "original-task",
+            }, source)!;
+            var restoreBody = CallbackNotifications.Serialize(restoredNotification);
+            using var originalBody = JsonDocument.Parse(body);
+            using (var restoreDocument = JsonDocument.Parse(restoreBody))
+            {
+                check("撤销同意回调明确指出恢复的原待办且不改其他事件正文",
+                    restoreDocument.RootElement.GetProperty("event").GetString() == "task.restored" &&
+                    restoreDocument.RootElement.GetProperty("taskId").GetString() == "original-task" &&
+                    !originalBody.RootElement.TryGetProperty("taskId", out _));
+            }
+
+            var restoreItem = new OutboxItemEntity
+            {
+                EventId = "restore-event",
+                InstanceId = "instance",
+                PayloadJson = restoreBody,
+                Attempts = 1,
+            };
+            var restoreStart = remote.RequestCount;
+            remote.Fail = true;
+            var restoreFailed = false;
+            try
+            {
+                await handler.DeliverAsync(restoreItem, CancellationToken.None);
+            }
+            catch (HttpRequestException)
+            {
+                restoreFailed = true;
+            }
+
+            remote.Fail = false;
+            restoreItem.Attempts = 2;
+            await handler.DeliverAsync(restoreItem, CancellationToken.None);
+            check("恢复待办回调失败重试保持同一事件 ID、任务 ID 与完整正文", restoreFailed &&
+                remote.RequestCount == restoreStart + 2 &&
+                remote.Bodies.Skip(restoreStart).All(sent => sent == restoreBody) &&
+                remote.RequestIds.Skip(restoreStart).All(id => id == "restore-event"));
 
             remote.LargeResponse = true;
             var oversized = false;

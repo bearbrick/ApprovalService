@@ -119,12 +119,13 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             retainedIds.Add(task.Id);
             if (existingTasks.TryGetValue(task.Id, out var existing))
             {
-                // 任务是引擎状态的查询投影，更新时保留已经记录的完成时间。
-                if (task.CompletedAt is null && existing.CompletedAt is not null)
+                // 撤销同意会把原任务恢复待办；只有仍已结束的任务才能沿用历史完成投影。
+                var stillCompleted = task.Status is not (EngineTaskStatuses.Pending or EngineTaskStatuses.Queued);
+                if (stillCompleted && task.CompletedAt is null && existing.CompletedAt is not null)
                 {
                     task.CompletedAt = existing.CompletedAt;
                 }
-                if (task.Opinion is null && existing.Opinion is not null)
+                if (stillCompleted && task.Opinion is null && existing.Opinion is not null)
                 {
                     // 后续节点命令会重建全部任务投影，已完成任务的意见必须持续保留。
                     task.Opinion = existing.Opinion;

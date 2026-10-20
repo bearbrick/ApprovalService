@@ -31,12 +31,18 @@ public static class CallbackNotifications
             "supplementRequested" => CallbackEventCodes.InstanceSupplementRequested,
             "taskCreated" => CallbackEventCodes.TaskCreated,
             "taskCompleted" => CallbackEventCodes.TaskCompleted,
+            "approvalRevoked" => CallbackEventCodes.TaskRestored,
             "taskCancelled" => CallbackEventCodes.TaskCancelled,
             _ => null,
         };
         if (eventCode is null)
         {
             return null;
+        }
+
+        if (item.Kind == "approvalRevoked" && string.IsNullOrWhiteSpace(item.TaskId))
+        {
+            throw new InvalidOperationException("恢复待办事件缺少原任务 ID。");
         }
 
         // 同一命令可以先发起再立即通过，因此开始事件不能借用最终状态。
@@ -50,6 +56,7 @@ public static class CallbackNotifications
             SerialNo = instance.SerialNo,
             FlowCode = instance.FlowCode,
             BusinessKey = instance.BusinessKey,
+            TaskId = item.Kind == "approvalRevoked" ? item.TaskId : null,
             Status = status,
             Data = data.RootElement.Clone(),
             FieldValues = item.Kind is "taskCompleted" or "instanceApproved" or "instanceRejected" or

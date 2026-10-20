@@ -25,7 +25,7 @@
 - `client/src/ApprovalService.Client/ApprovalErrorCodes.cs`：新错误码的副本
 - 检查程序 `OpenApiChecks*.cs`：用一个假的业务系统后端
 - `backend/README.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`：同步开放接口和接入实现
-- `docs/adr/0009-outbound-hook-protocol.md`：未定义的四类业务钩子协议提议，确认前不实施
+- `docs/adr/0010-outbound-hook-protocol.md`：未定义的四类业务钩子协议提议，确认前不实施
 
 ## 共享文件
 

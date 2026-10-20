@@ -1,7 +1,7 @@
 /**
  * 与服务端 FlowCompiler 一致的发布前静态校验镜像；最终发布仍以服务端结果为准。
  */
-import { flowFieldTypes, flowGatewayDirections, flowNodeTypes, flowSchemaVersion } from '../../model/flow.ts'
+import { flowFieldTypes, flowGatewayDirections, flowNodeTypes, flowReturnModes, flowSchemaVersion } from '../../model/flow.ts'
 import type { FlowCanvas, FlowDefinition, FlowEdge, FlowFieldDefinition, FlowNode } from '../../model/flow.ts'
 import { parseStaticExpression } from './expression-static.ts'
 import { evaluateConstantExpression } from './expression-constant.ts'
@@ -107,6 +107,8 @@ export function validateCanvasDefinition(definition: FlowDefinition): CanvasIssu
   if (definition.schemaVersion !== flowSchemaVersion) add(null, `流程定义格式版本不受支持：${definition.schemaVersion}。`)
   if (!definition.code?.trim()) add(null, '流程编码不能为空。')
   if (!definition.name?.trim()) add(null, '流程名称不能为空。')
+  if (definition.withdrawBeforeFirstDecision !== undefined && typeof definition.withdrawBeforeFirstDecision !== 'boolean') add(null, '发起人撤回限制必须为布尔值。')
+  if (definition.returnMode !== undefined && definition.returnMode !== flowReturnModes.Restart && definition.returnMode !== flowReturnModes.ReturnNode) add(null, '退回后重新提交方式只能是 restart 或 returnNode。')
   const canvas: FlowCanvas | undefined = definition.canvas
   if (!canvas) { add(null, '流程缺少自由画布。'); return issues }
   const nodes = canvas.nodes ?? []

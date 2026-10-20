@@ -1,3 +1,4 @@
+import { flowReturnModes } from '../../model/flow.ts'
 import type { FlowApprovalSettings, FlowDefinition, FlowEdge, FlowNode } from '../../model/flow.ts'
 import purchase from './samples/purchase-request.json' with { type: 'json' }
 import expense from './samples/expense.json' with { type: 'json' }
@@ -64,6 +65,7 @@ export function createEmptyFlow(code = 'NEW_FLOW'): FlowDefinition {
     printSettings: { orientation: 'portrait', fieldKeys: [], showComments: true, showSignatures: true,
       includeReceiptPages: false, showLogo: true, showQrCode: true, showWatermark: false },
     allowedClientApps: [], allowedInitiatorDepartments: [], allowedInitiatorRoles: [],
+    withdrawBeforeFirstDecision: false, returnMode: flowReturnModes.Restart,
   }
 }
 
@@ -86,6 +88,8 @@ export function normalizeSample(source: FlowDefinition): FlowDefinition {
   next.allowedClientApps ??= []
   next.allowedInitiatorDepartments ??= []
   next.allowedInitiatorRoles ??= []
+  next.withdrawBeforeFirstDecision ??= false
+  next.returnMode ??= flowReturnModes.Restart
   next.data ??= { fields: [], summaryFields: [] }
   next.data.fields ??= []
   next.data.summaryFields ??= []

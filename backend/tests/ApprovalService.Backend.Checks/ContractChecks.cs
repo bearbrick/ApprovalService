@@ -53,7 +53,8 @@ internal static partial class ContractChecks
         CheckFlowKinds(flowKinds, flowCopy, "FlowGatewayDirections", "flowGatewayDirections", "网关方向", check);
         CheckFlowKinds(flowKinds, flowCopy, "FlowFieldAccess", "flowFieldAccess", "字段权限", check);
         CheckFlowKinds(flowKinds, flowCopy, "FlowReturnModes", "flowReturnModes", "退回重提方式", check);
-        CheckFlowProperties(flowCopy, check);
+        var flowExecutionCopy = Read(Path.Combine("frontend", "src", "model", "flow-execution.ts"));
+        CheckFlowProperties(flowCopy + "\n" + flowExecutionCopy, check);
 
         var approvalKinds = Read(Path.Combine("backend", "src", "ApprovalService.Contracts", "Flows", "FlowApprovalKinds.cs"));
         var approvalCopy = Read(Path.Combine("frontend", "src", "model", "flow-approval-kinds.ts"));

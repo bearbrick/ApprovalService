@@ -1,6 +1,6 @@
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Organization;
-using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +31,18 @@ public sealed class IdentityRepository(IDbContextFactory<ApprovalDbContext> fact
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(
             item => item.Id == personId, cancellationToken);
         return person is null ? null : await LoadSnapshotAsync(db, person, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsEmbedSubjectActiveAsync(string clientAppCode, string externalUserId, string personId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await (from binding in db.ExternalPersonBindings.AsNoTracking()
+                      join app in db.ClientApps.AsNoTracking() on binding.ClientAppCode equals app.Code
+                      where binding.ClientAppCode == clientAppCode && binding.ExternalUserId == externalUserId &&
+                          binding.PersonId == personId && app.IsEnabled
+                      select binding.PersonId).AnyAsync(cancellationToken);
     }
 
     /// <inheritdoc />

@@ -66,9 +66,13 @@ public interface IOrganizationAppService
 /// </summary>
 public sealed class OrganizationPushResult
 {
-    /// <summary>所有校验问题。</summary>
+    /// <summary>
+    /// 所有校验问题。
+    /// </summary>
     public IReadOnlyList<OrganizationImportIssue> Issues { get; set; } = [];
-    /// <summary>需要管理员交接的离职人员 ID。</summary>
+    /// <summary>
+    /// 需要管理员交接的离职人员 ID。
+    /// </summary>
     public IReadOnlyList<string> DepartedPersonIds { get; set; } = [];
 }
 
@@ -77,17 +81,38 @@ public sealed class OrganizationPushResult
 /// </summary>
 public sealed class PersonBindingInput
 {
-    /// <summary>接入应用编码。</summary>
+    /// <summary>
+    /// 接入应用编码。
+    /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;
-    /// <summary>业务系统人员 ID。</summary>
+    /// <summary>
+    /// 业务系统人员 ID。
+    /// </summary>
     public string ExternalUserId { get; set; } = string.Empty;
-    /// <summary>管理员指定的内部人员 ID。</summary>
-    public string? PersonId { get; set; }
-    /// <summary>自动匹配工号。</summary>
-    public string? EmployeeNumber { get; set; }
-    /// <summary>自动匹配手机号。</summary>
-    public string? Phone { get; set; }
-    /// <summary>绑定方法：automatic、import、push 或 manual。</summary>
+    /// <summary>
+    /// 管理员指定的内部人员 ID。
+    /// </summary>
+    public string? PersonId
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 自动匹配工号。
+    /// </summary>
+    public string? EmployeeNumber
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 自动匹配手机号。
+    /// </summary>
+    public string? Phone
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 绑定方法：automatic、import、push 或 manual。
+    /// </summary>
     public string Method { get; set; } = "automatic";
 }
 
@@ -96,12 +121,20 @@ public sealed class PersonBindingInput
 /// </summary>
 public sealed class DepartmentBindingInput
 {
-    /// <summary>接入应用编码。</summary>
+    /// <summary>
+    /// 接入应用编码。
+    /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;
-    /// <summary>业务系统部门 ID。</summary>
+    /// <summary>
+    /// 业务系统部门 ID。
+    /// </summary>
     public string ExternalDepartmentId { get; set; } = string.Empty;
-    /// <summary>内部部门 ID。</summary>
+    /// <summary>
+    /// 内部部门 ID。
+    /// </summary>
     public string DepartmentId { get; set; } = string.Empty;
-    /// <summary>绑定方法：import、push 或 manual。</summary>
+    /// <summary>
+    /// 绑定方法：import、push 或 manual。
+    /// </summary>
     public string Method { get; set; } = "manual";
 }

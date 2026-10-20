@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
+namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     /// <inheritdoc />
     public partial class AddOrganizationIdentity : Migration
@@ -15,13 +15,13 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "Departments",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Code = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    ParentId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    HeadPersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    DivisionLeaderIdsJson = table.Column<string>(type: "text", nullable: false),
-                    TrustedSource = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Id = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    Code = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    ParentId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    HeadPersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    DivisionLeaderIdsJson = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TrustedSource = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
                     Version = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
@@ -33,10 +33,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "DepartureNotices",
                 columns: table => new
                 {
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    PendingTaskCount = table.Column<int>(type: "integer", nullable: false),
-                    AcknowledgedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    PendingTaskCount = table.Column<int>(type: "int", nullable: false),
+                    AcknowledgedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -47,12 +47,13 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "EmbedTokens",
                 columns: table => new
                 {
-                    TokenHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    ClientAppCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    TargetPath = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ConsumedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    TokenHash = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    ClientAppCode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    ExternalUserId = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    TargetPath = table.Column<string>(type: "nvarchar(1024)", maxLength: 1024, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ConsumedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -63,10 +64,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "ExternalDepartmentBindings",
                 columns: table => new
                 {
-                    ClientAppCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExternalDepartmentId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    DepartmentId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Method = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
+                    ClientAppCode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    ExternalDepartmentId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    DepartmentId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    Method = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -77,10 +78,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "ExternalPersonBindings",
                 columns: table => new
                 {
-                    ClientAppCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ExternalUserId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    Method = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false)
+                    ClientAppCode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    ExternalUserId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    Method = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -91,14 +92,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "LocalAccounts",
                 columns: table => new
                 {
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    PasswordHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    PasswordSalt = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    MustChangePassword = table.Column<bool>(type: "boolean", nullable: false),
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    PasswordSalt = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    MustChangePassword = table.Column<bool>(type: "bit", nullable: false),
                     TokenVersion = table.Column<long>(type: "bigint", nullable: false),
-                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    FailedLogins = table.Column<int>(type: "integer", nullable: false),
-                    LockedUntil = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    IsEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    FailedLogins = table.Column<int>(type: "int", nullable: false),
+                    LockedUntil = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -109,15 +110,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "OrganizationChanges",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    EntityKind = table.Column<string>(type: "character varying(48)", maxLength: 48, nullable: false),
-                    EntityId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    ActorId = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Source = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Kind = table.Column<string>(type: "character varying(48)", maxLength: 48, nullable: false),
-                    BeforeJson = table.Column<string>(type: "text", nullable: true),
-                    AfterJson = table.Column<string>(type: "text", nullable: true),
-                    OccurredAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    Id = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    EntityKind = table.Column<string>(type: "nvarchar(48)", maxLength: 48, nullable: false),
+                    EntityId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    ActorId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Source = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Kind = table.Column<string>(type: "nvarchar(48)", maxLength: 48, nullable: false),
+                    BeforeJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AfterJson = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    OccurredAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -128,8 +129,8 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "OrganizationRoles",
                 columns: table => new
                 {
-                    Code = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false)
+                    Code = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -140,17 +141,17 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "People",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    EmployeeNumber = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    Phone = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    ManagerId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
-                    Position = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    Grade = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
-                    GradeRank = table.Column<int>(type: "integer", nullable: false),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    TrustedSource = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Id = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    EmployeeNumber = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
+                    Phone = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    ManagerId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true),
+                    Position = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    Grade = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    GradeRank = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    TrustedSource = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
                     Version = table.Column<long>(type: "bigint", nullable: false)
                 },
                 constraints: table =>
@@ -162,9 +163,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "PersonDepartments",
                 columns: table => new
                 {
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    DepartmentId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false)
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    DepartmentId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    IsPrimary = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -175,8 +176,8 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "PersonRoles",
                 columns: table => new
                 {
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    RoleCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    RoleCode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false)
                 },
                 constraints: table =>
                 {
@@ -187,12 +188,13 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 name: "RefreshTokens",
                 columns: table => new
                 {
-                    TokenHash = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    PersonId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
-                    ClientAppCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    TokenHash = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    PersonId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    ClientAppCode = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: true),
+                    ExternalUserId = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     TokenVersion = table.Column<long>(type: "bigint", nullable: false),
-                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    ConsumedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ConsumedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {

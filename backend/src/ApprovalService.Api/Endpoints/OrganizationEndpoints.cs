@@ -40,6 +40,12 @@ internal static class OrganizationEndpoints
             ClientAppAppService apps, IOrganizationAppService service, CancellationToken cancellationToken) =>
         {
             var client = await apps.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey], cancellationToken);
+            if (request.Kind == "person" && !string.IsNullOrWhiteSpace(request.InternalId))
+            {
+                throw new UserFriendlyException(ErrorCodes.Forbidden,
+                    "接入应用不能直接指定内部人员 ID，请按本应用人员工号或手机号匹配。");
+            }
+
             return await BindAsync(service, request, client.Code, "client:" + client.Code, "push",
                 cancellationToken);
         });
@@ -72,7 +78,15 @@ internal static class OrganizationEndpoints
                 case ".csv":
                     using (var reader = new StreamReader(stream, new UTF8Encoding(false, true)))
                     {
-                        batch = OrganizationCsvCodec.Parse(await reader.ReadToEndAsync(cancellationToken));
+                        try
+                        {
+                            batch = OrganizationCsvCodec.Parse(await reader.ReadToEndAsync(cancellationToken));
+                        }
+                        catch (DecoderFallbackException)
+                        {
+                            throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                                "组织 CSV 文件不是有效的 UTF-8 编码。");
+                        }
                     }
 
                     break;
@@ -112,9 +126,13 @@ internal static class OrganizationEndpoints
     /// <returns>领域批次。</returns>
     private static OrganizationImportBatch ToBatch(OrganizationBatchRequest request)
     {
-        if (request.Departments is null || request.People is null || request.Memberships is null)
+        if (request.Departments is null || request.People is null || request.Memberships is null ||
+            request.Departments.Any(item => item is null) ||
+            request.People.Any(item => item is null) ||
+            request.Memberships.Any(item => item is null))
         {
-            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "组织部门、人员和所属部门列表不能为空。");
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                "组织部门、人员、所属部门列表及列表项不能为空。");
         }
 
         return new OrganizationImportBatch
@@ -174,7 +192,10 @@ internal static class OrganizationEndpoints
                 Phone = request.Phone,
                 Method = method,
             }, actorId, DateTimeOffset.UtcNow, cancellationToken);
-            return Results.Ok(new { personId });
+            return Results.Ok(new
+            {
+                personId
+            });
         }
 
         if (request.Kind == "department")

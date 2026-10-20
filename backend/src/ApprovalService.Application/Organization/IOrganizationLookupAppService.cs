@@ -18,6 +18,16 @@ public interface IOrganizationLookupAppService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 嵌入签发专用：只接受此接入应用已绑定的业务人员 ID，不回退到全局工号。
+    /// </summary>
+    /// <param name="clientAppCode">已鉴权的接入应用编码。</param>
+    /// <param name="externalUserId">已绑定的业务系统人员 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>绑定的在职内部人员 ID；无绑定时为空。</returns>
+    Task<string?> ResolveBoundPersonAsync(string clientAppCode, string externalUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 将接入应用部门 ID 或内部部门编码解析为内部部门 ID。
     /// </summary>
     /// <param name="clientAppCode">已鉴权的接入应用编码。</param>

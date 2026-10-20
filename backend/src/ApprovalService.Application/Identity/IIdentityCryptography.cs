@@ -1,6 +1,22 @@
 namespace ApprovalService.Application.Identity;
 
 /// <summary>
+/// 会话的可信来源类型，嵌入会话不能获得本地管理员权限。
+/// </summary>
+public static class IdentitySessionKinds
+{
+    /// <summary>
+    /// 工号与密码直接登录。
+    /// </summary>
+    public const string Local = "local";
+
+    /// <summary>
+    /// 接入应用的一次性嵌入令牌交换。
+    /// </summary>
+    public const string Embed = "embed";
+}
+
+/// <summary>
 /// 密码摘要结果。
 /// </summary>
 public sealed class PasswordDigest
@@ -57,9 +73,11 @@ public interface IIdentityAccessTokenService
     /// <param name="tokenVersion">账号令牌版本。</param>
     /// <param name="mustChangePassword">首次登录是否必须修改密码。</param>
     /// <param name="clientAppCode">嵌入会话的接入应用编码；本地密码登录时为空。</param>
+    /// <param name="externalUserId">嵌入会话的业务系统人员 ID；本地密码登录时为空。</param>
     /// <param name="issuedAt">签发时间。</param>
     /// <param name="expiresAt">过期时间。</param>
     /// <returns>已签名的 JWT。</returns>
     string Issue(string personId, long tokenVersion, bool mustChangePassword, string? clientAppCode,
+        string? externalUserId,
         DateTimeOffset issuedAt, DateTimeOffset expiresAt);
 }

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using ApprovalService.Application.Identity;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Identity;
+using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Identity;
@@ -56,6 +57,20 @@ internal static class IdentityAppServiceChecks
                     PasswordSalt = "salt",
                     MustChangePassword = true,
                 });
+                db.ClientApps.Add(new ClientAppEntity
+                {
+                    Code = "demo",
+                    Name = "演示系统",
+                    ApiKeyHash = "test-key-hash",
+                    SigningSecretCiphertext = "test-ciphertext",
+                });
+                db.ExternalPersonBindings.Add(new ExternalPersonBindingEntity
+                {
+                    ClientAppCode = "demo",
+                    ExternalUserId = "external-1",
+                    PersonId = "person-1",
+                    Method = "test",
+                });
                 await db.SaveChangesAsync();
             }
 
@@ -102,15 +117,15 @@ internal static class IdentityAppServiceChecks
                 await FailsWithCodeAsync(() => service.RefreshAsync(login.RefreshToken), ErrorCodes.Unauthorized));
             await service.ChangePasswordAsync("person-1", "initial-password", "new-password-123");
             check("改密使旧访问和刷新令牌失效",
-                !await service.ValidateAccessPrincipalAsync("person-1", 0) &&
+                !await service.ValidateAccessPrincipalAsync("person-1", 0, IdentitySessionKinds.Local, null, null) &&
                 await FailsWithCodeAsync(() => service.RefreshAsync(refreshed.RefreshToken), ErrorCodes.Unauthorized));
             var changedLogin = await service.LoginAsync("EMP-001", "new-password-123");
             check("首次改密后允许新密码登录且清除改密标记", !changedLogin.MustChangePassword &&
                 await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "initial-password"), ErrorCodes.Unauthorized));
 
             check("嵌入令牌拒绝外站路径", await FailsWithCodeAsync(() => service.CreateEmbedTokenAsync(
-                "demo", "person-1", "https://outside.example/"), ErrorCodes.ValidationFailed));
-            var embed = await service.CreateEmbedTokenAsync("demo", "person-1", "#/m/tasks");
+                "demo", "external-1", "person-1", "https://outside.example/"), ErrorCodes.ValidationFailed));
+            var embed = await service.CreateEmbedTokenAsync("demo", "external-1", "person-1", "#/m/tasks");
             await using (var db = await factory.CreateDbContextAsync())
             {
                 check("一次性嵌入令牌仅以摘要保存",
@@ -127,14 +142,50 @@ internal static class IdentityAppServiceChecks
             var embedRefreshed = await service.RefreshAsync(exchanged.RefreshToken);
             var refreshedEmbedJwt = new JsonWebTokenHandler().ReadJsonWebToken(embedRefreshed.AccessToken);
             check("嵌入会话及刷新令牌始终绑定原接入应用，不能升级成本地管理员会话",
-                IsEmbedJwt(embedJwt, "demo") && IsEmbedJwt(refreshedEmbedJwt, "demo"));
-            var expiring = await service.CreateEmbedTokenAsync("demo", "person-1", "#/m/tasks");
+                IsEmbedJwt(embedJwt, "demo", "external-1") &&
+                IsEmbedJwt(refreshedEmbedJwt, "demo", "external-1"));
+            var expiring = await service.CreateEmbedTokenAsync("demo", "external-1", "person-1", "#/m/tasks");
             clock.Advance(TimeSpan.FromMinutes(6));
             check("嵌入令牌过期后不能交换",
                 await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(expiring.Token), ErrorCodes.Unauthorized));
+
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                var binding = await db.ExternalPersonBindings.SingleAsync();
+                binding.PersonId = "person-2";
+                await db.SaveChangesAsync();
+            }
+
+            check("外部人员改绑后旧嵌入访问与刷新令牌均失效",
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1") &&
+                await FailsWithCodeAsync(() => service.RefreshAsync(embedRefreshed.RefreshToken),
+                    ErrorCodes.Unauthorized));
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                var binding = await db.ExternalPersonBindings.SingleAsync();
+                binding.PersonId = "person-1";
+                await db.SaveChangesAsync();
+            }
+
+            var beforeDisable = await service.ExchangeEmbedTokenAsync((await service.CreateEmbedTokenAsync(
+                "demo", "external-1", "person-1", "#/m/tasks")).Token);
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                var app = await db.ClientApps.SingleAsync();
+                app.IsEnabled = false;
+                await db.SaveChangesAsync();
+            }
+
+            check("接入应用停用后旧嵌入访问与刷新令牌均失效",
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1") &&
+                await FailsWithCodeAsync(() => service.RefreshAsync(beforeDisable.RefreshToken),
+                    ErrorCodes.Unauthorized));
+
             await service.RevokeAllAsync("person-1");
             check("管理员作废令牌版本后旧访问令牌无效",
-                !await service.ValidateAccessPrincipalAsync("person-1", 1));
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Local, null, null));
 
             await service.LoginAsync("EMP-001", "new-password-123");
 
@@ -186,12 +237,15 @@ internal static class IdentityAppServiceChecks
     /// </summary>
     /// <param name="token">已读取的 JWT。</param>
     /// <param name="clientAppCode">预期接入应用编码。</param>
+    /// <param name="externalUserId">预期外部人员 ID。</param>
     /// <returns>来源与应用编码均一致为真。</returns>
-    private static bool IsEmbedJwt(JsonWebToken token, string clientAppCode) =>
+    private static bool IsEmbedJwt(JsonWebToken token, string clientAppCode, string externalUserId) =>
         token.TryGetPayloadValue(JwtIdentityTokenService.SessionKindClaim, out string? kind) &&
         kind == JwtIdentityTokenService.EmbedSessionKind &&
         token.TryGetPayloadValue(JwtIdentityTokenService.ClientAppCodeClaim, out string? code) &&
-        code == clientAppCode;
+        code == clientAppCode &&
+        token.TryGetPayloadValue(JwtIdentityTokenService.ExternalUserIdClaim, out string? userId) &&
+        userId == externalUserId;
 
     /// <summary>
     /// 为检查程序创建独立数据库上下文。

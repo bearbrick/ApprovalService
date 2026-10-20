@@ -39,6 +39,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("PersonId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -110,6 +115,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PersonId")
                         .IsRequired()

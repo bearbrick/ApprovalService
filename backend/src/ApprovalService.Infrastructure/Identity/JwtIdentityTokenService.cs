@@ -40,6 +40,11 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
     public const string ClientAppCodeClaim = "clientAppCode";
 
     /// <summary>
+    /// 嵌入会话绑定的外部人员 ID 声明名称。
+    /// </summary>
+    public const string ExternalUserIdClaim = "externalUserId";
+
+    /// <summary>
     /// 本地密码会话的声明值。
     /// </summary>
     public const string LocalSessionKind = "local";
@@ -84,6 +89,7 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
 
     /// <inheritdoc />
     public string Issue(string personId, long tokenVersion, bool mustChangePassword, string? clientAppCode,
+        string? externalUserId,
         DateTimeOffset issuedAt, DateTimeOffset expiresAt)
     {
         var claims = new List<Claim>
@@ -97,6 +103,8 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
         if (clientAppCode is not null)
         {
             claims.Add(new Claim(ClientAppCodeClaim, clientAppCode));
+            claims.Add(new Claim(ExternalUserIdClaim, externalUserId ?? throw new InvalidOperationException(
+                "嵌入会话缺少外部人员 ID。")));
         }
 
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor

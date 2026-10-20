@@ -34,6 +34,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PersonId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -104,6 +109,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExternalUserId")
+                        .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PersonId")

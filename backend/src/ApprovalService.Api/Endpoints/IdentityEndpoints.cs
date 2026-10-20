@@ -50,9 +50,9 @@ internal static class IdentityEndpoints
             CancellationToken cancellationToken) =>
         {
             var appIdentity = await apps.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey], cancellationToken);
-            var personId = await organization.ResolvePersonAsync(appIdentity.Code, request.UserId, cancellationToken)
+            var personId = await organization.ResolveBoundPersonAsync(appIdentity.Code, request.UserId, cancellationToken)
                 ?? throw new UserFriendlyException(ErrorCodes.NotFound, "业务人员尚未绑定在职审批人员。");
-            var token = await identity.CreateEmbedTokenAsync(appIdentity.Code, personId, request.TargetPath,
+            var token = await identity.CreateEmbedTokenAsync(appIdentity.Code, request.UserId, personId, request.TargetPath,
                 cancellationToken);
             return new EmbedTokenResponse(token.Token, token.ExpiresAt, token.TargetPath);
         });

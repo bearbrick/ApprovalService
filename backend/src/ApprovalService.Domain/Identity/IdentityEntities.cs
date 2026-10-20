@@ -24,7 +24,10 @@ public sealed class LocalAccountEntity
     /// <summary>
     /// 作废旧令牌用的版本。
     /// </summary>
-    public long TokenVersion { get; set; }
+    public long TokenVersion
+    {
+        get; set;
+    }
     /// <summary>
     /// 账号是否启用。
     /// </summary>
@@ -33,12 +36,18 @@ public sealed class LocalAccountEntity
     /// <summary>
     /// 连续密码失败次数。
     /// </summary>
-    public int FailedLogins { get; set; }
+    public int FailedLogins
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 暂时锁定到此时间；空值表示没有锁定。
     /// </summary>
-    public DateTimeOffset? LockedUntil { get; set; }
+    public DateTimeOffset? LockedUntil
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -57,19 +66,38 @@ public sealed class RefreshTokenEntity
     /// <summary>
     /// 嵌入会话来源的接入应用编码；本地登录时为空。
     /// </summary>
-    public string? ClientAppCode { get; set; }
+    public string? ClientAppCode
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 嵌入会话的业务人员 ID；本地登录时为空。
+    /// </summary>
+    public string? ExternalUserId
+    {
+        get; set;
+    }
     /// <summary>
     /// 签发时的令牌版本。
     /// </summary>
-    public long TokenVersion { get; set; }
+    public long TokenVersion
+    {
+        get; set;
+    }
     /// <summary>
     /// 过期时间。
     /// </summary>
-    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset ExpiresAt
+    {
+        get; set;
+    }
     /// <summary>
     /// 已消费时间，非空表示不可再使用。
     /// </summary>
-    public DateTimeOffset? ConsumedAt { get; set; }
+    public DateTimeOffset? ConsumedAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -86,6 +114,10 @@ public sealed class EmbedTokenEntity
     /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;
     /// <summary>
+    /// 签发时已绑定的业务人员 ID。
+    /// </summary>
+    public string ExternalUserId { get; set; } = string.Empty;
+    /// <summary>
     /// 绑定的人员 ID。
     /// </summary>
     public string PersonId { get; set; } = string.Empty;
@@ -96,9 +128,15 @@ public sealed class EmbedTokenEntity
     /// <summary>
     /// 过期时间。
     /// </summary>
-    public DateTimeOffset ExpiresAt { get; set; }
+    public DateTimeOffset ExpiresAt
+    {
+        get; set;
+    }
     /// <summary>
     /// 消费时间。
     /// </summary>
-    public DateTimeOffset? ConsumedAt { get; set; }
+    public DateTimeOffset? ConsumedAt
+    {
+        get; set;
+    }
 }

@@ -5,14 +5,14 @@ using ApprovalService.Domain.Shared;
 namespace ApprovalService.Application.Organization;
 
 /// <summary>
-/// 无第三方依赖的 UTF-8 CSV 导入格式；同一文件可含部门、人员和所属部门三种记录。
+/// 无第三方依赖的 UTF-8 CSV 导入格式；同一文件可含组织主数据及外部绑定。
 /// </summary>
 public static class OrganizationCsvCodec
 {
     /// <summary>
-    /// CSV 模板列，空字段留空；首列 kind 为 department、person 或 membership。
+    /// CSV 模板列，空字段留空；首列 kind 区分部门、人员、关系与绑定。
     /// </summary>
-    public const string Header = "kind,id,code,name,parentId,headPersonId,employeeNumber,phone,email,managerId,position,grade,gradeRank,isActive,personId,departmentId,isPrimary";
+    public const string Header = "kind,id,code,name,parentId,headPersonId,employeeNumber,phone,email,managerId,position,grade,gradeRank,isActive,personId,departmentId,isPrimary,clientAppCode,externalId,internalId";
 
     /// <summary>
     /// 解析 CSV 字符串；结构错误作为可修正的校验错误返回。
@@ -96,6 +96,24 @@ public static class OrganizationCsvCodec
                         PersonId = row[14].Trim(),
                         DepartmentId = row[15].Trim(),
                         IsPrimary = isPrimary,
+                    });
+                    break;
+                case "personBinding":
+                    batch.PersonBindings.Add(new ExternalPersonBindingEntity
+                    {
+                        ClientAppCode = row[17].Trim(),
+                        ExternalUserId = row[18].Trim(),
+                        PersonId = row[19].Trim(),
+                        Method = "import",
+                    });
+                    break;
+                case "departmentBinding":
+                    batch.DepartmentBindings.Add(new ExternalDepartmentBindingEntity
+                    {
+                        ClientAppCode = row[17].Trim(),
+                        ExternalDepartmentId = row[18].Trim(),
+                        DepartmentId = row[19].Trim(),
+                        Method = "import",
                     });
                     break;
                 default:

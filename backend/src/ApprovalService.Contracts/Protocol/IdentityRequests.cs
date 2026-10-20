@@ -49,7 +49,7 @@ public sealed record IdentityTokensResponse(string PersonId, string AccessToken,
 /// <summary>
 /// 接入应用签发嵌入令牌的请求。
 /// </summary>
-/// <param name="UserId">业务系统人员 ID 或工号。</param>
+/// <param name="UserId">该接入应用已绑定的业务系统人员 ID。</param>
 /// <param name="TargetPath">限定的站内相对路径。</param>
 public sealed record EmbedTokenRequest(string UserId, string TargetPath);
 

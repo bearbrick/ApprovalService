@@ -15,14 +15,21 @@ public interface IOrganizationRepository
     Task<OrganizationImportBatch> LoadMasterDataAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 读取已登记接入应用编码，供外部绑定导入预检使用。
+    /// </summary>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>已登记应用编码。</returns>
+    Task<IReadOnlyList<string>> LoadClientAppCodesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 将一批可信主数据和变更日志在同一事务内写入。
     /// </summary>
     /// <param name="batch">通过校验的批次。</param>
     /// <param name="actorId">操作人员 ID。</param>
     /// <param name="occurredAt">发生时间。</param>
     /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>异步操作。</returns>
-    Task SaveTrustedImportAsync(OrganizationImportBatch batch, string actorId, DateTimeOffset occurredAt,
+    /// <returns>同一事务内校验与保存的结果。</returns>
+    Task<OrganizationImportWriteResult> SaveTrustedImportAsync(OrganizationImportBatch batch, string actorId, DateTimeOffset occurredAt,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -33,8 +40,8 @@ public interface IOrganizationRepository
     /// <param name="actorId">操作人员 ID。</param>
     /// <param name="occurredAt">发生时间。</param>
     /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>需要交接提醒的离职人员 ID。</returns>
-    Task<IReadOnlyList<string>> SavePushedChangesAsync(OrganizationImportBatch batch, string clientAppCode,
+    /// <returns>同一事务内校验与保存的结果。</returns>
+    Task<OrganizationImportWriteResult> SavePushedChangesAsync(OrganizationImportBatch batch, string clientAppCode,
         string actorId, DateTimeOffset occurredAt, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -105,4 +112,12 @@ public interface IOrganizationRepository
     /// <returns>只含组织主数据的找人快照。</returns>
     Task<AssigneeSnapshot> LoadAssigneeSnapshotAsync(string initiatorId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 核对在职人员是否拥有组织管理员角色。
+    /// </summary>
+    /// <param name="personId">内部人员 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>在职且被授予组织管理员角色为真。</returns>
+    Task<bool> IsOrganizationAdminAsync(string personId, CancellationToken cancellationToken = default);
 }

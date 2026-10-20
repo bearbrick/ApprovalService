@@ -53,7 +53,24 @@ public static class OrganizationExcelCodec
                 }
 
                 // 单元格统一转为 CSV 字段，使两个文件格式采用相同的空值、布尔值和记录类型规则。
-                csv.AppendJoin(',', headers.Select(header => Escape(Convert.ToString(row[header], CultureInfo.InvariantCulture))));
+                for (var index = 0; index < headers.Length; index++)
+                {
+                    var value = Convert.ToString(row[headers[index]], CultureInfo.InvariantCulture);
+                    if (value is { Length: > MaximumCharacters } ||
+                        (value?.Length ?? 0) > MaximumCharacters - csv.Length)
+                    {
+                        throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                            "组织 Excel 解压后内容过大，请拆分文件导入。");
+                    }
+
+                    if (index > 0)
+                    {
+                        csv.Append(',');
+                    }
+
+                    csv.Append(Escape(value));
+                }
+
                 csv.Append("\r\n");
                 if (csv.Length > MaximumCharacters)
                 {

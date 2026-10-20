@@ -56,11 +56,13 @@ public interface IIdentityAppService
     /// 为已验证的接入应用和人员创建一次性嵌入令牌。
     /// </summary>
     /// <param name="clientAppCode">接入应用编码。</param>
+    /// <param name="externalUserId">该应用已绑定的外部人员 ID。</param>
     /// <param name="personId">已绑定的内部人员 ID。</param>
     /// <param name="targetPath">站内相对页面路径。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>只显示一次的原始令牌。</returns>
-    Task<EmbedTokenDto> CreateEmbedTokenAsync(string clientAppCode, string personId, string targetPath,
+    Task<EmbedTokenDto> CreateEmbedTokenAsync(string clientAppCode, string externalUserId, string personId,
+        string targetPath,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -76,8 +78,12 @@ public interface IIdentityAppService
     /// </summary>
     /// <param name="personId">令牌中的人员 ID。</param>
     /// <param name="tokenVersion">令牌中的版本。</param>
+    /// <param name="sessionKind">签名令牌的会话来源。</param>
+    /// <param name="clientAppCode">嵌入会话绑定的接入应用；本地登录为空。</param>
+    /// <param name="externalUserId">嵌入会话绑定的业务人员；本地登录为空。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>令牌仍有效为真。</returns>
-    Task<bool> ValidateAccessPrincipalAsync(string personId, long tokenVersion,
+    Task<bool> ValidateAccessPrincipalAsync(string personId, long tokenVersion, string? sessionKind,
+        string? clientAppCode, string? externalUserId,
         CancellationToken cancellationToken = default);
 }

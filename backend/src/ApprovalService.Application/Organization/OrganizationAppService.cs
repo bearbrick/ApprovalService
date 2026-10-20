@@ -15,8 +15,16 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(batch);
+        if (batch.Departments is null || batch.People is null || batch.Memberships is null ||
+            batch.PersonBindings is null || batch.DepartmentBindings is null)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "组织部门、人员和所属部门列表不能为空。");
+        }
+
         var existing = await repository.LoadMasterDataAsync(cancellationToken);
-        return OrganizationImportRules.Validate(batch, existing.Departments, existing.People);
+        var clientAppCodes = await repository.LoadClientAppCodesAsync(cancellationToken);
+        return OrganizationImportRules.Validate(batch, existing.Departments, existing.People,
+            existing.Memberships, clientAppCodes);
     }
 
     /// <inheritdoc />
@@ -24,13 +32,8 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
         string actorId, DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(actorId);
-        var issues = await ValidateImportAsync(batch, cancellationToken);
-        if (issues.Count == 0)
-        {
-            await repository.SaveTrustedImportAsync(batch, actorId, occurredAt, cancellationToken);
-        }
-
-        return issues;
+        var result = await repository.SaveTrustedImportAsync(batch, actorId, occurredAt, cancellationToken);
+        return result.Issues;
     }
 
     /// <inheritdoc />
@@ -43,15 +46,13 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
             throw new UserFriendlyException(ErrorCodes.Forbidden, "接入应用不能冒充组织主数据来源。");
         }
 
-        var issues = await ValidateImportAsync(batch, cancellationToken);
-        if (issues.Count > 0)
-        {
-            return new OrganizationPushResult { Issues = issues };
-        }
-
-        var departed = await repository.SavePushedChangesAsync(batch, clientAppCode,
+        var result = await repository.SavePushedChangesAsync(batch, clientAppCode,
             "client:" + clientAppCode, occurredAt, cancellationToken);
-        return new OrganizationPushResult { DepartedPersonIds = departed };
+        return new OrganizationPushResult
+        {
+            Issues = result.Issues,
+            DepartedPersonIds = result.DepartedPersonIds,
+        };
     }
 
     /// <inheritdoc />
@@ -72,6 +73,17 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
             throw new UserFriendlyException(ErrorCodes.NotFound, "找不到唯一匹配的审批服务人员。");
         }
 
+        if (!person.IsActive)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "离职人员不能建立新的业务系统绑定。");
+        }
+
+        if (input.Method == "push" && person.TrustedSource != input.ClientAppCode)
+        {
+            throw new UserFriendlyException(ErrorCodes.Forbidden,
+                "接入应用不能自行绑定其他来源的人员，请由组织管理员确认绑定。");
+        }
+
         await repository.BindPersonAsync(new ExternalPersonBindingEntity
         {
             ClientAppCode = input.ClientAppCode,
@@ -83,7 +95,7 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
     }
 
     /// <inheritdoc />
-    public Task BindDepartmentAsync(DepartmentBindingInput input, string actorId,
+    public async Task BindDepartmentAsync(DepartmentBindingInput input, string actorId,
         DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -93,7 +105,23 @@ public sealed class OrganizationAppService(IOrganizationRepository repository) :
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "部门绑定的应用、外部 ID 和内部 ID 不能为空。");
         }
 
-        return repository.BindDepartmentAsync(new ExternalDepartmentBindingEntity
+        if (input.Method == "push")
+        {
+            var master = await repository.LoadMasterDataAsync(cancellationToken);
+            var department = master.Departments.SingleOrDefault(item => item.Id == input.DepartmentId);
+            if (department is null)
+            {
+                throw new UserFriendlyException(ErrorCodes.NotFound, "部门不存在。");
+            }
+
+            if (department.TrustedSource != input.ClientAppCode)
+            {
+                throw new UserFriendlyException(ErrorCodes.Forbidden,
+                    "接入应用不能自行绑定其他来源的部门，请由组织管理员确认绑定。");
+            }
+        }
+
+        await repository.BindDepartmentAsync(new ExternalDepartmentBindingEntity
         {
             ClientAppCode = input.ClientAppCode,
             ExternalDepartmentId = input.ExternalDepartmentId,

@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 {
     [DbContext(typeof(PostgreSqlApprovalDbContext))]
-    [Migration("20261020102314_AddOrganizationIdentity")]
+    [Migration("20261020103212_AddOrganizationIdentity")]
     partial class AddOrganizationIdentity
     {
         /// <inheritdoc />
@@ -41,6 +41,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PersonId")
                         .IsRequired()
@@ -113,6 +118,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExternalUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("PersonId")
                         .IsRequired()

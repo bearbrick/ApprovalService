@@ -32,6 +32,7 @@ internal static class IdentityModelConfiguration
             entity.Property(item => item.TokenHash).HasMaxLength(64);
             entity.Property(item => item.PersonId).HasMaxLength(64).IsRequired();
             entity.Property(item => item.ClientAppCode).HasMaxLength(128);
+            entity.Property(item => item.ExternalUserId).HasMaxLength(256);
             entity.HasIndex(item => new { item.PersonId, item.ExpiresAt });
         });
 
@@ -41,6 +42,7 @@ internal static class IdentityModelConfiguration
             entity.HasKey(item => item.TokenHash);
             entity.Property(item => item.TokenHash).HasMaxLength(64);
             entity.Property(item => item.ClientAppCode).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.ExternalUserId).HasMaxLength(256).IsRequired();
             entity.Property(item => item.PersonId).HasMaxLength(64).IsRequired();
             entity.Property(item => item.TargetPath).HasMaxLength(1024).IsRequired();
             entity.HasIndex(item => new { item.PersonId, item.ExpiresAt });

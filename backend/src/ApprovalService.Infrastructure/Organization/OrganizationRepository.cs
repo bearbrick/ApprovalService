@@ -1,6 +1,8 @@
 using System.Data;
 using System.Text.Json;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Assignees;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -26,11 +28,24 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
     }
 
     /// <inheritdoc />
-    public async Task SaveTrustedImportAsync(OrganizationImportBatch batch, string actorId,
+    public async Task<IReadOnlyList<string>> LoadClientAppCodesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await db.ClientApps.AsNoTracking().Select(item => item.Code).ToArrayAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<OrganizationImportWriteResult> SaveTrustedImportAsync(OrganizationImportBatch batch, string actorId,
         DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var issues = await ValidateCurrentAsync(db, batch, cancellationToken);
+        if (issues.Count > 0)
+        {
+            return new OrganizationImportWriteResult { Issues = issues };
+        }
+
         foreach (var department in batch.Departments)
         {
             var existing = await db.Departments.SingleOrDefaultAsync(item => item.Id == department.Id, cancellationToken);
@@ -79,6 +94,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             var existing = await db.PersonDepartments.SingleOrDefaultAsync(item =>
                 item.PersonId == membership.PersonId && item.DepartmentId == membership.DepartmentId,
                 cancellationToken);
+            var before = existing is null ? null : JsonSerializer.Serialize(existing);
             if (existing is null)
             {
                 db.PersonDepartments.Add(membership);
@@ -89,20 +105,65 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             }
 
             Record(db, "membership", membership.PersonId + ":" + membership.DepartmentId,
-                actorId, "approvalService", existing is null ? null : JsonSerializer.Serialize(existing),
+                actorId, "approvalService", before,
                 JsonSerializer.Serialize(membership), occurredAt);
+        }
+
+        foreach (var binding in batch.PersonBindings)
+        {
+            var existing = await db.ExternalPersonBindings.SingleOrDefaultAsync(item =>
+                item.ClientAppCode == binding.ClientAppCode && item.ExternalUserId == binding.ExternalUserId,
+                cancellationToken);
+            var before = existing is null ? null : JsonSerializer.Serialize(existing);
+            if (existing is null)
+            {
+                db.ExternalPersonBindings.Add(binding);
+            }
+            else
+            {
+                db.Entry(existing).CurrentValues.SetValues(binding);
+            }
+
+            Record(db, "personBinding", binding.ClientAppCode + ":" + binding.ExternalUserId,
+                actorId, "approvalService", before, JsonSerializer.Serialize(binding), occurredAt);
+        }
+
+        foreach (var binding in batch.DepartmentBindings)
+        {
+            var existing = await db.ExternalDepartmentBindings.SingleOrDefaultAsync(item =>
+                item.ClientAppCode == binding.ClientAppCode && item.ExternalDepartmentId == binding.ExternalDepartmentId,
+                cancellationToken);
+            var before = existing is null ? null : JsonSerializer.Serialize(existing);
+            if (existing is null)
+            {
+                db.ExternalDepartmentBindings.Add(binding);
+            }
+            else
+            {
+                db.Entry(existing).CurrentValues.SetValues(binding);
+            }
+
+            Record(db, "departmentBinding", binding.ClientAppCode + ":" + binding.ExternalDepartmentId,
+                actorId, "approvalService", before, JsonSerializer.Serialize(binding), occurredAt);
         }
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
+        return new OrganizationImportWriteResult();
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<string>> SavePushedChangesAsync(OrganizationImportBatch batch,
+    public async Task<OrganizationImportWriteResult> SavePushedChangesAsync(OrganizationImportBatch batch,
         string clientAppCode, string actorId, DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var issues = await ValidateCurrentAsync(db, batch, cancellationToken);
+        if (issues.Count > 0)
+        {
+            return new OrganizationImportWriteResult { Issues = issues };
+        }
+
         var departed = new List<string>();
         foreach (var department in batch.Departments)
         {
@@ -158,7 +219,9 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         foreach (var membership in batch.Memberships)
         {
             var person = await db.People.FindAsync([membership.PersonId], cancellationToken);
-            if (person is null || person.TrustedSource != clientAppCode)
+            var department = await db.Departments.FindAsync([membership.DepartmentId], cancellationToken);
+            if (person is null || person.TrustedSource != clientAppCode ||
+                department is null || department.TrustedSource != clientAppCode)
             {
                 continue;
             }
@@ -166,6 +229,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             var existing = await db.PersonDepartments.SingleOrDefaultAsync(item =>
                 item.PersonId == membership.PersonId && item.DepartmentId == membership.DepartmentId,
                 cancellationToken);
+            var before = existing is null ? null : JsonSerializer.Serialize(existing);
             if (existing is null)
             {
                 db.PersonDepartments.Add(membership);
@@ -176,12 +240,12 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             }
 
             Record(db, "membership", membership.PersonId + ":" + membership.DepartmentId,
-                actorId, clientAppCode, null, JsonSerializer.Serialize(membership), occurredAt);
+                actorId, clientAppCode, before, JsonSerializer.Serialize(membership), occurredAt);
         }
 
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return departed;
+        return new OrganizationImportWriteResult { DepartedPersonIds = departed };
     }
 
     /// <inheritdoc />
@@ -220,7 +284,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         if (!await db.People.AnyAsync(item => item.Id == binding.PersonId, cancellationToken))
         {
-            throw new InvalidOperationException("绑定的人员不存在。");
+            throw new UserFriendlyException(ErrorCodes.NotFound, "绑定的人员不存在。");
         }
 
         var existing = await db.ExternalPersonBindings.SingleOrDefaultAsync(item =>
@@ -248,7 +312,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         if (!await db.Departments.AnyAsync(item => item.Id == binding.DepartmentId, cancellationToken))
         {
-            throw new InvalidOperationException("绑定的部门不存在。");
+            throw new UserFriendlyException(ErrorCodes.NotFound, "绑定的部门不存在。");
         }
 
         var existing = await db.ExternalDepartmentBindings.SingleOrDefaultAsync(item =>
@@ -294,10 +358,13 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
         var people = await db.People.AsNoTracking().ToArrayAsync(cancellationToken);
         var departments = await db.Departments.AsNoTracking().ToArrayAsync(cancellationToken);
         var memberships = await db.PersonDepartments.AsNoTracking().ToArrayAsync(cancellationToken);
         var roles = await db.PersonRoles.AsNoTracking().ToArrayAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         var primary = memberships.FirstOrDefault(item => item.PersonId == initiatorId && item.IsPrimary);
         return new AssigneeSnapshot
         {
@@ -324,6 +391,34 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 DivisionLeaderIds = JsonSerializer.Deserialize<List<string>>(item.DivisionLeaderIdsJson) ?? [],
             }).ToList(),
         };
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsOrganizationAdminAsync(string personId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await db.People.AsNoTracking().AnyAsync(person => person.Id == personId && person.IsActive,
+            cancellationToken) && await db.PersonRoles.AsNoTracking().AnyAsync(role =>
+            role.PersonId == personId && role.RoleCode == "organization-admin", cancellationToken);
+    }
+
+    /// <summary>
+    /// 在写入事务当前快照内重验所有组织关系，避免预览与保存之间发生并发变化。
+    /// </summary>
+    /// <param name="db">已开启可串行化事务的上下文。</param>
+    /// <param name="batch">待写入批次。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>当前快照下的全部校验问题。</returns>
+    private static async Task<IReadOnlyList<OrganizationImportIssue>> ValidateCurrentAsync(ApprovalDbContext db,
+        OrganizationImportBatch batch, CancellationToken cancellationToken)
+    {
+        var departments = await db.Departments.AsNoTracking().ToArrayAsync(cancellationToken);
+        var people = await db.People.AsNoTracking().ToArrayAsync(cancellationToken);
+        var memberships = await db.PersonDepartments.AsNoTracking().ToArrayAsync(cancellationToken);
+        var clientAppCodes = await db.ClientApps.AsNoTracking().Select(item => item.Code)
+            .ToArrayAsync(cancellationToken);
+        return OrganizationImportRules.Validate(batch, departments, people, memberships, clientAppCodes);
     }
 
     /// <summary>

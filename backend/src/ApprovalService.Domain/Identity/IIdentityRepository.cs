@@ -26,6 +26,17 @@ public interface IIdentityRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 核对嵌入会话的应用仍启用且外部人员绑定仍指向签发时的人员。
+    /// </summary>
+    /// <param name="clientAppCode">接入应用编码。</param>
+    /// <param name="externalUserId">外部人员 ID。</param>
+    /// <param name="personId">令牌绑定的内部人员 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>应用和绑定均有效为真。</returns>
+    Task<bool> IsEmbedSubjectActiveAsync(string clientAppCode, string externalUserId, string personId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 为已有人员开通账号。
     /// </summary>
     /// <param name="account">含初始密码摘要的新账号。</param>
@@ -126,5 +137,8 @@ public sealed class IdentityAccountSnapshot
     /// <summary>
     /// 本地账号；仅有人员而尚未开通账号时为空。
     /// </summary>
-    public LocalAccountEntity? Account { get; set; }
+    public LocalAccountEntity? Account
+    {
+        get; set;
+    }
 }

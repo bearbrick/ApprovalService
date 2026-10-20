@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -49,6 +49,7 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                 {
                     TokenHash = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     ClientAppCode = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    ExternalUserId = table.Column<string>(type: "TEXT", maxLength: 256, nullable: false),
                     PersonId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     TargetPath = table.Column<string>(type: "TEXT", maxLength: 1024, nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: false),
@@ -190,6 +191,7 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     TokenHash = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     PersonId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
                     ClientAppCode = table.Column<string>(type: "TEXT", maxLength: 128, nullable: true),
+                    ExternalUserId = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
                     TokenVersion = table.Column<long>(type: "INTEGER", nullable: false),
                     ExpiresAt = table.Column<DateTime>(type: "TEXT", nullable: false),
                     ConsumedAt = table.Column<DateTime>(type: "TEXT", nullable: true)

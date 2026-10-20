@@ -23,6 +23,17 @@ public sealed class OrganizationLookupAppService(IOrganizationRepository reposit
     }
 
     /// <inheritdoc />
+    public async Task<string?> ResolveBoundPersonAsync(string clientAppCode, string externalUserId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientAppCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalUserId);
+        var personId = await repository.ResolvePersonAsync(clientAppCode, externalUserId, cancellationToken);
+        var person = personId is null ? null : await repository.GetPersonAsync(personId, cancellationToken);
+        return person is { IsActive: true } ? person.Id : null;
+    }
+
+    /// <inheritdoc />
     public async Task<string?> ResolveDepartmentAsync(string clientAppCode, string departmentId,
         CancellationToken cancellationToken = default)
     {

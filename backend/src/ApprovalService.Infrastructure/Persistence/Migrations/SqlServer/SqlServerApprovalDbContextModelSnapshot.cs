@@ -39,6 +39,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
                     b.Property<string>("PersonId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -110,6 +115,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ExternalUserId")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("PersonId")
                         .IsRequired()

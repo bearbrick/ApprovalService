@@ -5,6 +5,7 @@ using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
@@ -34,6 +35,8 @@ internal static class PersistenceChecks
             var factory = new TestContextFactory(options);
             var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
             var parallelGraph = EngineScenarioChecks.GatewayGraph(FlowNodeTypes.ParallelGateway);
+            var allGraph = ModeGraph("all");
+            var anyGraph = ModeGraph("any");
             await using (var context = await factory.CreateDbContextAsync())
             {
                 await context.Database.EnsureCreatedAsync();
@@ -61,6 +64,24 @@ internal static class PersistenceChecks
                     SchemaVersion = FlowSchema.CurrentVersion,
                     DefinitionJson = "{}",
                     GraphJson = JsonSerializer.Serialize(parallelGraph, ApprovalJson.Options),
+                });
+                context.FlowVersions.Add(new FlowVersionEntity
+                {
+                    Id = "all-version",
+                    FlowId = "flow",
+                    Version = 3,
+                    SchemaVersion = FlowSchema.CurrentVersion,
+                    DefinitionJson = "{}",
+                    GraphJson = JsonSerializer.Serialize(allGraph, ApprovalJson.Options),
+                });
+                context.FlowVersions.Add(new FlowVersionEntity
+                {
+                    Id = "any-version",
+                    FlowId = "flow",
+                    Version = 4,
+                    SchemaVersion = FlowSchema.CurrentVersion,
+                    DefinitionJson = "{}",
+                    GraphJson = JsonSerializer.Serialize(anyGraph, ApprovalJson.Options),
                 });
                 await context.SaveChangesAsync();
             }
@@ -175,6 +196,9 @@ internal static class PersistenceChecks
                         item.Kind == "instanceApproved") == 1);
             }
 
+            await CheckMultiPersonModeAsync(check, factory, service, allGraph, "all", "会签");
+            await CheckMultiPersonModeAsync(check, factory, service, anyGraph, "any", "或签");
+
             check("只追加操作记录的顺序和前条校验值完整", await service.VerifyEventChainAsync("instance"));
             await using (var context = await factory.CreateDbContextAsync())
             {
@@ -191,6 +215,117 @@ internal static class PersistenceChecks
             SqliteConnection.ClearAllPools();
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// 检查同一节点的两位审批人并发提交及多人规则的最终结果。
+    /// </summary>
+    /// <param name="check">检查结果记录器。</param>
+    /// <param name="factory">真实 SQLite 上下文工厂。</param>
+    /// <param name="service">应用服务。</param>
+    /// <param name="graph">多人审批执行图。</param>
+    /// <param name="mode">多人审批方式。</param>
+    /// <param name="name">方式的中文名称。</param>
+    /// <returns>异步操作。</returns>
+    private static async Task CheckMultiPersonModeAsync(Action<string, bool> check, TestContextFactory factory,
+        ApprovalRuntimeAppService service, FlowExecutionGraph graph, string mode, string name)
+    {
+        var instanceId = mode + "-instance";
+        var started = await service.ExecuteAsync(new RuntimeCommandInput
+        {
+            Command = new EngineCommand
+            {
+                Kind = EngineCommandKinds.Start,
+                RequestId = mode + "-start",
+                InstanceId = instanceId,
+            },
+            Context = ModeContext(graph),
+            StartInstance = new InstanceEntity
+            {
+                Id = instanceId,
+                SerialNo = "AP-" + mode,
+                FlowVersionId = mode + "-version",
+                FlowCode = "PURCHASE",
+                BusinessKey = "PO-" + mode,
+                Title = name + "场景",
+                InitiatorId = "requester",
+                ClientAppCode = "demo",
+            },
+        });
+        check(name + "同一节点为两个人创建待办", started.State.Tasks.Count == 2 &&
+            started.State.Tasks.All(item => item.NodeId == "n1"));
+
+        var commands = started.State.Tasks.Select((task, index) => new EngineCommand
+        {
+            Kind = EngineCommandKinds.Approve,
+            RequestId = mode + "-approve-" + index,
+            InstanceId = instanceId,
+            TaskId = task.Id,
+        }).ToArray();
+        var gate = new LoadGate();
+        var services = Enumerable.Range(0, 2).Select(_ => new ApprovalRuntimeAppService(
+            new GatedRepository(new ApprovalRuntimeRepository(factory), gate))).ToArray();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var outcomes = await Task.WhenAll(services.Select((current, index) => CaptureAsync(() =>
+            current.ExecuteAsync(new RuntimeCommandInput
+            {
+                Command = commands[index],
+                Context = ModeContext(graph),
+            }, timeout.Token))));
+        check(name + "两人同节点并发仅一次旧版本提交成功",
+            outcomes.Count(error => error is null) == 1 &&
+            outcomes.Count(error => error is UserFriendlyException { Code: ErrorCodes.Conflict }) == 1);
+        if (mode == "all")
+        {
+            var loser = outcomes[0] is null ? commands[1] : commands[0];
+            var done = await service.ExecuteAsync(new RuntimeCommandInput
+            {
+                Command = loser,
+                Context = ModeContext(graph),
+            });
+            check("会签冲突方刷新重试后全员同意", done.State.Status == EngineInstanceStatuses.Approved &&
+                done.State.Tasks.All(task => task.Status == EngineTaskStatuses.Approved));
+        }
+
+        await using var context = await factory.CreateDbContextAsync();
+        var instance = await context.Instances.SingleAsync(item => item.Id == instanceId);
+        var completionCount = await context.OperationEvents.CountAsync(item => item.InstanceId == instanceId &&
+            item.Kind == "instanceApproved");
+        check(name + "并发同意后审批单只结束一次",
+            instance.Status == EngineInstanceStatuses.Approved && completionCount == 1 &&
+            instance.Version == (mode == "all" ? 3 : 2));
+    }
+
+    /// <summary>
+    /// 建立只有一个多人审批节点的执行图。
+    /// </summary>
+    /// <param name="mode">多人审批方式。</param>
+    /// <returns>执行图。</returns>
+    private static FlowExecutionGraph ModeGraph(string mode)
+    {
+        var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+        var node = graph.Nodes.Single(item => item.Id == "n1");
+        node.Assignee = new FlowAssignee { Source = "member", Value = "p1,p2" };
+        node.Approval = new FlowApprovalSettings { Mode = mode };
+        return graph;
+    }
+
+    /// <summary>
+    /// 为同节点多人审批提供固定的组织快照。
+    /// </summary>
+    /// <param name="graph">执行图。</param>
+    /// <returns>引擎上下文。</returns>
+    private static EngineContext ModeContext(FlowExecutionGraph graph)
+    {
+        var context = EngineScenarioChecks.Context(graph);
+        context.AssigneeSnapshot = new AssigneeSnapshot
+        {
+            InitiatorId = "requester",
+            AdministratorId = "admin",
+            People = [new AssigneePerson { Id = "requester" }, new AssigneePerson { Id = "p1" },
+                new AssigneePerson { Id = "p2" }, new AssigneePerson { Id = "admin" }],
+        };
+        return context;
     }
 
     /// <summary>

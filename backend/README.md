@@ -54,6 +54,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
 
+## 工作日历基础
+
+`Domain/Notifications/Calendar` 提供纯日期规则：默认周一至周五为工作日，调用方可传入本地日期覆盖清单，将节假日设为休息日、调休周末设为工作日。`GetWorkingDateAfter` 从指定日期之后计数，不把起点算作第一个工作日；`GetLocalDate` 按指定时区将时间点换成本地日期，避免使用服务器本地时区或固定 UTC 偏移。配置清单由调用方提供，规则本身不访问数据库。
+
+流程节点目前仅有分钟时限 `DueMinutes`，设计书同时要求“按工作日”；每天的计时区间、起算方式尚未确定。因此这里不生成实际任务到期时间，通知模块接入前应先确认换算规则。
+
 ## 持久化与后台任务
 
 流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。

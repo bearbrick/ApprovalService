@@ -12,6 +12,16 @@ namespace ApprovalService.Api.Endpoints.Files;
 internal static class FileEndpoints
 {
     /// <summary>
+    /// 身份令牌区分本地会话与绑定接入应用的嵌入会话。
+    /// </summary>
+    private const string SessionKindClaim = "sessionKind";
+
+    /// <summary>
+    /// 嵌入会话绑定的接入应用编码声明。
+    /// </summary>
+    private const string ClientAppCodeClaim = "clientAppCode";
+
+    /// <summary>
     /// 登记上传和验权下载接口。
     /// </summary>
     /// <param name="app">路由登记器。</param>
@@ -35,7 +45,7 @@ internal static class FileEndpoints
     private static async Task<IResult> UploadAsync(HttpContext http, string? fileName, IFileAppService service,
         CancellationToken cancellationToken)
     {
-        var userId = RequireVerifiedUser(http.User);
+        var userId = RequireVerifiedUser(http.User, out _);
         var uploaded = await service.UploadAsync(new UploadFileInput
         {
             Content = http.Request.Body,
@@ -57,14 +67,14 @@ internal static class FileEndpoints
     private static async Task<IResult> DownloadAsync(HttpContext http, string id, IFileAppService service,
         CancellationToken cancellationToken)
     {
-        var userId = RequireVerifiedUser(http.User);
+        var userId = RequireVerifiedUser(http.User, out var clientAppCode);
         // 大文件先写到会自动删除的临时文件，避免按可配置上限占用整份内存。
         var temporary = Path.Combine(Path.GetTempPath(), "approval-download-" + Guid.NewGuid().ToString("N"));
         var buffer = new FileStream(temporary, FileMode.CreateNew, FileAccess.ReadWrite,
             FileShare.None, 80 * 1024, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
         try
         {
-            var result = await service.DownloadAsync(id, userId, buffer, cancellationToken);
+            var result = await service.DownloadAsync(id, userId, buffer, clientAppCode, cancellationToken);
             if (result.DirectUrl is not null)
             {
                 await buffer.DisposeAsync();
@@ -85,15 +95,32 @@ internal static class FileEndpoints
     /// 未接入身份服务时默认拒绝；以后只从已验证的 ClaimsPrincipal 提取 ID。
     /// </summary>
     /// <param name="principal">宿主鉴权中间件建立的身份。</param>
+    /// <param name="clientAppCode">嵌入会话绑定的接入应用；本地会话为空。</param>
     /// <returns>可信的用户 ID。</returns>
-    private static string RequireVerifiedUser(ClaimsPrincipal principal)
+    private static string RequireVerifiedUser(ClaimsPrincipal principal, out string? clientAppCode)
     {
-        var userId = principal.Identities.Where(identity => identity.IsAuthenticated)
-            .Select(identity => identity.FindFirst(ClaimTypes.NameIdentifier)?.Value)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        clientAppCode = null;
+        var identity = principal.Identities.FirstOrDefault(candidate => candidate.IsAuthenticated &&
+            !string.IsNullOrWhiteSpace(candidate.FindFirst(ClaimTypes.NameIdentifier)?.Value));
+        var userId = identity?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrWhiteSpace(userId))
         {
             throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录后再操作附件。");
+        }
+
+        var sessionKind = identity!.FindFirst(SessionKindClaim)?.Value;
+        if (sessionKind == "embed")
+        {
+            clientAppCode = identity.FindFirst(ClientAppCodeClaim)?.Value;
+            if (string.IsNullOrWhiteSpace(clientAppCode))
+            {
+                throw new UserFriendlyException(ErrorCodes.Unauthorized, "嵌入会话缺少接入应用身份。");
+            }
+        }
+        else if (sessionKind != "local")
+        {
+            // 未标明会话来源时不能把嵌入身份当作无应用限制的本地会话。
+            throw new UserFriendlyException(ErrorCodes.Unauthorized, "登录会话来源无效。");
         }
 
         return userId;

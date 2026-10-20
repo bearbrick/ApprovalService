@@ -112,7 +112,7 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
         RequireUser(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
         ArgumentException.ThrowIfNullOrWhiteSpace(instanceId);
-        if (!await repository.CanViewInstanceAsync(instanceId, userId, cancellationToken))
+        if (!await repository.CanViewInstanceAsync(instanceId, userId, cancellationToken: cancellationToken))
         {
             throw new UserFriendlyException(ErrorCodes.Forbidden, "无权在这张审批单上使用附件。");
         }
@@ -125,16 +125,17 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
 
     /// <inheritdoc />
     public async Task<FileDownloadDto> DownloadAsync(string fileId, string userId, Stream destination,
-        CancellationToken cancellationToken = default)
+        string? clientAppCode = null, CancellationToken cancellationToken = default)
     {
         RequireUser(userId);
         ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
         ArgumentNullException.ThrowIfNull(destination);
         var file = await repository.FindAsync(fileId, cancellationToken)
             ?? throw new UserFriendlyException(ErrorCodes.NotFound, "附件不存在。");
+        // 未关联文件没有可信的应用归属，嵌入会话必须拒绝，不能仅凭相同人员 ID 跨应用读取。
         var canView = file.InstanceId is null
-            ? file.UploadedById == userId && file.CleanupOwner is null
-            : await repository.CanViewInstanceAsync(file.InstanceId, userId, cancellationToken);
+            ? clientAppCode is null && file.UploadedById == userId && file.CleanupOwner is null
+            : await repository.CanViewInstanceAsync(file.InstanceId, userId, clientAppCode, cancellationToken);
         if (!canView)
         {
             throw new UserFriendlyException(ErrorCodes.Forbidden, "无权查看这张审批单的附件。");

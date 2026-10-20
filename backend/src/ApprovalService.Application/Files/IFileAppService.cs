@@ -29,10 +29,11 @@ public interface IFileAppService
     /// <param name="fileId">文件 ID。</param>
     /// <param name="userId">已认证调用者 ID。</param>
     /// <param name="destination">需要转发时使用的输出流。</param>
+    /// <param name="clientAppCode">嵌入会话绑定的接入应用编码；本地会话为空。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>下载响应信息。</returns>
     Task<FileDownloadDto> DownloadAsync(string fileId, string userId, Stream destination,
-        CancellationToken cancellationToken = default);
+        string? clientAppCode = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 删除超过保留期且未被任何审批单使用的附件。

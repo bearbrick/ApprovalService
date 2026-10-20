@@ -1,18 +1,21 @@
 using System.IO.Compression;
 using System.Net;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using ApprovalService.Application.Files;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Infrastructure;
 using ApprovalService.Infrastructure.Files;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -65,6 +68,9 @@ internal static class FileChecks
             check("其他用户不能读取尚未关联的附件",
                 await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "intruder", new MemoryStream()),
                     ErrorCodes.Forbidden));
+            check("嵌入会话不能凭同一人员 ID 读取无应用归属的未关联附件",
+                await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "requester", new MemoryStream(),
+                    "other-app"), ErrorCodes.Forbidden));
             check("附件根据文件签名而不是扩展名识别类型",
                 await ThrowsCodeAsync(() => service.UploadAsync(Input(png, "假票据.pdf", "requester")),
                     ErrorCodes.ValidationFailed));
@@ -82,6 +88,9 @@ internal static class FileChecks
             check("伪装成 Word 的普通 ZIP 不作为 DOCX 接受",
                 await ThrowsCodeAsync(() => service.UploadAsync(Input(OfficeBytes("xl/workbook.xml"),
                     "伪装.docx", "requester")), ErrorCodes.ValidationFailed));
+            check("只有空 Office 条目的 ZIP 不作为真实文档接受",
+                await ThrowsCodeAsync(() => service.UploadAsync(Input(EmptyOfficeBytes("word/document.xml"),
+                    "空文档.docx", "requester")), ErrorCodes.ValidationFailed));
             var smallService = new FileAppService(repository, selector,
                 new FilePolicyOptions { MaxUploadBytes = 5 }, TimeProvider.System);
             check("超过可配置大小限制的上传在写存储前拒绝",
@@ -96,6 +105,19 @@ internal static class FileChecks
             await using var reviewerOutput = new MemoryStream();
             await service.DownloadAsync(uploaded.Id, "reviewer", reviewerOutput);
             check("已分配的审批人能够读取其审批单附件", reviewerOutput.ToArray().SequenceEqual(png));
+            await using var embeddedOutput = new MemoryStream();
+            await service.DownloadAsync(uploaded.Id, "reviewer", embeddedOutput, "demo");
+            check("同应用嵌入会话的审批人可下载附件", embeddedOutput.ToArray().SequenceEqual(png));
+            check("其他应用嵌入会话不能用同一审批人身份下载附件",
+                await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "reviewer", new MemoryStream(),
+                    "other-app"), ErrorCodes.Forbidden));
+            check("其他应用嵌入会话不能用同一发起人身份下载附件",
+                await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "requester", new MemoryStream(),
+                    "other-app"), ErrorCodes.Forbidden));
+            check("对象存储拒绝超过五分钟的预签名地址有效期",
+                await RejectsLongPresignedUrlAsync());
+            check("附件配置不能把预签名地址有效期设为七天",
+                RejectsLongPresignedConfiguration());
 
             var orphan = await service.UploadAsync(Input(png, "临时.png", "requester"));
             await using (var context = await factory.CreateDbContextAsync())
@@ -112,6 +134,11 @@ internal static class FileChecks
                 await ApiRejectsAnonymousAsync(backendRoot));
             check("可信身份的上传下载接口能完整发送本地文件并关闭临时流",
                 await ApiStreamsAuthenticatedFileAsync(backendRoot, png));
+            check("嵌入身份的应用声明会传至下载授权并拒绝无归属文件",
+                await ApiRejectsUnlinkedEmbeddedDownloadAsync(backendRoot, png));
+            check("缺少会话来源或嵌入应用声明的可信身份也不能操作附件",
+                await ApiRejectsInvalidSessionAsync(backendRoot, png, null, null) &&
+                await ApiRejectsInvalidSessionAsync(backendRoot, png, "embed", null));
             await CheckMigrationAsync(check);
 
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("APPROVAL_TEST_MINIO")))
@@ -140,20 +167,61 @@ internal static class FileChecks
     };
 
     /// <summary>
-    /// 建立最小 Office ZIP 结构以检查主部件识别，不解压用户输入。
+    /// 建立含清单、入口关系和完整主部件的最小 Office ZIP。
     /// </summary>
     /// <param name="mainPart">文档类型对应的主部件路径。</param>
     /// <returns>ZIP 文件字节。</returns>
     private static byte[] OfficeBytes(string mainPart)
     {
+        var (contentType, root, namespaceUri) = mainPart switch
+        {
+            "word/document.xml" => ("application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml", "document", "http://schemas.openxmlformats.org/wordprocessingml/2006/main"),
+            "xl/workbook.xml" => ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml", "workbook", "http://schemas.openxmlformats.org/spreadsheetml/2006/main"),
+            "ppt/presentation.xml" => ("application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml", "presentation", "http://schemas.openxmlformats.org/presentationml/2006/main"),
+            _ => throw new ArgumentOutOfRangeException(nameof(mainPart)),
+        };
+        using var buffer = new MemoryStream();
+        using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            WriteOfficeEntry(archive, "[Content_Types].xml",
+                $"<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Override PartName=\"/{mainPart}\" ContentType=\"{contentType}\"/></Types>");
+            WriteOfficeEntry(archive, "_rels/.rels",
+                $"<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"{mainPart}\"/></Relationships>");
+            WriteOfficeEntry(archive, mainPart, $"<{root} xmlns=\"{namespaceUri}\"/>");
+        }
+
+        return buffer.ToArray();
+    }
+
+    /// <summary>
+    /// 构造只有预期条目名称、内容全部为空的伪装压缩包。
+    /// </summary>
+    /// <param name="mainPart">伪装的主部件路径。</param>
+    /// <returns>伪装压缩包字节。</returns>
+    private static byte[] EmptyOfficeBytes(string mainPart)
+    {
         using var buffer = new MemoryStream();
         using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
         {
             archive.CreateEntry("[Content_Types].xml");
+            archive.CreateEntry("_rels/.rels");
             archive.CreateEntry(mainPart);
         }
 
         return buffer.ToArray();
+    }
+
+    /// <summary>
+    /// 写入一个测试用 Office XML 条目。
+    /// </summary>
+    /// <param name="archive">正在构造的压缩包。</param>
+    /// <param name="name">条目路径。</param>
+    /// <param name="xml">XML 内容。</param>
+    private static void WriteOfficeEntry(ZipArchive archive, string name, string xml)
+    {
+        using var entry = archive.CreateEntry(name).Open();
+        var bytes = Encoding.UTF8.GetBytes(xml);
+        entry.Write(bytes);
     }
 
     /// <summary>
@@ -217,6 +285,46 @@ internal static class FileChecks
     }
 
     /// <summary>
+    /// 无需访问远端对象存储即可检查预签名地址的硬上限。
+    /// </summary>
+    /// <returns>超出五分钟的有效期在签发前被拒绝时为真。</returns>
+    private static async Task<bool> RejectsLongPresignedUrlAsync()
+    {
+        var storage = new MinioFileStorage(Options.Create(new FileStorageOptions { BrowserAccessible = true }));
+        try
+        {
+            await storage.CreateDownloadUrlAsync("file", TimeSpan.FromSeconds(301));
+            return false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// 检查部署配置在服务启动前拒绝超出上限的预签名地址有效期。
+    /// </summary>
+    /// <returns>七天的配置被选项验证拒绝时为真。</returns>
+    private static bool RejectsLongPresignedConfiguration()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [FileStorageOptions.SectionName + ":PresignedUrlSeconds"] = "604800",
+        }).Build();
+        using var provider = new ServiceCollection().AddApprovalInfrastructure(configuration).BuildServiceProvider();
+        try
+        {
+            _ = provider.GetRequiredService<IOptions<FileStorageOptions>>().Value;
+            return false;
+        }
+        catch (OptionsValidationException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
     /// 进程内启动服务，验证公开路径没有自报用户 ID 的绕过方式。
     /// </summary>
     /// <param name="backendRoot">后端根目录。</param>
@@ -252,7 +360,8 @@ internal static class FileChecks
         {
             await using var baseline = new ServerFactory(backendRoot, directory);
             await using var authenticated = baseline.WithWebHostBuilder(builder =>
-                builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, FileIdentityStartupFilter>()));
+                builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(
+                    new FileIdentityStartupFilter("local", null))));
             using var http = authenticated.CreateClient();
             using var upload = await http.PostAsync(ApiRoutes.Files + "?fileName=" + Uri.EscapeDataString("票据.png"),
                 new ByteArrayContent(bytes));
@@ -267,6 +376,68 @@ internal static class FileChecks
             return response.StatusCode == HttpStatusCode.OK && uploaded.ContentType == "image/png" &&
                 (await response.Content.ReadAsByteArrayAsync()).SequenceEqual(bytes) &&
                 response.Content.Headers.ContentType?.MediaType == "image/png";
+        }
+        finally
+        {
+            TempDataDirectory.Delete(directory);
+        }
+    }
+
+    /// <summary>
+    /// 检查 HTTP 层没有把带应用绑定的嵌入会话降级为无范围本地会话。
+    /// </summary>
+    /// <param name="backendRoot">后端根目录。</param>
+    /// <param name="bytes">上传文件内容。</param>
+    /// <returns>嵌入身份上传后下载未关联附件被拒绝时为真。</returns>
+    private static async Task<bool> ApiRejectsUnlinkedEmbeddedDownloadAsync(string backendRoot, byte[] bytes)
+    {
+        var directory = TempDataDirectory.Create();
+        try
+        {
+            await using var baseline = new ServerFactory(backendRoot, directory);
+            await using var authenticated = baseline.WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(
+                    new FileIdentityStartupFilter("embed", "demo"))));
+            using var http = authenticated.CreateClient();
+            using var upload = await http.PostAsync(ApiRoutes.Files + "?fileName=a.png", new ByteArrayContent(bytes));
+            var uploaded = JsonSerializer.Deserialize<FileUploadResponse>(
+                await upload.Content.ReadAsStringAsync(), ApprovalJson.Options);
+            if (upload.StatusCode != HttpStatusCode.OK || uploaded is null)
+            {
+                return false;
+            }
+
+            using var response = await http.GetAsync(ApiRoutes.Files + "/" + uploaded.Id);
+            return response.StatusCode == HttpStatusCode.Forbidden;
+        }
+        finally
+        {
+            TempDataDirectory.Delete(directory);
+        }
+    }
+
+    /// <summary>
+    /// 检查缺少必要来源声明的身份不能被当作本地登录会话。
+    /// </summary>
+    /// <param name="backendRoot">后端根目录。</param>
+    /// <param name="bytes">上传文件内容。</param>
+    /// <param name="sessionKind">模拟的会话来源；缺失时为空。</param>
+    /// <param name="clientAppCode">嵌入会话的接入应用编码。</param>
+    /// <returns>上传在进入应用服务前被拒绝时为真。</returns>
+    private static async Task<bool> ApiRejectsInvalidSessionAsync(string backendRoot, byte[] bytes,
+        string? sessionKind, string? clientAppCode)
+    {
+        var directory = TempDataDirectory.Create();
+        try
+        {
+            await using var baseline = new ServerFactory(backendRoot, directory);
+            await using var authenticated = baseline.WithWebHostBuilder(builder =>
+                builder.ConfigureServices(services => services.AddSingleton<IStartupFilter>(
+                    new FileIdentityStartupFilter(sessionKind, clientAppCode))));
+            using var http = authenticated.CreateClient();
+            using var response = await http.PostAsync(ApiRoutes.Files + "?fileName=a.png",
+                new ByteArrayContent(bytes));
+            return response.StatusCode == HttpStatusCode.Unauthorized;
         }
         finally
         {
@@ -507,6 +678,27 @@ internal static class FileChecks
     /// </summary>
     private sealed class FileIdentityStartupFilter : IStartupFilter
     {
+        /// <summary>
+        /// 模拟已验证的登录会话种类。
+        /// </summary>
+        private readonly string? sessionKind;
+
+        /// <summary>
+        /// 嵌入会话绑定的接入应用编码。
+        /// </summary>
+        private readonly string? clientAppCode;
+
+        /// <summary>
+        /// 建立只用于检查程序的可信身份中间件。
+        /// </summary>
+        /// <param name="sessionKind">本地或嵌入会话；缺失时为空。</param>
+        /// <param name="clientAppCode">嵌入会话应用编码。</param>
+        public FileIdentityStartupFilter(string? sessionKind, string? clientAppCode)
+        {
+            this.sessionKind = sessionKind;
+            this.clientAppCode = clientAppCode;
+        }
+
         /// <inheritdoc />
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next)
         {
@@ -514,8 +706,21 @@ internal static class FileChecks
             {
                 app.Use(async (context, continuePipeline) =>
                 {
-                    context.User = new ClaimsPrincipal(new ClaimsIdentity(
-                        [new Claim(ClaimTypes.NameIdentifier, "requester")], "file-check"));
+                    var claims = new List<Claim>
+                    {
+                        new(ClaimTypes.NameIdentifier, "requester"),
+                    };
+                    if (sessionKind is not null)
+                    {
+                        claims.Add(new Claim("sessionKind", sessionKind));
+                    }
+
+                    if (clientAppCode is not null)
+                    {
+                        claims.Add(new Claim("clientAppCode", clientAppCode));
+                    }
+
+                    context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "file-check"));
                     await continuePipeline();
                 });
                 next(app);

@@ -11,6 +11,11 @@ public sealed class FileStorageOptions
     public const string SectionName = "ApprovalService:Files";
 
     /// <summary>
+    /// 对象存储直连地址最长有效五分钟。
+    /// </summary>
+    public const int MaxPresignedUrlSeconds = 300;
+
+    /// <summary>
     /// 新上传文件的存储提供者：Local 或 Minio。
     /// </summary>
     public string Provider { get; set; } = "Local";

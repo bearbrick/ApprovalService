@@ -68,6 +68,11 @@ public sealed class MinioFileStorage : IFileStorage
         }
 
         var seconds = checked((int)Math.Ceiling(lifetime.TotalSeconds));
+        if (seconds is < 1 or > FileStorageOptions.MaxPresignedUrlSeconds)
+        {
+            throw new ArgumentOutOfRangeException(nameof(lifetime), "附件预签名地址有效期必须为 1 秒到 5 分钟。");
+        }
+
         var args = new PresignedGetObjectArgs().WithBucket(Bucket).WithObject(key).WithExpiry(seconds);
         return new Uri(await Client.PresignedGetObjectAsync(args), UriKind.Absolute);
     }

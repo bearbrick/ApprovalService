@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Xml;
+using System.Xml.Linq;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
 
@@ -80,21 +82,21 @@ public static class FileTypeDetector
     }
 
     /// <summary>
-    /// Office Open XML 是 ZIP 容器，必须同时包含通用清单与对应文档主部件。
+    /// Office Open XML 是 ZIP 容器，必须包含有效清单、入口关系与对应文档主部件。
     /// </summary>
     /// <param name="content">已通过上传字节上限的可定位文件流。</param>
     /// <param name="extension">上传文件扩展名。</param>
     /// <returns>对应 Office 类型；结构不匹配时为空。</returns>
     private static string? DetectOfficeType(Stream content, string extension)
     {
-        var part = extension switch
+        (string Part, string ContentType, string Root, string Namespace)? expected = extension switch
         {
-            ".docx" => "word/document.xml",
-            ".xlsx" => "xl/workbook.xml",
-            ".pptx" => "ppt/presentation.xml",
+            ".docx" => (Part: "word/document.xml", ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml", Root: "document", Namespace: "http://schemas.openxmlformats.org/wordprocessingml/2006/main"),
+            ".xlsx" => (Part: "xl/workbook.xml", ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml", Root: "workbook", Namespace: "http://schemas.openxmlformats.org/spreadsheetml/2006/main"),
+            ".pptx" => (Part: "ppt/presentation.xml", ContentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml", Root: "presentation", Namespace: "http://schemas.openxmlformats.org/presentationml/2006/main"),
             _ => null,
         };
-        if (part is null || !content.CanSeek)
+        if (expected is null || !content.CanSeek)
         {
             return null;
         }
@@ -103,12 +105,34 @@ public static class FileTypeDetector
         {
             content.Position = 0;
             using var archive = new ZipArchive(content, ZipArchiveMode.Read, leaveOpen: true);
-            if (archive.GetEntry("[Content_Types].xml") is null || archive.GetEntry(part) is null)
+            var typesEntry = archive.GetEntry("[Content_Types].xml");
+            var relationshipsEntry = archive.GetEntry("_rels/.rels");
+            var mainEntry = archive.GetEntry(expected.Value.Part);
+            if (typesEntry is null || relationshipsEntry is null || mainEntry is null)
+            {
+                return null;
+            }
+
+            XNamespace typesNamespace = "http://schemas.openxmlformats.org/package/2006/content-types";
+            XNamespace relationshipsNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
+            var types = ReadPackageXml(typesEntry);
+            var relationships = ReadPackageXml(relationshipsEntry);
+            if (types.Root?.Name != typesNamespace + "Types" ||
+                !types.Root.Elements(typesNamespace + "Override").Any(item =>
+                    (string?)item.Attribute("PartName") == "/" + expected.Value.Part &&
+                    (string?)item.Attribute("ContentType") == expected.Value.ContentType) ||
+                relationships.Root?.Name != relationshipsNamespace + "Relationships" ||
+                !relationships.Root.Elements(relationshipsNamespace + "Relationship").Any(item =>
+                    (string?)item.Attribute("Type") ==
+                    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" &&
+                    (string?)item.Attribute("Target") is string target &&
+                    target.TrimStart('/') == expected.Value.Part) ||
+                !HasDocumentRoot(mainEntry, expected.Value.Root, expected.Value.Namespace))
             {
                 return null;
             }
         }
-        catch (InvalidDataException)
+        catch (Exception exception) when (exception is InvalidDataException or XmlException)
         {
             return null;
         }
@@ -119,5 +143,64 @@ public static class FileTypeDetector
             ".xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             _ => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         };
+    }
+
+    /// <summary>
+    /// 有界读取包清单或入口关系，禁止文档类型定义和外部资源。
+    /// </summary>
+    /// <param name="entry">压缩包中的 XML 条目。</param>
+    /// <returns>已解析的短 XML 文档。</returns>
+    private static XDocument ReadPackageXml(ZipArchiveEntry entry)
+    {
+        const int maximumBytes = 256 * 1024;
+        if (entry.Length is 0 or > maximumBytes)
+        {
+            throw new InvalidDataException("Office 包清单大小无效。");
+        }
+
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = maximumBytes,
+        });
+        return XDocument.Load(reader);
+    }
+
+    /// <summary>
+    /// 完整读取主部件 XML，避免只靠文件名或开头标签接受伪造压缩包。
+    /// </summary>
+    /// <param name="entry">主部件压缩条目。</param>
+    /// <param name="root">该 Office 类型的根元素名。</param>
+    /// <param name="namespaceUri">该 Office 类型的 XML 命名空间。</param>
+    /// <returns>主部件为有界且完整的预期 XML 时为真。</returns>
+    private static bool HasDocumentRoot(ZipArchiveEntry entry, string root, string namespaceUri)
+    {
+        const int maximumBytes = 32 * 1024 * 1024;
+        if (entry.Length is 0 or > maximumBytes)
+        {
+            return false;
+        }
+
+        using var stream = entry.Open();
+        using var reader = XmlReader.Create(stream, new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            MaxCharactersInDocument = maximumBytes,
+        });
+        if (reader.MoveToContent() != XmlNodeType.Element || reader.LocalName != root ||
+            reader.NamespaceURI != namespaceUri)
+        {
+            return false;
+        }
+
+        while (reader.Read())
+        {
+            // 读完整个主部件，确保后续 XML 损坏或超限不会被当成真实 Office 文件。
+        }
+
+        return true;
     }
 }

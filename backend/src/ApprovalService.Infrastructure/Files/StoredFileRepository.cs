@@ -49,9 +49,15 @@ public sealed class StoredFileRepository(IDbContextFactory<ApprovalDbContext> fa
 
     /// <inheritdoc />
     public async Task<bool> CanViewInstanceAsync(string instanceId, string userId,
-        CancellationToken cancellationToken = default)
+        string? clientAppCode = null, CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
+        if (clientAppCode is not null && !await context.Instances.AsNoTracking().AnyAsync(item =>
+                item.Id == instanceId && item.ClientAppCode == clientAppCode, cancellationToken))
+        {
+            return false;
+        }
+
         var isInitiator = await context.Instances.AsNoTracking().AnyAsync(item => item.Id == instanceId &&
             (item.InitiatorId == userId || item.SubmittedById == userId), cancellationToken);
         if (isInitiator)

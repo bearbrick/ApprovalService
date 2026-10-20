@@ -38,9 +38,11 @@ public interface IStoredFileRepository
     /// </summary>
     /// <param name="instanceId">审批单 ID。</param>
     /// <param name="userId">已认证用户 ID。</param>
+    /// <param name="clientAppCode">嵌入会话绑定的接入应用编码；本地会话为空。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>当前可见为真。</returns>
-    Task<bool> CanViewInstanceAsync(string instanceId, string userId, CancellationToken cancellationToken = default);
+    Task<bool> CanViewInstanceAsync(string instanceId, string userId, string? clientAppCode = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 列出超过保留期且未关联的附件候选。

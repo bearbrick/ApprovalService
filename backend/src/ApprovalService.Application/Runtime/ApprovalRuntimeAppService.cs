@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ApprovalService.Application.Integration;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
@@ -110,14 +111,26 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
                     : null,
         }).ToArray();
         var events = BuildEvents(instance.Id, command.RequestId, result.Events, snapshot?.LastEvent);
-        var outbox = events.Select(entry => new OutboxItemEntity
+        var outbox = result.Events.Select(item =>
         {
-            Id = entry.Id + ":dispatch",
-            InstanceId = instance.Id,
-            EventId = entry.Id,
-            Kind = "engineEvent",
-            PayloadJson = entry.PayloadJson,
-            AvailableAt = entry.OccurredAt,
+            var notification = CallbackNotifications.Create(item, instance);
+            return notification is not null ? new OutboxItemEntity
+            {
+                Id = item.Id + ":callback",
+                InstanceId = instance.Id,
+                EventId = item.Id,
+                Kind = "callback",
+                PayloadJson = CallbackNotifications.Serialize(notification),
+                AvailableAt = item.OccurredAt,
+            } : new OutboxItemEntity
+            {
+                Id = item.Id + ":dispatch",
+                InstanceId = instance.Id,
+                EventId = item.Id,
+                Kind = "engineEvent",
+                PayloadJson = JsonSerializer.Serialize(item, ApprovalJson.Options),
+                AvailableAt = item.OccurredAt,
+            };
         }).ToArray();
 
         // 仓储在同一个事务中更新版本、任务投影、事件链和待发项；抢输乐观锁时不重算命令。

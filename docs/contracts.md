@@ -79,15 +79,17 @@
 | `POST /api/v1/embed-tokens` | 签发嵌入令牌，换成免登录打开地址 | T-007 |
 | `POST /api/v1/org/changes`、`POST /api/v1/org/bindings` | 推送组织架构变更、绑定业务系统的用户和部门 | T-007 |
 
-## 回调和业务系统提供的接口（规划中）
+## 回调和业务系统提供的接口
 
 审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。
 
-- **结果回调**：审批状态变化时发 POST，请求体带 `eventId`（同一事件可能重发，按它去重）、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（审批人填写的字段）、`occurredAt`。事件：发起、节点完成（可选）、通过、拒绝、撤回、退回给发起人、终止、撤销、数据被更新，以及（可选订阅）新待办、待办已处理。
+- **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`，以及 `task.created`、`task.completed`、`task.cancelled`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
 - **取数接口**：只传单号发起时，审批服务按单号回业务系统取审批数据。
 - **校验钩子**：发起前、某个节点同意前问业务系统能不能过，不能过时返回原因。
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
+
+四类钩子的精确请求/响应与双向验签协议尚待确认，提议见 [ADR 0010](adr/0010-outbound-hook-protocol.md)，确认前不实现。
 
 ## 流程定义 JSON
 

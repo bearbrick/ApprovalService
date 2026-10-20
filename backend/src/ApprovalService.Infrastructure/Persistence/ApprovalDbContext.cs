@@ -65,6 +65,11 @@ public class ApprovalDbContext : DbContext
     /// </summary>
     public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
 
+    /// <summary>
+    /// 每次回调发送的结果日志。
+    /// </summary>
+    public DbSet<OutboundSendLogEntity> OutboundSendLogs => Set<OutboundSendLogEntity>();
+
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -101,6 +106,18 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<OutboundSendLogEntity>(entity =>
+        {
+            entity.ToTable("OutboundSendLogs");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasMaxLength(64);
+            entity.Property(item => item.EventId).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.ClientAppCode).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.TargetUrl).HasMaxLength(2048).IsRequired();
+            entity.Property(item => item.ErrorCode).HasMaxLength(128);
+            entity.HasIndex(item => new { item.EventId, item.Attempt });
+        });
+
         modelBuilder.Entity<ClientAppEntity>(entity =>
         {
             entity.ToTable("ClientApps");

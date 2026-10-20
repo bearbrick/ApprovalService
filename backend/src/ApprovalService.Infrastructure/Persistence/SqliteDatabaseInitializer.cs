@@ -1,4 +1,5 @@
 using ApprovalService.Infrastructure.Options;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -28,5 +29,9 @@ internal sealed class SqliteDatabaseInitializer(IDbContextFactory<SqliteApproval
     }
 
     /// <inheritdoc />
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        SqliteConnection.ClearAllPools();
+        return Task.CompletedTask;
+    }
 }

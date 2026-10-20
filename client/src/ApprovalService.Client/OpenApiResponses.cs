@@ -18,7 +18,10 @@ public sealed class AvailableFlow
     /// <summary>
     /// 当前发布版本号。
     /// </summary>
-    public int Version { get; set; }
+    public int Version
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -34,7 +37,10 @@ public sealed class FlowSchema
     /// <summary>
     /// 当前发布版本号。
     /// </summary>
-    public int Version { get; set; }
+    public int Version
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 审批数据字段与摘要字段定义，保持服务返回的 JSON 结构。
@@ -85,12 +91,18 @@ public sealed class ApprovalInstance
     /// <summary>
     /// 发起部门内部 ID。
     /// </summary>
-    public string? InitiatorDepartmentId { get; set; }
+    public string? InitiatorDepartmentId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 代发人内部 ID。
     /// </summary>
-    public string? SubmittedById { get; set; }
+    public string? SubmittedById
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 来源接入应用编码。
@@ -110,12 +122,18 @@ public sealed class ApprovalInstance
     /// <summary>
     /// 发起时间。
     /// </summary>
-    public DateTimeOffset StartedAt { get; set; }
+    public DateTimeOffset StartedAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 结束时间；在途时为空。
     /// </summary>
-    public DateTimeOffset? EndedAt { get; set; }
+    public DateTimeOffset? EndedAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 人工任务和处理结果。
@@ -156,17 +174,26 @@ public sealed class ApprovalInstanceTask
     /// <summary>
     /// 审批意见。
     /// </summary>
-    public string? Opinion { get; set; }
+    public string? Opinion
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 到期时间。
     /// </summary>
-    public DateTimeOffset? DueAt { get; set; }
+    public DateTimeOffset? DueAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 实际处理时间。
     /// </summary>
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? CompletedAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -182,7 +209,10 @@ public sealed class ApprovalOperation
     /// <summary>
     /// 审批单内顺序号。
     /// </summary>
-    public long Sequence { get; set; }
+    public long Sequence
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 事件类型。
@@ -197,7 +227,10 @@ public sealed class ApprovalOperation
     /// <summary>
     /// 发生时间。
     /// </summary>
-    public DateTimeOffset OccurredAt { get; set; }
+    public DateTimeOffset OccurredAt
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -208,17 +241,26 @@ public sealed class ApprovalTaskCount
     /// <summary>
     /// 待处理数量。
     /// </summary>
-    public int Pending { get; set; }
+    public int Pending
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 其中加急数量。
     /// </summary>
-    public int Urgent { get; set; }
+    public int Urgent
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 其中已超时数量。
     /// </summary>
-    public int Overdue { get; set; }
+    public int Overdue
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -259,12 +301,18 @@ public sealed class ApprovalTask
     /// <summary>
     /// 是否加急。
     /// </summary>
-    public bool IsUrgent { get; set; }
+    public bool IsUrgent
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 到期时间。
     /// </summary>
-    public DateTimeOffset? DueAt { get; set; }
+    public DateTimeOffset? DueAt
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 流程版本指定的摘要字段和值。

@@ -141,6 +141,7 @@ public sealed partial class ApprovalServiceClient
             ["relatedId"] = input.RelatedId,
             ["mode"] = input.Mode,
             ["mentionedUsers"] = input.MentionedUsers,
+            ["fieldValues"] = input.FieldValues,
         };
         return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(Protocol.TaskActions, taskId),
             cancellationToken, body).ConfigureAwait(false));

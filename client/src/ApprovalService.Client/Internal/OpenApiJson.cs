@@ -82,9 +82,12 @@ internal static class OpenApiJson
         var row = Object(value, "task");
         return new ApprovalInstanceTask
         {
-            Id = String(row, "id"), NodeId = String(row, "nodeId"),
-            AssigneeId = String(row, "assigneeId"), Status = String(row, "status"),
-            Opinion = OptionalString(row, "opinion"), DueAt = OptionalDate(row, "dueAt"),
+            Id = String(row, "id"),
+            NodeId = String(row, "nodeId"),
+            AssigneeId = String(row, "assigneeId"),
+            Status = String(row, "status"),
+            Opinion = OptionalString(row, "opinion"),
+            DueAt = OptionalDate(row, "dueAt"),
             CompletedAt = OptionalDate(row, "completedAt"),
         };
     }
@@ -99,8 +102,10 @@ internal static class OpenApiJson
         var row = Object(value, "event");
         return new ApprovalOperation
         {
-            EventId = String(row, "eventId"), Sequence = Long(row, "sequence"),
-            Event = String(row, "event"), Detail = Object(Field(row, "detail"), "detail"),
+            EventId = String(row, "eventId"),
+            Sequence = Long(row, "sequence"),
+            Event = String(row, "event"),
+            Detail = Object(Field(row, "detail"), "detail"),
             OccurredAt = Date(row, "occurredAt"),
         };
     }
@@ -127,11 +132,16 @@ internal static class OpenApiJson
             var row = Object(item, "task");
             return new ApprovalTask
             {
-                Id = String(row, "id"), InstanceId = String(row, "instanceId"),
-                FlowCode = String(row, "flowCode"), BusinessKey = String(row, "businessKey"),
-                Title = String(row, "title"), NodeId = String(row, "nodeId"),
-                IsUrgent = Bool(row, "isUrgent"), DueAt = OptionalDate(row, "dueAt"),
-                Summary = Object(Field(row, "summary"), "summary"), OpenPath = String(row, "openPath"),
+                Id = String(row, "id"),
+                InstanceId = String(row, "instanceId"),
+                FlowCode = String(row, "flowCode"),
+                BusinessKey = String(row, "businessKey"),
+                Title = String(row, "title"),
+                NodeId = String(row, "nodeId"),
+                IsUrgent = Bool(row, "isUrgent"),
+                DueAt = OptionalDate(row, "dueAt"),
+                Summary = Object(Field(row, "summary"), "summary"),
+                OpenPath = String(row, "openPath"),
             };
         }).ToArray();
 

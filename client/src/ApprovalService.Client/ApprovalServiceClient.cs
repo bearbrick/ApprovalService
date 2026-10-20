@@ -7,8 +7,7 @@ namespace ApprovalService.Client;
 /// 审批流服务的客户端。应用内建一个实例、多线程共享即可。
 /// </summary>
 /// <remarks>
-/// 骨架阶段只有 <see cref="GetInfoAsync"/>；发起、查询、撤回、重新提交、待办、审批操作、免登录地址、推送组织架构、上传附件、回调验签
-/// 按接口清单（设计书第 13 节）在 SDK 任务里补齐。
+/// 目前覆盖服务信息与首批已确认的开放接口；其余接口按设计书第 13 节在后续 SDK 任务中补齐。
 /// </remarks>
 public sealed partial class ApprovalServiceClient : IDisposable
 {
@@ -109,9 +108,9 @@ public sealed partial class ApprovalServiceClient : IDisposable
     /// <param name="method">HTTP 方法。</param>
     /// <param name="path">相对服务地址的路径，如 api/v1/info。</param>
     /// <param name="cancellationToken">取消令牌。</param>
+    /// <param name="payload">可选的 JSON 请求体。</param>
     /// <returns>解析后的 JSON（对象是字典，数组是列表）；响应体为空时为 null。</returns>
     /// <exception cref="ApprovalServiceException">服务返回错误、连不上或超时。</exception>
-    /// <param name="payload">可选的 JSON 请求体。</param>
     private async Task<object?> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken, object? payload = null)
     {
         using (var request = new HttpRequestMessage(method, path))

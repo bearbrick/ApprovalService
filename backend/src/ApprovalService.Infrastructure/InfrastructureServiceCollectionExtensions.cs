@@ -1,4 +1,7 @@
+using ApprovalService.Application.Notifications;
+using ApprovalService.Domain.Notifications;
 using ApprovalService.Infrastructure.Jobs;
+using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
@@ -33,6 +36,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddHostedService<DurableJobWorker>();
+        services.AddOptions<SmtpNotificationOptions>()
+            .Bind(configuration.GetSection(SmtpNotificationOptions.SectionName));
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
+        services.AddScoped<INotificationChannel, InAppNotificationChannel>();
+        services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();
         return services;
     }
 }

@@ -257,6 +257,7 @@ function issuesFor(id: string): string[] {
 .designer-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 700; }
 .designer-content { padding: 24px 28px; }
 .design-workspace { min-width: 0; padding: 18px; }
+.design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 158px minmax(0, 1fr) 340px; }
 .inspector-empty { text-align: center; padding: 90px 22px; color: var(--muted); }
 .inspector-empty span { font-size: 42px; color: #8fa8ce; }
 .inspector-empty h2 { margin: 8px 0; color: var(--ink); font-size: 16px; }
@@ -282,7 +283,8 @@ function issuesFor(id: string): string[] {
 .template-switch p, .version-panel p { margin: 9px 0 15px; color: var(--muted); }
 .template-switch .btn { margin: 0 8px 8px 0; }
 .version-panel span { color: var(--blue); font-size: 11px; font-weight: 700; }
-@media (max-width: 1150px) { .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1150px) { .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 120px minmax(0, 1fr) 280px; } }
 @media (max-width: 920px) { .designer-title { align-items: start; flex-direction: column; } }
+@media (max-width: 720px) { .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 74px minmax(0, 1fr); grid-template-rows: minmax(320px, 1fr) 240px; } .design-workspace :deep(.flow-canvas-inspector) { display: block; grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid var(--line); } }
 @media (max-width: 620px) { .designer-header { padding: 18px; } .designer-tabs { padding: 0 18px; gap: 18px; } .designer-content { padding: 16px; } .design-workspace { padding: 12px; } .template-grid { grid-template-columns: 1fr; padding: 12px 18px; } .template-intro { padding: 22px 18px 8px; } }
 </style>

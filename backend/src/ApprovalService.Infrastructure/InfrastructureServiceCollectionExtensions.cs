@@ -35,7 +35,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddApprovalPersistence(configuration);
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
+        services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<HttpClient>();
+        services.AddSingleton<SignedHttpOutboundAdapter>();
+        services.AddScoped<IOutboxHandler, CallbackOutboxHandler>();
+        services.AddScoped<IOutboxHandler, EngineEventOutboxHandler>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddHostedService<DurableJobWorker>();

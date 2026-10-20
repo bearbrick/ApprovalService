@@ -22,6 +22,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
         services.AddScoped<ClientAppAppService>();
         services.AddScoped<FlowCatalogAppService>();
+        services.AddScoped<CallbackDeliveryAppService>();
         return services;
     }
 }

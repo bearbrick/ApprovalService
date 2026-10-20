@@ -1,4 +1,5 @@
 using System.Text.Json;
+using ApprovalService.Application.Integration;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
@@ -101,6 +102,20 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         // 每张审批单始终使用发起时锁定版本的执行图，调用方不能替换它。
         input.Context.Graph = JsonSerializer.Deserialize<FlowExecutionGraph>(flowVersion.GraphJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布的执行图为空。");
+        if (input.UpdatedApprovalDataJson is not null || input.UpdatedRoutingInputsJson is not null)
+        {
+            if (command.Kind is not (ApprovalService.Engine.Commands.OperationKinds.Resubmit or
+                    ApprovalService.Engine.Commands.OperationKinds.Supplement) ||
+                input.UpdatedApprovalDataJson is null || input.UpdatedRoutingInputsJson is null)
+            {
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批数据与找人映射必须在重新提交时一起更新。");
+            }
+
+            // 数据只在引擎命令成功后随同状态、事件和回调快照进入同一事务。
+            instance.ApprovalDataJson = input.UpdatedApprovalDataJson;
+            instance.RoutingInputsJson = input.UpdatedRoutingInputsJson;
+        }
+
         EngineResult result;
         try
         {
@@ -140,20 +155,35 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             NodeId = task.NodeId,
             AssigneeId = task.AssigneeId,
             Status = task.Status,
+            Opinion = command.TaskId == task.Id && task.Status != EngineTaskStatuses.Pending &&
+                previousStatuses.TryGetValue(task.Id, out var previous) && previous == EngineTaskStatuses.Pending
+                    ? command.Operation?.Opinion : null,
             CompletedAt = task.Status != EngineTaskStatuses.Pending &&
                 (!previousStatuses.TryGetValue(task.Id, out var previousStatus) || previousStatus == EngineTaskStatuses.Pending)
                     ? input.Context.OccurredAt
                     : null,
         }).ToArray();
         var events = BuildEvents(instance.Id, command.RequestId, result.Events, snapshot?.LastEvent);
-        var outbox = events.Select(entry => new OutboxItemEntity
+        var outbox = result.Events.Select(item =>
         {
-            Id = entry.Id + ":dispatch",
-            InstanceId = instance.Id,
-            EventId = entry.Id,
-            Kind = "engineEvent",
-            PayloadJson = entry.PayloadJson,
-            AvailableAt = entry.OccurredAt,
+            var notification = CallbackNotifications.Create(item, instance);
+            return notification is not null ? new OutboxItemEntity
+            {
+                Id = item.Id + ":callback",
+                InstanceId = instance.Id,
+                EventId = item.Id,
+                Kind = "callback",
+                PayloadJson = CallbackNotifications.Serialize(notification),
+                AvailableAt = item.OccurredAt,
+            } : new OutboxItemEntity
+            {
+                Id = item.Id + ":dispatch",
+                InstanceId = instance.Id,
+                EventId = item.Id,
+                Kind = "engineEvent",
+                PayloadJson = JsonSerializer.Serialize(item, ApprovalJson.Options),
+                AvailableAt = item.OccurredAt,
+            };
         }).ToArray();
 
         // 仓储在同一个事务中更新版本、任务投影、事件链和待发项；抢输乐观锁时不重算命令。

@@ -55,6 +55,14 @@ internal static class Program
         await DeparturePersistenceChecks.RunAsync(Check);
         await DepartureJobChecks.RunAsync(Check);
         await OpenApiChecksClientApps.RunAsync(Check);
+        await OpenApiChecksFlows.RunAsync(Check);
+        await OpenApiChecksCallbacks.RunAsync(Check);
+        await OpenApiChecksActiveKeys.RunAsync(Check);
+        await OpenApiChecksQueries.RunAsync(Check);
+        await OpenApiChecksQueryHttp.RunAsync(backendRoot, Check);
+        await OpenApiChecksTasks.RunAsync(backendRoot, Check);
+        await OpenApiChecksStarts.RunAsync(backendRoot, Check);
+        OpenApiChecksData.Run(Check);
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);

@@ -1,0 +1,125 @@
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
+using ApprovalService.Contracts.Protocol;
+
+namespace ApprovalService.Infrastructure.Integration;
+
+/// <summary>
+/// 所有业务系统 HTTP 出站请求复用的 HMAC 签名与超时适配层。
+/// </summary>
+/// <param name="client">由依赖注入管理连接池的 HTTP 客户端。</param>
+/// <param name="transportPolicy">出站地址的部署级传输策略。</param>
+public sealed class SignedHttpOutboundAdapter(HttpClient client,
+    Application.Integration.IntegrationTransportPolicy? transportPolicy = null)
+{
+    /// <summary>
+    /// 钩子与回调响应最大正文，避免对端异常响应耗尽服务内存。
+    /// </summary>
+    public const int MaxResponseBytes = 1024 * 1024;
+
+    /// <summary>
+    /// 单次请求默认最大等待时间。
+    /// </summary>
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// 对原始 JSON 正文签名并发送，非成功状态或超时交给调用者处理。
+    /// </summary>
+    /// <param name="url">管理端登记的完整目标地址。</param>
+    /// <param name="body">已持久化的稳定 JSON 正文。</param>
+    /// <param name="signingSecret">本次发送时解密出的密钥。</param>
+    /// <param name="requestId">跨系统追踪用请求 ID。</param>
+    /// <param name="cancellationToken">宿主取消信号。</param>
+    /// <returns>业务系统响应的状态与原始正文。</returns>
+    public async Task<OutboundHttpResponse> PostAsync(string url, string body, string signingSecret, string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var address) ||
+            (address.Scheme != Uri.UriSchemeHttps &&
+                !(transportPolicy?.AllowHttpUrls == true && address.Scheme == Uri.UriSchemeHttp)))
+        {
+            throw new InvalidOperationException("业务系统出站地址必须使用 HTTPS；内网 HTTP 需要部署时显式开启。");
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, url);
+        request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        request.Headers.TryAddWithoutValidation(HeaderNames.Signature, Sign(body, signingSecret));
+        request.Headers.TryAddWithoutValidation(HeaderNames.RequestId, requestId);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(DefaultTimeout);
+        try
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength > MaxResponseBytes)
+            {
+                throw new InvalidDataException("业务系统响应体超过 1 MiB 限制。");
+            }
+
+            // 响应可能使用分块传输，不能只依赖 Content-Length；逐块计数后再解码。
+            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+            using var buffer = new MemoryStream();
+            var chunk = new byte[16 * 1024];
+            while (true)
+            {
+                var read = await stream.ReadAsync(chunk, timeout.Token);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                if (buffer.Length + read > MaxResponseBytes)
+                {
+                    throw new InvalidDataException("业务系统响应体超过 1 MiB 限制。");
+                }
+
+                await buffer.WriteAsync(chunk.AsMemory(0, read), timeout.Token);
+            }
+
+            return new OutboundHttpResponse
+            {
+                StatusCode = (int)response.StatusCode,
+                Body = Encoding.UTF8.GetString(buffer.ToArray()),
+            };
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("业务系统接口超过五秒未响应。");
+        }
+    }
+
+    /// <summary>
+    /// 计算原始 UTF-8 请求体的协议签名。
+    /// </summary>
+    /// <param name="body">待发送的原始正文。</param>
+    /// <param name="signingSecret">接入应用签名密钥。</param>
+    /// <returns>带 sha256 前缀的小写十六进制签名。</returns>
+    public static string Sign(string body, string signingSecret)
+    {
+        var key = Encoding.UTF8.GetBytes(signingSecret);
+        var bytes = Encoding.UTF8.GetBytes(body);
+        return "sha256=" + Convert.ToHexStringLower(HMACSHA256.HashData(key, bytes));
+    }
+}
+
+/// <summary>
+/// 出站 HTTP 调用的成功响应，仅在业务系统返回 2xx 时构造。
+/// </summary>
+public sealed class OutboundHttpResponse
+{
+    /// <summary>
+    /// HTTP 状态码。
+    /// </summary>
+    public int StatusCode
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 原始响应正文；回调接收方可留空。
+    /// </summary>
+    public string Body { get; set; } = string.Empty;
+}

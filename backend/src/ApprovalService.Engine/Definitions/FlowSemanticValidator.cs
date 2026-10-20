@@ -67,6 +67,12 @@ internal static class FlowSemanticValidator
                     Add(issues, node.Id, $"节点“{node.Id}”的字段权限引用了不存在的字段“{permission.FieldKey}”。");
                 }
             }
+
+            foreach (var duplicate in (node.FieldPermissions ?? []).GroupBy(item => item.FieldKey,
+                StringComparer.Ordinal).Where(group => group.Count() > 1))
+            {
+                Add(issues, node.Id, $"节点“{node.Id}”的字段“{duplicate.Key}”配置了重复权限。");
+            }
         }
 
         foreach (var summaryKey in definition.Data?.SummaryFields ?? [])

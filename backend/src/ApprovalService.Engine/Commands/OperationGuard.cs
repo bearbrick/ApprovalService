@@ -166,6 +166,7 @@ internal static class OperationGuard
                 TargetUserId = input.TargetUserId ??
                     (command.Kind == OperationKinds.ReassignInactive ? item.TargetCode : null),
                 MentionedUserIds = [.. input.MentionedUserIds],
+                FieldValues = input.FieldValues?.Clone(),
             };
         }
     }

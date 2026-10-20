@@ -140,6 +140,7 @@ internal static class OperationChecksBoundaries
         var consult = Execute(pending.State, consultationContext,
             Target(OperationKinds.Consult, "consult", pendingTask, "expert"));
         var reply = Command(OperationKinds.Reply, "wrong-reply", "other");
+        reply.TaskId = pendingTask.Id;
         reply.Operation!.RelatedId = consult.State.Operations.Consultations.Single().Id;
         reply.Operation.Opinion = "回复";
         check("非受询人不能回复征询", Throws(ErrorCodes.Forbidden, () =>

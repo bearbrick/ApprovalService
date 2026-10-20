@@ -47,6 +47,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<InstanceEntity> Instances => Set<InstanceEntity>();
 
     /// <summary>
+    /// 仅在进行中保留的流程与业务单号唯一键。
+    /// </summary>
+    public DbSet<ActiveInstanceKeyEntity> ActiveInstanceKeys => Set<ActiveInstanceKeyEntity>();
+
+    /// <summary>
     /// 待办任务投影。
     /// </summary>
     public DbSet<ApprovalTaskEntity> ApprovalTasks => Set<ApprovalTaskEntity>();
@@ -125,6 +130,7 @@ public class ApprovalDbContext : DbContext
     /// 一次性嵌入令牌。
     /// </summary>
     public DbSet<EmbedTokenEntity> EmbedTokens => Set<EmbedTokenEntity>();
+
     /// <summary>
     /// 已登记的业务系统接入应用。
     /// </summary>
@@ -134,6 +140,16 @@ public class ApprovalDbContext : DbContext
     /// 已投递的站内消息。
     /// </summary>
     public DbSet<InAppNotificationEntity> InAppNotifications => Set<InAppNotificationEntity>();
+
+    /// <summary>
+    /// 审批编号的持久流水号。
+    /// </summary>
+    public DbSet<SerialNumberCounterEntity> SerialNumberCounters => Set<SerialNumberCounterEntity>();
+
+    /// <summary>
+    /// 每次回调发送的结果日志。
+    /// </summary>
+    public DbSet<OutboundSendLogEntity> OutboundSendLogs => Set<OutboundSendLogEntity>();
 
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -171,8 +187,40 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<SerialNumberCounterEntity>(entity =>
+        {
+            entity.ToTable("SerialNumberCounters");
+            entity.HasKey(item => new { item.Prefix, item.DateBucket });
+            entity.Property(item => item.Prefix).HasMaxLength(16);
+            entity.Property(item => item.DateBucket).HasMaxLength(8);
+            entity.Property(item => item.Version).IsConcurrencyToken();
+        });
+
+        modelBuilder.Entity<ActiveInstanceKeyEntity>(entity =>
+        {
+            entity.ToTable("ActiveInstanceKeys");
+            entity.HasKey(item => new { item.FlowCode, item.BusinessKey });
+            entity.Property(item => item.FlowCode).HasMaxLength(128);
+            entity.Property(item => item.BusinessKey).HasMaxLength(200);
+            entity.Property(item => item.InstanceId).HasMaxLength(64).IsRequired();
+            entity.HasIndex(item => item.InstanceId).IsUnique();
+        });
+
+        modelBuilder.Entity<OutboundSendLogEntity>(entity =>
+        {
+            entity.ToTable("OutboundSendLogs");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasMaxLength(64);
+            entity.Property(item => item.EventId).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.ClientAppCode).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.TargetUrl).HasMaxLength(2048).IsRequired();
+            entity.Property(item => item.ErrorCode).HasMaxLength(128);
+            entity.HasIndex(item => new { item.EventId, item.Attempt });
+        });
+
         OrganizationModelConfiguration.Configure(modelBuilder);
         IdentityModelConfiguration.Configure(modelBuilder);
+
         modelBuilder.Entity<ClientAppEntity>(entity =>
         {
             entity.ToTable("ClientApps");
@@ -230,13 +278,14 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.InitiatorDepartmentId).HasMaxLength(128);
             entity.Property(item => item.SubmittedById).HasMaxLength(128);
             entity.Property(item => item.ClientAppCode).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.RoutingInputsJson).IsRequired();
             entity.Property(item => item.Status).HasMaxLength(48).IsRequired();
             entity.Property(item => item.Version).IsConcurrencyToken();
             entity.Property(item => item.LastEventHash).HasMaxLength(64).IsRequired();
             entity.Property(item => item.ParentInstanceId).HasMaxLength(64);
             entity.HasOne<FlowVersionEntity>().WithMany().HasForeignKey(item => item.FlowVersionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.SerialNo).IsUnique();
-            entity.HasIndex(item => new { item.FlowCode, item.BusinessKey }).IsUnique();
+            entity.HasIndex(item => new { item.FlowCode, item.BusinessKey });
             entity.HasIndex(item => new { item.Status, item.StartedAt });
         });
 

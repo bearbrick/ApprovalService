@@ -72,6 +72,11 @@ public sealed class InstanceEntity
     public string ApprovalDataJson { get; set; } = "{}";
 
     /// <summary>
+    /// 发起时规范化的自选人员及业务数据找人标识，后续节点到达时与最新组织快照合用。
+    /// </summary>
+    public string RoutingInputsJson { get; set; } = "{}";
+
+    /// <summary>
     /// 业务详情地址。
     /// </summary>
     public string? DetailUrl

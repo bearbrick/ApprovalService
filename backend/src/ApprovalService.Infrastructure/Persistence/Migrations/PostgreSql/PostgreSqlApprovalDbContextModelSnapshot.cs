@@ -193,42 +193,70 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("ClientApps", (string)null);
                 });
 
-            modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
+            modelBuilder.Entity("ApprovalService.Domain.Integration.OutboundSendLogEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("RecipientId")
+                    b.Property<string>("ClientAppCode")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
-                    b.Property<string>("Subject")
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("EventId")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<string>("TargetPath")
+                    b.Property<int?>("HttpStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("TargetUrl")
                         .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("character varying(512)");
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RecipientId", "CreatedAt");
+                    b.HasIndex("EventId", "Attempt");
 
-                    b.ToTable("InAppNotifications", (string)null);
+                    b.ToTable("OutboundSendLogs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Integration.SerialNumberCounterEntity", b =>
+                {
+                    b.Property<string>("Prefix")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("DateBucket")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<long>("NextSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Prefix", "DateBucket");
+
+                    b.ToTable("SerialNumberCounters", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
@@ -511,6 +539,29 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("PersonRoles", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.ActiveInstanceKeyEntity", b =>
+                {
+                    b.Property<string>("FlowCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("BusinessKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("FlowCode", "BusinessKey");
+
+                    b.HasIndex("InstanceId")
+                        .IsUnique();
+
+                    b.ToTable("ActiveInstanceKeys", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -703,6 +754,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("RoutingInputsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("SerialNo")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -740,8 +795,7 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasIndex("SerialNo")
                         .IsUnique();
 
-                    b.HasIndex("FlowCode", "BusinessKey")
-                        .IsUnique();
+                    b.HasIndex("FlowCode", "BusinessKey");
 
                     b.HasIndex("Status", "StartedAt");
 
@@ -880,10 +934,6 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)

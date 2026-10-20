@@ -67,6 +67,22 @@
 { "name": "ApprovalService", "version": "0.1.0", "apiVersion": "v1" }
 ```
 
+`GET /api/v1/flows` 和 `GET /api/v1/flows/{code}/schema` 需要 `X-Api-Key`。列表只包含当前已发布、接入应用已获授权且流程定义允许该应用使用的版本；无权限读取单个流程时返回 `FORBIDDEN`。列表项为 `{ "code": "PURCHASE", "name": "采购申请", "version": 3 }`。数据定义接口返回 `{ "flowCode": "PURCHASE", "version": 3, "data": { "fields": [], "summaryFields": [] }, "example": {} }`；`example` 按当前定义生成，不含计算字段和审批人填写字段。
+
+`GET /api/v1/instances/{id}` 与 `GET /api/v1/instances?flowCode=PURCHASE&businessKey=PR001` 也需要 `X-Api-Key`，只能读取由该接入应用发起的审批单；前者返回一张审批单，后者按发起时间倒序返回同业务单号的历史数组。审批单响应包含 `id`、`serialNo`、`flowCode`、`businessKey`、`title`、`initiatorId`、`initiatorDepartmentId`、`submittedById`、`clientAppCode`、`status`、`data`、`startedAt`、`endedAt`、`tasks`、`events`。详情中的任务包含 `id`、`nodeId`、`assigneeId`、`status`、`opinion`、`dueAt`、`completedAt`；操作记录包含 `eventId`、`sequence`、`event`、`detail`、`occurredAt`。按业务单号返回的历史摘要把 `tasks`、`events` 留空。缺少任一查询参数返回 `VALIDATION_FAILED`；用其他应用的 Key 查详情返回 `FORBIDDEN`，历史查询不会列出其他应用的记录。
+
+在途审批仍按全局的 `(flowCode, businessKey)` 唯一。相同单号已由其他接入应用占用时，发起用例只能返回 `CONFLICT`，不能把对方的审批单当作幂等结果；本应用同号才可复用本应用现有在途审批单。
+
+`GET /api/v1/tasks/count?user=alice` 和 `GET /api/v1/tasks?user=alice&skip=0&take=20` 需要 `X-Api-Key`，`user` 必须是当前接入应用已绑定的在职业务人员 ID，不按全局工号回退。默认只统计或列出本应用的待办；`scope=all` 要求该接入应用已获跨应用待办权限，否则返回 `FORBIDDEN`。数量响应为 `{pending, urgent, overdue}`；列表为任务数组，每项有 `id, instanceId, flowCode, businessKey, title, nodeId, isUrgent, dueAt, summary, openPath`。摘要仅取锁定流程版本指定的字段；`skip` 默认 0，`take` 默认 20、上限 100。
+
+待办摘要还必须按锁定发布图中该待办的当前节点权限过滤：`fieldPermissions` 显式为 `hidden` 的字段不返回；未配置节点权限的字段沿用默认可见语义。同一节点重复配置同一字段权限时拒绝发布，查询旧异常图也拒绝投影，避免权限冲突导致泄露。
+
+`POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 是审批数据对象，服务端按已发布定义校验并重算公式、分支条件，审批人填写值不接受业务系统自造；附件 ID 在同应用归属与原子关联接通前拒绝。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。只传单号取数、业务校验/取人/动作钩子的协议待 ADR 0010 确认，当前明确返回 `VALIDATION_FAILED` 而不猜测调用方式。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
+
+`POST /api/v1/instances/{id}/withdraw` 与 `POST /api/v1/instances/{id}/remind` 的 JSON 请求体为 `{user}`，`user` 必须是本应用已绑定的在职发起人；目标审批单也必须属于当前应用。前者按锁定流程的撤回规则执行，后者对当前待办催办，同一步每小时最多一次。`POST /api/v1/tasks/{id}/actions` 的请求体为 `{user, action, opinion?, targetUser?, targetNodeId?, relatedId?, mode?, mentionedUsers?, fieldValues?}`；`user`、`targetUser` 和 `mentionedUsers` 都须在本应用既有绑定且在职，目标任务须属于当前应用。`id` 是可能包含斜杠的不透明任务 ID，作为 URL 路径参数时应进行百分号编码。`action` 允许 `approve`、`reject`、`handle`、`acknowledge`、`return`、`transfer`、`addSigner`、`removeSigner`、`revokeApproval`、`comment`、`saveDraft`、`copyTo`、`consult`、`reply`、`requestSupplement`；节点权限、任务处理人、意见必填等仍由统一引擎校验。`fieldValues` 是按字段 key 的 JSON 对象，仅接受已发布定义标记 `approverInput=true` 且当前节点 `fieldPermissions` 显式为 `editable` 的顶层字段；类型沿用审批数据规则，人员和部门 ID 须在本应用既有绑定，附件 ID 暂不接受。明细子字段没有行索引协议，当前明确返回 `VALIDATION_FAILED`；业务原始字段、计算字段和无编辑权限字段不能提交。已核准值只写操作事件 `detail.audit.fieldValues` 及相关 `task.completed`、`instance.approved`、`instance.rejected` 回调的可选 `fieldValues`，原审批数据 `data` 不变，由业务系统决定是否回写业务单据。审批人必填字段在各人工命令中的生效边界待确认；当前严格校验已提交字段，不强制未提交字段。上述三个操作成功返回最新审批单详情。发起时选定部门、审批数据、自选审批/抄送人和业务数据找人标识保存为审批单快照；后续节点到达使用最新组织与审批矩阵重算，符合设计书第 4 节规则。
+
+`reply` 必须带原发问任务 ID 和该任务产生的 `relatedId` 征询 ID，实际受询人可以回复意见，但不能携带 `fieldValues`；不能借另一任务的节点权限写入征询审计。审批人实际处理任务时的意见进入任务详情的 `opinion` 并在后续状态更新中保留。退回发起人或要求补充操作若提交了合法 `fieldValues`，对应状态回调也会携带独立的填写值快照。
+
 ## 组织和身份接口
 
 `POST /api/v1/identity/login` 接受 `{ "employeeNumber": "E001", "password": "..." }`；
@@ -86,29 +102,33 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 组织管理员以 `multipart/form-data` 的 `file` 字段调用 `POST /api/v1/admin/org/import?preview=true` 预检查，或省略 `preview` 真正导入。仅接受 UTF-8 CSV、XLSX，文件不超过 5 MB；Excel 最多 10,000 行且解压后字段总量不超过 10 MiB 字符。无效 UTF-8 返回 `VALIDATION_FAILED`。预检查不写库，响应仍为 `{applied:false, issues, departedPersonIds:[]}`。`GET /api/v1/admin/org/template?format=xlsx` 下载 Excel 模板，`format=csv` 下载同字段 CSV 模板；模板首列 `kind` 为 `department`、`person`、`membership`、`personBinding` 或 `departmentBinding`。绑定行使用 `clientAppCode`、`externalId`、`internalId` 三列，绑定方式记为 `import`；`clientAppCode` 必须是已登记的接入应用。导入会检查重复部门编码与字段列宽，正式写入在可串行化事务内按当前组织快照重验，绑定和主数据及每项来源、操作者、时间与前后快照一起提交。
 
+
 ## 规划中的接口
 
 按设计书第 13 节，在对应任务里实现，实现时把请求和响应的格式补进本文：
 
 | 接口 | 用途 | 任务 |
 | --- | --- | --- |
-| `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema`、`POST /api/v1/flows/{code}/preview` | 能用的流程、要传的审批数据、预览会走哪些节点 | T-006 |
-| `POST /api/v1/instances`、`POST /api/v1/instances/batch` | 发起审批（传数据，或只传单号让服务回业务系统取） | T-006 |
-| `GET /api/v1/instances/{id}`、`PATCH /api/v1/instances/{id}/data` | 查询状态和审批记录、审批中更新允许更新的字段 | T-006 |
+| `POST /api/v1/flows/{code}/preview` | 预览会走哪些节点 | T-006 |
+| `POST /api/v1/instances/batch` | 批量发起审批 | T-006 |
+| `PATCH /api/v1/instances/{id}/data` | 审批中更新允许更新的字段 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
-| `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=`、`POST /api/v1/tasks/{id}/actions` | 待办数量、待办列表、审批操作 | T-006 |
+| `POST /api/v1/tasks/{id}/actions` | 审批操作 | T-006 |
 | `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
 
-## 回调和业务系统提供的接口（规划中）
+## 回调和业务系统提供的接口
 
-审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。
+审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。回调和钩子地址默认只能是 HTTPS；仅可信内网部署显式设置 `ApprovalService:Integration:AllowHttpUrls=true` 时接受 HTTP。签名只防篡改，不提供传输保密。出站客户端不跟随 HTTP 重定向，避免把审批数据和签名转发至未登记的地址。
 
-- **结果回调**：审批状态变化时发 POST，请求体带 `eventId`（同一事件可能重发，按它去重）、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（审批人填写的字段）、`occurredAt`。事件：发起、节点完成（可选）、通过、拒绝、撤回、退回给发起人、终止、撤销、数据被更新，以及（可选订阅）新待办、待办已处理。
+- **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`；人工操作已填写字段另在可选 `fieldValues` 中，绝不覆盖 `data`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`、`instance.returnedToInitiator`、`instance.supplementRequested`，以及 `task.created`、`task.completed`、`task.cancelled`。后两种实例事件表示已退回发起人或正等待发起人补充，`status` 为 `awaitingInitiator`；退回历史审批节点不使用 `instance.returnedToInitiator`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。停用接入应用期间保留待发项且不出站；尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
+  接入应用被停用后，已有待发回调暂停发送并记录 `CLIENT_APP_DISABLED`，仍留在队列等待后续重试；重新启用后可送达同一事件。
 - **取数接口**：只传单号发起时，审批服务按单号回业务系统取审批数据。
 - **校验钩子**：发起前、某个节点同意前问业务系统能不能过，不能过时返回原因。
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
+
+四类钩子的精确请求/响应与双向验签协议尚待确认，提议见 [ADR 0010](adr/0010-outbound-hook-protocol.md)，确认前不实现。
 
 ## 流程定义 JSON
 

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Commands;
@@ -170,8 +171,21 @@ internal static class OperationChecks
         var consulted = EngineRuntime.Execute(started.State,
             Command(OperationKinds.Consult, "consult", task.Id, task.AssigneeId, target: "expert"), context);
         var inquiry = consulted.State.Operations.Consultations.Single();
-        var reply = Command(OperationKinds.Reply, "reply", actor: "expert", opinion: "建议同意");
+        var reply = Command(OperationKinds.Reply, "reply", task.Id, actor: "expert", opinion: "建议同意");
         reply.Operation!.RelatedId = inquiry.Id;
+        var wrongTaskReply = Command(OperationKinds.Reply, "wrong-task-reply", "another-task", actor: "expert",
+            opinion: "借其他任务回复");
+        wrongTaskReply.Operation!.RelatedId = inquiry.Id;
+        check("受询人不能借另一任务的字段权限回复原征询",
+            Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(consulted.State, wrongTaskReply, context)));
+        var fieldReply = Command(OperationKinds.Reply, "field-reply", task.Id, actor: "expert", opinion: "填写字段");
+        fieldReply.Operation!.RelatedId = inquiry.Id;
+        fieldReply.Operation.FieldValues = JsonSerializer.SerializeToElement(new
+        {
+            amount = 100
+        });
+        check("受询人回复只允许意见，不能填写原审批任务字段",
+            Throws(ErrorCodes.Forbidden, () => EngineRuntime.Execute(consulted.State, fieldReply, context)));
         var replied = EngineRuntime.Execute(consulted.State, reply, context);
         check("征询回复只由受询人完成且不推进审批", replied.State.Operations.Consultations.Single().Replied &&
             replied.State.Tasks.Single().Status == EngineTaskStatuses.Pending &&

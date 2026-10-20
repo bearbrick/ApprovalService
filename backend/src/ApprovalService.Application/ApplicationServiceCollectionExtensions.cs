@@ -23,9 +23,17 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
         services.AddScoped<IServiceReadinessAppService, ServiceReadinessAppService>();
         services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
+        services.AddScoped<ClientAppAppService>();
+        services.AddScoped<FlowCatalogAppService>();
+        services.AddScoped<CallbackDeliveryAppService>();
+        services.AddScoped<OpenApprovalQueryAppService>();
+        services.AddScoped<OpenApprovalStartAppService>();
+        services.AddScoped<OpenInstanceCommandAppService>();
+        services.AddScoped<OpenTaskActionAppService>();
+        services.AddScoped<OpenStartContextBuilder>();
+        services.AddSingleton<IMatrixMatchProvider, UnconfiguredMatrixMatchProvider>();
         services.AddScoped<IOrganizationAppService, OrganizationAppService>();
         services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
-        services.AddScoped<ClientAppAppService>();
         services.AddScoped<IIdentityAppService, IdentityAppService>();
         services.AddScoped<INotificationAppService, NotificationAppService>();
         return services;

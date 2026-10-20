@@ -196,6 +196,17 @@ internal static class OperationDispatcher
         RequireOpinion(input);
         var consultation = state.Operations.Consultations.SingleOrDefault(item => item.Id == input.RelatedId && !item.Replied)
             ?? throw new EngineException(ErrorCodes.Conflict, "征询不存在或已经回复。");
+        if (command.TaskId != consultation.TaskId)
+        {
+            throw new EngineException(ErrorCodes.Conflict, "征询回复必须使用原发问任务。");
+        }
+
+        if (input.FieldValues is not null)
+        {
+            // 受询人没有原审批任务的字段编辑权限，回复只能携带意见。
+            throw new EngineException(ErrorCodes.Forbidden, "征询回复不能填写审批人字段。");
+        }
+
         if (consultation.RecipientId != input.ActorId)
         {
             throw new EngineException(ErrorCodes.Forbidden, "只有受询人可以回复。");

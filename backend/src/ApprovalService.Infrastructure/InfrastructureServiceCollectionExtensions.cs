@@ -41,14 +41,34 @@ public static class InfrastructureServiceCollectionExtensions
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
+        services.AddScoped<IClientAppRepository, ClientAppRepository>();
+        services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
+        services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
+        services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
+        services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
+        services.AddSingleton(new IntegrationTransportPolicy
+        {
+            AllowHttpUrls = configuration.GetValue<bool>("ApprovalService:Integration:AllowHttpUrls"),
+        });
+        services.AddSingleton(new OpenStartSerialOptions
+        {
+            Prefix = configuration["ApprovalService:Integration:SerialPrefix"] ?? "SP",
+            DatePattern = configuration["ApprovalService:Integration:SerialDatePattern"] ?? "yyyyMM",
+            Digits = configuration.GetValue<int?>("ApprovalService:Integration:SerialDigits") ?? 6,
+        });
+        services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
+        services.AddSingleton(TimeProvider.System);
+        // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
+        services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
+        services.AddSingleton<SignedHttpOutboundAdapter>();
+        services.AddScoped<IOutboxHandler, CallbackOutboxHandler>();
+        services.AddScoped<IOutboxHandler, EngineEventOutboxHandler>();
         services.Configure<IdentityTokenOptions>(configuration.GetSection(IdentityTokenOptions.SectionName));
         services.AddSingleton<JwtIdentityTokenService>();
         services.AddSingleton<IIdentityAccessTokenService>(provider => provider.GetRequiredService<JwtIdentityTokenService>());
         services.AddSingleton<IIdentityPasswordService, Pbkdf2IdentityPasswordService>();
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
-        services.AddScoped<IClientAppRepository, ClientAppRepository>();
-        services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddScoped<IScheduledJobHandler, DepartureJobHandler>();

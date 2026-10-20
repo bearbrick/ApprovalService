@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using ApprovalService.Api.Endpoints;
+using ApprovalService.Api.Endpoints.OpenApi;
 using ApprovalService.Api.Hosting;
 using ApprovalService.Application;
 using ApprovalService.Application.Identity;
@@ -77,8 +78,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapSystemEndpoints();
+app.MapOpenFlowEndpoints();
+app.MapOpenInstanceQueryEndpoints();
+app.MapOpenTaskEndpoints();
+app.MapOpenStartEndpoints();
+app.MapOpenInstanceCommandEndpoints();
+app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+
 
 app.Run();
 

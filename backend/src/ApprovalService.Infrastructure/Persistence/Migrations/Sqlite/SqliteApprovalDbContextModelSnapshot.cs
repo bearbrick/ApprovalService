@@ -188,42 +188,70 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("ClientApps", (string)null);
                 });
 
-            modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
+            modelBuilder.Entity("ApprovalService.Domain.Integration.OutboundSendLogEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
+                    b.Property<int>("Attempt")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime?>("ReadAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("RecipientId")
+                    b.Property<string>("ClientAppCode")
                         .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Subject")
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventId")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("TargetPath")
+                    b.Property<int?>("HttpStatus")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TargetUrl")
                         .IsRequired()
-                        .HasMaxLength(512)
+                        .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RecipientId", "CreatedAt");
+                    b.HasIndex("EventId", "Attempt");
 
-                    b.ToTable("InAppNotifications", (string)null);
+                    b.ToTable("OutboundSendLogs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Integration.SerialNumberCounterEntity", b =>
+                {
+                    b.Property<string>("Prefix")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DateBucket")
+                        .HasMaxLength(8)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("NextSequence")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Prefix", "DateBucket");
+
+                    b.ToTable("SerialNumberCounters", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
@@ -506,6 +534,29 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("PersonRoles", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.ActiveInstanceKeyEntity", b =>
+                {
+                    b.Property<string>("FlowCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BusinessKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InstanceId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FlowCode", "BusinessKey");
+
+                    b.HasIndex("InstanceId")
+                        .IsUnique();
+
+                    b.ToTable("ActiveInstanceKeys", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -698,6 +749,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("RoutingInputsJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("SerialNo")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -735,8 +790,7 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasIndex("SerialNo")
                         .IsUnique();
 
-                    b.HasIndex("FlowCode", "BusinessKey")
-                        .IsUnique();
+                    b.HasIndex("FlowCode", "BusinessKey");
 
                     b.HasIndex("Status", "StartedAt");
 
@@ -874,10 +928,6 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("LeaseOwner")

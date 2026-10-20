@@ -60,6 +60,32 @@ public class ApprovalDbContext : DbContext
     public DbSet<ScheduledJobEntity> ScheduledJobs => Set<ScheduledJobEntity>();
 
     /// <inheritdoc />
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        GuardImmutableRecords();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    /// <inheritdoc />
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        GuardImmutableRecords();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>
+    /// 已发布版本和审计事件只能插入，不能被 EF 的普通更新或删除改写。
+    /// </summary>
+    private void GuardImmutableRecords()
+    {
+        if (ChangeTracker.Entries<FlowVersionEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+        {
+            throw new InvalidOperationException("已发布版本和操作记录只能追加，不能修改或删除。");
+        }
+    }
+
+    /// <inheritdoc />
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // 三种提供程序均存 UTC DateTime；SQLite 因而可以在 SQL 中比较租约和到期时间。

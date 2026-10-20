@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace ApprovalService.Infrastructure.Persistence;
 
@@ -20,29 +21,20 @@ public static class PersistenceServiceCollectionExtensions
     /// <returns>同一个服务集合。</returns>
     public static IServiceCollection AddApprovalPersistence(this IServiceCollection services, IConfiguration configuration)
     {
-        var data = configuration.GetSection(DataOptions.SectionName).Get<DataOptions>() ?? new DataOptions();
-        switch (data.Provider)
+        // 测试宿主会在服务登记之后覆盖配置；连接与提供程序必须在创建工厂时再读取最终选项。
+        services.AddDbContextFactory<SqliteApprovalDbContext>((provider, options) =>
         {
-            case "Sqlite":
-                var directory = Path.IsPathRooted(data.Directory) ? data.Directory : Path.Combine(AppContext.BaseDirectory, data.Directory);
-                var file = Path.Combine(directory, "approval.db");
-                var connection = new SqliteConnectionStringBuilder { DataSource = file }.ToString();
-                services.AddDbContextFactory<SqliteApprovalDbContext>(options => options.UseSqlite(connection));
-                services.AddSingleton<IDbContextFactory<ApprovalDbContext>>(provider =>
-                    new DbContextFactoryAdapter<SqliteApprovalDbContext>(provider.GetRequiredService<IDbContextFactory<SqliteApprovalDbContext>>()));
-                services.AddHostedService<SqliteDatabaseInitializer>();
-                break;
-            case "SqlServer":
-                services.AddDbContextFactory<SqlServerApprovalDbContext>(options => options.UseSqlServer(data.ConnectionString));
-                services.AddSingleton<IDbContextFactory<ApprovalDbContext>>(provider =>
-                    new DbContextFactoryAdapter<SqlServerApprovalDbContext>(provider.GetRequiredService<IDbContextFactory<SqlServerApprovalDbContext>>()));
-                break;
-            case "PostgreSql":
-                services.AddDbContextFactory<PostgreSqlApprovalDbContext>(options => options.UseNpgsql(data.ConnectionString));
-                services.AddSingleton<IDbContextFactory<ApprovalDbContext>>(provider =>
-                    new DbContextFactoryAdapter<PostgreSqlApprovalDbContext>(provider.GetRequiredService<IDbContextFactory<PostgreSqlApprovalDbContext>>()));
-                break;
-        }
+            var data = provider.GetRequiredService<IOptions<DataOptions>>().Value;
+            var directory = Path.IsPathRooted(data.Directory) ? data.Directory : Path.Combine(AppContext.BaseDirectory, data.Directory);
+            var file = Path.Combine(directory, "approval.db");
+            options.UseSqlite(new SqliteConnectionStringBuilder { DataSource = file }.ToString());
+        });
+        services.AddDbContextFactory<SqlServerApprovalDbContext>((provider, options) =>
+            options.UseSqlServer(provider.GetRequiredService<IOptions<DataOptions>>().Value.ConnectionString));
+        services.AddDbContextFactory<PostgreSqlApprovalDbContext>((provider, options) =>
+            options.UseNpgsql(provider.GetRequiredService<IOptions<DataOptions>>().Value.ConnectionString));
+        services.AddSingleton<IDbContextFactory<ApprovalDbContext>, SelectedApprovalDbContextFactory>();
+        services.AddHostedService<SqliteDatabaseInitializer>();
 
         services.AddScoped(provider => provider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>().CreateDbContext());
         services.AddScoped<IApprovalRuntimeRepository, ApprovalRuntimeRepository>();

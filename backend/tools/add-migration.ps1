@@ -23,4 +23,14 @@ foreach ($provider in 'Sqlite', 'SqlServer', 'PostgreSql') {
     }
 }
 
+# 首次指定显式命名空间时 EF CLI 会把快照放到命名空间对应的目录，移回迁移目录。
+$misplaced = Join-Path $project 'ApprovalService/Infrastructure/Persistence/Migrations'
+foreach ($provider in 'Sqlite', 'SqlServer', 'PostgreSql') {
+    $source = Join-Path $misplaced "$provider/${provider}ApprovalDbContextModelSnapshot.cs"
+    if (Test-Path -LiteralPath $source) {
+        $destination = Join-Path $project "Persistence/Migrations/$provider/${provider}ApprovalDbContextModelSnapshot.cs"
+        Move-Item -LiteralPath $source -Destination $destination -Force
+    }
+}
+
 Write-Host '三种数据库迁移已生成；请运行 dotnet format 和后端检查并核对模型快照。' -ForegroundColor Green

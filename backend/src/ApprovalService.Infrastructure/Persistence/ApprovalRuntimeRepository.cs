@@ -14,7 +14,10 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         var instance = await db.Instances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == instanceId, cancellationToken);
-        if (instance is null) return null;
+        if (instance is null)
+        {
+            return null;
+        }
         var version = await db.FlowVersions.AsNoTracking().SingleAsync(item => item.Id == instance.FlowVersionId, cancellationToken);
         var lastEvent = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderByDescending(item => item.Sequence).FirstOrDefaultAsync(cancellationToken);
@@ -34,7 +37,7 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
         ArgumentNullException.ThrowIfNull(commit);
         if (commit.Instance.Version != commit.ExpectedVersion.GetValueOrDefault() + 1)
         {
-            throw new InvalidOperationException("审批单提交版本必须比读取版本增加一。 ");
+            throw new InvalidOperationException("审批单提交版本必须比读取版本增加一。");
         }
 
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
@@ -60,7 +63,10 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             if (existingTasks.TryGetValue(task.Id, out var existing))
             {
                 // 任务是引擎状态的查询投影，更新时保留已经记录的完成时间。
-                if (task.CompletedAt is null && existing.CompletedAt is not null) task.CompletedAt = existing.CompletedAt;
+                if (task.CompletedAt is null && existing.CompletedAt is not null)
+                {
+                    task.CompletedAt = existing.CompletedAt;
+                }
                 db.Entry(existing).CurrentValues.SetValues(task);
             }
             else

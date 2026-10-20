@@ -1,5 +1,13 @@
+using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
+using ApprovalService.Domain.Identity;
+using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Organization;
+using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Options;
+using ApprovalService.Infrastructure.Organization;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,8 +38,17 @@ public static class InfrastructureServiceCollectionExtensions
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
+        services.Configure<IdentityTokenOptions>(configuration.GetSection(IdentityTokenOptions.SectionName));
+        services.AddSingleton<JwtIdentityTokenService>();
+        services.AddSingleton<IIdentityAccessTokenService>(provider => provider.GetRequiredService<JwtIdentityTokenService>());
+        services.AddSingleton<IIdentityPasswordService, Pbkdf2IdentityPasswordService>();
+        services.AddScoped<IIdentityRepository, IdentityRepository>();
+        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<IClientAppRepository, ClientAppRepository>();
+        services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
+        services.AddScoped<IScheduledJobHandler, DepartureJobHandler>();
         services.AddHostedService<DurableJobWorker>();
         return services;
     }

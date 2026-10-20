@@ -1,5 +1,6 @@
 using System.Data.Common;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Domain.Shared;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -197,9 +198,11 @@ public sealed class DurableJobWorker : BackgroundService
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception error)
         {
-            await scheduledJobs.FailAsync(job, now.Add(timeProvider.GetElapsedTime(started)), cancellationToken);
+            var errorCode = error is UserFriendlyException friendly ? friendly.Code : error.GetType().Name;
+            await scheduledJobs.FailAsync(job, now.Add(timeProvider.GetElapsedTime(started)),
+                errorCode, cancellationToken);
             return;
         }
 

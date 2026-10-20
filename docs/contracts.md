@@ -54,12 +54,37 @@
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
 | `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
 | `GET /api/v1/info` | 无 | 服务信息 |
+| `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
+| `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
+| `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
+| `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
+| `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
+| `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
 
 `GET /api/v1/info` 的响应：
 
 ```json
 { "name": "ApprovalService", "version": "0.1.0", "apiVersion": "v1" }
 ```
+
+## 组织和身份接口
+
+`POST /api/v1/identity/login` 接受 `{ "employeeNumber": "E001", "password": "..." }`；
+`POST /api/v1/identity/refresh` 接受 `{ "refreshToken": "..." }`；
+`POST /api/v1/embed-tokens/exchange` 接受 `{ "token": "..." }`。三者成功后都返回
+`{personId, accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, mustChangePassword, targetPath}`，普通登录的 `targetPath` 为 null 并按通用约定省略。访问令牌有效 15 分钟，刷新令牌有效 30 天、每次使用后立即轮换；数据库只存刷新令牌摘要。登录失败连续 5 次暂时锁定 15 分钟。管理员开通账号时通过 `POST /api/v1/identity/provision` 传 `{personId, temporaryPassword}`，首次登录必须改密码；`POST /api/v1/identity/change-password` 传 `{currentPassword, newPassword}`；管理员作废人员全部令牌时向 `/identity/revoke-all` 传 `{personId}`。改密和作废会使旧访问及刷新令牌失效。
+
+JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核对账号、在职状态和令牌版本。首次登录尚未改密码的访问令牌只能调用 `/identity/change-password`。JWT 内部 `sessionKind` 为 `local` 或 `embed`；嵌入交换和后续刷新保持 `embed` 来源、`clientAppCode` 及 `externalUserId`，只用于审批中心。每次交换、刷新和访问都重新核对接入应用仍启用且原绑定仍指向同一人员；改绑或停用应用立即使旧令牌失效。组织管理授权要求 `sessionKind=local` 且人员当前具有 `organization-admin` 角色；业务系统的外部用户绑定不能提升为管理员。首位管理员由本机部署引导流程开通，具体运维入口待确认，不提供匿名管理 HTTP 路由。
+
+`POST /api/v1/embed-tokens` 由接入应用后端带 `X-Api-Key` 调用，请求为 `{userId, targetPath}`；`userId` 必须已在该应用自己的绑定表对应在职内部人员，嵌入签发不按全局工号回退，也不能使用别的应用的绑定。`targetPath` 只能是本站相对路由。响应为 `{token, expiresAt, targetPath}`；令牌绑定已认证接入应用和人员，5 分钟有效，只能原子交换一次，数据库只存摘要。嵌入令牌无效或已消费时返回 `UNAUTHORIZED`。
+
+`POST /api/v1/org/changes` 的 JSON 请求有 `departments`、`people`、`memberships` 三个数组；部门含 `id, code, name, parentId, headPersonId`，人员含 `id, employeeNumber, name, phone, email, managerId, position, grade, gradeRank, isActive`，所属部门含 `personId, departmentId, isPrimary`。响应 `{applied, issues, departedPersonIds}`；`issues` 每项按通用错误字段结构给出路径、码和中文提示。服务一次收集重复工号、缺失上级及组织环等问题；验证通过才写入。接入应用只能覆盖本应用来源的数据，不能覆盖审批服务主数据。人员转离职时在 `departedPersonIds` 返回需交接的内部人员 ID，并持久留下管理员交接提醒。
+
+`POST /api/v1/org/bindings` 请求 `{kind, externalId, internalId, employeeNumber, phone, method, clientAppCode}`：`kind` 为 `person` 或 `department`。开放接口忽略请求里的 `clientAppCode` 和 `method`，始终使用 API Key 所属应用及 `push` 来源；人员不允许直接指定 `internalId`，只能按唯一工号或手机号匹配本接入应用来源且在职的人员，部门也仅能绑定本应用来源。审批服务或其他应用来源的人员和部门须由本地组织管理员在 `/api/v1/admin/org/bindings` 手工确认，管理员在请求体指定 `clientAppCode`，来源固定为 `manual`。人员绑定成功返回 `{personId}`，部门绑定成功返回 204。之后该接入应用可在开放接口中使用自己的人员和部门 ID。
+
+开放发起接口解析业务部门 ID 时必须使用该应用已建立且仍指向现有部门的绑定；未绑定、跨应用绑定或失效绑定返回可纠正的输入错误，不将该值回退为全局部门编码或内部 ID。既有的通用部门查询语义保持不变，严格查询由应用服务 `ResolveBoundDepartmentAsync` 单独提供。
+
+组织管理员以 `multipart/form-data` 的 `file` 字段调用 `POST /api/v1/admin/org/import?preview=true` 预检查，或省略 `preview` 真正导入。仅接受 UTF-8 CSV、XLSX，文件不超过 5 MB；Excel 最多 10,000 行且解压后字段总量不超过 10 MiB 字符。无效 UTF-8 返回 `VALIDATION_FAILED`。预检查不写库，响应仍为 `{applied:false, issues, departedPersonIds:[]}`。`GET /api/v1/admin/org/template?format=xlsx` 下载 Excel 模板，`format=csv` 下载同字段 CSV 模板；模板首列 `kind` 为 `department`、`person`、`membership`、`personBinding` 或 `departmentBinding`。绑定行使用 `clientAppCode`、`externalId`、`internalId` 三列，绑定方式记为 `import`；`clientAppCode` 必须是已登记的接入应用。导入会检查重复部门编码与字段列宽，正式写入在可串行化事务内按当前组织快照重验，绑定和主数据及每项来源、操作者、时间与前后快照一起提交。
 
 ## 规划中的接口
 
@@ -74,8 +99,6 @@
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=`、`POST /api/v1/tasks/{id}/actions` | 待办数量、待办列表、审批操作 | T-006 |
 | `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
-| `POST /api/v1/embed-tokens` | 签发嵌入令牌，换成免登录打开地址 | T-007 |
-| `POST /api/v1/org/changes`、`POST /api/v1/org/bindings` | 推送组织架构变更、绑定业务系统的用户和部门 | T-007 |
 
 ## 回调和业务系统提供的接口（规划中）
 

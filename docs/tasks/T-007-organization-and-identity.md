@@ -54,6 +54,8 @@
 
 ## 交接记录
 
+- 2026-10-20 · Codex · 用户要求暂停节省流量，状态保持“进行中”。工作树 `C:\Users\dukun\.codex\worktrees\organization-identity\ApprovalService`，分支 `ai/codex/T-007-organization-identity`；从 main 认领后已合入完成的 T-005，仅在任务分支内。已提交：`212db63` 组织实体/仓储/应用查询及导入规则、`e5b34f3` 组织 DI、`261d7de` 身份 Application/Infrastructure 核心、`d2ac749`/`cac8226` JWT 包版本和项目引用；前置认领与范围登记见 `2f9eda2`/`8de06ae`。暂停时未提交：组织 CSV 解析器、Domain Identity 仓储接口与账号失败锁定字段、三套 `AddOrganizationIdentity` 迁移及快照、Contracts 的路由和请求响应模型、注释格式修正、IdentityAppServiceChecks.cs、MiniExcel 提案记录（本文件）。三套迁移在账号锁定字段加入前生成，恢复后须用 EF 工具移除并重生，不要手改。身份登录锁定仓储/应用逻辑、首次开通账号用例、组织与身份场景检查、API/认证/DI、契约与设计文档同步、全量 verify 均未完成；当前工作树因并行新增尚未完成的 Identity 接口和检查，不保证可编译。T-006 的 API Key 认证基础提交 `4a1f76b`/`b234d49`/`93b0e04` 尚未合入，嵌入签发接口不得匿名开放。用户已同意使用本机缓存的 MiniExcel 1.33.0，但尚未引入；恢复后按 R8 写 ADR，再实现 Excel 导入。所有已列验收项仍未勾选，未合并 main、未推送。
+- 2026-10-20 · Codex · Excel 导入候选包提案（尚未引用或下载）：`MiniExcel` 1.33.0，来源 [NuGet](https://www.nuget.org/packages/MiniExcel/1.33.0) / [项目仓库](https://github.com/mini-software/MiniExcel)，本机 NuGet 缓存已有 373,138 字节 `.nupkg`，Apache-2.0；缓存的包元数据日期为 2024-07，满足发布满两周。本包同时可读取与导出 `.xlsx` 模板，且无 .NET 6 及以上的外部传递依赖。标签服务未使用 Excel 读写库，故无同包版本需对齐。备选 `NPOI` 2.7.6 亦已缓存，但包体约 13 MB、接口面更大；`ExcelDataReader` 3.6.0 只能读，不能导出模板；CSV 无依赖，已先实现解析但不能满足 Excel 验收项。拟在 Infrastructure/Organization 引入 MiniExcel 并写 ADR，先等用户同意，当前未添加依赖。
 - 2026-10-20 · Codex · T-007 原范围未列 Contracts、EF 模型和迁移，但新增开放接口及持久化实体必须改这些文件；已获协调者同意在本任务登记后按 AGENTS.md §6.4 实施。计划同步 `docs/contracts.md` 和设计书 §11/§13 中受影响的部分；共享 DI、Program、包版本和检查入口单独提交。JWT Bearer 10.0.12 已在本机缓存，与标签服务一致。Excel 库尚未引入，先做 CSV 导入；引入提案需另行征得用户同意。
 - 2026-10-20 · Codex · 从 `main` 创建独立任务工作树并认领。依赖 T-005 已完成；认领提交后将合入 T-005 任务分支，继续组织、账号、嵌入令牌开发。共享文件和新增依赖在修改前逐项登记。
 

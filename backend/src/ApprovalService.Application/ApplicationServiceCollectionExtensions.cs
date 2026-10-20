@@ -1,3 +1,4 @@
+using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +17,7 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddApprovalApplication(this IServiceCollection services)
     {
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
+        services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
         return services;
     }
 }

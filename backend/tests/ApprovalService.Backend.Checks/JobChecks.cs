@@ -43,6 +43,7 @@ internal static class JobChecks
             await CheckOutboxAsync(options, check);
             await CheckScheduledJobsAsync(options, check);
             await CheckWorkerAsync(options, check);
+            await CheckExpiredWorkerLeaseAsync(options, check);
             await CheckDatabaseOutageAsync(directory, check);
         }
         finally
@@ -219,6 +220,62 @@ internal static class JobChecks
     }
 
     /// <summary>
+    /// 处理器跨过租约截止时间时，旧执行者不能用领取时的时间确认完成。
+    /// </summary>
+    /// <param name="options">同一数据库的连接选项。</param>
+    /// <param name="check">检查结果记录器。</param>
+    /// <returns>异步操作。</returns>
+    private static async Task CheckExpiredWorkerLeaseAsync(DbContextOptions<ApprovalDbContext> options,
+        Action<string, bool> check)
+    {
+        var now = new DateTimeOffset(2026, 10, 20, 11, 0, 0, TimeSpan.Zero);
+        await using (var context = new ApprovalDbContext(options))
+        {
+            context.OutboxItems.Add(new OutboxItemEntity
+            {
+                Id = "outbox-expired",
+                InstanceId = "instance",
+                EventId = "event-expired",
+                Kind = "slow-callback",
+                PayloadJson = "{}",
+                AvailableAt = now,
+            });
+            context.ScheduledJobs.Add(new ScheduledJobEntity
+            {
+                Id = "scheduled-expired",
+                Kind = "slow-reminder",
+                PayloadJson = "{}",
+                DueAt = now,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        var clock = new AdvancingTimeProvider();
+        using var services = new ServiceCollection()
+            .AddSingleton<IOutboxHandler>(new AdvancingOutboxHandler(clock))
+            .AddSingleton<IScheduledJobHandler>(new AdvancingScheduledJobHandler(clock))
+            .BuildServiceProvider();
+        var factory = new PooledDbContextFactory<ApprovalDbContext>(options);
+        using var worker = new DurableJobWorker(new OutboxQueue(factory), new ScheduledJobQueue(factory),
+            services.GetRequiredService<IServiceScopeFactory>(), clock);
+        await worker.RunOnceAsync(now);
+        await using (var context = new ApprovalDbContext(options))
+        {
+            var outbox = await context.OutboxItems.AsNoTracking().SingleAsync(item => item.Id == "outbox-expired");
+            var job = await context.ScheduledJobs.AsNoTracking().SingleAsync(item => item.Id == "scheduled-expired");
+            check("处理器运行超过租约后旧执行者不能确认待发项或定时任务",
+                outbox.Status == JobStatuses.Leased && job.Status == JobStatuses.Leased);
+        }
+
+        var reclaimedOutbox = await new OutboxQueue(factory).ClaimNextAsync(now.AddMinutes(6),
+            TimeSpan.FromMinutes(2));
+        var reclaimedJob = await new ScheduledJobQueue(factory).ClaimNextAsync(now.AddMinutes(6),
+            TimeSpan.FromMinutes(2));
+        check("租约过期的两类工作仍能由新执行者领取", reclaimedOutbox?.Id == "outbox-expired" &&
+            reclaimedJob?.Id == "scheduled-expired");
+    }
+
+    /// <summary>
     /// 数据库临时不可达时后台执行器保持运行，等待连接恢复。
     /// </summary>
     /// <param name="directory">测试目录。</param>
@@ -268,6 +325,63 @@ internal static class JobChecks
     /// </summary>
     private sealed class TestDatabaseException : DbException
     {
+    }
+
+    /// <summary>
+    /// 以手动推进的单调时钟模拟处理器跨过租约期限。
+    /// </summary>
+    private sealed class AdvancingTimeProvider : TimeProvider
+    {
+        /// <summary>
+        /// 当前单调时钟刻度。
+        /// </summary>
+        private long ticks;
+
+        /// <inheritdoc />
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+        /// <inheritdoc />
+        public override long GetTimestamp() => Interlocked.Read(ref ticks);
+
+        /// <summary>
+        /// 推进测试时钟。
+        /// </summary>
+        /// <param name="duration">前进的时长。</param>
+        public void Advance(TimeSpan duration) => Interlocked.Add(ref ticks, duration.Ticks);
+    }
+
+    /// <summary>
+    /// 模拟耗时超过租约的待发处理器。
+    /// </summary>
+    /// <param name="clock">可手动推进的时钟。</param>
+    private sealed class AdvancingOutboxHandler(AdvancingTimeProvider clock) : IOutboxHandler
+    {
+        /// <inheritdoc />
+        public string Kind => "slow-callback";
+
+        /// <inheritdoc />
+        public Task DeliverAsync(OutboxItemEntity item, CancellationToken cancellationToken)
+        {
+            clock.Advance(TimeSpan.FromMinutes(3));
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// 模拟耗时超过租约的定时任务处理器。
+    /// </summary>
+    /// <param name="clock">可手动推进的时钟。</param>
+    private sealed class AdvancingScheduledJobHandler(AdvancingTimeProvider clock) : IScheduledJobHandler
+    {
+        /// <inheritdoc />
+        public string Kind => "slow-reminder";
+
+        /// <inheritdoc />
+        public Task ExecuteAsync(ScheduledJobEntity job, CancellationToken cancellationToken)
+        {
+            clock.Advance(TimeSpan.FromMinutes(3));
+            return Task.CompletedTask;
+        }
     }
 
     /// <summary>

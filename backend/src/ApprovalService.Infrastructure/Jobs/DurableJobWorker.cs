@@ -107,17 +107,20 @@ public sealed class DurableJobWorker : BackgroundService
     public async Task<int> RunOnceAsync(DateTimeOffset now, CancellationToken cancellationToken = default)
     {
         var processed = 0;
+        var outboxStarted = timeProvider.GetTimestamp();
         var outboxItem = await outbox.ClaimNextAsync(now, LeaseDuration, cancellationToken);
         if (outboxItem is not null)
         {
-            await DeliverAsync(outboxItem, now, cancellationToken);
+            await DeliverAsync(outboxItem, now, outboxStarted, cancellationToken);
             processed++;
         }
 
-        var job = await scheduledJobs.ClaimNextAsync(now, LeaseDuration, cancellationToken);
+        var jobNow = now.Add(timeProvider.GetElapsedTime(outboxStarted));
+        var jobStarted = timeProvider.GetTimestamp();
+        var job = await scheduledJobs.ClaimNextAsync(jobNow, LeaseDuration, cancellationToken);
         if (job is not null)
         {
-            await ExecuteJobAsync(job, now, cancellationToken);
+            await ExecuteJobAsync(job, jobNow, jobStarted, cancellationToken);
             processed++;
         }
 
@@ -129,9 +132,11 @@ public sealed class DurableJobWorker : BackgroundService
     /// </summary>
     /// <param name="item">已领取的待发项。</param>
     /// <param name="now">本轮固定时间。</param>
+    /// <param name="started">领取前的单调时钟刻度。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>异步操作。</returns>
-    private async Task DeliverAsync(OutboxItemEntity item, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task DeliverAsync(OutboxItemEntity item, DateTimeOffset now, long started,
+        CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         try
@@ -154,12 +159,13 @@ public sealed class DurableJobWorker : BackgroundService
         }
         catch (Exception error)
         {
-            await outbox.FailAsync(item, now, error.GetType().Name, cancellationToken);
+            await outbox.FailAsync(item, now.Add(timeProvider.GetElapsedTime(started)),
+                error.GetType().Name, cancellationToken);
             return;
         }
 
         // 成功发送后的确认单独执行；数据库故障由宿主报告，租约到期后仍可重试。
-        await outbox.CompleteAsync(item, now, cancellationToken);
+        await outbox.CompleteAsync(item, now.Add(timeProvider.GetElapsedTime(started)), cancellationToken);
     }
 
     /// <summary>
@@ -167,9 +173,11 @@ public sealed class DurableJobWorker : BackgroundService
     /// </summary>
     /// <param name="job">已领取任务。</param>
     /// <param name="now">本轮固定时间。</param>
+    /// <param name="started">领取前的单调时钟刻度。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>异步操作。</returns>
-    private async Task ExecuteJobAsync(ScheduledJobEntity job, DateTimeOffset now, CancellationToken cancellationToken)
+    private async Task ExecuteJobAsync(ScheduledJobEntity job, DateTimeOffset now, long started,
+        CancellationToken cancellationToken)
     {
         using var scope = scopeFactory.CreateScope();
         try
@@ -191,10 +199,10 @@ public sealed class DurableJobWorker : BackgroundService
         }
         catch (Exception)
         {
-            await scheduledJobs.FailAsync(job, now, cancellationToken);
+            await scheduledJobs.FailAsync(job, now.Add(timeProvider.GetElapsedTime(started)), cancellationToken);
             return;
         }
 
-        await scheduledJobs.CompleteAsync(job, now, cancellationToken);
+        await scheduledJobs.CompleteAsync(job, now.Add(timeProvider.GetElapsedTime(started)), cancellationToken);
     }
 }

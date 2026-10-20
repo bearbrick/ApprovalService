@@ -49,6 +49,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("TokenVersion")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("TokenHash");
 
                     b.HasIndex("PersonId", "ExpiresAt");

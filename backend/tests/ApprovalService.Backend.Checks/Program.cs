@@ -52,6 +52,7 @@ internal static class Program
         await JobChecks.RunAsync(Check);
         ApprovalDataChecks.Run(Check);
         await OpenApiChecksClientApps.RunAsync(Check);
+        await OpenApiChecksFlows.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

@@ -34,6 +34,7 @@ public static class InfrastructureServiceCollectionExtensions
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
+        services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();

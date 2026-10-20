@@ -1,4 +1,5 @@
 using ApprovalService.Api.Endpoints;
+using ApprovalService.Api.Endpoints.OpenApi;
 using ApprovalService.Api.Hosting;
 using ApprovalService.Application;
 using ApprovalService.Contracts;
@@ -19,6 +20,7 @@ app.UseMiddleware<RequestTraceMiddleware>();
 app.UseStatusCodePages(context => ApiErrors.WriteStatusAsync(context.HttpContext));
 
 app.MapSystemEndpoints();
+app.MapOpenFlowEndpoints();
 
 app.Run();
 

@@ -14,7 +14,7 @@ public sealed partial class ApprovalServiceClient
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>流程列表。</returns>
     public async Task<IReadOnlyList<AvailableFlow>> GetFlowsAsync(CancellationToken cancellationToken = default) =>
-        OpenApiJson.Flows(await SendAsync(HttpMethod.Get, Relative(Protocol.Flows), cancellationToken).ConfigureAwait(false));
+        OpenApiJson.Flows(await SendAsync(HttpMethod.Get, Relative(OpenApiPaths.Flows), cancellationToken).ConfigureAwait(false));
 
     /// <summary>
     /// 查询流程发起时的数据定义与 JSON 样例。
@@ -23,7 +23,7 @@ public sealed partial class ApprovalServiceClient
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>数据定义与样例。</returns>
     public async Task<FlowSchema> GetFlowSchemaAsync(string flowCode, CancellationToken cancellationToken = default) =>
-        OpenApiJson.Schema(await SendAsync(HttpMethod.Get, ForCode(Protocol.FlowSchema, flowCode), cancellationToken).ConfigureAwait(false));
+        OpenApiJson.Schema(await SendAsync(HttpMethod.Get, ForCode(OpenApiPaths.FlowSchema, flowCode), cancellationToken).ConfigureAwait(false));
 
     /// <summary>
     /// 以业务系统已绑定人员身份发起审批。
@@ -51,7 +51,7 @@ public sealed partial class ApprovalServiceClient
             ["isUrgent"] = input.IsUrgent,
             ["selectedAssignees"] = input.SelectedAssignees,
         };
-        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, Relative(Protocol.Instances), cancellationToken, body).ConfigureAwait(false));
+        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, Relative(OpenApiPaths.Instances), cancellationToken, body).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public sealed partial class ApprovalServiceClient
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>审批单详情。</returns>
     public async Task<ApprovalInstance> GetInstanceAsync(string instanceId, CancellationToken cancellationToken = default) =>
-        OpenApiJson.Instance(await SendAsync(HttpMethod.Get, ForId(Protocol.Instance, instanceId), cancellationToken).ConfigureAwait(false));
+        OpenApiJson.Instance(await SendAsync(HttpMethod.Get, ForId(OpenApiPaths.Instance, instanceId), cancellationToken).ConfigureAwait(false));
 
     /// <summary>
     /// 按流程编码与业务单号查询本应用的历史审批单，最新的排在前面。
@@ -73,7 +73,7 @@ public sealed partial class ApprovalServiceClient
     public async Task<IReadOnlyList<ApprovalInstance>> FindInstancesAsync(string flowCode, string businessKey,
         CancellationToken cancellationToken = default)
     {
-        var path = Relative(Protocol.Instances) + "?flowCode=" + Encode(flowCode, nameof(flowCode))
+        var path = Relative(OpenApiPaths.Instances) + "?flowCode=" + Encode(flowCode, nameof(flowCode))
             + "&businessKey=" + Encode(businessKey, nameof(businessKey));
         return OpenApiJson.Instances(await SendAsync(HttpMethod.Get, path, cancellationToken).ConfigureAwait(false));
     }
@@ -88,7 +88,7 @@ public sealed partial class ApprovalServiceClient
     public async Task<ApprovalTaskCount> GetTaskCountAsync(string user, bool allApps = false,
         CancellationToken cancellationToken = default)
     {
-        var path = Relative(Protocol.TaskCount) + "?user=" + Encode(user, nameof(user)) + (allApps ? "&scope=all" : "");
+        var path = Relative(OpenApiPaths.TaskCount) + "?user=" + Encode(user, nameof(user)) + (allApps ? "&scope=all" : "");
         return OpenApiJson.TaskCount(await SendAsync(HttpMethod.Get, path, cancellationToken).ConfigureAwait(false));
     }
 
@@ -109,7 +109,7 @@ public sealed partial class ApprovalServiceClient
             throw new ArgumentOutOfRangeException(nameof(take), "待办分页要求 skip 非负、take 为一到一百。");
         }
 
-        var path = Relative(Protocol.Tasks) + "?user=" + Encode(user, nameof(user))
+        var path = Relative(OpenApiPaths.Tasks) + "?user=" + Encode(user, nameof(user))
             + "&skip=" + skip.ToString(System.Globalization.CultureInfo.InvariantCulture)
             + "&take=" + take.ToString(System.Globalization.CultureInfo.InvariantCulture)
             + (allApps ? "&scope=all" : "");
@@ -143,7 +143,7 @@ public sealed partial class ApprovalServiceClient
             ["mentionedUsers"] = input.MentionedUsers,
             ["fieldValues"] = input.FieldValues,
         };
-        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(Protocol.TaskActions, taskId),
+        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(OpenApiPaths.TaskActions, taskId),
             cancellationToken, body).ConfigureAwait(false));
     }
 
@@ -156,7 +156,7 @@ public sealed partial class ApprovalServiceClient
     /// <returns>撤回后的审批单详情。</returns>
     public async Task<ApprovalInstance> WithdrawAsync(string instanceId, string user,
         CancellationToken cancellationToken = default) =>
-        OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(Protocol.InstanceWithdraw, instanceId),
+        OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(OpenApiPaths.InstanceWithdraw, instanceId),
             cancellationToken, UserBody(user)).ConfigureAwait(false));
 
     /// <summary>
@@ -168,7 +168,7 @@ public sealed partial class ApprovalServiceClient
     /// <returns>催办后的审批单详情。</returns>
     public async Task<ApprovalInstance> RemindAsync(string instanceId, string user,
         CancellationToken cancellationToken = default) =>
-        OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(Protocol.InstanceRemind, instanceId),
+        OpenApiJson.Instance(await SendAsync(HttpMethod.Post, ForId(OpenApiPaths.InstanceRemind, instanceId),
             cancellationToken, UserBody(user)).ConfigureAwait(false));
 
     /// <summary>

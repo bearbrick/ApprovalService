@@ -46,6 +46,13 @@ internal static partial class ContractChecks
             .ToArray();
         check("docs/contracts.md 写了全部错误码和 HTTP 头" + (undocumented.Length > 0 ? "，缺：" + string.Join("、", undocumented) : ""), undocumented.Length == 0);
 
+        var callbackEvents = Constants(Read(Path.Combine(contracts, "CallbackEventCodes.cs")));
+        var undocumentedCallbacks = callbackEvents.Select(item => item.Value)
+            .Where(value => !document.Contains($"`{value}`", StringComparison.Ordinal)).ToArray();
+        check("docs/contracts.md 写了全部回调事件码" +
+            (undocumentedCallbacks.Length > 0 ? "，缺：" + string.Join("、", undocumentedCallbacks) : ""),
+            undocumentedCallbacks.Length == 0);
+
         var flowKinds = Read(Path.Combine("backend", "src", "ApprovalService.Contracts", "Flows", "FlowKinds.cs"));
         var flowCopy = Read(Path.Combine("frontend", "src", "model", "flow.ts"));
         CheckFlowKinds(flowKinds, flowCopy, "FlowNodeTypes", "flowNodeTypes", "节点类型", check);

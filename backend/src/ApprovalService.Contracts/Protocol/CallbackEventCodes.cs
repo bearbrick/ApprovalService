@@ -56,6 +56,11 @@ public static class CallbackEventCodes
     public const string TaskCompleted = "task.completed";
 
     /// <summary>
+    /// 撤销同意后原审批任务恢复为待办。
+    /// </summary>
+    public const string TaskRestored = "task.restored";
+
+    /// <summary>
     /// 审批任务已取消。
     /// </summary>
     public const string TaskCancelled = "task.cancelled";

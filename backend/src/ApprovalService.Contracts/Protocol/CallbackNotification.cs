@@ -38,6 +38,14 @@ public sealed class CallbackNotification
     public string BusinessKey { get; set; } = string.Empty;
 
     /// <summary>
+    /// 相关任务 ID；目前仅恢复原待办回调携带，其他事件省略。
+    /// </summary>
+    public string? TaskId
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 事件发生时的审批状态。
     /// </summary>
     public string Status { get; set; } = string.Empty;

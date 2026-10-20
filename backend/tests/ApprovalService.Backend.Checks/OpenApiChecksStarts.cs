@@ -44,7 +44,7 @@ internal static partial class OpenApiChecksStarts
             {
                 Code = "demo",
                 Name = "示例",
-                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY"],
+                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY", "REVOKE"],
             });
             var other = await clients.CreateAsync(new CreateClientAppInput
             {
@@ -342,6 +342,7 @@ internal static partial class OpenApiChecksStarts
             await RunRoutingAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunApproverInputsAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunFlowPoliciesAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunRevokeAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

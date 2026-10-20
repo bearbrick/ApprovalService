@@ -63,6 +63,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：为继续发起/待办接口，计划局部合入 T-007 已提交基线 `04045e2`，只使用严格本应用绑定的 `ResolveBoundPersonAsync`，不调用待确认的全局工号回退。合并预计涉及共享 `Program.cs`、应用/基础设施 DI、`ApprovalDbContext.cs`、三库模型快照、`docs/contracts.md`、`docs/architecture.md` 与设计书；冲突只保留两任务的登记和已确认条款。离职在途重分配由独立任务处理，T-006 不修改其 Engine/Runtime/Persistence 文件。
 - 2026-10-20 · Codex：共享文件增量登记：`InfrastructureServiceCollectionExtensions.cs` 增加部署级 HTTPS/内网 HTTP 策略并关闭 HTTP 自动重定向，`docs/contracts.md` 和 `docs/architecture.md` 同步全局在途键的跨应用冲突、回调停用与传输边界；这些共享改动单独提交。审批单查询产品与 HTTP 隔离场景已提交 `eba0029`、`f5a65a7`、`00728fe`、`7ca8835`；全量验证后端 392、调用端 33、前端 65 项通过。审阅修复 `3dfcec2` 补了跨应用同号只报 409、HTTPS 默认、停用应用不发送回调、审批详情一致快照；新场景后端 401 项通过，待 T-007 释放 5289 后重跑全量。
 - 2026-10-20 · Codex：回调和流程目录已能独立运行，后端完整检查 383 项通过。发起接口要求同一业务单号结束后可再次发起，而现有 `Instances(FlowCode,BusinessKey)` 为全生命周期唯一索引；为跨 SQLite、SQL Server、PostgreSQL 保持一致事务语义，登记独立在途键实体 `Domain/Runtime/ActiveInstanceKeyEntity.cs`，在运行仓储的同一次提交中增删，之后才实现重复发起返回已有审批单。
 - 2026-10-20 · Codex：恢复后完成流程目录与数据定义接口提交 `a0ca17a`、共享 DI/路由/检查登记 `d11fd63`。设计书 §api 对取数、校验、取人、业务动作钩子只写用途，未定义精确 URL/HTTP 方法和 JSON 请求响应；按 R13 登记提议 ADR，待确认前不实施这四类钩子协议。签名 HTTP 出站适配层和结果回调属于已明确部分，继续开发。

@@ -1,0 +1,318 @@
+{
+  "schemaVersion": 1,
+  "code": "PURCHASE_REQUEST",
+  "name": "采购申请审批",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "start",
+        "name": "业务系统发起",
+        "x": 80,
+        "y": 220
+      },
+      {
+        "id": "manager",
+        "type": "approval",
+        "name": "部门负责人审批",
+        "x": 300,
+        "y": 220,
+        "assignee": {
+          "source": "manager"
+        },
+        "approval": {
+          "mode": "sequential",
+          "allowedActions": [
+            "approve",
+            "reject",
+            "return"
+          ],
+          "commentRequired": true
+        }
+      },
+      {
+        "id": "split",
+        "type": "exclusiveGateway",
+        "name": "按金额分支",
+        "x": 530,
+        "y": 220,
+        "gatewayPairId": "amount",
+        "gatewayDirection": "split"
+      },
+      {
+        "id": "finance",
+        "type": "approval",
+        "name": "财务复核",
+        "x": 750,
+        "y": 110,
+        "assignee": {
+          "source": "role",
+          "value": "FINANCE_REVIEWER"
+        },
+        "approval": {
+          "mode": "all",
+          "allowedActions": [
+            "approve",
+            "reject"
+          ]
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "approvedBudget",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "contract",
+        "type": "subprocess",
+        "name": "合同审批",
+        "x": 970,
+        "y": 110,
+        "subprocess": {
+          "flowCode": "CONTRACT_REVIEW",
+          "waitForCompletion": true,
+          "dataMappings": {
+            "contractTitle": "title",
+            "contractAmount": "totalAmount"
+          }
+        }
+      },
+      {
+        "id": "join",
+        "type": "exclusiveGateway",
+        "name": "金额分支汇合",
+        "x": 1180,
+        "y": 220,
+        "gatewayPairId": "amount",
+        "gatewayDirection": "join"
+      },
+      {
+        "id": "buyer",
+        "type": "handling",
+        "name": "采购员办理",
+        "x": 1400,
+        "y": 220,
+        "assignee": {
+          "source": "role",
+          "value": "PURCHASING"
+        },
+        "approval": {
+          "allowedActions": [
+            "submit"
+          ]
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "orderNumber",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "order",
+        "type": "automatic",
+        "name": "生成采购订单",
+        "x": 1620,
+        "y": 220,
+        "automation": {
+          "actionCode": "createPurchaseOrder"
+        }
+      },
+      {
+        "id": "end",
+        "type": "end",
+        "name": "结束",
+        "x": 1840,
+        "y": 220
+      }
+    ],
+    "edges": [
+      {
+        "id": "p01",
+        "sourceId": "start",
+        "targetId": "manager"
+      },
+      {
+        "id": "p02",
+        "sourceId": "manager",
+        "targetId": "split"
+      },
+      {
+        "id": "p03",
+        "sourceId": "split",
+        "targetId": "finance",
+        "priority": 1,
+        "condition": "${totalAmount} >= 50000"
+      },
+      {
+        "id": "p04",
+        "sourceId": "split",
+        "targetId": "join",
+        "priority": 2,
+        "isDefault": true
+      },
+      {
+        "id": "p05",
+        "sourceId": "finance",
+        "targetId": "contract"
+      },
+      {
+        "id": "p06",
+        "sourceId": "contract",
+        "targetId": "join"
+      },
+      {
+        "id": "p07",
+        "sourceId": "join",
+        "targetId": "buyer"
+      },
+      {
+        "id": "p08",
+        "sourceId": "buyer",
+        "targetId": "order"
+      },
+      {
+        "id": "p09",
+        "sourceId": "order",
+        "targetId": "end"
+      }
+    ]
+  },
+  "data": {
+    "fields": [
+      {
+        "key": "title",
+        "name": "采购主题",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "requester",
+        "name": "申请人",
+        "type": "person",
+        "required": true
+      },
+      {
+        "key": "department",
+        "name": "申请部门",
+        "type": "department",
+        "required": true
+      },
+      {
+        "key": "baseAmount",
+        "name": "未税金额",
+        "type": "money",
+        "required": true
+      },
+      {
+        "key": "taxAmount",
+        "name": "税额",
+        "type": "money",
+        "required": true
+      },
+      {
+        "key": "totalAmount",
+        "name": "采购总额",
+        "type": "money",
+        "formula": "${baseAmount} + ${taxAmount}"
+      },
+      {
+        "key": "items",
+        "name": "采购明细",
+        "type": "detailTable",
+        "children": [
+          {
+            "key": "itemName",
+            "name": "物料名称",
+            "type": "text"
+          },
+          {
+            "key": "quantity",
+            "name": "数量",
+            "type": "number"
+          },
+          {
+            "key": "unitPrice",
+            "name": "单价",
+            "type": "money"
+          }
+        ]
+      },
+      {
+        "key": "approvedBudget",
+        "name": "核定预算",
+        "type": "money",
+        "approverInput": true
+      },
+      {
+        "key": "orderNumber",
+        "name": "采购订单号",
+        "type": "text",
+        "approverInput": true
+      }
+    ],
+    "summaryFields": [
+      "title",
+      "department",
+      "totalAmount"
+    ]
+  },
+  "detailLayout": {
+    "mode": "custom",
+    "groups": [
+      {
+        "title": "申请信息",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "title"
+          },
+          {
+            "fieldKey": "requester"
+          },
+          {
+            "fieldKey": "department"
+          },
+          {
+            "fieldKey": "totalAmount"
+          }
+        ]
+      },
+      {
+        "title": "采购明细",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "items"
+          },
+          {
+            "fieldKey": "approvedBudget"
+          },
+          {
+            "fieldKey": "orderNumber"
+          }
+        ]
+      }
+    ]
+  },
+  "printSettings": {
+    "orientation": "portrait",
+    "fieldKeys": [
+      "title",
+      "requester",
+      "department",
+      "items",
+      "totalAmount",
+      "approvedBudget",
+      "orderNumber"
+    ],
+    "showComments": true,
+    "showSignatures": true,
+    "showQrCode": true,
+    "showWatermark": true
+  },
+  "allowedClientApps": [
+    "DEMO_WINUI"
+  ]
+}

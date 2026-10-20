@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
+using Microsoft.Extensions.Options;
 
 namespace ApprovalService.Backend.Checks;
 
@@ -56,11 +57,83 @@ internal static class ServerChecks
             var wrongMethod = await http.PostAsync(ApiRoutes.Info, null);
             check("方法不对返回 405 和统一格式的错误体",
                 wrongMethod.StatusCode == HttpStatusCode.MethodNotAllowed && (await ReadErrorAsync(wrongMethod))?.Code == ErrorCodes.NotFound);
+
+            check("未知数据库提供程序在启动时拒绝，诊断指出 Provider 且不回显连接串",
+                await RejectsInvalidConfigurationAsync(backendRoot, data,
+                    new Dictionary<string, string?>
+                    {
+                        ["ApprovalService:Data:Provider"] = "Unknown",
+                        ["ApprovalService:Data:ConnectionString"] = "example-sensitive-marker",
+                    }, "ApprovalService:Data:Provider", "example-sensitive-marker"));
+            check("空数据目录在启动时拒绝，并指出 Directory 配置键",
+                await RejectsInvalidConfigurationAsync(backendRoot, data,
+                    new Dictionary<string, string?> { ["ApprovalService:Data:Directory"] = " " }, "ApprovalService:Data:Directory"));
+            check("外部数据库缺少连接串时在启动时拒绝，并指出 ConnectionString 配置键",
+                await RejectsInvalidConfigurationAsync(backendRoot, data,
+                    new Dictionary<string, string?> { ["ApprovalService:Data:Provider"] = "SqlServer" }, "ApprovalService:Data:ConnectionString"));
+            check("有效的 SQL Server 和 PostgreSQL 配置能启动（此阶段不探测数据库）",
+                await StartsWithConfigurationAsync(backendRoot, data, "SqlServer")
+                && await StartsWithConfigurationAsync(backendRoot, data, "PostgreSql"));
         }
         finally
         {
             TempDataDirectory.Delete(data);
         }
+    }
+
+    /// <summary>
+    /// 确认错误数据配置在服务监听请求前被拒绝，且诊断包含对应配置键。
+    /// </summary>
+    /// <param name="backendRoot">后端目录。</param>
+    /// <param name="dataDirectory">临时数据目录。</param>
+    /// <param name="settings">覆盖默认值的错误配置。</param>
+    /// <param name="expectedKey">应出现在诊断中的配置键。</param>
+    /// <param name="forbiddenText">不得出现在诊断中的文本；不需要检查时为 null。</param>
+    /// <returns>启动被拒绝且诊断正确时为 true。</returns>
+    private static async Task<bool> RejectsInvalidConfigurationAsync(
+        string backendRoot,
+        string dataDirectory,
+        IReadOnlyDictionary<string, string?> settings,
+        string expectedKey,
+        string? forbiddenText = null)
+    {
+        var quietSettings = new Dictionary<string, string?>(settings)
+        {
+            ["Logging:LogLevel:Microsoft.Extensions.Hosting.Internal.Host"] = "None",
+        };
+        await using var factory = new ServerFactory(backendRoot, dataDirectory, quietSettings);
+        try
+        {
+            using var client = factory.CreateClient();
+            // 启动校验应在这里抛出；请求只用于确保惰性启动已经发生。
+            await client.GetAsync(ApiRoutes.HealthReady);
+            return false;
+        }
+        catch (OptionsValidationException error)
+        {
+            return error.Failures.Any(failure => failure.Contains(expectedKey, StringComparison.Ordinal))
+                && (forbiddenText is null || !error.Message.Contains(forbiddenText, StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>
+    /// 确认有效的外部数据库配置能完成当前骨架的启动。
+    /// </summary>
+    /// <param name="backendRoot">后端目录。</param>
+    /// <param name="dataDirectory">临时数据目录。</param>
+    /// <param name="provider">数据库提供程序。</param>
+    /// <returns>就绪接口返回 200 时为 true。</returns>
+    private static async Task<bool> StartsWithConfigurationAsync(string backendRoot, string dataDirectory, string provider)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ApprovalService:Data:Provider"] = provider,
+            ["ApprovalService:Data:ConnectionString"] = "Server=localhost;Database=approval;",
+        };
+        await using var factory = new ServerFactory(backendRoot, dataDirectory, settings);
+        using var client = factory.CreateClient();
+        var response = await client.GetAsync(ApiRoutes.HealthReady);
+        return response.StatusCode == HttpStatusCode.OK;
     }
 
     /// <summary>

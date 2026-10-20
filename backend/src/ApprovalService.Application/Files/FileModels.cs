@@ -6,6 +6,11 @@ namespace ApprovalService.Application.Files;
 public sealed class FilePolicyOptions
 {
     /// <summary>
+    /// 每批处理的过期上传数；后台任务在满批次时继续下一批。
+    /// </summary>
+    public const int CleanupBatchSize = 100;
+
+    /// <summary>
     /// 默认单文件二十兆字节。
     /// </summary>
     public long MaxUploadBytes { get; set; } = 20L * 1024 * 1024;

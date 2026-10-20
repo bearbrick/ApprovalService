@@ -1,7 +1,9 @@
 using System.IO.Compression;
 using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 using ApprovalService.Application.Files;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
@@ -108,7 +110,7 @@ internal static class FileChecks
                 await repository.FindAsync(uploaded.Id) is not null);
             check("服务公开下载接口在身份模块未接入时默认拒绝",
                 await ApiRejectsAnonymousAsync(backendRoot));
-            check("可信身份的下载接口能完整发送本地文件并关闭临时流",
+            check("可信身份的上传下载接口能完整发送本地文件并关闭临时流",
                 await ApiStreamsAuthenticatedFileAsync(backendRoot, png));
             await CheckMigrationAsync(check);
 
@@ -252,11 +254,17 @@ internal static class FileChecks
             await using var authenticated = baseline.WithWebHostBuilder(builder =>
                 builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, FileIdentityStartupFilter>()));
             using var http = authenticated.CreateClient();
-            using var scope = authenticated.Services.CreateScope();
-            var service = scope.ServiceProvider.GetRequiredService<IFileAppService>();
-            var uploaded = await service.UploadAsync(Input(bytes, "票据.png", "requester"));
+            using var upload = await http.PostAsync(ApiRoutes.Files + "?fileName=" + Uri.EscapeDataString("票据.png"),
+                new ByteArrayContent(bytes));
+            var uploaded = JsonSerializer.Deserialize<FileUploadResponse>(
+                await upload.Content.ReadAsStringAsync(), ApprovalJson.Options);
+            if (upload.StatusCode != HttpStatusCode.OK || uploaded is null)
+            {
+                return false;
+            }
+
             using var response = await http.GetAsync(ApiRoutes.Files + "/" + uploaded.Id);
-            return response.StatusCode == HttpStatusCode.OK &&
+            return response.StatusCode == HttpStatusCode.OK && uploaded.ContentType == "image/png" &&
                 (await response.Content.ReadAsByteArrayAsync()).SequenceEqual(bytes) &&
                 response.Content.Headers.ContentType?.MediaType == "image/png";
         }

@@ -22,8 +22,14 @@ public sealed class FileCleanupHostedService(IServiceScopeFactory scopeFactory,
             try
             {
                 await using var scope = scopeFactory.CreateAsyncScope();
-                await scope.ServiceProvider.GetRequiredService<IFileAppService>()
-                    .CleanupUnusedAsync(stoppingToken);
+                var service = scope.ServiceProvider.GetRequiredService<IFileAppService>();
+                int removed;
+                do
+                {
+                    // 这一轮持续处理满批次，避免长期积压超过保留期的未使用文件。
+                    removed = await service.CleanupUnusedAsync(stoppingToken);
+                }
+                while (removed == FilePolicyOptions.CleanupBatchSize && !stoppingToken.IsCancellationRequested);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

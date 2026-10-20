@@ -88,8 +88,10 @@ internal static class FileEndpoints
     /// <returns>可信的用户 ID。</returns>
     private static string RequireVerifiedUser(ClaimsPrincipal principal)
     {
-        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (principal.Identity?.IsAuthenticated != true || string.IsNullOrWhiteSpace(userId))
+        var userId = principal.Identities.Where(identity => identity.IsAuthenticated)
+            .Select(identity => identity.FindFirst(ClaimTypes.NameIdentifier)?.Value)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        if (string.IsNullOrWhiteSpace(userId))
         {
             throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录后再操作附件。");
         }

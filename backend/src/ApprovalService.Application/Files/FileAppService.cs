@@ -161,7 +161,8 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
     public async Task<int> CleanupUnusedAsync(CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
-        var candidates = await repository.FindUnusedAsync(now - policy.UnusedRetention, now, 100,
+        var candidates = await repository.FindUnusedAsync(now - policy.UnusedRetention, now,
+            FilePolicyOptions.CleanupBatchSize,
             cancellationToken);
         var removed = 0;
         foreach (var file in candidates)

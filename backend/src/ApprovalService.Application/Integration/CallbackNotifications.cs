@@ -50,6 +50,8 @@ public static class CallbackNotifications
             BusinessKey = instance.BusinessKey,
             Status = status,
             Data = data.RootElement.Clone(),
+            FieldValues = item.Kind is "taskCompleted" or "instanceApproved" or "instanceRejected"
+                ? item.Audit?.FieldValues?.Clone() : null,
             OccurredAt = item.OccurredAt,
         };
     }

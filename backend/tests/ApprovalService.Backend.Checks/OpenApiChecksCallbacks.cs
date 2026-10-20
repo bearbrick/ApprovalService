@@ -89,6 +89,7 @@ internal static class OpenApiChecksCallbacks
                 BusinessKey = "PO-1",
                 Status = "approved",
                 Data = document.RootElement.Clone(),
+                FieldValues = JsonSerializer.SerializeToElement(new { approvedAmount = 12000 }),
                 OccurredAt = DateTimeOffset.UtcNow,
             };
             var body = CallbackNotifications.Serialize(notification);
@@ -171,7 +172,7 @@ internal static class OpenApiChecksCallbacks
             remote.Fail = false;
             item.Attempts = 2;
             await handler.DeliverAsync(item, CancellationToken.None);
-            check("重发使用同一事件 ID 与完全相同的请求正文", remote.RequestCount == 2 &&
+            check("含审批人填写字段的回调重发保持同一事件 ID 与完全相同正文", remote.RequestCount == 2 &&
                 remote.Bodies.All(sent => sent == body) && remote.RequestIds.All(id => id == "event-1"));
             check("回调按原始 UTF-8 正文生成 HMAC-SHA256 签名", remote.Signatures.All(signature =>
                 signature == SignedHttpOutboundAdapter.Sign(body, secret)));

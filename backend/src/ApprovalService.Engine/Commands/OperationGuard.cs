@@ -165,6 +165,7 @@ internal static class OperationGuard
                 Reason = input.Reason,
                 TargetUserId = input.TargetUserId,
                 MentionedUserIds = [.. input.MentionedUserIds],
+                FieldValues = input.FieldValues?.Clone(),
             };
         }
     }

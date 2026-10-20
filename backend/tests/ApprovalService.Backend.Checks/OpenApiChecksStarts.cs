@@ -44,7 +44,7 @@ internal static partial class OpenApiChecksStarts
             {
                 Code = "demo",
                 Name = "示例",
-                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC"],
+                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT"],
             });
             var other = await clients.CreateAsync(new CreateClientAppInput
             {
@@ -340,6 +340,7 @@ internal static partial class OpenApiChecksStarts
                 withdrawn.Tasks.All(task => task.Status == EngineTaskStatuses.Cancelled));
 
             await RunRoutingAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunApproverInputsAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

@@ -2,6 +2,7 @@ import { buildCondition } from '../src/designer/workbench/condition-model.ts'
 import { fieldReferences } from '../src/designer/data/data-model.ts'
 import type { ConditionGroup } from '../src/designer/workbench/condition-model.ts'
 import { checkPublication } from '../src/designer/workbench/publication-check.ts'
+import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../src/designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, flowTemplates, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
 
 /**
@@ -39,4 +40,18 @@ export function runWorkbenchChecks(check: (name: string, value: boolean) => void
   const groups: ConditionGroup[] = [{ join: 'AND', rules: [{ fieldKey: 'items.amount', aggregate: 'SUM', operator: '>=', value: '50000' }, { fieldKey: 'urgent', aggregate: '', operator: '==', value: 'true' }] }]
   const data = { fields: [{ key: 'items', name: '明细', type: 'detailTable' as const, required: false, approverInput: false, children: [{ key: 'amount', name: '金额', type: 'money' as const, required: false, approverInput: false, children: [] }] }, { key: 'urgent', name: '加急', type: 'text' as const, required: false, approverInput: false, children: [] }], summaryFields: [] }
   check('结构化条件可生成明细合计与且分组表达式', buildCondition(groups, data) === '(SUM(${items.amount}) >= 50000 AND ${urgent} == true)')
+  const initial = createEmptyFlow('HISTORY')
+  const movedOnce = replaceNode(initial, { ...initial.canvas.nodes[0]!, x: 112 })
+  const movedTwice = replaceNode(movedOnce, { ...movedOnce.canvas.nodes[0]!, x: 128 })
+  const renamed = replaceNode(movedTwice, { ...movedTwice.canvas.nodes[0]!, name: '业务系统发起' })
+  let history = createDraftHistory(initial)
+  history = previewDraft(history, movedOnce)
+  history = previewDraft(history, movedTwice)
+  history = commitDraft(history, initial)
+  history = editDraft(history, renamed)
+  check('画布拖动多帧与节点属性交错编辑只登记两个撤销步骤', history.past.length === 2 && history.present.canvas.nodes[0]!.name === '业务系统发起')
+  history = undoDraft(history)
+  check('首次撤销仅还原节点属性而保留拖动位置', history.present.canvas.nodes[0]!.name === '开始' && history.present.canvas.nodes[0]!.x === 128)
+  history = undoDraft(history)
+  check('再次撤销还原画布拖动且重做依次恢复两次编辑', history.present.canvas.nodes[0]!.x === 80 && redoDraft(redoDraft(history)).present.canvas.nodes[0]!.name === '业务系统发起')
 }

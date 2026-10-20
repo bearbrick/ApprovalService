@@ -16,6 +16,7 @@
 
 - `frontend/src/designer/workbench/`（新建）、`frontend/src/model/` 的纯逻辑（节点配置、条件编辑、发布检查反馈），`frontend/tests/checks.ts` 补检查
 - `frontend/src/pages/DesignerPage.vue`
+- `frontend/README.md`（同步设计工作台的实际接入状态）
 - `frontend/src/components/layout/DesktopShell.vue`、`frontend/src/styles/layout.css`、`frontend/tests/ui-checks.ts`（设计器工作区移除重复左栏，其余工作区保持现有导航）
 - 后端管理接口还没有时，先读写本地示例流程（`backend/samples/flows` 的副本放在前端测试数据里），接口好了再接
 

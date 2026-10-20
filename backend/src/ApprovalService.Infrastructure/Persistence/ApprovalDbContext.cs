@@ -1,3 +1,4 @@
+using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,6 +60,11 @@ public class ApprovalDbContext : DbContext
     /// </summary>
     public DbSet<ScheduledJobEntity> ScheduledJobs => Set<ScheduledJobEntity>();
 
+    /// <summary>
+    /// 已登记的业务系统接入应用。
+    /// </summary>
+    public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
+
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -95,6 +101,23 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<ClientAppEntity>(entity =>
+        {
+            entity.ToTable("ClientApps");
+            entity.HasKey(item => item.Code);
+            entity.Property(item => item.Code).HasMaxLength(128);
+            entity.Property(item => item.Name).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.ApiKeyHash).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.SigningSecretCiphertext).IsRequired();
+            entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
+            entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
+            entity.Property(item => item.DataUrl).HasMaxLength(2048);
+            entity.Property(item => item.ValidationUrl).HasMaxLength(2048);
+            entity.Property(item => item.AssigneeUrl).HasMaxLength(2048);
+            entity.Property(item => item.ActionUrl).HasMaxLength(2048);
+            entity.HasIndex(item => item.ApiKeyHash).IsUnique();
+        });
+
         modelBuilder.Entity<FlowEntity>(entity =>
         {
             entity.ToTable("Flows");

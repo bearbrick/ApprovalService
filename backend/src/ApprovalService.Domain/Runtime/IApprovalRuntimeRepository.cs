@@ -6,6 +6,13 @@ namespace ApprovalService.Domain.Runtime;
 public interface IApprovalRuntimeRepository
 {
     /// <summary>
+    /// 检查当前数据库是否可连接，供就绪探针使用。
+    /// </summary>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>数据库可连接为真。</returns>
+    Task<bool> CanConnectAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 读取审批单、固定流程版本和最新操作记录。
     /// </summary>
     /// <param name="instanceId">审批单 ID。</param>

@@ -71,9 +71,9 @@ internal static class ServerChecks
             check("外部数据库缺少连接串时在启动时拒绝，并指出 ConnectionString 配置键",
                 await RejectsInvalidConfigurationAsync(backendRoot, data,
                     new Dictionary<string, string?> { ["ApprovalService:Data:Provider"] = "SqlServer" }, "ApprovalService:Data:ConnectionString"));
-            check("有效的 SQL Server 和 PostgreSQL 配置能启动（此阶段不探测数据库）",
-                await StartsWithConfigurationAsync(backendRoot, data, "SqlServer")
-                && await StartsWithConfigurationAsync(backendRoot, data, "PostgreSql"));
+            check("外部数据库不可连接时服务仍存活但就绪检查返回 503",
+                await ReportsUnavailableDatabaseAsync(backendRoot, data, "SqlServer")
+                && await ReportsUnavailableDatabaseAsync(backendRoot, data, "PostgreSql"));
         }
         finally
         {
@@ -117,23 +117,26 @@ internal static class ServerChecks
     }
 
     /// <summary>
-    /// 确认有效的外部数据库配置能完成当前骨架的启动。
+    /// 确认外部数据库不可用时服务仍能启动，但不能报告就绪。
     /// </summary>
     /// <param name="backendRoot">后端目录。</param>
     /// <param name="dataDirectory">临时数据目录。</param>
     /// <param name="provider">数据库提供程序。</param>
-    /// <returns>就绪接口返回 200 时为 true。</returns>
-    private static async Task<bool> StartsWithConfigurationAsync(string backendRoot, string dataDirectory, string provider)
+    /// <returns>存活检查为 200 且就绪检查为 503 时为真。</returns>
+    private static async Task<bool> ReportsUnavailableDatabaseAsync(string backendRoot, string dataDirectory, string provider)
     {
         var settings = new Dictionary<string, string?>
         {
             ["ApprovalService:Data:Provider"] = provider,
-            ["ApprovalService:Data:ConnectionString"] = "Server=localhost;Database=approval;",
+            ["ApprovalService:Data:ConnectionString"] = provider == "SqlServer"
+                ? "Server=127.0.0.1,1;Database=approval;User Id=test;Password=test-only;Connect Timeout=1;Encrypt=False"
+                : "Host=127.0.0.1;Port=1;Database=approval;Username=test;Password=test-only;Timeout=1",
         };
         await using var factory = new ServerFactory(backendRoot, dataDirectory, settings);
         using var client = factory.CreateClient();
-        var response = await client.GetAsync(ApiRoutes.HealthReady);
-        return response.StatusCode == HttpStatusCode.OK;
+        var live = await client.GetAsync(ApiRoutes.HealthLive);
+        var ready = await client.GetAsync(ApiRoutes.HealthReady);
+        return live.StatusCode == HttpStatusCode.OK && ready.StatusCode == HttpStatusCode.ServiceUnavailable;
     }
 
     /// <summary>

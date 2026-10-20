@@ -45,3 +45,5 @@
 | [0006](0006-organization-and-accounts.md) | 组织架构自己维护、业务系统绑定；账号先独立，登录按统一登录预留 | 已采纳 |
 | [0007](0007-single-canvas-designer.md) | 流程设计统一使用自由画布 | 已采纳 |
 | [0008](0008-ef-core-providers.md) | 运行库使用 EF Core 和三种独立迁移 | 已采纳 |
+| [0009](0009-local-jwt-identity.md) | 本地账号使用短期 JWT 与可轮换刷新令牌 | 已采纳 |
+| [0010](0010-miniexcel-organization-import.md) | 组织 Excel 导入导出使用 MiniExcel | 已采纳 |

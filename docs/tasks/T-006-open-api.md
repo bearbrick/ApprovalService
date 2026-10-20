@@ -17,8 +17,14 @@
 - `backend/src/ApprovalService.Contracts/Protocol/`：开放接口的请求和响应、新错误码
 - `backend/src/ApprovalService.Api/Endpoints/OpenApi/`；`Application/Integration/`（接入应用、API Key 只存 SHA-256、流程授权）
 - `backend/src/ApprovalService.Infrastructure/Integration/`：出站适配层（HMAC 签名、5 秒超时、按 1 分钟 / 5 分钟 / 30 分钟 / 2 小时重试、发送日志）、钩子调用（取数、校验、取人、业务动作）
+- `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
+- `backend/src/ApprovalService.Domain/Runtime/IApprovalRuntimeRepository.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalRuntimeRepository.cs`：审批单和任务查询、在途唯一性与数据更新所需仓储能力
+- `backend/src/ApprovalService.Application/Runtime/`：现有运行应用服务的发起、查询和更新数据接入
+- `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`Migrations/`：接入应用实体、索引和出站记录的三种数据库迁移
+- `backend/src/ApprovalService.Infrastructure/Options/`：签名密钥加密主密钥等接入配置
 - `client/src/ApprovalService.Client/ApprovalErrorCodes.cs`：新错误码的副本
 - 检查程序 `OpenApiChecks*.cs`：用一个假的业务系统后端
+- `backend/README.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`：同步开放接口和接入实现
 
 ## 共享文件
 
@@ -28,6 +34,9 @@
 - `backend/src/ApprovalService.Contracts/**`
 - `ApprovalErrorCodes.cs`
 - `Program.cs`（Api、检查程序）
+- `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`：接入服务登记
+- `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`：新增实体与索引所需模型登记
+- `docs/architecture.md`：接入应用持久化和出站可靠发送说明
 
 ## 验收标准
 
@@ -51,4 +60,4 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
-- 2026-10-20 · Codex：基于 main 建立独立 T-006 工作树，合入已完成的 T-005、T-004 与 T-010 依赖；共享的检查入口与后端 README 冲突已保留两边内容。现认领任务，先明确接入应用、实例查询所需的仓储与迁移范围，再实施开放接口。
+- 2026-10-20 · Codex：基于 main 建立独立 T-006 工作树，合入已完成的 T-005、T-004 与 T-010 依赖；共享的检查入口与后端 README 冲突已保留两边内容。接入应用需落库并加密密钥，实例与任务接口需持久化查询和在途唯一性，已与主任务协调并在范围中显式登记 Domain/Integration、Application/Runtime、Runtime 仓储、Persistence 上下文与三库迁移及共享登记文件，之后实施开放接口。

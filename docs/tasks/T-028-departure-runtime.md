@@ -20,7 +20,7 @@
 - `backend/src/ApprovalService.Application/Organization/`、`Domain/Organization/`、`Infrastructure/Organization/`：从已提交且无人编辑的 T-007 节点接管离职推送的可靠触发；保持既有可信来源边界。
 - `backend/src/ApprovalService.Infrastructure/Jobs/`：消费组织离职的持久任务，逐实例调用运行时入口并可重试。
 - `backend/tests/ApprovalService.Backend.Checks/Organization*Checks.cs`：补真实 SQLite 离职排程与重启后消费检查。
-- `backend/tests/ApprovalService.Backend.Checks/DepartureChecks*.cs`：引擎、事务、并发场景。
+- `backend/tests/ApprovalService.Backend.Checks/DepartureChecks*.cs`、`DepartureJobChecks.cs`：引擎、事务、并发和持久离职任务场景。
 - `backend/tests/ApprovalService.Backend.Checks/PersistenceChecks.cs`、`EventChainConsistencyChecks.cs`：给原有仓储测试代理透传新增的只读候选查询接口。
 - 本任务文件；`backend/README.md` 的功能同步说明。
 

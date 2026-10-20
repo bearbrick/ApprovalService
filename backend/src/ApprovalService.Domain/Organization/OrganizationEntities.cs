@@ -275,7 +275,7 @@ public sealed class OrganizationChangeEntity
 }
 
 /// <summary>
-/// 离职交接提醒；管理员确认前保留。
+/// 离职交接提醒；管理员确认前保留，复职后取消过期提醒。
 /// </summary>
 public sealed class DepartureNoticeEntity
 {

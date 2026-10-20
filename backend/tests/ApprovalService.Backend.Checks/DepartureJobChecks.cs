@@ -48,6 +48,7 @@ internal static class DepartureJobChecks
             await StartAsync(runtime, graph, "first", "departed");
             await StartAsync(runtime, graph, "second", "departed");
             await StartAsync(runtime, graph, "blocked", "no-manager");
+            await StartAsync(runtime, graph, "reactivated", "rehired");
             var occurredAt = new DateTimeOffset(2026, 10, 20, 11, 0, 0, TimeSpan.Zero);
             var departed = await organization.PushChangesAsync(new OrganizationImportBatch
             {
@@ -117,6 +118,38 @@ internal static class DepartureJobChecks
                         item.Kind == "inactiveTaskReassigned") == 1 &&
                     await db.ScheduledJobs.CountAsync(item => item.Kind == DepartureJobHandler.JobKind &&
                         item.Status == JobStatuses.Completed && item.LastError == null) == 2);
+            }
+
+            var reactivatedAt = occurredAt.AddMinutes(6);
+            await organization.PushChangesAsync(new OrganizationImportBatch
+            {
+                People = [new PersonEntity { Id = "rehired", EmployeeNumber = "E5", Name = "复职人员",
+                    ManagerId = "manager", IsActive = false }],
+            }, "demo", reactivatedAt);
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("离职后复职前已有交接提醒和待发任务",
+                    await db.DepartureNotices.AnyAsync(item => item.PersonId == "rehired" &&
+                        item.PendingTaskCount == 1) &&
+                    await db.ScheduledJobs.AnyAsync(item => item.Kind == DepartureJobHandler.JobKind &&
+                        item.Status == JobStatuses.Pending && item.DueAt == reactivatedAt));
+            }
+            await organization.PushChangesAsync(new OrganizationImportBatch
+            {
+                People = [new PersonEntity { Id = "rehired", EmployeeNumber = "E5", Name = "复职人员",
+                    ManagerId = "manager", IsActive = true }],
+            }, "demo", reactivatedAt.AddSeconds(1));
+            await worker.RunOnceAsync(reactivatedAt.AddSeconds(2));
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("执行前复职取消过期提醒且保留本人待办",
+                    await db.ApprovalTasks.AnyAsync(item => item.InstanceId == "reactivated" &&
+                        item.AssigneeId == "rehired" && item.Status == EngineTaskStatuses.Pending) &&
+                    !await db.DepartureNotices.AnyAsync(item => item.PersonId == "rehired") &&
+                    await db.OperationEvents.CountAsync(item => item.InstanceId == "reactivated" &&
+                        item.Kind == "inactiveTaskReassigned") == 0 &&
+                    await db.ScheduledJobs.CountAsync(item => item.Kind == DepartureJobHandler.JobKind &&
+                        item.Status == JobStatuses.Completed) == 3);
             }
         }
         finally
@@ -189,6 +222,14 @@ internal static class DepartureJobChecks
                 EmployeeNumber = "E4",
                 Name = "流程管理员",
                 TrustedSource = "approvalService"
+            },
+            new PersonEntity
+            {
+                Id = "rehired",
+                EmployeeNumber = "E5",
+                Name = "复职人员",
+                ManagerId = "manager",
+                TrustedSource = "demo"
             });
         await db.SaveChangesAsync();
     }

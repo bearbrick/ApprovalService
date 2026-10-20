@@ -45,7 +45,9 @@ public sealed class DepartureJobHandler(IApprovalRuntimeAppService runtime,
             ?? throw new InvalidOperationException("离职任务对应的组织人员不存在。");
         if (person.IsActive)
         {
-            // 到执行时已经复职，不能再转走该人员当前的待办。
+            // 到执行时已经复职，原待办无需改派；只取消过期的离职提醒。
+            // 删除条件再次读取当前在职状态，避免并发再次离职时误删新提醒。
+            await CancelReactivatedNoticeAsync(person.Id, cancellationToken);
             return;
         }
 
@@ -79,6 +81,20 @@ public sealed class DepartureJobHandler(IApprovalRuntimeAppService runtime,
         }
 
         await RefreshNoticeAsync(person.Id, cancellationToken);
+    }
+
+    /// <summary>
+    /// 仅在人员当前仍在职时取消已失效的离职交接提醒。
+    /// </summary>
+    /// <param name="personId">内部人员 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>异步操作。</returns>
+    private async Task CancelReactivatedNoticeAsync(string personId, CancellationToken cancellationToken)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await db.DepartureNotices.Where(notice => notice.PersonId == personId &&
+            db.People.Any(person => person.Id == personId && person.IsActive))
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
     /// <summary>

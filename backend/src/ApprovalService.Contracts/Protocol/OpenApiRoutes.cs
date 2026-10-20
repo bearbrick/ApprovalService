@@ -15,4 +15,14 @@ public static class OpenApiRoutes
     /// </summary>
     public const string FlowSchema = "/api/v1/flows/{code}/schema";
 
+    /// <summary>
+    /// 按流程编码与业务单号读取历史审批单。
+    /// </summary>
+    public const string Instances = "/api/v1/instances";
+
+    /// <summary>
+    /// 按审批单 ID 读取状态、任务和操作记录。
+    /// </summary>
+    public const string Instance = "/api/v1/instances/{id}";
+
 }

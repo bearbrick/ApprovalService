@@ -63,6 +63,8 @@
 
 `GET /api/v1/flows` 和 `GET /api/v1/flows/{code}/schema` 需要 `X-Api-Key`。列表只包含当前已发布、接入应用已获授权且流程定义允许该应用使用的版本；无权限读取单个流程时返回 `FORBIDDEN`。列表项为 `{ "code": "PURCHASE", "name": "采购申请", "version": 3 }`。数据定义接口返回 `{ "flowCode": "PURCHASE", "version": 3, "data": { "fields": [], "summaryFields": [] }, "example": {} }`；`example` 按当前定义生成，不含计算字段和审批人填写字段。
 
+`GET /api/v1/instances/{id}` 与 `GET /api/v1/instances?flowCode=PURCHASE&businessKey=PR001` 也需要 `X-Api-Key`，只能读取由该接入应用发起的审批单；前者返回一张审批单，后者按发起时间倒序返回同业务单号的历史数组。审批单响应包含 `id`、`serialNo`、`flowCode`、`businessKey`、`title`、`initiatorId`、`clientAppCode`、`status`、`data`、`startedAt`、`endedAt`、`tasks`、`events`。详情中的任务包含 `id`、`nodeId`、`assigneeId`、`status`、`opinion`、`dueAt`、`completedAt`；操作记录包含 `eventId`、`sequence`、`event`、`detail`、`occurredAt`。按业务单号返回的历史摘要把 `tasks`、`events` 留空。缺少任一查询参数返回 `VALIDATION_FAILED`；用其他应用的 Key 查详情返回 `FORBIDDEN`，历史查询不会列出其他应用的记录。
+
 ## 规划中的接口
 
 按设计书第 13 节，在对应任务里实现，实现时把请求和响应的格式补进本文：
@@ -71,7 +73,7 @@
 | --- | --- | --- |
 | `POST /api/v1/flows/{code}/preview` | 预览会走哪些节点 | T-006 |
 | `POST /api/v1/instances`、`POST /api/v1/instances/batch` | 发起审批（传数据，或只传单号让服务回业务系统取） | T-006 |
-| `GET /api/v1/instances/{id}`、`PATCH /api/v1/instances/{id}/data` | 查询状态和审批记录、审批中更新允许更新的字段 | T-006 |
+| `PATCH /api/v1/instances/{id}/data` | 审批中更新允许更新的字段 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=`、`POST /api/v1/tasks/{id}/actions` | 待办数量、待办列表、审批操作 | T-006 |

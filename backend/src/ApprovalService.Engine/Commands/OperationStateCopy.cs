@@ -18,6 +18,7 @@ internal static class OperationStateCopy
         FlowCode = source.FlowCode,
         WithdrawBeforeFirstDecision = source.WithdrawBeforeFirstDecision,
         ReturnMode = source.ReturnMode,
+        CancellationRequested = source.CancellationRequested,
         HasHumanDecision = source.HasHumanDecision,
         HumanDecisionCount = source.HumanDecisionCount,
         LastApprovalUndo = source.LastApprovalUndo is null ? null : new OperationUndoFrame
@@ -38,6 +39,7 @@ internal static class OperationStateCopy
         LastReminders = new Dictionary<string, DateTimeOffset>(source.LastReminders, StringComparer.Ordinal),
         DraftOpinions = new Dictionary<string, string>(source.DraftOpinions, StringComparer.Ordinal),
         AssigneeOverrides = new Dictionary<string, string>(source.AssigneeOverrides, StringComparer.Ordinal),
+        CopyRecipients = new HashSet<string>(source.CopyRecipients, StringComparer.Ordinal),
         Consultations = source.Consultations.Select(item => new OperationConsultation
         {
             Id = item.Id,

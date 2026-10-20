@@ -69,6 +69,15 @@ internal static class OperationChecksBoundaries
         badJump.Operation!.TargetNodeId = "absent";
         check("管理员不能跳转到不存在的节点", Throws(ErrorCodes.ValidationFailed, () =>
             Execute(started.State, context, badJump)));
+        foreach (var gatewayType in new[] { FlowNodeTypes.ParallelGateway, FlowNodeTypes.InclusiveGateway })
+        {
+            var gatewayContext = Context(EngineScenarioChecks.GatewayGraph(gatewayType));
+            var gatewayStarted = Start(gatewayContext);
+            var joinJump = Admin(OperationKinds.Jump, "join-" + gatewayType, "纠正路径");
+            joinJump.Operation!.TargetNodeId = "join";
+            check("管理员不能直接跳到" + gatewayType + "汇合网关", Throws(ErrorCodes.ValidationFailed, () =>
+                Execute(gatewayStarted.State, gatewayContext, joinJump)));
+        }
         var resend = Admin(OperationKinds.Resend, "resend", "回调遗失");
         resend.Operation!.Mode = "callback";
         var resent = Execute(started.State, context, resend);

@@ -27,6 +27,12 @@ internal static class OperationDispatcher
                     throw new EngineException(ErrorCodes.Conflict, "只有已通过的审批单可以发起撤销审批。");
                 }
 
+                if (state.Operations.CancellationRequested)
+                {
+                    throw new EngineException(ErrorCodes.Conflict, "该审批单已经申请撤销审批。");
+                }
+
+                state.Operations.CancellationRequested = true;
                 work.Emit("cancellationApprovalRequested");
                 break;
             case OperationKinds.DelegateExisting:
@@ -73,6 +79,7 @@ internal static class OperationDispatcher
                 RequireRunning(state);
                 RequireTarget(input.TargetUserId);
                 var copyTask = PendingTask(state, command.TaskId);
+                state.Operations.CopyRecipients.Add(input.TargetUserId!);
                 work.Emit("copyRequested", copyTask.NodeId, copyTask.TokenId, copyTask.Id);
                 break;
             case OperationKinds.Consult:
@@ -133,7 +140,11 @@ internal static class OperationDispatcher
                 Jump(state, command, context, work);
                 break;
             case OperationKinds.Resend:
-                RequireTarget(input.Mode);
+                if (input.Mode is not ("reminder" or "callback"))
+                {
+                    throw new EngineException(ErrorCodes.ValidationFailed, "只能重发提醒或回调。");
+                }
+
                 work.Emit("outboundResendRequested", targetCode: input.Mode);
                 break;
             default:
@@ -266,6 +277,11 @@ internal static class OperationDispatcher
             return;
         }
 
+        if (input.TargetNodeId == task.NodeId)
+        {
+            throw new EngineException(ErrorCodes.Conflict, "退回目标必须是之前处理过的其他节点。");
+        }
+
         var target = state.Operations.Visits.LastOrDefault(item => item.NodeId == input.TargetNodeId &&
             IsBranchPrefix(item.Forks, token.Forks));
         if (target is null || !context.Graph.Nodes.Any(item => item.Id == target.NodeId))
@@ -356,6 +372,11 @@ internal static class OperationDispatcher
         var input = command.Operation!;
         RequireTarget(input.RelatedId);
         RequireTarget(input.TargetUserId);
+        if (input.RelatedId == input.TargetUserId)
+        {
+            throw new EngineException(ErrorCodes.ValidationFailed, "交接的原人员和接手人员不能相同。");
+        }
+
         var tasks = state.Tasks.Where(item => item.AssigneeId == input.RelatedId &&
             item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued).ToArray();
         if (tasks.Length == 0)

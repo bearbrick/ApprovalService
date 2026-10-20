@@ -37,6 +37,18 @@ internal static class OperationGuard
             throw new EngineException(ErrorCodes.ValidationFailed, "操作人不能为空。");
         }
 
+        if (command.Kind == OperationKinds.RevokeApproval)
+        {
+            var approved = state.Tasks.SingleOrDefault(item => item.Id == command.TaskId &&
+                item.Status == EngineTaskStatuses.Approved);
+            return approved is null ? null : new EngineTask
+            {
+                Id = approved.Id,
+                AssigneeId = approved.AssigneeId,
+                DelegatorId = approved.DelegatorId,
+            };
+        }
+
         if (command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Reject or
             EngineCommandKinds.Handle or EngineCommandKinds.Acknowledge || IsTaskOperation(command.Kind))
         {

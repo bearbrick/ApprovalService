@@ -302,6 +302,13 @@ public sealed class OperationState
     /// </summary>
     public string ReturnMode { get; set; } = "restart";
     /// <summary>
+    /// 是否已经为原审批单申请另起撤销审批。
+    /// </summary>
+    public bool CancellationRequested
+    {
+        get; set;
+    }
+    /// <summary>
     /// 已有人工任务完成。
     /// </summary>
     public bool HasHumanDecision
@@ -341,6 +348,10 @@ public sealed class OperationState
     /// 管理员对尚未到达节点设置的审批人覆盖值。
     /// </summary>
     public Dictionary<string, string> AssigneeOverrides { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>
+    /// 审批人临时抄送过的可见人员。
+    /// </summary>
+    public HashSet<string> CopyRecipients { get; set; } = new(StringComparer.Ordinal);
     /// <summary>
     /// 尚未回复的征询。
     /// </summary>

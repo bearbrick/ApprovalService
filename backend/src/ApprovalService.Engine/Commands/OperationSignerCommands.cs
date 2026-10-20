@@ -116,6 +116,13 @@ internal static class OperationSignerCommands
             item.AddedByTaskId == source.Id && item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued)
             ?? throw new EngineException(ErrorCodes.Conflict, "加签任务不存在或对方已经处理。");
         signer.Status = EngineTaskStatuses.Cancelled;
+        var savedSigner = state.Operations.LastApprovalUndo?.Snapshot.Tasks.SingleOrDefault(item => item.Id == signer.Id);
+        if (savedSigner is not null)
+        {
+            // 同意后的减签也要写入撤销同意的前态，避免撤销时复活已减掉的人。
+            savedSigner.Status = EngineTaskStatuses.Cancelled;
+        }
+
         if (source.Status == EngineTaskStatuses.Queued && signer.SignerMode == "before" &&
             !state.Tasks.Any(item => item.AddedByTaskId == source.Id && item.SignerMode == "before" &&
                 item.Status == EngineTaskStatuses.Pending))

@@ -64,6 +64,15 @@ internal static class OperationChecks
         check("处理后的旧任务不能再操作", Throws(ErrorCodes.Conflict, () =>
             EngineRuntime.Execute(accepted.State, Command(EngineCommandKinds.Approve, "again", task.Id,
                 task.AssigneeId, "再试"), context)));
+        var rejectGraph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+        var rejectContext = Context(rejectGraph);
+        var rejectStart = Start(rejectContext);
+        var rejectTask = rejectStart.State.Tasks.Single();
+        var rejected = EngineRuntime.Execute(rejectStart.State,
+            Command(EngineCommandKinds.Reject, "reject", rejectTask.Id, rejectTask.AssigneeId, "不符合要求"), rejectContext);
+        check("有权限的当前审批人拒绝会结束审批并留下意见", rejected.State.Status ==
+            EngineInstanceStatuses.Rejected && rejected.Events.Any(item => item.Kind == "instanceRejected" &&
+                item.Audit?.Opinion == "不符合要求"));
         check("失败命令没有改写输入状态", started.State.Tasks.Single().Status == EngineTaskStatuses.Pending &&
             started.State.Operations.HasHumanDecision == false);
     }
@@ -149,6 +158,7 @@ internal static class OperationChecks
         var copied = EngineRuntime.Execute(started.State,
             Command(OperationKinds.CopyTo, "copy", task.Id, task.AssigneeId, target: "observer"), context);
         check("抄送产生待发事件但不改变审批流", copied.State.Tasks.Single().Status == EngineTaskStatuses.Pending &&
+            copied.State.Operations.CopyRecipients.Contains("observer") &&
             copied.Events.Any(item => item.Kind == "copyRequested" && item.Audit?.TargetUserId == "observer"));
         var consulted = EngineRuntime.Execute(started.State,
             Command(OperationKinds.Consult, "consult", task.Id, task.AssigneeId, target: "expert"), context);
@@ -287,6 +297,23 @@ internal static class OperationChecks
         check("退回到已走过的上一步直接重建任务", previous.State.Tasks.Last().NodeId == "n1" &&
             previous.State.Tasks.Last().Status == EngineTaskStatuses.Pending);
 
+        var longer = Context(EngineScenarioChecks.Chain(FlowNodeTypes.Approval, FlowNodeTypes.Approval,
+            FlowNodeTypes.Approval));
+        var longerState = Start(longer).State;
+        for (var index = 0; index < 2; index++)
+        {
+            var currentTask = longerState.Tasks.Last();
+            longerState = EngineRuntime.Execute(longerState,
+                Command(EngineCommandKinds.Approve, "past-" + index, currentTask.Id, currentTask.AssigneeId), longer).State;
+        }
+
+        var thirdTask = longerState.Tasks.Last();
+        var anyPrior = Command(OperationKinds.Return, "any-prior", thirdTask.Id, thirdTask.AssigneeId);
+        anyPrior.Operation!.TargetNodeId = "n1";
+        var backToFirst = EngineRuntime.Execute(longerState, anyPrior, longer);
+        check("可退回任一已处理过的节点", backToFirst.State.Tasks.Last().NodeId == "n1" &&
+            backToFirst.State.Tasks.Last().Status == EngineTaskStatuses.Pending);
+
         var graph = EngineScenarioChecks.GatewayGraph(FlowNodeTypes.ParallelGateway);
         var parallelContext = Context(graph);
         var parallel = Start(parallelContext);
@@ -295,6 +322,22 @@ internal static class OperationChecks
         crossBranch.Operation!.TargetNodeId = "b";
         check("并行分支不能退回另一分支", Throws(ErrorCodes.Conflict, () =>
             EngineRuntime.Execute(parallel.State, crossBranch, parallelContext)));
+        graph.Nodes.Add(new FlowExecutionNode { Id = "a2", Type = FlowNodeTypes.Approval });
+        graph.Edges.Single(item => item.Id == "a-join").TargetId = "a2";
+        graph.Edges.Add(new FlowExecutionEdge { Id = "a2-join", SourceId = "a2", TargetId = "join" });
+        var sameBranchContext = Context(graph);
+        var branched = Start(sameBranchContext);
+        var firstBranchTask = branched.State.Tasks.Single(item => item.NodeId == "a");
+        var progressed = EngineRuntime.Execute(branched.State,
+            Command(EngineCommandKinds.Approve, "branch-progress", firstBranchTask.Id, firstBranchTask.AssigneeId),
+            sameBranchContext);
+        var secondBranchTask = progressed.State.Tasks.Last();
+        var sameBranchReturn = Command(OperationKinds.Return, "same-branch", secondBranchTask.Id,
+            secondBranchTask.AssigneeId);
+        sameBranchReturn.Operation!.TargetNodeId = "a";
+        var returnedBranch = EngineRuntime.Execute(progressed.State, sameBranchReturn, sameBranchContext);
+        check("并行分支可退回本分支已走过的节点且保留另一分支", returnedBranch.State.Tasks.Last().NodeId == "a" &&
+            returnedBranch.State.Tasks.Any(item => item.NodeId == "b" && item.Status == EngineTaskStatuses.Pending));
     }
 
     /// <summary>
@@ -349,6 +392,8 @@ internal static class OperationChecks
             Command(OperationKinds.RequestCancellation, "cancel-request", actor: "initiator"), context);
         check("撤销申请先产生新审批请求且不直接改原审批单", request.State.Status == EngineInstanceStatuses.Approved &&
             request.Events.Any(item => item.Kind == "cancellationApprovalRequested"));
+        check("撤销审批申请不能重复发起", Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(request.State,
+            Command(OperationKinds.RequestCancellation, "cancel-again", actor: "initiator"), context)));
         check("撤销审批未通过时不能直接撤销", Throws(ErrorCodes.Conflict, () =>
             EngineRuntime.Execute(request.State, Command(EngineCommandKinds.Cancel, "cancel", actor: "initiator"), context)));
         context.Operations.CancellationApproved = true;

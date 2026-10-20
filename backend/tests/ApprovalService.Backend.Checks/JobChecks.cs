@@ -177,8 +177,9 @@ internal static class JobChecks
             .AddSingleton<IScheduledJobHandler>(jobHandler)
             .BuildServiceProvider();
         var factory = new PooledDbContextFactory<ApprovalDbContext>(options);
+        var clock = new AdvancingTimeProvider();
         var worker = new DurableJobWorker(new OutboxQueue(factory), new ScheduledJobQueue(factory),
-            services.GetRequiredService<IServiceScopeFactory>());
+            services.GetRequiredService<IServiceScopeFactory>(), clock);
         var processed = await worker.RunOnceAsync(now);
         await using var verification = new ApprovalDbContext(options);
         var outbox = await verification.OutboxItems.SingleAsync(item => item.Id == "outbox-worker");

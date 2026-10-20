@@ -1,4 +1,8 @@
+using ApprovalService.Domain.Identity;
+using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Organization;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApprovalService.Infrastructure.Persistence;
@@ -59,6 +63,42 @@ public class ApprovalDbContext : DbContext
     /// </summary>
     public DbSet<ScheduledJobEntity> ScheduledJobs => Set<ScheduledJobEntity>();
 
+    /// <summary>组织部门。</summary>
+    public DbSet<DepartmentEntity> Departments => Set<DepartmentEntity>();
+
+    /// <summary>组织人员。</summary>
+    public DbSet<PersonEntity> People => Set<PersonEntity>();
+
+    /// <summary>人员部门关系。</summary>
+    public DbSet<PersonDepartmentEntity> PersonDepartments => Set<PersonDepartmentEntity>();
+
+    /// <summary>组织角色。</summary>
+    public DbSet<OrganizationRoleEntity> OrganizationRoles => Set<OrganizationRoleEntity>();
+
+    /// <summary>人员角色关系。</summary>
+    public DbSet<PersonRoleEntity> PersonRoles => Set<PersonRoleEntity>();
+
+    /// <summary>接入应用人员绑定。</summary>
+    public DbSet<ExternalPersonBindingEntity> ExternalPersonBindings => Set<ExternalPersonBindingEntity>();
+
+    /// <summary>接入应用部门绑定。</summary>
+    public DbSet<ExternalDepartmentBindingEntity> ExternalDepartmentBindings => Set<ExternalDepartmentBindingEntity>();
+
+    /// <summary>组织变更记录。</summary>
+    public DbSet<OrganizationChangeEntity> OrganizationChanges => Set<OrganizationChangeEntity>();
+
+    /// <summary>离职交接提醒。</summary>
+    public DbSet<DepartureNoticeEntity> DepartureNotices => Set<DepartureNoticeEntity>();
+
+    /// <summary>本地账号。</summary>
+    public DbSet<LocalAccountEntity> LocalAccounts => Set<LocalAccountEntity>();
+
+    /// <summary>刷新令牌。</summary>
+    public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
+
+    /// <summary>一次性嵌入令牌。</summary>
+    public DbSet<EmbedTokenEntity> EmbedTokens => Set<EmbedTokenEntity>();
+
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -95,6 +135,8 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        OrganizationModelConfiguration.Configure(modelBuilder);
+        IdentityModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<FlowEntity>(entity =>
         {
             entity.ToTable("Flows");

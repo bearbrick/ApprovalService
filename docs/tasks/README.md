@@ -48,6 +48,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-030](T-030-notification-channels.md) | 消息渠道与持久发送基础 | 后端 | M3 | T-005 | Notifications 模块 |
 | [T-031](T-031-center-frontend.md) | 审批中心电脑前端基础 | 前端 | M3 | T-025、T-008、T-009、T-010 | frontend/src/pages/center、frontend/src/model/center.ts |
 | [T-032](T-032-integration-baseline.md) | 已验收功能的可验证集成基线 | 全部 | M2～M4 | T-001～T-005、T-008～T-010、T-025～T-028、T-030、T-031 | backend、frontend、client、docs |
+| [T-034](T-034-flow-operation-policies.md) | 流程级撤回与退回重提策略 | 后端 + 前端 | M2 / M1 | T-001、T-004、T-008～T-010、T-032 | Contracts/Flows、Engine/Definitions、frontend/src/designer/workbench |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

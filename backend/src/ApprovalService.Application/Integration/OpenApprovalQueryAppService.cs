@@ -29,8 +29,10 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
         var instance = await repository.LoadInstanceAsync(instanceId, cancellationToken)
             ?? throw new UserFriendlyException(ErrorCodes.NotFound, "审批单不存在。");
         RequireOwner(app, instance);
-        var details = await repository.LoadDetailsAsync(instanceId, cancellationToken);
-        return ProjectInstance(instance, details);
+        var details = await repository.LoadDetailsAsync(instanceId, cancellationToken)
+            ?? throw new UserFriendlyException(ErrorCodes.NotFound, "审批单不存在。");
+        RequireOwner(app, details.Instance);
+        return ProjectInstance(details.Instance, details);
     }
 
     /// <summary>
@@ -52,6 +54,38 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
 
         var records = await repository.ListInstancesAsync(flowCode, businessKey, app.Code, cancellationToken);
         return records.Select(item => ProjectInstance(item, null)).ToArray();
+    }
+
+    /// <summary>
+    /// 发起前查全局在途单号；别的应用占用时只返回冲突，不泄露审批单。
+    /// </summary>
+    /// <param name="app">已认证接入应用。</param>
+    /// <param name="flowCode">流程编码。</param>
+    /// <param name="businessKey">业务单号。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>本应用现有在途单；未占用时为空。</returns>
+    public async Task<OpenInstanceResponse?> FindActiveForStartAsync(ClientAppEntity app, string flowCode,
+        string businessKey, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        if (string.IsNullOrWhiteSpace(flowCode) || string.IsNullOrWhiteSpace(businessKey))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "流程编码和业务单号不能为空。");
+        }
+
+        var active = await repository.LoadActiveAsync(flowCode, businessKey, cancellationToken);
+        if (active is null)
+        {
+            return null;
+        }
+
+        if (active.ClientAppCode != app.Code)
+        {
+            // 在途唯一键按流程和业务单号全局生效，但不能把其他应用的单据当成幂等结果。
+            throw new UserFriendlyException(ErrorCodes.Conflict, "该流程的业务单号已有在途审批，请核对单号。");
+        }
+
+        return ProjectInstance(active, null);
     }
 
     /// <summary>

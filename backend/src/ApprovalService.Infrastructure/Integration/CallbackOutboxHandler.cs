@@ -4,6 +4,7 @@ using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +40,23 @@ public sealed class CallbackOutboxHandler(IDbContextFactory<ApprovalDbContext> f
         var appCode = await db.Instances.AsNoTracking().Where(instance => instance.Id == item.InstanceId)
             .Select(instance => instance.ClientAppCode).SingleAsync(cancellationToken);
         var app = await db.ClientApps.AsNoTracking().SingleAsync(client => client.Code == appCode, cancellationToken);
+        if (!app.IsEnabled)
+        {
+            // 保留待发项并由队列重试，管理员重新启用应用后仍可送达同一事件。
+            db.OutboundSendLogs.Add(new OutboundSendLogEntity
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                EventId = item.EventId,
+                ClientAppCode = appCode,
+                Attempt = item.Attempts,
+                TargetUrl = app.CallbackUrl ?? string.Empty,
+                SentAt = timeProvider.GetUtcNow(),
+                ErrorCode = "CLIENT_APP_DISABLED",
+            });
+            await db.SaveChangesAsync(cancellationToken);
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "接入应用已停用，回调暂缓发送并保留待发事件。");
+        }
+
         if (string.IsNullOrWhiteSpace(app.CallbackUrl))
         {
             // 未登记回调地址的应用使用主动查询状态；该事件仍在操作记录中留存。

@@ -75,6 +75,18 @@ internal static class OpenApiChecksQueries
             }
 
             check("接入应用不能读取其他业务系统的审批数据", forbidden);
+            var ownActive = await queries.FindActiveForStartAsync(app, "PURCHASE", "PO-1");
+            var foreignConflict = false;
+            try
+            {
+                await queries.FindActiveForStartAsync(app, "PURCHASE", "PO-2");
+            }
+            catch (UserFriendlyException error) when (error.Code == "CONFLICT")
+            {
+                foreignConflict = true;
+            }
+
+            check("同号在途幂等仅返回本应用审批单，跨应用占用只报冲突", ownActive?.Id == "own" && foreignConflict);
             var ownCount = await queries.CountTasksAsync(app, "user-n1", allApps: false);
             var ownTasks = await queries.ListTasksAsync(app, "user-n1", allApps: false, skip: 0, take: 10);
             check("待办数量与列表默认只统计本接入应用", ownCount.Pending == 1 && ownTasks.Count == 1 &&
@@ -96,6 +108,27 @@ internal static class OpenApiChecksQueries
             var allCount = await queries.CountTasksAsync(app, "user-n1", allApps: true);
             var allTasks = await queries.ListTasksAsync(app, "user-n1", allApps: true, skip: 0, take: 10);
             check("获授权应用可以统计并列出这个人的全部待办", allCount.Pending == 2 && allTasks.Count == 2);
+
+            var racing = new OpenApprovalQueryAppService(new MutatingRepository(
+                new ApprovalOpenQueryRepository(factory), async () =>
+                {
+                    await runtime.ExecuteAsync(new RuntimeCommandInput
+                    {
+                        Command = new EngineCommand
+                        {
+                            Kind = EngineCommandKinds.Approve,
+                            InstanceId = "own",
+                            RequestId = "approve-own",
+                            TaskId = detail.Tasks.Single().Id,
+                        },
+                        Context = EngineScenarioChecks.Context(graph),
+                    });
+                }), TimeProvider.System);
+            var completed = await racing.GetInstanceAsync(app, "own");
+            check("查询两阶段之间发生审批时详情仍来自同一新快照",
+                completed.Status == EngineInstanceStatuses.Approved &&
+                completed.Tasks.Single().Status == EngineTaskStatuses.Approved &&
+                completed.Events.Last().Event == "instanceApproved");
         }
         finally
         {
@@ -143,5 +176,44 @@ internal static class OpenApiChecksQueries
         /// <inheritdoc />
         public Task<ApprovalDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult(CreateDbContext());
+    }
+
+    /// <summary>
+    /// 在权限预读与一致快照读取之间插入一次真实审批提交。
+    /// </summary>
+    /// <param name="inner">实际查询仓储。</param>
+    /// <param name="commit">插入的审批命令。</param>
+    private sealed class MutatingRepository(IApprovalOpenQueryRepository inner, Func<Task> commit) : IApprovalOpenQueryRepository
+    {
+        /// <inheritdoc />
+        public Task<InstanceEntity?> LoadInstanceAsync(string instanceId, CancellationToken cancellationToken = default) =>
+            inner.LoadInstanceAsync(instanceId, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<InstanceEntity?> LoadActiveAsync(string flowCode, string businessKey,
+            CancellationToken cancellationToken = default) => inner.LoadActiveAsync(flowCode, businessKey, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<InstanceEntity>> ListInstancesAsync(string flowCode, string businessKey,
+            string clientAppCode, CancellationToken cancellationToken = default) =>
+            inner.ListInstancesAsync(flowCode, businessKey, clientAppCode, cancellationToken);
+
+        /// <inheritdoc />
+        public async Task<OpenInstanceDetails?> LoadDetailsAsync(string instanceId,
+            CancellationToken cancellationToken = default)
+        {
+            await commit();
+            return await inner.LoadDetailsAsync(instanceId, cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public Task<IReadOnlyList<OpenTaskRecord>> ListPendingTasksAsync(string personId, string? clientAppCode,
+            int skip, int take, CancellationToken cancellationToken = default) =>
+            inner.ListPendingTasksAsync(personId, clientAppCode, skip, take, cancellationToken);
+
+        /// <inheritdoc />
+        public Task<OpenTaskCounts> CountPendingTasksAsync(string personId, string? clientAppCode, DateTimeOffset now,
+            CancellationToken cancellationToken = default) =>
+            inner.CountPendingTasksAsync(personId, clientAppCode, now, cancellationToken);
     }
 }

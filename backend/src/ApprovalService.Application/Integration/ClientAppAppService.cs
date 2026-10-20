@@ -12,7 +12,9 @@ namespace ApprovalService.Application.Integration;
 /// </summary>
 /// <param name="repository">接入应用仓储。</param>
 /// <param name="protector">签名密钥加密器。</param>
-public sealed class ClientAppAppService(IClientAppRepository repository, IIntegrationSecretProtector protector)
+/// <param name="transportPolicy">出站地址的部署级传输策略。</param>
+public sealed class ClientAppAppService(IClientAppRepository repository, IIntegrationSecretProtector protector,
+    IntegrationTransportPolicy? transportPolicy = null)
 {
     /// <summary>
     /// 创建接入应用并只在本次返回新生成的密钥。
@@ -78,7 +80,7 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     /// 校验编码、授权流程及回调地址，避免保存无效配置。
     /// </summary>
     /// <param name="input">待校验配置。</param>
-    private static void Validate(CreateClientAppInput input)
+    private void Validate(CreateClientAppInput input)
     {
         if (string.IsNullOrWhiteSpace(input.Code) || input.Code.Length > 128 ||
             input.Code.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_')) ||
@@ -92,9 +94,11 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
             input.AssigneeUrl, input.ActionUrl })
         {
             if (address is not null && (!Uri.TryCreate(address, UriKind.Absolute, out var parsed) ||
-                parsed.Scheme is not ("http" or "https")))
+                (parsed.Scheme != Uri.UriSchemeHttps &&
+                    !(transportPolicy?.AllowHttpUrls == true && parsed.Scheme == Uri.UriSchemeHttp))))
             {
-                throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用回调或钩子地址必须是 HTTP 绝对地址。");
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                    "接入应用回调或钩子地址必须是 HTTPS 绝对地址；内网 HTTP 需要部署时显式开启。");
             }
         }
     }

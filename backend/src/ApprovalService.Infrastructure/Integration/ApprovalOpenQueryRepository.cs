@@ -42,17 +42,23 @@ public sealed class ApprovalOpenQueryRepository(IDbContextFactory<ApprovalDbCont
     }
 
     /// <inheritdoc />
-    public async Task<OpenInstanceDetails> LoadDetailsAsync(string instanceId, CancellationToken cancellationToken = default)
+    public async Task<OpenInstanceDetails?> LoadDetailsAsync(string instanceId, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        // 任务投影和操作记录来自同一持久快照，避免并发审批时详情自相矛盾。
+        // 审批单状态、任务投影和操作记录来自同一持久快照，避免并发审批时详情自相矛盾。
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var instance = await db.Instances.AsNoTracking().SingleOrDefaultAsync(item => item.Id == instanceId, cancellationToken);
+        if (instance is null)
+        {
+            return null;
+        }
+
         var tasks = await db.ApprovalTasks.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderBy(item => item.Id).ToArrayAsync(cancellationToken);
         var events = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderBy(item => item.Sequence).ToArrayAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return new OpenInstanceDetails { Tasks = tasks, Events = events };
+        return new OpenInstanceDetails { Instance = instance, Tasks = tasks, Events = events };
     }
 
     /// <inheritdoc />

@@ -5,6 +5,7 @@ using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
@@ -154,6 +155,47 @@ internal static class OpenApiChecksCallbacks
             }
 
             check("业务系统异常大响应被限制在 1 MiB 内", oversized);
+            remote.LargeResponse = false;
+            remote.Redirect = true;
+            var redirectRejected = false;
+            try
+            {
+                await new SignedHttpOutboundAdapter(client).PostAsync("https://business.invalid/callback", body,
+                    secret, "redirect-check");
+            }
+            catch (HttpRequestException error) when (error.StatusCode == HttpStatusCode.TemporaryRedirect)
+            {
+                redirectRejected = true;
+            }
+
+            check("业务系统重定向不能被当作回调成功", redirectRejected);
+            remote.Redirect = false;
+
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                var app = await db.ClientApps.SingleAsync();
+                app.IsEnabled = false;
+                await db.SaveChangesAsync();
+            }
+
+            var requestsBeforeDisable = remote.RequestCount;
+            var disabled = false;
+            try
+            {
+                await handler.DeliverAsync(item, CancellationToken.None);
+            }
+            catch (UserFriendlyException error) when (error.Code == ErrorCodes.Forbidden)
+            {
+                disabled = true;
+            }
+
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("停用应用后不发送含审批数据的回调且留下可诊断失败记录", disabled &&
+                    remote.RequestCount == requestsBeforeDisable &&
+                    await db.OutboundSendLogs.AnyAsync(log => log.EventId == item.EventId &&
+                        log.ErrorCode == "CLIENT_APP_DISABLED"));
+            }
         }
         finally
         {
@@ -198,6 +240,14 @@ internal static class OpenApiChecksCallbacks
         }
 
         /// <summary>
+        /// 是否返回到其他主机的临时重定向。
+        /// </summary>
+        public bool Redirect
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// 实际收到的请求次数。
         /// </summary>
         public int RequestCount
@@ -227,7 +277,12 @@ internal static class OpenApiChecksCallbacks
             Bodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
             Signatures.Add(request.Headers.GetValues(HeaderNames.Signature).Single());
             RequestIds.Add(request.Headers.GetValues(HeaderNames.RequestId).Single());
-            var response = new HttpResponseMessage(Fail ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
+            var response = new HttpResponseMessage(Redirect ? HttpStatusCode.TemporaryRedirect :
+                Fail ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
+            if (Redirect)
+            {
+                response.Headers.Location = new Uri("https://unregistered.invalid/receive");
+            }
             if (LargeResponse)
             {
                 response.Content = new StringContent(new string('x', SignedHttpOutboundAdapter.MaxResponseBytes + 1));

@@ -36,12 +36,12 @@ public interface IApprovalOpenQueryRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 读取一张审批单的任务和审计事件。
+    /// 在同一个数据库事务快照中读取审批单、任务和审计事件。
     /// </summary>
     /// <param name="instanceId">审批单 ID。</param>
     /// <param name="cancellationToken">取消信号。</param>
-    /// <returns>按发生顺序排列的详情。</returns>
-    Task<OpenInstanceDetails> LoadDetailsAsync(string instanceId, CancellationToken cancellationToken = default);
+    /// <returns>按发生顺序排列的详情；审批单不存在时为空。</returns>
+    Task<OpenInstanceDetails?> LoadDetailsAsync(string instanceId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 读取待办任务与对应的审批单、锁定流程版本。
@@ -72,6 +72,11 @@ public interface IApprovalOpenQueryRepository
 /// </summary>
 public sealed class OpenInstanceDetails
 {
+    /// <summary>
+    /// 与任务和事件处于同一读取快照的审批单状态。
+    /// </summary>
+    public InstanceEntity Instance { get; set; } = new();
+
     /// <summary>
     /// 人工任务投影。
     /// </summary>

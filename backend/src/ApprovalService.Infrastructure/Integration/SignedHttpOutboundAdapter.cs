@@ -9,7 +9,9 @@ namespace ApprovalService.Infrastructure.Integration;
 /// 所有业务系统 HTTP 出站请求复用的 HMAC 签名与超时适配层。
 /// </summary>
 /// <param name="client">由依赖注入管理连接池的 HTTP 客户端。</param>
-public sealed class SignedHttpOutboundAdapter(HttpClient client)
+/// <param name="transportPolicy">出站地址的部署级传输策略。</param>
+public sealed class SignedHttpOutboundAdapter(HttpClient client,
+    Application.Integration.IntegrationTransportPolicy? transportPolicy = null)
 {
     /// <summary>
     /// 钩子与回调响应最大正文，避免对端异常响应耗尽服务内存。
@@ -33,6 +35,13 @@ public sealed class SignedHttpOutboundAdapter(HttpClient client)
     public async Task<OutboundHttpResponse> PostAsync(string url, string body, string signingSecret, string requestId,
         CancellationToken cancellationToken = default)
     {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var address) ||
+            (address.Scheme != Uri.UriSchemeHttps &&
+                !(transportPolicy?.AllowHttpUrls == true && address.Scheme == Uri.UriSchemeHttp)))
+        {
+            throw new InvalidOperationException("业务系统出站地址必须使用 HTTPS；内网 HTTP 需要部署时显式开启。");
+        }
+
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
         request.Content = new StringContent(body, Encoding.UTF8, "application/json");
         request.Headers.TryAddWithoutValidation(HeaderNames.Signature, Sign(body, signingSecret));

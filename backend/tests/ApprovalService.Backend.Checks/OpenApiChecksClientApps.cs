@@ -88,6 +88,35 @@ internal static class OpenApiChecksClientApps
             }
 
             check("显式空流程授权配置返回可纠正错误", invalidFlows);
+
+            var insecureDenied = false;
+            try
+            {
+                await service.CreateAsync(new CreateClientAppInput
+                {
+                    Code = "insecure-default",
+                    Name = "错误地址",
+                    AllowedFlowCodes = ["PURCHASE"],
+                    CallbackUrl = "http://business.invalid/callback",
+                });
+            }
+            catch (UserFriendlyException error) when (error.Code == "VALIDATION_FAILED")
+            {
+                insecureDenied = true;
+            }
+
+            check("回调地址默认拒绝明文 HTTP", insecureDenied);
+            var intranetService = new ClientAppAppService(repository, protector,
+                new IntegrationTransportPolicy { AllowHttpUrls = true });
+            await intranetService.CreateAsync(new CreateClientAppInput
+            {
+                Code = "intranet",
+                Name = "受信任内网",
+                AllowedFlowCodes = ["PURCHASE"],
+                CallbackUrl = "http://business.invalid/callback",
+            });
+            check("部署显式允许时可登记内网 HTTP 地址",
+                (await repository.FindByCodeAsync("intranet"))?.CallbackUrl == "http://business.invalid/callback");
         }
         finally
         {

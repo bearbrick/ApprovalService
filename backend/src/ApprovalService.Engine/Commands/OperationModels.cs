@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApprovalService.Engine.Execution;
 
 namespace ApprovalService.Engine.Commands;
@@ -149,6 +150,13 @@ public sealed class OperationInput
     /// </summary>
     public List<string> MentionedUserIds { get; set; } = [];
     /// <summary>
+    /// 应用层核准的审批人填写值，随操作事件审计保存。
+    /// </summary>
+    public JsonElement? FieldValues
+    {
+        get; set;
+    }
+    /// <summary>
     /// 本次是否由应用层确认管理员权限。
     /// </summary>
     public bool IsAdministrator
@@ -275,6 +283,13 @@ public sealed class OperationAudit
     /// 被提及的人员。
     /// </summary>
     public List<string> MentionedUserIds { get; set; } = [];
+    /// <summary>
+    /// 本次操作中审批人提交的顶层字段值。
+    /// </summary>
+    public JsonElement? FieldValues
+    {
+        get; set;
+    }
 }
 
 /// <summary>

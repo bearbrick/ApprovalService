@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace ApprovalService.Contracts.Protocol;
 
 /// <summary>
@@ -59,4 +61,12 @@ public sealed class OpenTaskActionRequest
     /// 被提及的本应用业务人员 ID。
     /// </summary>
     public List<string> MentionedUsers { get; set; } = [];
+
+    /// <summary>
+    /// 本节点允许审批人填写的顶层字段值；不修改发起时的业务数据快照。
+    /// </summary>
+    public JsonElement? FieldValues
+    {
+        get; set;
+    }
 }

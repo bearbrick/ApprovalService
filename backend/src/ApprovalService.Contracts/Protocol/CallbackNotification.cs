@@ -51,6 +51,14 @@ public sealed class CallbackNotification
     }
 
     /// <summary>
+    /// 本次任务操作中由审批人填写的字段；原业务数据快照仍在 data 中。
+    /// </summary>
+    public JsonElement? FieldValues
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 事件发生时间。
     /// </summary>
     public DateTimeOffset OccurredAt

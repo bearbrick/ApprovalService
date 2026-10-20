@@ -86,6 +86,10 @@ public sealed class OpenTaskActionAppService(IApprovalOpenQueryRepository reposi
             ?? throw new InvalidOperationException("审批单锁定的流程定义为空。");
         var graph = JsonSerializer.Deserialize<FlowExecutionGraph>(record.FlowVersion.GraphJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("审批单锁定的执行图为空。");
+        var node = graph.Nodes.SingleOrDefault(item => item.Id == record.Task.NodeId)
+            ?? throw new InvalidOperationException("审批任务引用的执行图节点不存在。");
+        var fieldValues = await OpenActionFieldValidator.ValidateAsync(app.Code, definition, node,
+            input.FieldValues, organization, cancellationToken);
         var context = await contextBuilder.BuildContinuationAsync(record.Instance, definition, graph,
             timeProvider.GetUtcNow(), cancellationToken);
         await runtime.ExecuteAsync(new RuntimeCommandInput
@@ -105,6 +109,7 @@ public sealed class OpenTaskActionAppService(IApprovalOpenQueryRepository reposi
                     RelatedId = input.RelatedId,
                     Mode = input.Mode,
                     MentionedUserIds = mentioned,
+                    FieldValues = fieldValues,
                 },
             },
             Context = context,

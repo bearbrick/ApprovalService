@@ -172,7 +172,10 @@ internal static class JobReadbackRaceChecks
         /// <summary>
         /// 实际调用次数。
         /// </summary>
-        public int Calls { get; private set; }
+        public int Calls
+        {
+            get; private set;
+        }
 
         /// <inheritdoc />
         public Task DeliverAsync(OutboxItemEntity item, CancellationToken cancellationToken)
@@ -193,7 +196,10 @@ internal static class JobReadbackRaceChecks
         /// <summary>
         /// 实际调用次数。
         /// </summary>
-        public int Calls { get; private set; }
+        public int Calls
+        {
+            get; private set;
+        }
 
         /// <inheritdoc />
         public Task ExecuteAsync(ScheduledJobEntity job, CancellationToken cancellationToken)

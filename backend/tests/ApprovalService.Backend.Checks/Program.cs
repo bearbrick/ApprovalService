@@ -51,6 +51,7 @@ internal static class Program
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
         ApprovalDataChecks.Run(Check);
+        await OpenApiChecksClientApps.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

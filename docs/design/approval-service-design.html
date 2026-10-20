@@ -1133,6 +1133,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>POST /api/v1/org/bindings</code></td><td>绑定业务系统的用户 ID、部门 ID</td></tr>
             </tbody>
           </table>
+          <p>流程目录只返回当前已发布、接入应用获授权且流程定义允许该应用使用的版本；每项给出编码、名称、版本号。数据定义接口返回当前版本的字段定义与按同一字段生成的 JSON 样例，样例不含计算字段和审批人填写字段。</p>
         </div>
         <h3>业务系统按需提供的接口</h3>
         <p>都由审批服务的后端调用，带签名，默认 5 秒超时（可以设）。都不是必须的，用到哪个功能才提供哪个。</p>

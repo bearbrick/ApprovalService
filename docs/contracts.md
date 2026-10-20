@@ -61,13 +61,15 @@
 { "name": "ApprovalService", "version": "0.1.0", "apiVersion": "v1" }
 ```
 
+`GET /api/v1/flows` 和 `GET /api/v1/flows/{code}/schema` 需要 `X-Api-Key`。列表只包含当前已发布、接入应用已获授权且流程定义允许该应用使用的版本；无权限读取单个流程时返回 `FORBIDDEN`。列表项为 `{ "code": "PURCHASE", "name": "采购申请", "version": 3 }`。数据定义接口返回 `{ "flowCode": "PURCHASE", "version": 3, "data": { "fields": [], "summaryFields": [] }, "example": {} }`；`example` 按当前定义生成，不含计算字段和审批人填写字段。
+
 ## 规划中的接口
 
 按设计书第 13 节，在对应任务里实现，实现时把请求和响应的格式补进本文：
 
 | 接口 | 用途 | 任务 |
 | --- | --- | --- |
-| `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema`、`POST /api/v1/flows/{code}/preview` | 能用的流程、要传的审批数据、预览会走哪些节点 | T-006 |
+| `POST /api/v1/flows/{code}/preview` | 预览会走哪些节点 | T-006 |
 | `POST /api/v1/instances`、`POST /api/v1/instances/batch` | 发起审批（传数据，或只传单号让服务回业务系统取） | T-006 |
 | `GET /api/v1/instances/{id}`、`PATCH /api/v1/instances/{id}/data` | 查询状态和审批记录、审批中更新允许更新的字段 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |

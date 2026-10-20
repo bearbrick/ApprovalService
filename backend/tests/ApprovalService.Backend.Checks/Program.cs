@@ -43,6 +43,8 @@ internal static class Program
         EngineFuzzChecks.Run(Check);
         AssigneeChecks.Run(Check);
         ApprovalPolicyChecks.Run(Check);
+        OperationChecks.Run(Check);
+        OperationChecksBoundaries.Run(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);

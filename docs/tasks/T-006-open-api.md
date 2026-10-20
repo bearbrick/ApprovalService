@@ -15,7 +15,9 @@
 可以新建、修改的文件：
 
 - `backend/src/ApprovalService.Contracts/Protocol/`：开放接口的请求和响应、新错误码
-- `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`frontend/src/model/flow.ts`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：仅合入已验收的流程级撤回/退回策略契约原子提交，不在本任务另行改设计器
+- `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`frontend/src/model/flow.ts`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：合入已验收的流程级撤回/退回策略契约
+- `backend/src/ApprovalService.Engine/Definitions/FlowCompiler.cs`、`FlowSemanticValidator.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowDefinitionChecks.cs`：合入 T-034 已验收的发布编译、语义校验与场景检查
+- `frontend/src/designer/canvas/canvas-validation.ts`、`frontend/src/designer/workbench/FlowRulesPanel.vue`、`workbench-model.ts`、`frontend/src/model/flow-execution.ts`、`frontend/tests/workbench-checks.ts`、`frontend/README.md`：合入 T-034 已验收的设计器配置与检查，不在本任务另写流程策略逻辑
 - `backend/src/ApprovalService.Api/Endpoints/OpenApi/`；`Application/Integration/`（接入应用、API Key 只存 SHA-256、流程授权）
 - `backend/src/ApprovalService.Infrastructure/Integration/`：出站适配层（HMAC 签名、5 秒超时、按 1 分钟 / 5 分钟 / 30 分钟 / 2 小时重试、发送日志）、钩子调用（取数、校验、取人、业务动作）
 - `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
@@ -44,6 +46,7 @@
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`：新增实体与索引所需模型登记
 - `docs/architecture.md`：接入应用持久化和出站可靠发送说明
 - `docs/adr/README.md`：登记 T-006 钩子协议提议 ADR
+- `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`、`frontend/src/model/flow.ts`：合入 T-034 已验收契约与检查
 
 ## 验收标准
 
@@ -67,6 +70,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：经主任务确认，T-006 需完整合入 T-034 已验收的 `8d46176`，包含发布图编译、语义校验、设计器规则面板、前后端检查和 README。上述跨范围文件与 Contracts 共享文件已登记；保留既有 T-006 契约与文档增量，不另写一套编译逻辑。合入后把发布图策略写进发起运行上下文，并以真实持久场景验证撤回、退回重提和旧图默认。
 - 2026-10-20 · Codex：T-034 已验收的 `48d5adf` 定义流程级 `withdrawBeforeFirstDecision` 与 `returnMode`，为让发起时运行策略按锁定发布图固定，本任务登记合入该 Contracts/前端副本/契约检查原子提交，随后只在开放发起应用服务把图上的值映射到 `EngineContext.Operations`。`docs/contracts.md` 与设计书已有 T-006 审批人字段条款，合并时保留两边增量；旧图缺省值应与现有运行时一致。真实持久场景覆盖首人处理后撤回限制、退回到原节点重提以及旧图默认。
 - 2026-10-20 · Codex：任务操作新增可选 `fieldValues`，仅锁定流程中 `approverInput=true` 且当前节点唯一权限为 `editable` 的顶层字段可写；复用既有字段类型规则、严格核对本应用人员/部门绑定。原业务 `data` 快照不变，填写值随引擎操作审计入事件链，并在任务完成/审批结果回调的独立字段中固定入队、重发同正文。HTTP 场景覆盖原字段/无权限字段越权、错误类型、未绑定人员、明细子字段缺行索引、历史可查及结果回调；`docs/contracts.md`、设计书 §api、后端 README 已同步。附件填写因归属未接通而拒绝；明细子字段仍待行索引协议。`Required` 在各人工命令中何时强制仍待用户答复，当前只校验已提交字段。完整 `verify.ps1` 通过：后端 506、调用端 33、前端 65 项，构建零警告。
 - 2026-10-20 · Codex：审批人填写字段按已评审设计 §form605 只入操作记录和结果回调，由业务系统决定是否回写原单；审批数据快照保持不变。为实现该明确能力，先登记 T-006 范围扩展到 `OperationModels.cs`、`OperationGuard.cs` 和新 `OpenActionFieldValidator.cs`，共享 Contracts 请求/回调载体、`docs/contracts.md`、设计书 §api 将以同一契约提交同步。仅支持顶层 `ApproverInput`，明细子字段缺行索引协议将明确拒绝并交接；T-034 并行修改 Flows 契约和相同文档，合并时须保留双方条款。必填字段在不同人工命令中的生效边界待主任务确认，先实现已提交字段的严格权限与类型校验。

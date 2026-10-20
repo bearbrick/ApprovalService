@@ -30,6 +30,52 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
     /// </summary>
     private static readonly TimeSpan EmbedLifetime = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// 连续错误密码达到此次数后暂时锁定账号。
+    /// </summary>
+    private const int MaxFailedLogins = 5;
+
+    /// <summary>
+    /// 账号因连续失败而锁定的时长。
+    /// </summary>
+    private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
+
+    /// <inheritdoc />
+    public async Task ProvisionAccountAsync(string personId, string temporaryPassword,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(personId) || string.IsNullOrWhiteSpace(temporaryPassword) ||
+            temporaryPassword.Length is < 10 or > 128)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "人员 ID 和 10 到 128 位临时密码不能为空。");
+        }
+
+        var snapshot = await repository.FindByPersonIdAsync(personId, cancellationToken);
+        if (snapshot is null)
+        {
+            throw new UserFriendlyException(ErrorCodes.NotFound, "人员不存在。");
+        }
+
+        if (!snapshot.Person.IsActive)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "离职人员不能开通账号。");
+        }
+
+        if (snapshot.Account is not null)
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "账号已开通。");
+        }
+
+        var digest = passwords.Hash(temporaryPassword);
+        await repository.CreateAccountAsync(new LocalAccountEntity
+        {
+            PersonId = personId,
+            PasswordHash = digest.Hash,
+            PasswordSalt = digest.Salt,
+            MustChangePassword = true,
+        }, cancellationToken);
+    }
+
     /// <inheritdoc />
     public async Task<IdentityTokensDto> LoginAsync(string employeeNumber, string password,
         CancellationToken cancellationToken = default)
@@ -47,12 +93,25 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
         }
 
         var account = snapshot.Account;
+        var now = clock.GetUtcNow();
+        if (account.LockedUntil is { } lockedUntil && lockedUntil > now)
+        {
+            passwords.VerifyMissing(password);
+            throw InvalidCredentials();
+        }
+
         if (!passwords.Verify(password, account.PasswordHash, account.PasswordSalt))
         {
+            await repository.RecordFailedLoginAsync(snapshot.Person.Id, now, MaxFailedLogins,
+                LockoutDuration, cancellationToken);
             throw InvalidCredentials();
         }
 
         EnsureEnabled(snapshot);
+        if (!await repository.ResetFailedLoginsAsync(snapshot.Person.Id, now, cancellationToken))
+        {
+            throw InvalidCredentials();
+        }
         return await IssueTokensAsync(snapshot, null, cancellationToken);
     }
 

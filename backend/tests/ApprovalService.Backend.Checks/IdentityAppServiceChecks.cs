@@ -1,0 +1,223 @@
+using System.Security.Cryptography;
+using ApprovalService.Application.Identity;
+using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Identity;
+using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Shared;
+using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Options;
+using ApprovalService.Infrastructure.Persistence;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+
+namespace ApprovalService.Backend.Checks;
+
+/// <summary>
+/// 用真实 SQLite 检查账号令牌、改密作废及一次性嵌入。
+/// </summary>
+internal static class IdentityAppServiceChecks
+{
+    /// <summary>
+    /// 执行身份服务的主要场景。
+    /// </summary>
+    /// <param name="check">检查结果记录器。</param>
+    /// <returns>异步操作。</returns>
+    public static async Task RunAsync(Action<string, bool> check)
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "approval-identity-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var options = new DbContextOptionsBuilder<ApprovalDbContext>()
+                .UseSqlite("Data Source=" + Path.Combine(directory, "identity.db"))
+                .Options;
+            var factory = new IdentityContextFactory(options);
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                await db.Database.EnsureCreatedAsync();
+                db.People.Add(new PersonEntity
+                {
+                    Id = "person-1",
+                    EmployeeNumber = "EMP-001",
+                    Name = "审批人",
+                });
+                db.People.Add(new PersonEntity
+                {
+                    Id = "person-2",
+                    EmployeeNumber = "EMP-002",
+                    Name = "新审批人",
+                });
+                db.LocalAccounts.Add(new LocalAccountEntity
+                {
+                    PersonId = "person-1",
+                    PasswordHash = "hash:initial-password",
+                    PasswordSalt = "salt",
+                    MustChangePassword = true,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var clock = new IdentityClock(new DateTimeOffset(2026, 10, 20, 4, 0, 0, TimeSpan.Zero));
+            var repository = new IdentityRepository(factory);
+            var jwt = new JwtIdentityTokenService(Options.Create(new IdentityTokenOptions
+            {
+                SigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+            }), Options.Create(new DataOptions { Directory = directory }));
+            var service = new IdentityAppService(repository, new CheckPasswordService(), jwt, clock);
+
+            await service.ProvisionAccountAsync("person-2", "initial-password-2");
+            var firstLogin = await service.LoginAsync("EMP-002", "initial-password-2");
+            check("管理员开通在职人员账号后必须首次改密，不能重复开通",
+                firstLogin.MustChangePassword &&
+                await FailsWithCodeAsync(() => service.ProvisionAccountAsync("person-2", "initial-password-2"),
+                    ErrorCodes.Conflict));
+
+            var login = await service.LoginAsync("EMP-001", "initial-password");
+            check("账号登录签发短期访问令牌与刷新令牌且提示首次改密",
+                login.PersonId == "person-1" && login.AccessToken.Length > 80 &&
+                login.RefreshToken.Length >= 40 && login.MustChangePassword &&
+                login.AccessExpiresAt == clock.GetUtcNow().AddMinutes(15) &&
+                login.RefreshExpiresAt == clock.GetUtcNow().AddDays(30));
+            check("密码错误与不存在工号均返回未授权",
+                await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "wrong"), ErrorCodes.Unauthorized) &&
+                await FailsWithCodeAsync(() => service.LoginAsync("MISSING", "wrong"), ErrorCodes.Unauthorized));
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("数据库只保存刷新令牌摘要，不保存原始令牌",
+                    await db.RefreshTokens.CountAsync() == 2 &&
+                    await db.RefreshTokens.AllAsync(item => item.TokenHash.Length == 64 &&
+                        item.TokenHash != login.RefreshToken));
+            }
+
+            var refreshed = await service.RefreshAsync(login.RefreshToken);
+            check("刷新令牌轮换成功且旧令牌不能复用",
+                refreshed.RefreshToken != login.RefreshToken &&
+                await FailsWithCodeAsync(() => service.RefreshAsync(login.RefreshToken), ErrorCodes.Unauthorized));
+            await service.ChangePasswordAsync("person-1", "initial-password", "new-password-123");
+            check("改密使旧访问和刷新令牌失效",
+                !await service.ValidateAccessPrincipalAsync("person-1", 0) &&
+                await FailsWithCodeAsync(() => service.RefreshAsync(refreshed.RefreshToken), ErrorCodes.Unauthorized));
+            var changedLogin = await service.LoginAsync("EMP-001", "new-password-123");
+            check("首次改密后允许新密码登录且清除改密标记", !changedLogin.MustChangePassword &&
+                await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "initial-password"), ErrorCodes.Unauthorized));
+
+            check("嵌入令牌拒绝外站路径", await FailsWithCodeAsync(() => service.CreateEmbedTokenAsync(
+                "demo", "person-1", "https://outside.example/"), ErrorCodes.ValidationFailed));
+            var embed = await service.CreateEmbedTokenAsync("demo", "person-1", "#/m/tasks");
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("一次性嵌入令牌仅以摘要保存",
+                    await db.EmbedTokens.CountAsync() == 1 &&
+                    await db.EmbedTokens.AllAsync(item => item.TokenHash.Length == 64 &&
+                        item.TokenHash != embed.Token));
+            }
+
+            var exchanged = await service.ExchangeEmbedTokenAsync(embed.Token);
+            check("嵌入交换绑定人员与站内路径且只能消费一次",
+                exchanged.PersonId == "person-1" && exchanged.TargetPath == "#/m/tasks" &&
+                await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(embed.Token), ErrorCodes.Unauthorized));
+            var expiring = await service.CreateEmbedTokenAsync("demo", "person-1", "#/m/tasks");
+            clock.Advance(TimeSpan.FromMinutes(6));
+            check("嵌入令牌过期后不能交换",
+                await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(expiring.Token), ErrorCodes.Unauthorized));
+            await service.RevokeAllAsync("person-1");
+            check("管理员作废令牌版本后旧访问令牌无效",
+                !await service.ValidateAccessPrincipalAsync("person-1", 1));
+
+            await service.LoginAsync("EMP-001", "new-password-123");
+
+            for (var failure = 0; failure < 5; failure++)
+            {
+                await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "wrong"), ErrorCodes.Unauthorized);
+            }
+
+            check("连续五次密码错误锁定账号且正确密码也不能绕过",
+                await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "new-password-123"),
+                    ErrorCodes.Unauthorized));
+            clock.Advance(TimeSpan.FromMinutes(16));
+            var unlocked = await service.LoginAsync("EMP-001", "new-password-123");
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("锁定期结束后正确登录清除失败计数", unlocked.PersonId == "person-1" &&
+                    await db.LocalAccounts.AnyAsync(item => item.PersonId == "person-1" &&
+                        item.FailedLogins == 0 && item.LockedUntil == null));
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// 检查应用服务是否按指定可纠正错误拒绝操作。
+    /// </summary>
+    /// <param name="action">异步操作。</param>
+    /// <param name="code">预期错误码。</param>
+    /// <returns>错误码匹配为真。</returns>
+    private static async Task<bool> FailsWithCodeAsync(Func<Task> action, string code)
+    {
+        try
+        {
+            await action();
+            return false;
+        }
+        catch (UserFriendlyException error)
+        {
+            return error.Code == code;
+        }
+    }
+
+    /// <summary>
+    /// 为检查程序创建独立数据库上下文。
+    /// </summary>
+    /// <param name="options">SQLite 配置。</param>
+    private sealed class IdentityContextFactory(DbContextOptions<ApprovalDbContext> options) : IDbContextFactory<ApprovalDbContext>
+    {
+        /// <inheritdoc />
+        public ApprovalDbContext CreateDbContext() => new(options);
+
+        /// <inheritdoc />
+        public Task<ApprovalDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(CreateDbContext());
+    }
+
+    /// <summary>
+    /// 将安全哈希服务隔离，以便场景只验证业务与数据库原子性。
+    /// </summary>
+    private sealed class CheckPasswordService : IIdentityPasswordService
+    {
+        /// <inheritdoc />
+        public PasswordDigest Hash(string password) => new() { Hash = "hash:" + password, Salt = "salt" };
+
+        /// <inheritdoc />
+        public bool Verify(string password, string hash, string salt) =>
+            hash == "hash:" + password && salt == "salt";
+
+        /// <inheritdoc />
+        public bool VerifyMissing(string password) => false;
+    }
+
+    /// <summary>
+    /// 可手动推进的令牌检查时间来源。
+    /// </summary>
+    /// <param name="now">初始 UTC 时间。</param>
+    private sealed class IdentityClock(DateTimeOffset now) : TimeProvider
+    {
+        /// <summary>
+        /// 当前 UTC 时间。
+        /// </summary>
+        private DateTimeOffset current = now;
+
+        /// <inheritdoc />
+        public override DateTimeOffset GetUtcNow() => current;
+
+        /// <summary>
+        /// 手动推进时间。
+        /// </summary>
+        /// <param name="duration">要前进的时长。</param>
+        public void Advance(TimeSpan duration) => current = current.Add(duration);
+    }
+}

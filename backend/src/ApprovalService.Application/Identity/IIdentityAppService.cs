@@ -6,6 +6,16 @@ namespace ApprovalService.Application.Identity;
 public interface IIdentityAppService
 {
     /// <summary>
+    /// 管理员为在职人员首次开通本地账号，初始密码必须在首次登录后修改。
+    /// </summary>
+    /// <param name="personId">已存在的人员 ID。</param>
+    /// <param name="temporaryPassword">只由受保护调用方传入的临时密码。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>异步操作。</returns>
+    Task ProvisionAccountAsync(string personId, string temporaryPassword,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 用工号和密码登录。
     /// </summary>
     /// <param name="employeeNumber">审批服务工号。</param>

@@ -110,15 +110,23 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
         if (!File.Exists(path))
         {
             var generated = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+            var temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                // 多实例同时首次启动时只有一个能创建，输掉的一方读取已创建的文件。
-                using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                using var writer = new StreamWriter(stream);
-                writer.Write(generated);
+                // 先写完临时文件再原子改名，其他实例不会读到未写完的密钥。
+                File.WriteAllText(temporaryPath, generated);
+                File.Move(temporaryPath, path);
             }
             catch (IOException) when (File.Exists(path))
             {
+                // 另一个实例赢得首次创建时复用其密钥。
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
             }
         }
 

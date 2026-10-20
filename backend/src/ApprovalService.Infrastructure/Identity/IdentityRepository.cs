@@ -1,5 +1,7 @@
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -36,7 +38,53 @@ public sealed class IdentityRepository(IDbContextFactory<ApprovalDbContext> fact
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         db.LocalAccounts.Add(account);
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            // 并发开通只能有一个成功；只把已存在账号的冲突转为使用者可修正的错误。
+            await using var checkDb = await factory.CreateDbContextAsync(cancellationToken);
+            if (await checkDb.LocalAccounts.AnyAsync(item => item.PersonId == account.PersonId, cancellationToken))
+            {
+                throw new UserFriendlyException(ErrorCodes.Conflict, "账号已开通。");
+            }
+
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<DateTimeOffset?> RecordFailedLoginAsync(string personId, DateTimeOffset now, int maxAttempts,
+        TimeSpan lockoutDuration, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        var until = now.Add(lockoutDuration);
+        await db.LocalAccounts.Where(item => item.PersonId == personId &&
+            (item.LockedUntil == null || item.LockedUntil <= now))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.FailedLogins,
+                    item => item.LockedUntil != null ? 1 : item.FailedLogins + 1)
+                .SetProperty(item => item.LockedUntil,
+                    item => item.LockedUntil != null
+                        ? (maxAttempts <= 1 ? until : (DateTimeOffset?)null)
+                        : item.FailedLogins + 1 >= maxAttempts ? until : (DateTimeOffset?)null), cancellationToken);
+        return await db.LocalAccounts.AsNoTracking().Where(item => item.PersonId == personId)
+            .Select(item => item.LockedUntil).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ResetFailedLoginsAsync(string personId, DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        var changed = await db.LocalAccounts.Where(item => item.PersonId == personId &&
+            (item.LockedUntil == null || item.LockedUntil <= now))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.FailedLogins, 0)
+                .SetProperty(item => item.LockedUntil, (DateTimeOffset?)null), cancellationToken);
+        return changed == 1;
     }
 
     /// <inheritdoc />

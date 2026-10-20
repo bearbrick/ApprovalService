@@ -65,7 +65,14 @@ public sealed class OutboxQueue
                     .SetProperty(item => item.Version, item => item.Version + 1), cancellationToken);
             if (claimed == 1)
             {
-                return await context.OutboxItems.AsNoTracking().SingleAsync(item => item.Id == id, cancellationToken);
+                // 回读前租约也可能再次过期并被他人领取，不能把新执行者的标记交给旧执行者。
+                var owned = await context.OutboxItems.AsNoTracking().SingleOrDefaultAsync(item =>
+                    item.Id == id && item.Status == JobStatuses.Leased && item.LeaseOwner == leaseOwner,
+                    cancellationToken);
+                if (owned is not null)
+                {
+                    return owned;
+                }
             }
         }
 

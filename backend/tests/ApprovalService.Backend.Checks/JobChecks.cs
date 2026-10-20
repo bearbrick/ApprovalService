@@ -43,6 +43,7 @@ internal static class JobChecks
             await CheckOutboxAsync(options, check);
             await CheckScheduledJobsAsync(options, check);
             await CheckWorkerAsync(options, check);
+            await JobReadbackRaceChecks.RunAsync(options, check);
             await CheckExpiredWorkerLeaseAsync(options, check);
             await CheckDatabaseOutageAsync(directory, check);
         }

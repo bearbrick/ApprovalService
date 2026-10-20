@@ -64,7 +64,14 @@ public sealed class ScheduledJobQueue
                     .SetProperty(job => job.Version, job => job.Version + 1), cancellationToken);
             if (claimed == 1)
             {
-                return await context.ScheduledJobs.AsNoTracking().SingleAsync(job => job.Id == id, cancellationToken);
+                // 回读只接受本次租约，避免暂停后的旧执行者读取并使用新执行者的租约。
+                var owned = await context.ScheduledJobs.AsNoTracking().SingleOrDefaultAsync(job =>
+                    job.Id == id && job.Status == JobStatuses.Leased && job.LeaseOwner == leaseOwner,
+                    cancellationToken);
+                if (owned is not null)
+                {
+                    return owned;
+                }
             }
         }
 

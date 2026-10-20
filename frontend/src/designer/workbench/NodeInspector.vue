@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { FlowApprovalSettings, FlowAssignee, FlowAutomationSettings, FlowDataDefinition, FlowNode, FlowSubprocessSettings } from '../../model/flow.ts'
 import { fieldReferences } from '../data/data-model.ts'
 import NodeFieldPermissionsEditor from '../data/NodeFieldPermissionsEditor.vue'
-import { approvalActions, assigneeSources, nodeLabels } from './rule-options.ts'
+import { actionsForNodeType, approvalActions, assigneeSources, defaultActionsForNodeType, nodeLabels } from './rule-options.ts'
 import { defaultApproval } from './workbench-model.ts'
 
 /**
@@ -55,7 +55,19 @@ const pairingCandidates = computed(() => props.nodes.filter(node => node.id !== 
 /**
  * 节点的审批规则，缺失时使用安全默认值。
  */
-const approval = computed(() => ({ ...defaultApproval, ...props.node.approval }))
+const approval = computed(() => ({
+  ...defaultApproval,
+  ...props.node.approval,
+  allowedActions: (props.node.approval?.allowedActions ?? defaultActionsForNodeType(props.node.type))
+    .filter(action => actionsForNodeType(props.node.type).includes(action)),
+}))
+/**
+ * 按节点职责展示可用操作；办理不能同意或拒绝，抄送不产生待办操作。
+ */
+const availableActions = computed(() => {
+  const allowed = new Set(actionsForNodeType(props.node.type))
+  return approvalActions.filter(action => allowed.has(action.value))
+})
 /**
  * 票签权重输入错误，避免把不合法 JSON 写进草稿。
  */
@@ -91,7 +103,8 @@ function setApproval(key: keyof FlowApprovalSettings, value: string | number | b
  * @param enabled 是否允许。
  */
 function setAction(action: string, enabled: boolean): void {
-  const selected = new Set(approval.value.allowedActions)
+  const available = new Set<string>(availableActions.value.map(item => item.value))
+  const selected = new Set<string>(approval.value.allowedActions.filter(item => available.has(item)))
   if (enabled) selected.add(action)
   else selected.delete(action)
   setApproval('allowedActions', [...selected])
@@ -170,7 +183,7 @@ function setMappings(text: string): void {
       <label class="form-row">处理时限（分钟）<input type="number" min="1" :value="approval.dueMinutes ?? ''" placeholder="留空则不启用" @change="setApproval('dueMinutes', ($event.target as HTMLInputElement).value ? Number(($event.target as HTMLInputElement).value) : null)" /></label>
       <label class="check-row"><input type="checkbox" :checked="approval.commentRequired" @change="setApproval('commentRequired', ($event.target as HTMLInputElement).checked)" />审批意见必填</label>
       <label v-if="node.type === 'cc'" class="check-row"><input type="checkbox" :checked="approval.readReceiptRequired" @change="setApproval('readReceiptRequired', ($event.target as HTMLInputElement).checked)" />要求确认已阅</label>
-      <h3>允许的操作</h3><div class="action-grid"><label v-for="action in approvalActions" :key="action.value" class="check-row"><input type="checkbox" :checked="approval.allowedActions.includes(action.value)" @change="setAction(action.value, ($event.target as HTMLInputElement).checked)" />{{ action.label }}</label></div>
+      <template v-if="availableActions.length"><h3>允许的操作</h3><div class="action-grid"><label v-for="action in availableActions" :key="action.value" class="check-row"><input type="checkbox" :checked="approval.allowedActions.includes(action.value)" @change="setAction(action.value, ($event.target as HTMLInputElement).checked)" />{{ action.label }}</label></div></template>
       <NodeFieldPermissionsEditor :data="data" :permissions="node.fieldPermissions" @update:permissions="emit('update', { ...node, fieldPermissions: $event })" />
     </template>
     <template v-if="node.type === 'subprocess'"><h3>子流程</h3><label class="form-row">目标流程编码<input :value="node.subprocess?.flowCode ?? ''" @input="setSubprocess('flowCode', ($event.target as HTMLInputElement).value)" /></label><label class="check-row"><input type="checkbox" :checked="node.subprocess?.waitForCompletion ?? true" @change="setSubprocess('waitForCompletion', ($event.target as HTMLInputElement).checked)" />等待子流程结束</label><label class="form-row">字段映射<textarea rows="5" placeholder="子流程字段=当前流程字段，每行一条" :value="Object.entries(node.subprocess?.dataMappings ?? {}).map(([target, source]) => `${target}=${source}`).join('\n')" @change="setMappings(($event.target as HTMLTextAreaElement).value)" /></label></template>

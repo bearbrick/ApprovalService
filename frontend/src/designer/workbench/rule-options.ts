@@ -1,3 +1,5 @@
+import type { FlowNodeType } from '../../model/flow.ts'
+
 /**
  * 处理人来源，与流程契约中的来源编码保持一致。
  */
@@ -24,6 +26,28 @@ export const approvalActions = [
   { value: 'comment', label: '评论与 @人' }, { value: 'saveDraft', label: '暂存' },
   { value: 'batchApprove', label: '批量同意' }, { value: 'submit', label: '办理提交' },
 ] as const
+
+/**
+ * 按人工节点职责返回能启用的操作。
+ * @param type 节点类型。
+ * @returns 该节点可用的操作编码。
+ */
+export function actionsForNodeType(type: FlowNodeType): string[] {
+  if (type === 'cc') return []
+  if (type === 'handling') return approvalActions.filter(action => !['approve', 'reject', 'withdrawApproval', 'batchApprove'].includes(action.value)).map(action => action.value)
+  return approvalActions.filter(action => action.value !== 'submit').map(action => action.value)
+}
+
+/**
+ * 人工节点尚未设置审批规则时使用符合职责的默认操作。
+ * @param type 节点类型。
+ * @returns 默认允许的操作编码。
+ */
+export function defaultActionsForNodeType(type: FlowNodeType): string[] {
+  if (type === 'handling') return ['submit']
+  if (type === 'cc') return []
+  return ['approve', 'reject']
+}
 
 /**
  * 人工节点类型的展示名称。

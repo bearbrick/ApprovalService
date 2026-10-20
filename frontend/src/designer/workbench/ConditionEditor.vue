@@ -81,8 +81,9 @@ function updateRule(rule: ConditionRule, key: keyof ConditionRule, value: string
 
 <template>
   <section class="condition-editor">
-    <div class="condition-mode"><strong>路线条件</strong><button type="button" class="text-button" @click="rawMode = !rawMode">{{ rawMode ? '使用条件构建器' : '编辑表达式原文' }}</button></div>
+    <div class="condition-mode"><strong>路线条件</strong><button type="button" class="text-button" @click="rawMode = !rawMode">{{ rawMode && condition ? '用新条件替换当前表达式' : rawMode ? '使用条件构建器' : '编辑表达式原文' }}</button></div>
     <p class="hint">条件只使用审批数据与发起人上下文；多组之间按“或”连接。计算字段可直接引用，明细列可选择合计。</p>
+    <p v-if="!rawMode && condition" class="hint">当前表达式不会自动转成构建器规则；点击“应用条件”会替换它。</p>
     <template v-if="!rawMode">
       <div v-for="(group, groupIndex) in groups" :key="groupIndex" class="condition-group">
         <div class="condition-group-head"><strong>第 {{ groupIndex + 1 }} 组</strong><label>组内关系<select v-model="group.join"><option value="AND">且 · 全部满足</option><option value="OR">或 · 任一满足</option></select></label><button type="button" class="text-button" :disabled="groups.length === 1" @click="groups.splice(groupIndex, 1)">移除组</button></div>

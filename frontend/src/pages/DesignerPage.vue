@@ -228,7 +228,7 @@ function issuesFor(id: string): string[] {
         <FlowCanvasEditor ref="canvasEditor" :model-value="draft" :issues="issues" history-mode="external" @update:model-value="updateDraft($event, false)" @edit-committed="commitCanvasEdit" @undo="undo" @redo="redo" @validate="handleCanvasValidation">
           <template #inspector="{ node, edge }">
             <NodeInspector v-if="node" :node="node" :nodes="draft.canvas.nodes" :data="draft.data" :issues="issuesFor(node.id)" @update="updateNode" />
-            <EdgeInspector v-else-if="edge" :edge="edge" :nodes="draft.canvas.nodes" :data="draft.data" :issues="issuesFor(edge.id)" @update="updateEdge" />
+            <EdgeInspector v-else-if="edge" :key="edge.id" :edge="edge" :nodes="draft.canvas.nodes" :data="draft.data" :issues="issuesFor(edge.id)" @update="updateEdge" />
             <div v-else class="inspector-empty"><span>◇</span><h2>选择画布元素</h2><p>选中节点或连线后，在此设置审批规则、条件和字段权限。</p></div>
           </template>
         </FlowCanvasEditor>

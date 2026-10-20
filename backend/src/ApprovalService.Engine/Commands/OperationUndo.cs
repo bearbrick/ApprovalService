@@ -24,6 +24,7 @@ internal static class OperationUndo
             ActorId = command.Operation!.ActorId,
             TaskId = command.TaskId!,
             DecisionCountAfter = state.Operations.HumanDecisionCount + 1,
+            ProcessedRequestCountAfter = state.ProcessedRequestIds.Count + 1,
         };
     }
 
@@ -38,9 +39,10 @@ internal static class OperationUndo
         var frame = state.Operations.LastApprovalUndo;
         if (state.Status != EngineInstanceStatuses.Running || frame is null ||
             frame.TaskId != command.TaskId || frame.ActorId != command.Operation!.ActorId ||
-            state.Operations.HumanDecisionCount != frame.DecisionCountAfter)
+            state.Operations.HumanDecisionCount != frame.DecisionCountAfter ||
+            state.ProcessedRequestIds.Count != frame.ProcessedRequestCountAfter)
         {
-            throw new EngineException(ErrorCodes.Conflict, "下一步已经处理，或当前人员不能撤销这次同意。");
+            throw new EngineException(ErrorCodes.Conflict, "下一步已有操作，或当前人员不能撤销这次同意。");
         }
 
         var restored = EngineStateCopy.Copy(frame.Snapshot);

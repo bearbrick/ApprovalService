@@ -57,6 +57,13 @@ internal static class OperationChecks
         check("其他人员不能撤销同意", Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(accepted.State,
             Command(OperationKinds.RevokeApproval, "not-owner", task.Id, "other"), context)));
         var next = accepted.State.Tasks.Last();
+        var transferred = EngineRuntime.Execute(accepted.State,
+            Command(OperationKinds.Transfer, "next-transfer", next.Id, next.AssigneeId, target: "replacement"), context);
+        check("下一步转交后不能撤销同意以免抹掉已留痕操作", Throws(ErrorCodes.Conflict, () =>
+            EngineRuntime.Execute(transferred.State,
+                Command(OperationKinds.RevokeApproval, "revoke-after-transfer", task.Id, task.AssigneeId), context)) &&
+            transferred.State.Tasks.Last().AssigneeId == "replacement" &&
+            transferred.Events.Any(item => item.Kind == "taskTransferred"));
         var nextDone = EngineRuntime.Execute(accepted.State,
             Command(EngineCommandKinds.Approve, "next", next.Id, next.AssigneeId), context);
         check("下一步处理后无法撤销先前同意", Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(nextDone.State,

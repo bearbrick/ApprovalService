@@ -454,4 +454,11 @@ public sealed class OperationUndoFrame
     {
         get; set;
     }
+    /// <summary>
+    /// 同意命令完成后的已处理请求数，防止撤销时抹掉后续已留痕操作。
+    /// </summary>
+    public int ProcessedRequestCountAfter
+    {
+        get; set;
+    }
 }

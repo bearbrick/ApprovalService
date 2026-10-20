@@ -27,6 +27,7 @@ internal static class OperationStateCopy
             ActorId = source.LastApprovalUndo.ActorId,
             TaskId = source.LastApprovalUndo.TaskId,
             DecisionCountAfter = source.LastApprovalUndo.DecisionCountAfter,
+            ProcessedRequestCountAfter = source.LastApprovalUndo.ProcessedRequestCountAfter,
         },
         Pause = source.Pause is null ? null : new OperationPause
         {

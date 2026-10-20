@@ -1,3 +1,4 @@
+using ApprovalService.Application.Organization;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +20,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
         services.AddScoped<IServiceReadinessAppService, ServiceReadinessAppService>();
         services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
+        services.AddScoped<IOrganizationAppService, OrganizationAppService>();
+        services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
         return services;
     }
 }

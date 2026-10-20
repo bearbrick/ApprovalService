@@ -1,4 +1,6 @@
+using ApprovalService.Domain.Organization;
 using ApprovalService.Infrastructure.Jobs;
+using ApprovalService.Infrastructure.Organization;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
@@ -30,6 +32,7 @@ public static class InfrastructureServiceCollectionExtensions
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
+        services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddHostedService<DurableJobWorker>();

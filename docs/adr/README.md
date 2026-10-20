@@ -44,3 +44,4 @@
 | [0005](0005-demo-winui-and-integration-library.md) | 示例业务系统用 WinUI 3 做界面，对接代码放在不依赖界面的类库里 | 已采纳 |
 | [0006](0006-organization-and-accounts.md) | 组织架构自己维护、业务系统绑定；账号先独立，登录按统一登录预留 | 已采纳 |
 | [0007](0007-single-canvas-designer.md) | 流程设计统一使用自由画布 | 已采纳 |
+| [0008](0008-ef-core-providers.md) | 运行库使用 EF Core 和三种独立迁移 | 已采纳 |

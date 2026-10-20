@@ -20,12 +20,14 @@
 - 管理员：修改审批人、跳转、终止、离职交接、重发；都要填原因
 - 委托代理：时间段、范围、不连环委托、代理人是发起人时的处理
 - `backend/tests/ApprovalService.Backend.Checks/OperationChecks*.cs`（新建，按主题拆文件）
+- `backend/README.md`、`docs/architecture.md`：记录新命令、状态及应用层接入职责；目前未新增开放接口或流程定义字段，因此 `docs/contracts.md` 与设计书只需核对，无需修改
 
 ## 共享文件
 
 改这些文件前先在交接记录里写明改什么；改动尽量小，单独成一个提交：
 
 - `backend/tests/ApprovalService.Backend.Checks/Program.cs`
+- `docs/architecture.md`：在引擎核心段补充 T-004 的命令状态、事件审计与业务系统边界
 
 ## 验收标准
 
@@ -45,4 +47,4 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
-- 2026-10-20 · Codex：从 main 创建独立任务分支并合入已验收的 T-003。现有引擎唯一入口、可持久化状态与事件在 `Engine/Execution`，仅修改原定的 `Engine/Commands` 无法让操作进入同一入口；与主任务协调后将这四个具体文件登记为必要范围扩展。计划为检查程序登记 `OperationChecks` 入口，完成后再记录验证与剩余事项。
+- 2026-10-20 · Codex：从 main 创建独立任务分支并合入已验收的 T-003。现有引擎唯一入口、可持久化状态与事件在 `Engine/Execution`，仅修改原定的 `Engine/Commands` 无法让操作进入同一入口；与主任务协调后将这四个具体文件登记为必要范围扩展。为记录操作状态的持久化及应用层边界，另登记 `backend/README.md` 与共享的 `docs/architecture.md`。计划为检查程序登记 `OperationChecks` 入口，完成后再记录验证与剩余事项。

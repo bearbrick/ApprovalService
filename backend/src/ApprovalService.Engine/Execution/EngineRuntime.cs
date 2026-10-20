@@ -1,5 +1,6 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Engine.Commands;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -50,12 +51,17 @@ public static class EngineRuntime
 
             var start = context.Graph.Nodes.SingleOrDefault(node => node.Type == FlowNodeTypes.Start)
                 ?? throw new EngineException(ErrorCodes.ValidationFailed, "执行图缺少唯一开始节点。");
+            state.Operations.InitiatorId = context.Operations.InitiatorId;
+            state.Operations.FlowCode = context.Operations.FlowCode;
+            state.Operations.WithdrawBeforeFirstDecision = context.Operations.WithdrawBeforeFirstDecision;
+            state.Operations.ReturnMode = context.Operations.ReturnMode;
             state.Tokens.Add(new EngineToken { Id = work.NewId("token"), NodeId = start.Id });
             work.Emit("instanceStarted", start.Id);
             work.Advance();
         }
         else if (command.Kind is EngineCommandKinds.Withdraw or EngineCommandKinds.Terminate or EngineCommandKinds.Cancel)
         {
+            OperationGuard.Validate(state, command, context);
             if (command.Kind == EngineCommandKinds.Cancel)
             {
                 if (state.Status != EngineInstanceStatuses.Approved)
@@ -66,6 +72,7 @@ public static class EngineRuntime
                 state.Status = EngineInstanceStatuses.Cancelled;
                 work.Emit("instanceCancelled");
                 state.ProcessedRequestIds.Add(command.RequestId);
+                OperationGuard.AttachAudit(work.Events, command, null);
                 return new EngineResult { State = state, Events = work.Events };
             }
 
@@ -87,6 +94,7 @@ public static class EngineRuntime
             EngineCommandKinds.Acknowledge or EngineCommandKinds.Reject)
         {
             RequireRunning(state);
+            var auditTask = OperationGuard.Validate(state, command, context);
             var task = state.Tasks.SingleOrDefault(item => item.Id == command.TaskId && item.Status == EngineTaskStatuses.Pending)
                 ?? throw new EngineException(ErrorCodes.Conflict, "任务不存在或已处理。");
             var token = state.Tokens.SingleOrDefault(item => item.Id == task.TokenId && item.WaitingFor == "task")
@@ -97,7 +105,18 @@ public static class EngineRuntime
                 throw new EngineException(ErrorCodes.Conflict, "操作与任务节点类型不匹配。");
             }
 
+            var undo = command.Kind == EngineCommandKinds.Approve && command.Operation is not null
+                ? OperationUndo.Capture(state, command) : null;
             work.CompleteTask(task, token, node, command.Kind);
+            if (undo is not null && state.Status == EngineInstanceStatuses.Running)
+            {
+                state.Operations.LastApprovalUndo = undo;
+            }
+            else if (command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or EngineCommandKinds.Reject)
+            {
+                state.Operations.LastApprovalUndo = null;
+            }
+            OperationGuard.AttachAudit(work.Events, command, auditTask);
         }
         else if (command.Kind is EngineCommandKinds.ActionSucceeded or EngineCommandKinds.ActionFailed or
             EngineCommandKinds.SubprocessCompleted)
@@ -125,7 +144,15 @@ public static class EngineRuntime
         }
         else
         {
-            throw new EngineException(ErrorCodes.ValidationFailed, "不支持的引擎命令。");
+            var auditTask = OperationGuard.Validate(state, command, context);
+            OperationDispatcher.Execute(state, command, context, work);
+            OperationGuard.AttachAudit(work.Events, command, auditTask);
+        }
+
+        if (command.Kind is EngineCommandKinds.Withdraw or EngineCommandKinds.Terminate or EngineCommandKinds.Cancel or
+            EngineCommandKinds.Start)
+        {
+            OperationGuard.AttachAudit(work.Events, command, null);
         }
 
         state.ProcessedRequestIds.Add(command.RequestId);

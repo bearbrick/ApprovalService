@@ -1,11 +1,14 @@
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Jobs;
+using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Organization;
 using ApprovalService.Infrastructure.Persistence;
@@ -50,6 +53,12 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ScheduledJobQueue>();
         services.AddScoped<IScheduledJobHandler, DepartureJobHandler>();
         services.AddHostedService<DurableJobWorker>();
+        services.AddOptions<SmtpNotificationOptions>()
+            .Bind(configuration.GetSection(SmtpNotificationOptions.SectionName));
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
+        services.AddScoped<INotificationChannel, InAppNotificationChannel>();
+        services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();
         return services;
     }
 }

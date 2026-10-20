@@ -1,8 +1,10 @@
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Organization;
 using Microsoft.EntityFrameworkCore;
 
@@ -127,6 +129,11 @@ public class ApprovalDbContext : DbContext
     /// 已登记的业务系统接入应用。
     /// </summary>
     public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
+
+    /// <summary>
+    /// 已投递的站内消息。
+    /// </summary>
+    public DbSet<InAppNotificationEntity> InAppNotifications => Set<InAppNotificationEntity>();
 
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -292,5 +299,6 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Version).IsConcurrencyToken();
             entity.HasIndex(item => new { item.Status, item.DueAt, item.LeaseUntil });
         });
+        NotificationModelConfiguration.Configure(modelBuilder);
     }
 }

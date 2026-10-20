@@ -140,6 +140,20 @@ internal static class OpenApiChecksCallbacks
                 check("管理员重发保留原事件 ID 与原始正文", queued.Status == "pending" &&
                     queued.EventId == "event-1" && queued.PayloadJson == body && queued.CompletedAt is null);
             }
+
+            remote.LargeResponse = true;
+            var oversized = false;
+            try
+            {
+                await new SignedHttpOutboundAdapter(client).PostAsync("https://business.invalid/callback", body,
+                    secret, "size-check");
+            }
+            catch (InvalidDataException)
+            {
+                oversized = true;
+            }
+
+            check("业务系统异常大响应被限制在 1 MiB 内", oversized);
         }
         finally
         {
@@ -176,6 +190,14 @@ internal static class OpenApiChecksCallbacks
         }
 
         /// <summary>
+        /// 本次是否返回超限正文。
+        /// </summary>
+        public bool LargeResponse
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// 实际收到的请求次数。
         /// </summary>
         public int RequestCount
@@ -205,7 +227,13 @@ internal static class OpenApiChecksCallbacks
             Bodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
             Signatures.Add(request.Headers.GetValues(HeaderNames.Signature).Single());
             RequestIds.Add(request.Headers.GetValues(HeaderNames.RequestId).Single());
-            return new HttpResponseMessage(Fail ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
+            var response = new HttpResponseMessage(Fail ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK);
+            if (LargeResponse)
+            {
+                response.Content = new StringContent(new string('x', SignedHttpOutboundAdapter.MaxResponseBytes + 1));
+            }
+
+            return response;
         }
     }
 }

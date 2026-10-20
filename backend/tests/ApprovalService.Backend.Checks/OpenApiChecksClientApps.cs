@@ -71,6 +71,23 @@ internal static class OpenApiChecksClientApps
             }
 
             check("无效 API Key 不能调用开放接口", unauthorized);
+
+            var invalidFlows = false;
+            try
+            {
+                await service.CreateAsync(new CreateClientAppInput
+                {
+                    Code = "invalid-null-flows",
+                    Name = "错误配置",
+                    AllowedFlowCodes = null!,
+                });
+            }
+            catch (UserFriendlyException error) when (error.Code == "VALIDATION_FAILED")
+            {
+                invalidFlows = true;
+            }
+
+            check("显式空流程授权配置返回可纠正错误", invalidFlows);
         }
         finally
         {

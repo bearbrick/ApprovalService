@@ -83,7 +83,7 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
         if (string.IsNullOrWhiteSpace(input.Code) || input.Code.Length > 128 ||
             input.Code.Any(character => !char.IsAsciiLetterOrDigit(character) && character is not ('-' or '_')) ||
             string.IsNullOrWhiteSpace(input.Name) || input.Name.Length > 256 ||
-            input.AllowedFlowCodes.Any(string.IsNullOrWhiteSpace))
+            input.AllowedFlowCodes is null || input.AllowedFlowCodes.Any(string.IsNullOrWhiteSpace))
         {
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用编码、名称或流程授权配置不正确。");
         }

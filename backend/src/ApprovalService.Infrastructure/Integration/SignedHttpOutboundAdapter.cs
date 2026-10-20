@@ -12,6 +12,11 @@ namespace ApprovalService.Infrastructure.Integration;
 public sealed class SignedHttpOutboundAdapter(HttpClient client)
 {
     /// <summary>
+    /// 钩子与回调响应最大正文，避免对端异常响应耗尽服务内存。
+    /// </summary>
+    public const int MaxResponseBytes = 1024 * 1024;
+
+    /// <summary>
     /// 单次请求默认最大等待时间。
     /// </summary>
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
@@ -40,10 +45,35 @@ public sealed class SignedHttpOutboundAdapter(HttpClient client)
         {
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
             response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength > MaxResponseBytes)
+            {
+                throw new InvalidDataException("业务系统响应体超过 1 MiB 限制。");
+            }
+
+            // 响应可能使用分块传输，不能只依赖 Content-Length；逐块计数后再解码。
+            await using var stream = await response.Content.ReadAsStreamAsync(timeout.Token);
+            using var buffer = new MemoryStream();
+            var chunk = new byte[16 * 1024];
+            while (true)
+            {
+                var read = await stream.ReadAsync(chunk, timeout.Token);
+                if (read == 0)
+                {
+                    break;
+                }
+
+                if (buffer.Length + read > MaxResponseBytes)
+                {
+                    throw new InvalidDataException("业务系统响应体超过 1 MiB 限制。");
+                }
+
+                await buffer.WriteAsync(chunk.AsMemory(0, read), timeout.Token);
+            }
+
             return new OutboundHttpResponse
             {
                 StatusCode = (int)response.StatusCode,
-                Body = await response.Content.ReadAsStringAsync(timeout.Token),
+                Body = Encoding.UTF8.GetString(buffer.ToArray()),
             };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

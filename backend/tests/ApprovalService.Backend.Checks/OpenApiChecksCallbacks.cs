@@ -6,6 +6,7 @@ using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
@@ -91,6 +92,43 @@ internal static class OpenApiChecksCallbacks
                 OccurredAt = DateTimeOffset.UtcNow,
             };
             var body = CallbackNotifications.Serialize(notification);
+            var source = new InstanceEntity
+            {
+                Id = "source-instance",
+                SerialNo = "CG-2",
+                FlowCode = "PURCHASE",
+                BusinessKey = "PO-2",
+                Status = EngineInstanceStatuses.Approved,
+                ApprovalDataJson = "{\"amount\":1}",
+            };
+            var mappedEvents = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["instanceStarted"] = "instance.started",
+                ["instanceApproved"] = "instance.approved",
+                ["instanceRejected"] = "instance.rejected",
+                ["instanceWithdrawn"] = "instance.withdrawn",
+                ["instanceTerminated"] = "instance.terminated",
+                ["instanceCancelled"] = "instance.cancelled",
+                ["taskCreated"] = "task.created",
+                ["taskCompleted"] = "task.completed",
+                ["taskCancelled"] = "task.cancelled",
+            };
+            check("实例与任务的九类回调事件有稳定外部编码，内部事件不外发",
+                mappedEvents.All(pair => CallbackNotifications.Create(new EngineEvent
+                {
+                    Id = "mapped-event",
+                    Kind = pair.Key,
+                }, source)?.Event == pair.Value) &&
+                CallbackNotifications.Create(new EngineEvent { Kind = "gatewayJoined" }, source) is null);
+            var startedNotification = CallbackNotifications.Create(new EngineEvent
+            {
+                Id = "snapshot-started",
+                Kind = "instanceStarted",
+            }, source)!;
+            source.ApprovalDataJson = "{\"amount\":2}";
+            check("同一命令立刻完成时开始回调仍保存发起状态和当时数据快照",
+                startedNotification.Status == EngineInstanceStatuses.Running &&
+                startedNotification.Data.GetProperty("amount").GetInt32() == 1);
             var item = new OutboxItemEntity
             {
                 Id = "event-1:callback",
@@ -103,6 +141,22 @@ internal static class OpenApiChecksCallbacks
             var remote = new FakeBusinessHandler { Fail = true };
             using var client = new HttpClient(remote);
             var handler = new CallbackOutboxHandler(factory, protector, new SignedHttpOutboundAdapter(client), TimeProvider.System);
+            var mismatched = false;
+            try
+            {
+                await handler.DeliverAsync(new OutboxItemEntity
+                {
+                    EventId = "unexpected-event",
+                    InstanceId = item.InstanceId,
+                    PayloadJson = item.PayloadJson,
+                }, CancellationToken.None);
+            }
+            catch (InvalidOperationException)
+            {
+                mismatched = true;
+            }
+
+            check("回调待发项与正文事件身份不一致时拒绝出站", mismatched && remote.RequestCount == 0);
             var failed = false;
             try
             {

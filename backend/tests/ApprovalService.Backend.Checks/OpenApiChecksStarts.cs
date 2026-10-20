@@ -340,6 +340,7 @@ internal static partial class OpenApiChecksStarts
                 withdrawn.Tasks.All(task => task.Status == EngineTaskStatuses.Cancelled));
 
             await RunRoutingAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally
         {

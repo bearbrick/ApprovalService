@@ -15,6 +15,7 @@
 可以新建、修改的文件：
 
 - `backend/src/ApprovalService.Contracts/Protocol/`：开放接口的请求和响应、新错误码
+- `backend/src/ApprovalService.Contracts/Protocol/CallbackNotification.cs`、`CallbackEventCodes.cs`：撤销同意恢复原待办的兼容回调事件码及可选任务 ID；其他回调正文格式不变
 - `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`frontend/src/model/flow.ts`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：合入已验收的流程级撤回/退回策略契约
 - `backend/src/ApprovalService.Engine/Definitions/FlowCompiler.cs`、`FlowSemanticValidator.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowDefinitionChecks.cs`：仅从 T-034 已验收提交取发布编译、语义校验与场景检查；完整前端设计器由 T-036 集成
 - `frontend/src/model/flow-execution.ts`、`frontend/src/model/flow.ts`：仅从 T-034 已验收提交取独立的执行图类型拆分，保持源码少于 500 行和旧导入路径兼容
@@ -33,6 +34,7 @@
 - `backend/src/ApprovalService.Infrastructure/Options/`：签名密钥加密主密钥等接入配置
 - `client/src/ApprovalService.Client/ApprovalErrorCodes.cs`：新错误码的副本
 - 检查程序 `OpenApiChecks*.cs`：用一个假的业务系统后端
+- `backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：核对新增回调编码与契约文档一致
 - `backend/README.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`：同步开放接口和接入实现
 - `docs/adr/0010-outbound-hook-protocol.md`：未定义的四类业务钩子协议提议，确认前不实施
 
@@ -72,6 +74,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：主任务在稳定交接后要求补撤销同意回归：原任务恢复 `pending` 时必须清空任务投影的意见与完成时间，历史事件仍保留原同意；撤销同意要回调明确通知业务系统原任务恢复。修改在既有 Persistence/Integration 范围，新增的 Contracts 回调 `taskId?` 与 `task.restored` 先登记在 Protocol 共享文件并同步 `docs/contracts.md`、设计书 §integration/#api、后端 README，同提交全量验证。检查用真实 HTTP/SQLite 与出站重试同正文。其他待决事项不受此修复影响，状态保持阻塞。
 - 2026-10-20 · Codex：T-006 已实现的开放发起、流程目录/数据定义、审批单查询、待办数量与列表、撤回/催办/任务操作、签名回调/重试/重发及锁定发布图策略均有场景检查；审阅发现的隐藏摘要、征询借任务权限、退回/补充漏回调、意见投影四处已修。完整 `verify.ps1` 最终通过：后端 532、调用端 33、前端 65 项，零构建警告；5289 已释放。稳定提交 `6fd8bf4`（前端执行图类型拆分）、`45a95e4`（运行策略持久场景）、`6c448db`（摘要/征询/意见安全修复）、`486cd14`（回调兼容契约）。尚未开放只传单号/四类钩子、PATCH、外部重提、终止、批量发起、预览；分别等待 ADR 0010 钩子协议、业务字段更新授权、重提审批人字段保留、终止权限、批量部分失败与预览响应范围的用户决策，不能把这些验收项标完成。审批人字段 `Required` 的操作范围和明细子字段行索引协议也待确认。附件同应用归属/事务绑定依赖 T-013 用户决策，尚拒绝附件 ID。另接入应用停用→启用后旧嵌入 JWT/刷新令牌可能复活；需 T-006/T-007 协作引入单调 `AuthGeneration`，在签发与验证、刷新及一次性令牌中完整绑定，本任务未单独加无效字段。按 R13 状态改为阻塞，等这些产品/安全边界确认后续接。
 - 2026-10-20 · Codex：独立审阅的三处高优先级问题已修：待办摘要按锁定发布图的当前节点显式 `hidden` 权限过滤，重复权限发布时拒绝；征询回复必须使用原发问任务 ID，受询人仍可合法回复意见但不得携带 `fieldValues`；退回发起人、要求补充映射成稳定回调事件码，事务内固定等待状态、数据和填写值。任务意见投影在后续运行命令中保留。流程级撤回/重提策略从发布图固定到发起运行上下文，HTTP + SQLite 场景覆盖首人处理后拒撤、旧图默认可撤、退回原节点重提、任务意见和回调待发快照。后端 532 项、格式检查、前端 65 项及 build 已通过；完整 `verify.ps1` 首次仅因 `flow.ts` 525 行超限失败，已引入 T-034 已验收类型拆分修正，待 5289 窗口复验。外部终止/PATCH/重提/批量/预览与钩子协议仍待用户决策，状态保持进行中。
 - 2026-10-20 · Codex：本轮完整 `verify.ps1` 后端 532、调用端 33 均通过，前端因 T-034 契约合入使 `flow.ts` 达 525 行而停在源码规模检查，验证进程已退出释放 5289。T-034 已验收的 `8d46176` 有不依赖缺失工作台的 `flow-execution.ts` 类型拆分及 `flow.ts` 兼容转出；已只取这两个模型文件，`flow.ts` 降为 496 行，前端 65 项及构建通过。全量复验发现原 `ContractChecks.cs` 仅扫描 `flow.ts`，已在其既有登记范围内同步扫描拆出的类型文件，待 5289 重新验证。

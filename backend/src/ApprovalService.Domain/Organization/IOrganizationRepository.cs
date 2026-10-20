@@ -105,6 +105,16 @@ public interface IOrganizationRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 只从指定应用的现有绑定解析仍存在的内部部门，不回退到全局部门编码或 ID。
+    /// </summary>
+    /// <param name="clientAppCode">已鉴权的接入应用编码。</param>
+    /// <param name="externalDepartmentId">本应用已绑定的外部部门 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>有效内部部门 ID；绑定或部门不存在时为空。</returns>
+    Task<string?> ResolveBoundDepartmentAsync(string clientAppCode, string externalDepartmentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 获取引擎找人的组织快照。
     /// </summary>
     /// <param name="initiatorId">发起人员 ID。</param>

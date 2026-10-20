@@ -17,6 +17,64 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("ApprovalService.Domain.Integration.ClientAppEntity", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AllowedFlowCodesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ApiKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("AssigneeUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CallbackUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("CanViewAllTasks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SigningSecretCiphertext")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ValidationUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("ApiKeyHash")
+                        .IsUnique();
+
+                    b.ToTable("ClientApps", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
                 {
                     b.Property<string>("Id")

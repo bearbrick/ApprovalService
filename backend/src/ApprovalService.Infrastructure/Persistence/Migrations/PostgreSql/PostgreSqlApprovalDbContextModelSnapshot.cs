@@ -22,6 +22,64 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ApprovalService.Domain.Integration.ClientAppEntity", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ActionUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("AllowedFlowCodesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApiKeyHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("AssigneeUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("CallbackUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<bool>("CanViewAllTasks")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("SigningSecretCiphertext")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ValidationUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.HasKey("Code");
+
+                    b.HasIndex("ApiKeyHash")
+                        .IsUnique();
+
+                    b.ToTable("ClientApps", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
                 {
                     b.Property<string>("Id")

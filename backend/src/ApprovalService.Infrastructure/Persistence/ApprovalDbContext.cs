@@ -1,5 +1,6 @@
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Organization;
@@ -98,6 +99,10 @@ public class ApprovalDbContext : DbContext
 
     /// <summary>一次性嵌入令牌。</summary>
     public DbSet<EmbedTokenEntity> EmbedTokens => Set<EmbedTokenEntity>();
+    /// <summary>
+    /// 已登记的业务系统接入应用。
+    /// </summary>
+    public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
 
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -137,6 +142,23 @@ public class ApprovalDbContext : DbContext
     {
         OrganizationModelConfiguration.Configure(modelBuilder);
         IdentityModelConfiguration.Configure(modelBuilder);
+        modelBuilder.Entity<ClientAppEntity>(entity =>
+        {
+            entity.ToTable("ClientApps");
+            entity.HasKey(item => item.Code);
+            entity.Property(item => item.Code).HasMaxLength(128);
+            entity.Property(item => item.Name).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.ApiKeyHash).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.SigningSecretCiphertext).IsRequired();
+            entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
+            entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
+            entity.Property(item => item.DataUrl).HasMaxLength(2048);
+            entity.Property(item => item.ValidationUrl).HasMaxLength(2048);
+            entity.Property(item => item.AssigneeUrl).HasMaxLength(2048);
+            entity.Property(item => item.ActionUrl).HasMaxLength(2048);
+            entity.HasIndex(item => item.ApiKeyHash).IsUnique();
+        });
+
         modelBuilder.Entity<FlowEntity>(entity =>
         {
             entity.ToTable("Flows");

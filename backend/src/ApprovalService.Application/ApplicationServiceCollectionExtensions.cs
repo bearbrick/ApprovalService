@@ -1,3 +1,8 @@
+using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
+using ApprovalService.Application.Organization;
+using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +21,13 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddApprovalApplication(this IServiceCollection services)
     {
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
+        services.AddScoped<IServiceReadinessAppService, ServiceReadinessAppService>();
+        services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
+        services.AddScoped<IOrganizationAppService, OrganizationAppService>();
+        services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
+        services.AddScoped<ClientAppAppService>();
+        services.AddScoped<IIdentityAppService, IdentityAppService>();
+        services.AddScoped<INotificationAppService, NotificationAppService>();
         return services;
     }
 }

@@ -40,6 +40,11 @@
 | [0001](0001-tech-stack-and-layout.md) | 技术栈和仓库结构沿用标签服务，后端多一个引擎核心项目 | 已采纳 |
 | [0002](0002-product-boundary.md) | 审批服务不产生业务单据，对业务系统只提供数据接口 | 已采纳 |
 | [0003](0003-separate-database.md) | 审批库和业务库分开，不做直连业务库的数据库连接器 | 已采纳 |
-| [0004](0004-own-engine.md) | 引擎自己写：执行图加令牌、操作都是命令，两种画法编译成同一种执行图 | 已采纳 |
+| [0004](0004-own-engine.md) | 引擎自己写：执行图加令牌、操作都是命令，两种画法编译成同一种执行图 | 画法部分被 0007 取代 |
 | [0005](0005-demo-winui-and-integration-library.md) | 示例业务系统用 WinUI 3 做界面，对接代码放在不依赖界面的类库里 | 已采纳 |
 | [0006](0006-organization-and-accounts.md) | 组织架构自己维护、业务系统绑定；账号先独立，登录按统一登录预留 | 已采纳 |
+| [0007](0007-single-canvas-designer.md) | 流程设计统一使用自由画布 | 已采纳 |
+| [0008](0008-ef-core-providers.md) | 运行库使用 EF Core 和三种独立迁移 | 已采纳 |
+| [0011](0011-local-jwt-identity.md) | 本地账号使用短期 JWT 与可轮换刷新令牌 | 已采纳 |
+| [0012](0012-miniexcel-organization-import.md) | 组织 Excel 导入导出使用 MiniExcel | 已采纳 |
+| [0013](0013-bound-user-id-for-open-api.md) | 开放接口只接受接入应用已绑定的人员 ID | 提议 |

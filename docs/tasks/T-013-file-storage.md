@@ -19,6 +19,7 @@
 - `backend/src/ApprovalService.Api/Endpoints/Files/`、`backend/src/ApprovalService.Contracts/Protocol/`：上传下载路由和契约；`backend/tests/ApprovalService.Backend.Checks/FileChecks.cs`：场景检查
 - `backend/tools/`：从本地存储迁移到 MinIO 的命令
 - S3 客户端要新增依赖：按 R8 写 ADR、征得同意再下载
+- 新增本机已缓存的 `Minio` 7.0.0：它提供 S3 兼容对象上传、读取、删除及短时预签名地址，避免手写签名和 HTTP 协议；选择依据见 ADR 0009
 - 图片缩略图可以用标签服务在用的 SkiaSharp（本机缓存里有）
 
 ## 共享文件

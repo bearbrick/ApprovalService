@@ -98,6 +98,16 @@ internal static class FlowDefinitionChecks
         check("分支条件引用不存在的审批字段时拒绝发布并定位连线",
             FlowCompiler.Compile(missingField).Issues.Any(issue => issue.ElementId == missingEdge.Id));
 
+        var invalidExpression = Copy(baseline);
+        var expressionGateway = invalidExpression.Canvas.Nodes.First(node => node.Type == FlowNodeTypes.ExclusiveGateway && node.GatewayDirection == FlowGatewayDirections.Split);
+        var expressionEdge = invalidExpression.Canvas.Edges.First(edge => edge.SourceId == expressionGateway.Id && !edge.IsDefault);
+        expressionEdge.Condition = "EXEC('bad')";
+        check("未知函数条件在发布时拒绝并定位连线",
+            FlowCompiler.Compile(invalidExpression).Issues.Any(issue => issue.ElementId == expressionEdge.Id && issue.Message.Contains("不支持函数", StringComparison.Ordinal)));
+        expressionEdge.Condition = "1 / 0";
+        check("常量条件除零在发布时拒绝并定位连线",
+            FlowCompiler.Compile(invalidExpression).Issues.Any(issue => issue.ElementId == expressionEdge.Id && issue.Message.Contains("为零", StringComparison.Ordinal)));
+
         var nestedField = Copy(flows.First(flow => flow.Data.Fields.Any(field => field.Key == "items")));
         var nestedGateway = nestedField.Canvas.Nodes.First(node => node.Type == FlowNodeTypes.ExclusiveGateway && node.GatewayDirection == FlowGatewayDirections.Split);
         var nestedEdge = nestedField.Canvas.Edges.First(edge => edge.SourceId == nestedGateway.Id && !edge.IsDefault);

@@ -21,6 +21,14 @@
 
 正式自由画布流程定义的 TypeScript 副本位于 `src/model/flow.ts`，供后续设计器使用；字段与后端 Contracts 保持一致。当前页面尚未接入流程设计、发布或审批业务接口。
 
+## 审批数据与详情排版模块
+
+`src/designer/data/ApprovalFieldsEditor.vue` 编辑流程的 `data`：顶层字段、明细表子字段、计算表达式、必传、审批人填写和摘要字段。它提供业务系统提交数据的 JSON 样例；计算字段与审批人填写字段不要求业务系统提交。表达式只作为定义保存，实际解析与计算由后端负责。
+
+`ApprovalDetailLayoutEditor.vue` 编辑 `detailLayout`：自动排版、自定义分组（每行一至三列、字段跨列、明细列宽、金额大写）和嵌入业务系统只读原单的页面编码。自定义模式支持拖放字段，键盘可用分组下拉框和上下移动按钮。右侧实时预览只展示字段结构和类型提示，不使用或伪造真实业务数据。嵌入模式只存页面编码，不接受任意 URL；实际地址及短时身份由业务系统对接提供。
+
+`NodeFieldPermissionsEditor.vue` 编辑人工节点的 `fieldPermissions`，字段路径包括 `tableKey.childKey`。三个组件由流程工作台分别在字段、排版、节点设置中挂载，均接收契约镜像类型并通过 `update:data`、`update:detailLayout`、`update:permissions` 返回新对象，不直接修改父级草稿。`data-model.ts` 提供纯函数和场景检查；设计时提示不能代替后端发布校验。审批服务不创建业务单据，也不在设计器提供发起表单。
+
 ## 命令
 
 ```powershell

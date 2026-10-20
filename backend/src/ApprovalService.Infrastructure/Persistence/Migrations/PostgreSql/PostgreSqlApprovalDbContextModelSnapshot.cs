@@ -843,6 +843,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");

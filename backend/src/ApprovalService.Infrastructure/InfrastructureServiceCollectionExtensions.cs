@@ -48,6 +48,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
+        services.AddScoped<IScheduledJobHandler, DepartureJobHandler>();
         services.AddHostedService<DurableJobWorker>();
         return services;
     }

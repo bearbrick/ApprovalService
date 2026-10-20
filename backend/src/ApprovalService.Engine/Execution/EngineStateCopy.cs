@@ -18,6 +18,7 @@ internal static class EngineStateCopy
         ProcessedRequestIds = new HashSet<string>(source.ProcessedRequestIds, StringComparer.Ordinal),
         ApprovedAssigneeIds = new HashSet<string>(source.ApprovedAssigneeIds, StringComparer.Ordinal),
         LastApprovedAssigneeId = source.LastApprovedAssigneeId,
+        Operations = ApprovalService.Engine.Commands.OperationStateCopy.Copy(source.Operations),
         Tasks = source.Tasks.Select(task => new EngineTask
         {
             Id = task.Id,
@@ -27,6 +28,9 @@ internal static class EngineStateCopy
             Status = task.Status,
             CompletionKind = task.CompletionKind,
             CanReject = task.CanReject,
+            DelegatorId = task.DelegatorId,
+            AddedByTaskId = task.AddedByTaskId,
+            SignerMode = task.SignerMode,
         }).ToList(),
         Tokens = source.Tokens.Select(token => new EngineToken
         {

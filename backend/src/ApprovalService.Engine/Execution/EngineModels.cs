@@ -1,6 +1,7 @@
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Engine.Abstractions;
 using ApprovalService.Engine.Assignees;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Policies;
 
 namespace ApprovalService.Engine.Execution;
@@ -165,6 +166,14 @@ public sealed class EngineCommand
     /// 动作或子流程结果是否成功。
     /// </summary>
     public bool Success { get; set; } = true;
+
+    /// <summary>
+    /// 本次操作的身份、意见和目标参数；旧自动命令可为空。
+    /// </summary>
+    public OperationInput? Operation
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -226,6 +235,11 @@ public sealed class EngineContext
     /// 本次执行额外注册的纯节点行为；相同类型最多一个，可覆盖内置行为。
     /// </summary>
     public IReadOnlyList<INodeBehavior> NodeBehaviors { get; set; } = [];
+
+    /// <summary>
+    /// 发起人及流程编码等由应用层提供的操作上下文。
+    /// </summary>
+    public OperationContext Operations { get; set; } = new();
 }
 
 /// <summary>
@@ -322,6 +336,30 @@ public sealed class EngineTask
     {
         get; set;
     }
+
+    /// <summary>
+    /// 代理任务的原审批人；空值表示本人任务。
+    /// </summary>
+    public string? DelegatorId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 动态加签时发起加签的任务 ID；普通任务为空。
+    /// </summary>
+    public string? AddedByTaskId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 加签位置：before、after 或 parallel。
+    /// </summary>
+    public string? SignerMode
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -367,105 +405,10 @@ public sealed class EngineState
     {
         get; set;
     }
-}
-
-/// <summary>
-/// 引擎产生的一条只追加事件，应用层负责持久化及出站派发。
-/// </summary>
-public sealed class EngineEvent
-{
-    /// <summary>
-    /// 确定性事件 ID。
-    /// </summary>
-    public string Id { get; set; } = string.Empty;
-    /// <summary>
-    /// 事件种类。
-    /// </summary>
-    public string Kind { get; set; } = string.Empty;
-    /// <summary>
-    /// 发生时间，由调用方提供。
-    /// </summary>
-    public DateTimeOffset OccurredAt
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 相关节点 ID。
-    /// </summary>
-    public string? NodeId
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 相关令牌 ID。
-    /// </summary>
-    public string? TokenId
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 相关任务 ID。
-    /// </summary>
-    public string? TaskId
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 子流程编码或自动动作编码。
-    /// </summary>
-    public string? TargetCode
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 预览时的人员，仅人员变化事件填入。
-    /// </summary>
-    public List<string> PreviewAssigneeIds { get; set; } = [];
-    /// <summary>
-    /// 到节点时重新解析的人员，仅人员变化事件填入。
-    /// </summary>
-    public List<string> ResolvedAssigneeIds { get; set; } = [];
-}
-
-/// <summary>
-/// 一次命令的纯计算结果。
-/// </summary>
-public sealed class EngineResult
-{
-    /// <summary>
-    /// 新状态。
-    /// </summary>
-    public EngineState State { get; set; } = new();
-    /// <summary>
-    /// 本命令产生的新事件；幂等重放为空。
-    /// </summary>
-    public List<EngineEvent> Events { get; set; } = [];
-    /// <summary>
-    /// 同一请求 ID 已处理过时为真。
-    /// </summary>
-    public bool IsReplay
-    {
-        get; set;
-    }
-}
-
-/// <summary>
-/// 可由调用方纠正的无效命令或运行图。
-/// </summary>
-public sealed class EngineException : Exception
-{
-    /// <summary>
-    /// 构造带稳定错误码和中文说明的错误。
-    /// </summary>
-    /// <param name="code">错误码。</param>
-    /// <param name="message">中文说明。</param>
-    public EngineException(string code, string message) : base(message) => Code = code;
 
     /// <summary>
-    /// 错误码。
+    /// 审批操作所需的可持久化补充状态。
     /// </summary>
-    public string Code
-    {
-        get;
-    }
+    public OperationState Operations { get; set; } = new();
 }
+

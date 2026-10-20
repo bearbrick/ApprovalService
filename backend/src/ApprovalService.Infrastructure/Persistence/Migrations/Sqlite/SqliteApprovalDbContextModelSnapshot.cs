@@ -838,6 +838,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");

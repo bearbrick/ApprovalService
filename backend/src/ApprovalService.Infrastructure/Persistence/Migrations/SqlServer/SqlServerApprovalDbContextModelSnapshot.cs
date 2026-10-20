@@ -843,6 +843,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");

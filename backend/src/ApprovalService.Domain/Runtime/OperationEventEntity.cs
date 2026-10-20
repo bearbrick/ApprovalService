@@ -215,6 +215,14 @@ public sealed class ScheduledJobEntity
     }
 
     /// <summary>
+    /// 上次失败的稳定错误码；不保存异常消息或组织人员数据。
+    /// </summary>
+    public string? LastError
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 乐观锁版本。
     /// </summary>
     public long Version

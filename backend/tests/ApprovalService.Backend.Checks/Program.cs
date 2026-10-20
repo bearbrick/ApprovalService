@@ -48,6 +48,11 @@ internal static class Program
         await EventAnchorChecks.RunAsync(Check);
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
+        OperationChecks.Run(Check);
+        OperationChecksBoundaries.Run(Check);
+        DepartureChecks.Run(Check);
+        await DeparturePersistenceChecks.RunAsync(Check);
+        await DepartureJobChecks.RunAsync(Check);
         await OpenApiChecksClientApps.RunAsync(Check);
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);

@@ -81,7 +81,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 db.Entry(existing).CurrentValues.SetValues(person);
                 if (wasActive && !person.IsActive)
                 {
-                    await AddDepartureNoticeAsync(db, person.Id, occurredAt, cancellationToken);
+                    await DepartureScheduleWriter.AddAsync(db, person.Id, occurredAt, cancellationToken);
                 }
             }
 
@@ -210,7 +210,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 if (wasActive && !person.IsActive)
                 {
                     departed.Add(person.Id);
-                    await AddDepartureNoticeAsync(db, person.Id, occurredAt, cancellationToken);
+                    await DepartureScheduleWriter.AddAsync(db, person.Id, occurredAt, cancellationToken);
                 }
             }
             // 其他来源只能维护绑定，不能覆盖可信主数据。
@@ -459,35 +459,4 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             OccurredAt = occurredAt,
         });
 
-    /// <summary>
-    /// 留下离职提醒和当前未办任务数；具体改派遵循节点离职规则，由运行用例接续。
-    /// </summary>
-    /// <param name="db">同一事务的上下文。</param>
-    /// <param name="personId">离职人员 ID。</param>
-    /// <param name="occurredAt">发生时间。</param>
-    /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>异步操作。</returns>
-    private static async Task AddDepartureNoticeAsync(ApprovalDbContext db, string personId,
-        DateTimeOffset occurredAt, CancellationToken cancellationToken)
-    {
-        var pending = await db.ApprovalTasks.CountAsync(item => item.AssigneeId == personId &&
-            item.Status == "pending", cancellationToken);
-        var notice = await db.DepartureNotices.SingleOrDefaultAsync(item => item.PersonId == personId,
-            cancellationToken);
-        if (notice is null)
-        {
-            db.DepartureNotices.Add(new DepartureNoticeEntity
-            {
-                PersonId = personId,
-                CreatedAt = occurredAt,
-                PendingTaskCount = pending,
-            });
-        }
-        else
-        {
-            notice.CreatedAt = occurredAt;
-            notice.PendingTaskCount = pending;
-            notice.AcknowledgedAt = null;
-        }
-    }
 }

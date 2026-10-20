@@ -3,6 +3,7 @@ using ApprovalService.Application.Organization;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
@@ -95,6 +96,7 @@ internal static class DepartureJobChecks
                 retryAt = retry.DueAt;
                 check("无在职接手人时保留任务并持久退避重试",
                     retry.Attempts == 1 && retry.DueAt > blockedAt &&
+                    retry.LastError == ErrorCodes.ValidationFailed &&
                     await db.ApprovalTasks.AnyAsync(item => item.InstanceId == "blocked" &&
                         item.AssigneeId == "no-manager") &&
                     await db.DepartureNotices.AnyAsync(item => item.PersonId == "no-manager" &&
@@ -114,7 +116,7 @@ internal static class DepartureJobChecks
                     await db.OperationEvents.CountAsync(item => item.InstanceId == "blocked" &&
                         item.Kind == "inactiveTaskReassigned") == 1 &&
                     await db.ScheduledJobs.CountAsync(item => item.Kind == DepartureJobHandler.JobKind &&
-                        item.Status == JobStatuses.Completed) == 2);
+                        item.Status == JobStatuses.Completed && item.LastError == null) == 2);
             }
         }
         finally

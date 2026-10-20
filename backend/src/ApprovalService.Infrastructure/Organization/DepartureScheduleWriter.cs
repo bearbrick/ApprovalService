@@ -24,8 +24,12 @@ internal static class DepartureScheduleWriter
     public static async Task AddAsync(ApprovalDbContext db, string personId, DateTimeOffset occurredAt,
         CancellationToken cancellationToken)
     {
-        var pending = await db.ApprovalTasks.CountAsync(item => item.AssigneeId == personId &&
-            (item.Status == EngineTaskStatuses.Pending || item.Status == EngineTaskStatuses.Queued), cancellationToken);
+        var pending = await (from task in db.ApprovalTasks
+                             join instance in db.Instances on task.InstanceId equals instance.Id
+                             where task.AssigneeId == personId &&
+                                 instance.Status == EngineInstanceStatuses.Running &&
+                                 (task.Status == EngineTaskStatuses.Pending || task.Status == EngineTaskStatuses.Queued)
+                             select task.Id).CountAsync(cancellationToken);
         var notice = await db.DepartureNotices.SingleOrDefaultAsync(item => item.PersonId == personId,
             cancellationToken);
         if (notice is null)

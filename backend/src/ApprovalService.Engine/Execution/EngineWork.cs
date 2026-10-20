@@ -2,6 +2,7 @@ using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Engine.Abstractions;
 using ApprovalService.Engine.Assignees;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution.Behaviors;
 using ApprovalService.Engine.Policies;
 
@@ -171,6 +172,8 @@ internal sealed class EngineWork
     /// <param name="commandKind">同意、办理完成、已阅或拒绝。</param>
     public void CompleteTask(EngineTask task, EngineToken token, FlowExecutionNode node, string commandKind)
     {
+        state.Operations.HasHumanDecision = true;
+        state.Operations.HumanDecisionCount++;
         task.Status = commandKind == EngineCommandKinds.Reject ? EngineTaskStatuses.Rejected : EngineTaskStatuses.Approved;
         if (task.Status == EngineTaskStatuses.Approved && node.Type == FlowNodeTypes.Approval)
         {
@@ -189,6 +192,7 @@ internal sealed class EngineWork
         var decision = node.Type == FlowNodeTypes.Approval
             ? ApprovalPolicyRegistry.Evaluate(node.Approval ?? new FlowApprovalSettings(), ballots, context.ApprovalPolicies)
             : new ApprovalPolicyDecision { Outcome = commandKind == EngineCommandKinds.Reject ? "rejected" : "approved" };
+        decision = OperationSignerCommands.AdjustDecision(state, token.Id, decision);
         if (decision.ActivateTaskId is not null)
         {
             var next = state.Tasks.Single(item => item.Id == decision.ActivateTaskId);
@@ -254,6 +258,12 @@ internal sealed class EngineWork
             throw new EngineException(ErrorCodes.ValidationFailed, "人工节点缺少已解析的处理人。");
         }
 
+        if (state.Operations.AssigneeOverrides.TryGetValue(node.Id, out var overrideId))
+        {
+            plan = new AssigneePlan { AssigneeIds = [overrideId] };
+            Emit("assigneeOverridden", node.Id, token.Id);
+        }
+
         if (context.PreviewAssignees.TryGetValue(node.Id, out var preview) &&
             !preview.SequenceEqual(plan.AssigneeIds, StringComparer.Ordinal))
         {
@@ -269,16 +279,31 @@ internal sealed class EngineWork
             return;
         }
 
+        state.Operations.Visits.Add(new OperationVisit
+        {
+            NodeId = node.Id,
+            Forks = OperationStateCopy.CopyForks(token.Forks),
+        });
+        var resolved = plan.AssigneeIds.Select(item => OperationDelegationResolver.Resolve(item, node, context))
+            .Where(item => item.AssigneeId is not null).ToArray();
+        if (resolved.Length == 0)
+        {
+            Emit("delegatedSelfApprovalSkipped", node.Id, token.Id);
+            MoveSingle(token);
+            return;
+        }
+
         var sequential = node.Type == FlowNodeTypes.Approval &&
             (node.Approval?.Mode ?? FlowApprovalModes.Sequential) == FlowApprovalModes.Sequential;
-        for (var index = 0; index < plan.AssigneeIds.Count; index++)
+        for (var index = 0; index < resolved.Length; index++)
         {
             var task = new EngineTask
             {
                 Id = NewId("task"),
                 TokenId = token.Id,
                 NodeId = node.Id,
-                AssigneeId = plan.AssigneeIds[index],
+                AssigneeId = resolved[index].AssigneeId!,
+                DelegatorId = resolved[index].DelegatorId,
                 Status = sequential && index > 0 ? EngineTaskStatuses.Queued : EngineTaskStatuses.Pending,
                 CompletionKind = decision.TaskCompletionKind,
                 CanReject = decision.CanReject,

@@ -1,6 +1,9 @@
+using System.Data.Common;
 using ApprovalService.Domain.Runtime;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace ApprovalService.Infrastructure.Jobs;
 
@@ -45,30 +48,52 @@ public sealed class DurableJobWorker : BackgroundService
     private readonly TimeProvider timeProvider;
 
     /// <summary>
+    /// 记录数据库暂时不可达的原因。
+    /// </summary>
+    private readonly ILogger<DurableJobWorker>? logger;
+
+    /// <summary>
     /// 创建后台执行器。
     /// </summary>
     /// <param name="outbox">待发队列。</param>
     /// <param name="scheduledJobs">定时任务队列。</param>
     /// <param name="scopeFactory">依赖范围工厂。</param>
     /// <param name="timeProvider">时钟；未注册时使用系统时钟。</param>
+    /// <param name="logger">可选日志记录器。</param>
     public DurableJobWorker(OutboxQueue outbox, ScheduledJobQueue scheduledJobs,
-        IServiceScopeFactory scopeFactory, TimeProvider? timeProvider = null)
+        IServiceScopeFactory scopeFactory, TimeProvider? timeProvider = null,
+        ILogger<DurableJobWorker>? logger = null)
     {
         this.outbox = outbox;
         this.scheduledJobs = scheduledJobs;
         this.scopeFactory = scopeFactory;
         this.timeProvider = timeProvider ?? TimeProvider.System;
+        this.logger = logger;
     }
 
     /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        var databaseRetryDelay = TimeSpan.FromSeconds(2);
         while (!stoppingToken.IsCancellationRequested)
         {
-            var processed = await RunOnceAsync(timeProvider.GetUtcNow(), stoppingToken);
-            if (processed == 0)
+            try
             {
-                await Task.Delay(IdleInterval, timeProvider, stoppingToken);
+                var processed = await RunOnceAsync(timeProvider.GetUtcNow(), stoppingToken);
+                databaseRetryDelay = TimeSpan.FromSeconds(2);
+                if (processed == 0)
+                {
+                    await Task.Delay(IdleInterval, timeProvider, stoppingToken);
+                }
+            }
+            catch (Exception error) when (error is DbException or
+                DbUpdateException { InnerException: DbException } or
+                InvalidOperationException { InnerException: DbException })
+            {
+                // 数据库暂时断开时保留进程和就绪接口；待发项仍留在数据库中，稍后重新领取。
+                logger?.LogError(error, "后台任务数据库暂时不可用，稍后重试。");
+                await Task.Delay(databaseRetryDelay, timeProvider, stoppingToken);
+                databaseRetryDelay = TimeSpan.FromSeconds(Math.Min(30, databaseRetryDelay.TotalSeconds * 2));
             }
         }
     }

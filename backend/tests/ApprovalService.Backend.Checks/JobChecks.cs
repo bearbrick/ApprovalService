@@ -1,3 +1,4 @@
+using System.Data.Common;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Persistence;
@@ -42,6 +43,7 @@ internal static class JobChecks
             await CheckOutboxAsync(options, check);
             await CheckScheduledJobsAsync(options, check);
             await CheckWorkerAsync(options, check);
+            await CheckDatabaseOutageAsync(directory, check);
         }
         finally
         {
@@ -184,7 +186,88 @@ internal static class JobChecks
             jobHandler.Calls == 1);
         check("后台执行成功后两类项目均持久标记完成", outbox.Status == JobStatuses.Completed &&
             job.Status == JobStatuses.Completed);
+
+        await using (var context = new ApprovalDbContext(options))
+        {
+            context.OutboxItems.Add(new OutboxItemEntity
+            {
+                Id = "outbox-failure",
+                InstanceId = "instance",
+                EventId = "event-failure",
+                Kind = "callback",
+                PayloadJson = "{}",
+                AvailableAt = now.AddMinutes(1),
+            });
+            await context.SaveChangesAsync();
+        }
+
+        outboxHandler.FailNext = true;
+        var firstAttempt = await worker.RunOnceAsync(now.AddMinutes(1));
+        await using var failedVerification = new ApprovalDbContext(options);
+        var failed = await failedVerification.OutboxItems.AsNoTracking()
+            .SingleAsync(item => item.Id == "outbox-failure");
+        check("后台发送器异常会持久安排重试", firstAttempt == 1 && failed.Status == JobStatuses.Pending &&
+            failed.Attempts == 1 && failed.LastError == nameof(InvalidOperationException) &&
+            failed.AvailableAt == now.AddMinutes(2));
+        var retryAttempt = await worker.RunOnceAsync(now.AddMinutes(2));
+        await using var retryVerification = new ApprovalDbContext(options);
+        var completed = await retryVerification.OutboxItems.AsNoTracking()
+            .SingleAsync(item => item.Id == "outbox-failure");
+        check("后台发送器重试成功后只确认一次", retryAttempt == 1 &&
+            completed.Status == JobStatuses.Completed && completed.Attempts == 2);
         worker.Dispose();
+    }
+
+    /// <summary>
+    /// 数据库临时不可达时后台执行器保持运行，等待连接恢复。
+    /// </summary>
+    /// <param name="directory">测试目录。</param>
+    /// <param name="check">检查结果记录器。</param>
+    /// <returns>异步操作。</returns>
+    private static async Task CheckDatabaseOutageAsync(string directory, Action<string, bool> check)
+    {
+        var missingPath = Path.Combine(directory, "absent", "jobs.db");
+        var options = new DbContextOptionsBuilder<ApprovalDbContext>()
+            .UseSqlite("Data Source=" + missingPath).Options;
+        var factory = new PooledDbContextFactory<ApprovalDbContext>(options);
+        using var services = new ServiceCollection().BuildServiceProvider();
+        using var worker = new DurableJobWorker(new OutboxQueue(factory), new ScheduledJobQueue(factory),
+            services.GetRequiredService<IServiceScopeFactory>());
+        await worker.StartAsync(CancellationToken.None);
+        await Task.Delay(150);
+        check("数据库连接失败时后台执行器保持运行等待重试", worker.ExecuteTask is { IsCompleted: false });
+        await worker.StopAsync(CancellationToken.None);
+
+        using var wrappedWorker = new DurableJobWorker(new OutboxQueue(new TransientFailureFactory()),
+            new ScheduledJobQueue(new TransientFailureFactory()),
+            services.GetRequiredService<IServiceScopeFactory>());
+        await wrappedWorker.StartAsync(CancellationToken.None);
+        await Task.Delay(150);
+        check("提供程序把连接错误包装为瞬断异常时后台执行器仍等待重试",
+            wrappedWorker.ExecuteTask is { IsCompleted: false });
+        await wrappedWorker.StopAsync(CancellationToken.None);
+    }
+
+    /// <summary>
+    /// 模拟数据库提供程序把连接异常包进瞬断异常的工厂。
+    /// </summary>
+    private sealed class TransientFailureFactory : IDbContextFactory<ApprovalDbContext>
+    {
+        /// <inheritdoc />
+        public ApprovalDbContext CreateDbContext() => throw new InvalidOperationException(
+            "数据库连接暂时不可用。", new TestDatabaseException());
+
+        /// <inheritdoc />
+        public Task<ApprovalDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
+            Task.FromException<ApprovalDbContext>(new InvalidOperationException(
+                "数据库连接暂时不可用。", new TestDatabaseException()));
+    }
+
+    /// <summary>
+    /// 测试用数据库连接异常。
+    /// </summary>
+    private sealed class TestDatabaseException : DbException
+    {
     }
 
     /// <summary>
@@ -198,12 +281,29 @@ internal static class JobChecks
         /// <summary>
         /// 已调用次数。
         /// </summary>
-        public int Calls { get; private set; }
+        public int Calls
+        {
+            get; private set;
+        }
+
+        /// <summary>
+        /// 下一次调用是否故意失败。
+        /// </summary>
+        public bool FailNext
+        {
+            get; set;
+        }
 
         /// <inheritdoc />
         public Task DeliverAsync(OutboxItemEntity item, CancellationToken cancellationToken)
         {
             Calls++;
+            if (FailNext)
+            {
+                FailNext = false;
+                throw new InvalidOperationException("模拟发送失败。");
+            }
+
             return Task.CompletedTask;
         }
     }
@@ -219,7 +319,10 @@ internal static class JobChecks
         /// <summary>
         /// 已调用次数。
         /// </summary>
-        public int Calls { get; private set; }
+        public int Calls
+        {
+            get; private set;
+        }
 
         /// <inheritdoc />
         public Task ExecuteAsync(ScheduledJobEntity job, CancellationToken cancellationToken)

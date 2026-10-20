@@ -3,7 +3,7 @@
 状态：进行中
 负责人：Codex 2026-10-20
 里程碑：M2～M4 集成
-依赖：T-001～T-005、T-008～T-010、T-025～T-028、T-030 的已验收提交
+依赖：T-001～T-005、T-008～T-010、T-025～T-028、T-030、T-031 的已验收提交
 设计书：§1、§2、§3、§4、§5、§6、§9、§10、§12、§13
 
 ## 目标
@@ -15,7 +15,7 @@
 可以新建、修改的文件：
 
 - `docs/tasks/T-032-integration-baseline.md`、`docs/tasks/README.md`。
-- 合入已验收任务提交所涉及的 `backend/`、`frontend/`、`client/`、`docs/` 文件及必要的 `docs/prototypes/` 文件；只为解决明确的集成冲突做最小修改，不增加业务行为。
+- 合入已验收任务（含 T-031 审批中心前端基础）提交所涉及的 `backend/`、`frontend/`、`client/`、`docs/` 文件及必要的 `docs/prototypes/` 文件；只为解决明确的集成冲突做最小修改，不增加业务行为。
 - 如验证暴露仅由集成引起的错误，修改对应受影响文件并在交接记录里逐项说明。
 
 ## 共享文件
@@ -23,7 +23,7 @@
 改这些文件前先在交接记录里写明改什么；改动尽量小，单独成一个提交：
 
 - `docs/tasks/README.md`：仅追加 T-032 索引。
-- 各任务已验收提交带入的 `docs/contracts.md`、`docs/architecture.md`、`docs/adr/README.md`、`backend/ApprovalService.Backend.slnx`、`backend/Directory.Packages.props`、`backend/src/ApprovalService.Contracts/**`、后端三个服务登记文件与检查程序 `Program.cs`、`client/ApprovalService.Client.slnx`、客户端协议副本与检查程序 `Program.cs`、`frontend/package.json`、`frontend/src/App.vue`、`frontend/src/model/routes.ts`：只保留各任务已实现的兼容内容；冲突时逐项核对。
+- 各任务已验收提交带入的 `docs/contracts.md`、`docs/architecture.md`、`docs/adr/README.md`、`backend/ApprovalService.Backend.slnx`、`backend/Directory.Packages.props`、`backend/src/ApprovalService.Contracts/**`、后端三个服务登记文件与检查程序 `Program.cs`、`client/ApprovalService.Client.slnx`、客户端协议副本与检查程序 `Program.cs`、`frontend/package.json`、`frontend/src/App.vue`、`frontend/src/model/routes.ts`：只保留各任务已实现的兼容内容；冲突时逐项核对。T-031 仅带入已验收的前端接入骨架与 `App.vue` 桌面中心入口。
 
 ## 验收标准
 
@@ -38,4 +38,5 @@
 
 ## 交接记录
 
+- 2026-10-20 · Codex · T-031 已由另一位 AI 独立验收，现纳入集成范围。先登记其对共享 `frontend/src/App.vue` 和 `docs/tasks/README.md` 的增量，再合并；保留 T-031 明确的未接入边界。
 - 2026-10-20 · Codex · 认领集成任务；先登记共享文件及预期用途，再逐分支核对合入。T-028 的已验收分支包含 T-007 的必要已提交基线，合入时需显式记录且不代替 T-007 验收。

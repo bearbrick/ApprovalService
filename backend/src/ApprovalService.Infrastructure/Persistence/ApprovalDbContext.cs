@@ -1,4 +1,6 @@
+using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApprovalService.Infrastructure.Persistence;
@@ -58,6 +60,11 @@ public class ApprovalDbContext : DbContext
     /// 可重启的定时任务。
     /// </summary>
     public DbSet<ScheduledJobEntity> ScheduledJobs => Set<ScheduledJobEntity>();
+
+    /// <summary>
+    /// 已投递的站内消息。
+    /// </summary>
+    public DbSet<InAppNotificationEntity> InAppNotifications => Set<InAppNotificationEntity>();
 
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -203,5 +210,6 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Version).IsConcurrencyToken();
             entity.HasIndex(item => new { item.Status, item.DueAt, item.LeaseUntil });
         });
+        NotificationModelConfiguration.Configure(modelBuilder);
     }
 }

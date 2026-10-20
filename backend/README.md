@@ -53,12 +53,20 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Provider` | `Sqlite` | 数据库：Sqlite、SqlServer、PostgreSql（MVP 用 SQLite） |
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
+| `Notifications:Smtp:Host` | — | SMTP 主机；未配置时邮件留在待发队列等待重试 |
+| `Notifications:Smtp:Port` | `587` | SMTP 端口 |
+| `Notifications:Smtp:EnableSsl` | `true` | 启用 SMTP TLS |
+| `Notifications:Smtp:FromAddress` | — | 发件地址 |
+| `Notifications:Smtp:UserName` / `Password` | — | SMTP 凭据，由部署环境提供，不提交到仓库 |
+| `Notifications:Smtp:PublicBaseUrl` | — | 审批中心公开地址，用于邮件中的需登录站内链接 |
 
 ## 持久化与后台任务
 
 流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。
 
 审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试。出站回调等具体发送器由后续集成任务登记。
+
+通知传输基础在 `Notifications/`：`INotificationAppService.QueueAsync` 把稳定 ID、渠道编码、收件人和站内路径写入待发队列；后台处理器在事务外选择 `INotificationChannel`，发送 SMTP 邮件或写入站内收件箱。站内消息按 ID 幂等，按人员读取和标记已读。邮件在 SMTP 接收后、待发确认前故障时可能重发，邮件带稳定的 `X-Approval-Notification-Id` 供下游去重。当前没有业务事件自动产生通知；后续接入审批事件时，应在审批事务的 `RuntimeCommit.OutboxItems` 中一并写入通知待发项，避免提交后进程退出漏发。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
 

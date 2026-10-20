@@ -54,6 +54,16 @@ internal static partial class ContractChecks
         CheckFlowKinds(flowKinds, flowCopy, "FlowFieldAccess", "flowFieldAccess", "字段权限", check);
         CheckFlowProperties(flowCopy, check);
 
+        var approvalKinds = Read(Path.Combine("backend", "src", "ApprovalService.Contracts", "Flows", "FlowApprovalKinds.cs"));
+        var approvalCopy = Read(Path.Combine("frontend", "src", "model", "flow-approval-kinds.ts"));
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowAssigneeSources", "flowAssigneeSources", "审批人来源", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowApprovalModes", "flowApprovalModes", "多人审批方式", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowRejectBehaviors", "flowRejectBehaviors", "会签拒绝处理", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowMissingAssigneeBehaviors", "flowMissingAssigneeBehaviors", "无审批人处理", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowSelfApprovalBehaviors", "flowSelfApprovalBehaviors", "本人审批处理", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowDuplicateAssigneeBehaviors", "flowDuplicateAssigneeBehaviors", "重复审批人处理", check);
+        CheckFlowKinds(approvalKinds, approvalCopy, "FlowInactiveAssigneeBehaviors", "flowInactiveAssigneeBehaviors", "离职审批人处理", check);
+
         var backendVersion = Regex.Match(flowKinds, @"public const int CurrentVersion = (?<value>\d+);").Groups["value"].Value;
         var frontendVersion = Regex.Match(flowCopy, @"export const flowSchemaVersion = (?<value>\d+) as const;").Groups["value"].Value;
         check("流程定义格式版本的前端副本和后端一致", backendVersion.Length > 0 && backendVersion == frontendVersion);
@@ -63,6 +73,9 @@ internal static partial class ContractChecks
             .Where(value => !document.Contains($"`{value}`", StringComparison.Ordinal))
             .ToArray();
         check("docs/contracts.md 写了全部流程节点和字段类型" + (missingFlowKinds.Length > 0 ? "，缺：" + string.Join("、", missingFlowKinds) : ""), missingFlowKinds.Length == 0);
+        var missingApprovalKinds = Constants(approvalKinds).Select(item => item.Value).Distinct(StringComparer.Ordinal)
+            .Where(value => !document.Contains($"`{value}`", StringComparison.Ordinal)).ToArray();
+        check("docs/contracts.md 写了全部审批来源与规则编码" + (missingApprovalKinds.Length > 0 ? "，缺：" + string.Join("、", missingApprovalKinds) : ""), missingApprovalKinds.Length == 0);
     }
 
     /// <summary>

@@ -2,6 +2,7 @@ using System.Text.Json;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Engine.Abstractions;
+using ApprovalService.Engine.Assignees;
 
 namespace ApprovalService.Engine.Execution;
 
@@ -35,6 +36,11 @@ internal static class EngineNodeInputCopy
                 OccurredAt = context.OccurredAt,
                 Conditions = context.Conditions.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
                 Assignees = context.Assignees.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal),
+                AssigneeSnapshot = context.AssigneeSnapshot is null ? null :
+                    JsonSerializer.Deserialize<AssigneeSnapshot>(
+                        JsonSerializer.Serialize(context.AssigneeSnapshot, ApprovalJson.Options), ApprovalJson.Options),
+                PreviewAssignees = context.PreviewAssignees.ToDictionary(pair => pair.Key,
+                    pair => (IReadOnlyList<string>)pair.Value.ToArray(), StringComparer.Ordinal),
                 SubprocessDepth = context.SubprocessDepth,
             },
         };

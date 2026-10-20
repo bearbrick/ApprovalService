@@ -75,7 +75,7 @@ public static class EngineRuntime
                 EngineCommandKinds.Withdraw => EngineInstanceStatuses.Withdrawn,
                 _ => EngineInstanceStatuses.Terminated,
             };
-            foreach (var task in state.Tasks.Where(item => item.Status == EngineTaskStatuses.Pending))
+            foreach (var task in state.Tasks.Where(item => item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued))
             {
                 task.Status = EngineTaskStatuses.Cancelled;
             }
@@ -97,25 +97,7 @@ public static class EngineRuntime
                 throw new EngineException(ErrorCodes.Conflict, "操作与任务节点类型不匹配。");
             }
 
-            task.Status = command.Kind == EngineCommandKinds.Reject ? EngineTaskStatuses.Rejected : EngineTaskStatuses.Approved;
-            work.Emit("taskCompleted", node.Id, token.Id, task.Id);
-            if (command.Kind == EngineCommandKinds.Reject)
-            {
-                foreach (var pending in state.Tasks.Where(item => item.Status == EngineTaskStatuses.Pending))
-                {
-                    pending.Status = EngineTaskStatuses.Cancelled;
-                }
-
-                state.Tokens.Clear();
-                state.Status = EngineInstanceStatuses.Rejected;
-                work.Emit("instanceRejected", node.Id, token.Id, task.Id);
-            }
-            else
-            {
-                token.WaitingFor = null;
-                work.MoveSingle(token);
-                work.Advance();
-            }
+            work.CompleteTask(task, token, node, command.Kind);
         }
         else if (command.Kind is EngineCommandKinds.ActionSucceeded or EngineCommandKinds.ActionFailed or
             EngineCommandKinds.SubprocessCompleted)

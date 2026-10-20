@@ -237,6 +237,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             ClientAppCode = clientAppCode,
             ExternalUserId = externalUserId,
             PersonId = personId,
+            TokenVersion = snapshot.Account.TokenVersion,
             TargetPath = targetPath,
             ExpiresAt = expiresAt,
         }, cancellationToken);
@@ -260,7 +261,8 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
         }
 
         var snapshot = await repository.FindByPersonIdAsync(consumed.PersonId, cancellationToken);
-        if (snapshot?.Account is null || !snapshot.Person.IsActive || !snapshot.Account.IsEnabled)
+        if (snapshot?.Account is null || !snapshot.Person.IsActive || !snapshot.Account.IsEnabled ||
+            snapshot.Account.TokenVersion != consumed.TokenVersion)
         {
             throw InvalidToken();
         }

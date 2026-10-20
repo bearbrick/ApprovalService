@@ -54,6 +54,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(1024)
                         .HasColumnType("nvarchar(1024)");
 
+                    b.Property<long>("TokenVersion")
+                        .HasColumnType("bigint");
+
                     b.HasKey("TokenHash");
 
                     b.HasIndex("PersonId", "ExpiresAt");

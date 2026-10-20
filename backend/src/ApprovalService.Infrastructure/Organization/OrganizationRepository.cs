@@ -79,6 +79,10 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             {
                 var wasActive = existing.IsActive;
                 db.Entry(existing).CurrentValues.SetValues(person);
+                if (wasActive != person.IsActive)
+                {
+                    await OrganizationIdentityGeneration.AdvanceAsync(db, [person.Id], cancellationToken);
+                }
                 if (wasActive && !person.IsActive)
                 {
                     await DepartureScheduleWriter.AddAsync(db, person.Id, occurredAt, cancellationToken);
@@ -115,6 +119,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 item.ClientAppCode == binding.ClientAppCode && item.ExternalUserId == binding.ExternalUserId,
                 cancellationToken);
             var before = existing is null ? null : JsonSerializer.Serialize(existing);
+            var previousPersonId = existing?.PersonId;
             if (existing is null)
             {
                 db.ExternalPersonBindings.Add(binding);
@@ -122,6 +127,12 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             else
             {
                 db.Entry(existing).CurrentValues.SetValues(binding);
+            }
+
+            if (previousPersonId != binding.PersonId)
+            {
+                await OrganizationIdentityGeneration.AdvanceAsync(db,
+                    [previousPersonId, binding.PersonId], cancellationToken);
             }
 
             Record(db, "personBinding", binding.ClientAppCode + ":" + binding.ExternalUserId,
@@ -205,6 +216,10 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 person.TrustedSource = clientAppCode;
                 person.Version = existing.Version + 1;
                 db.Entry(existing).CurrentValues.SetValues(person);
+                if (wasActive != person.IsActive)
+                {
+                    await OrganizationIdentityGeneration.AdvanceAsync(db, [person.Id], cancellationToken);
+                }
                 Record(db, "person", person.Id, actorId, clientAppCode, before,
                     JsonSerializer.Serialize(person), occurredAt);
                 if (wasActive && !person.IsActive)
@@ -282,6 +297,8 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
         if (!await db.People.AnyAsync(item => item.Id == binding.PersonId, cancellationToken))
         {
             throw new UserFriendlyException(ErrorCodes.NotFound, "绑定的人员不存在。");
@@ -291,6 +308,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             item.ClientAppCode == binding.ClientAppCode && item.ExternalUserId == binding.ExternalUserId,
             cancellationToken);
         var before = existing is null ? null : JsonSerializer.Serialize(existing);
+        var previousPersonId = existing?.PersonId;
         if (existing is null)
         {
             db.ExternalPersonBindings.Add(binding);
@@ -300,9 +318,16 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             db.Entry(existing).CurrentValues.SetValues(binding);
         }
 
+        if (previousPersonId != binding.PersonId)
+        {
+            await OrganizationIdentityGeneration.AdvanceAsync(db,
+                [previousPersonId, binding.PersonId], cancellationToken);
+        }
+
         Record(db, "personBinding", binding.ClientAppCode + ":" + binding.ExternalUserId,
             actorId, binding.ClientAppCode, before, JsonSerializer.Serialize(binding), occurredAt);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <inheritdoc />

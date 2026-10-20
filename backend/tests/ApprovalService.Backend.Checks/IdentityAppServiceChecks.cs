@@ -205,6 +205,8 @@ internal static class IdentityAppServiceChecks
                     await db.LocalAccounts.AnyAsync(item => item.PersonId == "person-1" &&
                         item.FailedLogins == 0 && item.LockedUntil == null));
             }
+
+            await IdentityLifecycleChecks.RunAsync(check);
         }
         finally
         {

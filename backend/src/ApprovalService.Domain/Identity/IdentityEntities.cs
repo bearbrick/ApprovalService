@@ -122,6 +122,13 @@ public sealed class EmbedTokenEntity
     /// </summary>
     public string PersonId { get; set; } = string.Empty;
     /// <summary>
+    /// 签发时账号的单调令牌版本，离职、复职或改绑后不允许兑换旧令牌。
+    /// </summary>
+    public long TokenVersion
+    {
+        get; set;
+    }
+    /// <summary>
     /// 目标相对页面路径。
     /// </summary>
     public string TargetPath { get; set; } = string.Empty;

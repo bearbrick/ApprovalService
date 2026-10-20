@@ -1,6 +1,6 @@
 # T-006 开放接口、接入应用、回调和钩子
 
-状态：进行中
+状态：阻塞
 负责人：Codex 2026-10-20
 里程碑：M4
 依赖：T-004、T-005
@@ -17,6 +17,7 @@
 - `backend/src/ApprovalService.Contracts/Protocol/`：开放接口的请求和响应、新错误码
 - `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`frontend/src/model/flow.ts`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`：合入已验收的流程级撤回/退回策略契约
 - `backend/src/ApprovalService.Engine/Definitions/FlowCompiler.cs`、`FlowSemanticValidator.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowDefinitionChecks.cs`：仅从 T-034 已验收提交取发布编译、语义校验与场景检查；完整前端设计器由 T-036 集成
+- `frontend/src/model/flow-execution.ts`、`frontend/src/model/flow.ts`：仅从 T-034 已验收提交取独立的执行图类型拆分，保持源码少于 500 行和旧导入路径兼容
 - `backend/src/ApprovalService.Api/Endpoints/OpenApi/`；`Application/Integration/`（接入应用、API Key 只存 SHA-256、流程授权）
 - `backend/src/ApprovalService.Infrastructure/Integration/`：出站适配层（HMAC 签名、5 秒超时、按 1 分钟 / 5 分钟 / 30 分钟 / 2 小时重试、发送日志）、钩子调用（取数、校验、取人、业务动作）
 - `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
@@ -26,6 +27,7 @@
 - `backend/src/ApprovalService.Application/Runtime/`：现有运行应用服务的发起、查询和更新数据接入
 - `backend/src/ApprovalService.Engine/Commands/OperationModels.cs`、`OperationGuard.cs`：审批人填写字段的纯命令/事件审计承载，不改变引擎流转规则
 - `backend/src/ApprovalService.Engine/Commands/OperationDispatcher.cs`：核对征询回复任务与允许填写字段的实际任务一致，防止借另一任务的权限写审计字段
+- `backend/tests/ApprovalService.Backend.Checks/OperationChecks.cs`、`OperationChecksBoundaries.cs`：征询回复合法路径与跨任务冒权回归场景
 - `backend/src/ApprovalService.Application/Integration/OpenActionFieldValidator.cs`：节点可写字段白名单和类型校验，复用已有审批字段验证器
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`Migrations/`：接入应用实体、索引和出站记录的三种数据库迁移
 - `backend/src/ApprovalService.Infrastructure/Options/`：签名密钥加密主密钥等接入配置
@@ -51,13 +53,13 @@
 ## 验收标准
 
 - [ ] 设计书第 13 节的审批服务接口全部可用（嵌入令牌、附件、打印除外）
-- [ ] “流程编码 + 业务单号”在进行中的审批里唯一，重复发起拿到已有的那张
+- [x] “流程编码 + 业务单号”在进行中的审批里唯一，重复发起拿到已有的那张
 - [ ] 只传单号发起时调取数接口；校验钩子不通过时挡住并返回原因；钩子超时有明确的错误
-- [ ] 回调带签名、失败按规则重试、可以手动重发；同一事件重发时 `eventId` 不变
-- [ ] `tasks/count` 能只算本接入应用的流程，也能算全部（按接入应用设置）
-- [ ] 性能初定：发起、审批 P95 ≤ 300 ms（不含钩子），待办数量 P95 ≤ 50 ms，写进交接记录
-- [ ] `verify.ps1` 通过（见 AGENTS.md）
-- [ ] 相关文档已更新（README、架构、契约、设计书受影响的部分）
+- [x] 回调带签名、失败按规则重试、可以手动重发；同一事件重发时 `eventId` 不变
+- [x] `tasks/count` 能只算本接入应用的流程，也能算全部（按接入应用设置）
+- [x] 性能初定：发起、审批 P95 ≤ 300 ms（不含钩子），待办数量 P95 ≤ 50 ms，写进交接记录
+- [x] `verify.ps1` 通过（见 AGENTS.md）
+- [x] 相关文档已更新（README、架构、契约、设计书受影响的部分）
 
 ## 不做
 
@@ -70,6 +72,9 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-20 · Codex：T-006 已实现的开放发起、流程目录/数据定义、审批单查询、待办数量与列表、撤回/催办/任务操作、签名回调/重试/重发及锁定发布图策略均有场景检查；审阅发现的隐藏摘要、征询借任务权限、退回/补充漏回调、意见投影四处已修。完整 `verify.ps1` 最终通过：后端 532、调用端 33、前端 65 项，零构建警告；5289 已释放。稳定提交 `6fd8bf4`（前端执行图类型拆分）、`45a95e4`（运行策略持久场景）、`6c448db`（摘要/征询/意见安全修复）、`486cd14`（回调兼容契约）。尚未开放只传单号/四类钩子、PATCH、外部重提、终止、批量发起、预览；分别等待 ADR 0010 钩子协议、业务字段更新授权、重提审批人字段保留、终止权限、批量部分失败与预览响应范围的用户决策，不能把这些验收项标完成。审批人字段 `Required` 的操作范围和明细子字段行索引协议也待确认。附件同应用归属/事务绑定依赖 T-013 用户决策，尚拒绝附件 ID。另接入应用停用→启用后旧嵌入 JWT/刷新令牌可能复活；需 T-006/T-007 协作引入单调 `AuthGeneration`，在签发与验证、刷新及一次性令牌中完整绑定，本任务未单独加无效字段。按 R13 状态改为阻塞，等这些产品/安全边界确认后续接。
+- 2026-10-20 · Codex：独立审阅的三处高优先级问题已修：待办摘要按锁定发布图的当前节点显式 `hidden` 权限过滤，重复权限发布时拒绝；征询回复必须使用原发问任务 ID，受询人仍可合法回复意见但不得携带 `fieldValues`；退回发起人、要求补充映射成稳定回调事件码，事务内固定等待状态、数据和填写值。任务意见投影在后续运行命令中保留。流程级撤回/重提策略从发布图固定到发起运行上下文，HTTP + SQLite 场景覆盖首人处理后拒撤、旧图默认可撤、退回原节点重提、任务意见和回调待发快照。后端 532 项、格式检查、前端 65 项及 build 已通过；完整 `verify.ps1` 首次仅因 `flow.ts` 525 行超限失败，已引入 T-034 已验收类型拆分修正，待 5289 窗口复验。外部终止/PATCH/重提/批量/预览与钩子协议仍待用户决策，状态保持进行中。
+- 2026-10-20 · Codex：本轮完整 `verify.ps1` 后端 532、调用端 33 均通过，前端因 T-034 契约合入使 `flow.ts` 达 525 行而停在源码规模检查，验证进程已退出释放 5289。T-034 已验收的 `8d46176` 有不依赖缺失工作台的 `flow-execution.ts` 类型拆分及 `flow.ts` 兼容转出；已只取这两个模型文件，`flow.ts` 降为 496 行，前端 65 项及构建通过。全量复验发现原 `ContractChecks.cs` 仅扫描 `flow.ts`，已在其既有登记范围内同步扫描拆出的类型文件，待 5289 重新验证。
 - 2026-10-20 · Codex：独立只读审阅指出待办摘要未按当前节点隐藏字段过滤、征询 `reply` 的 `relatedId` 与 `TaskId` 未一致校验、退回/补充事件未映射回调，以及待办意见摘要为空；已在本任务范围登记 `OperationDispatcher.cs`，其余位于现有 Integration/Runtime 范围。先补隔离/审计/回调场景后再开放新路由。
 - 2026-10-20 · Codex：T-034 已验收提交 `8d46176` 的完整 cherry-pick 遇到前端工作台四个文件在本分支缺失的 modify/delete 冲突，已按协作规则中止，不强行加入孤立前端文件。经主任务确认，先仅取其中 `FlowCompiler.cs`、`FlowSemanticValidator.cs`、`FlowDefinitionChecks.cs` 三个后端文件并单独提交；完整设计器已在 T-036 集成分支。发布图策略仍需在 T-006 发起时映射到运行上下文，并做真实持久场景。
 - 2026-10-20 · Codex：T-034 已验收的 `48d5adf` 定义流程级 `withdrawBeforeFirstDecision` 与 `returnMode`，为让发起时运行策略按锁定发布图固定，本任务登记合入该 Contracts/前端副本/契约检查原子提交，随后只在开放发起应用服务把图上的值映射到 `EngineContext.Operations`。`docs/contracts.md` 与设计书已有 T-006 审批人字段条款，合并时保留两边增量；旧图缺省值应与现有运行时一致。真实持久场景覆盖首人处理后撤回限制、退回到原节点重提以及旧图默认。

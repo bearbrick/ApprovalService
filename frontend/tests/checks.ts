@@ -11,6 +11,7 @@ import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigatio
 import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runCenterChecks } from './center-checks.ts'
+import { runAdminChecks } from './admin-checks.ts'
 import { runWorkbenchChecks } from './workbench-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
 import { runCanvasChecks } from './canvas-checks.ts'
@@ -95,6 +96,7 @@ checkRoutes()
 checkFlowModel()
 runDataChecks(check)
 await runCenterChecks(check)
+await runAdminChecks(check)
 runWorkbenchChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)

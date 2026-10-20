@@ -1,5 +1,6 @@
 using System.Data;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Engine.Execution;
 using Microsoft.EntityFrameworkCore;
 
 namespace ApprovalService.Infrastructure.Persistence;
@@ -30,6 +31,21 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         return await db.FlowVersions.AsNoTracking().SingleOrDefaultAsync(item => item.Id == versionId, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DepartureTaskRef>> ListDepartureTasksAsync(string assigneeId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assigneeId);
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await (from task in db.ApprovalTasks.AsNoTracking()
+                      join instance in db.Instances.AsNoTracking() on task.InstanceId equals instance.Id
+                      where task.AssigneeId == assigneeId && instance.Status == EngineInstanceStatuses.Running &&
+                          (task.Status == EngineTaskStatuses.Pending || task.Status == EngineTaskStatuses.Queued)
+                      orderby task.InstanceId, task.Id
+                      select new DepartureTaskRef { InstanceId = task.InstanceId, TaskId = task.Id })
+            .ToListAsync(cancellationToken);
     }
 
     /// <inheritdoc />

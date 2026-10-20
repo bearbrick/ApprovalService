@@ -34,6 +34,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
+人员离职或停用后的在途待办由运行时服务查询候选任务，再逐项提交引擎离职命令。命令按任务所在发布节点的配置选择在职直属上级或流程管理员；任务投影、操作事件和待发项在同一事务中保存，若无有效接手人则保持原任务并提示管理员修正组织数据。
+
 ## 流程定义
 
 正式流程定义模型位于 `src/ApprovalService.Contracts/Flows/`，只接受统一自由画布的 JSON；`schemaVersion` 标识格式版本。`src/ApprovalService.Engine/Definitions/` 负责在发布前检查设计内容并生成不含画布坐标的执行图。可导入的 BPMN 文件必须由本服务导出且携带本服务扩展信息。开发样例放在 `samples/flows/`，完整字段约定见 [docs/contracts.md](../docs/contracts.md)。

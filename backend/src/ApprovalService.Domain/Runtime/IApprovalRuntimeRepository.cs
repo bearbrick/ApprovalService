@@ -29,6 +29,15 @@ public interface IApprovalRuntimeRepository
     Task<FlowVersionEntity?> LoadVersionAsync(string versionId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 查询指定人员在进行中审批单上的待处理或排队任务。
+    /// </summary>
+    /// <param name="assigneeId">已停用人员 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>按审批单和任务 ID 排序的候选任务。</returns>
+    Task<IReadOnlyList<DepartureTaskRef>> ListDepartureTasksAsync(string assigneeId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 在一个事务中保存状态、任务、操作记录和待发项。
     /// </summary>
     /// <param name="commit">本次命令的全部变更。</param>
@@ -43,6 +52,22 @@ public interface IApprovalRuntimeRepository
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>事件链快照；审批单不存在时为空。</returns>
     Task<EventChainSnapshot?> LoadEventChainAsync(string instanceId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// 离职扫描得到的在途任务定位信息，不作为直接写入任务投影的命令。
+/// </summary>
+public sealed class DepartureTaskRef
+{
+    /// <summary>
+    /// 审批单 ID。
+    /// </summary>
+    public string InstanceId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 人工任务 ID。
+    /// </summary>
+    public string TaskId { get; set; } = string.Empty;
 }
 
 /// <summary>

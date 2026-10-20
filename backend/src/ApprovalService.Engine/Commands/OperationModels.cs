@@ -60,6 +60,10 @@ public static class OperationKinds
     /// </summary>
     public const string Handover = "handover";
     /// <summary>
+    /// 组织来源确认人员停用后，按当前节点规则重分配一项在途任务。
+    /// </summary>
+    public const string ReassignInactive = "reassignInactive";
+    /// <summary>
     /// 管理员重发通知或回调。
     /// </summary>
     public const string Resend = "resend";

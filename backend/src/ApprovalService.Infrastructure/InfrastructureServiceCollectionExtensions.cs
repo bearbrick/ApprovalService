@@ -1,3 +1,6 @@
+using ApprovalService.Application.Files;
+using ApprovalService.Domain.Files;
+using ApprovalService.Infrastructure.Files;
 using ApprovalService.Infrastructure.Jobs;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
@@ -30,6 +33,37 @@ public static class InfrastructureServiceCollectionExtensions
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
+        services.AddOptions<FileStorageOptions>()
+            .Bind(configuration.GetSection(FileStorageOptions.SectionName))
+            .Validate(options => options.Provider is "Local" or "Minio", "附件存储提供者必须是 Local 或 Minio。")
+            .Validate(options => options.MaxUploadBytes > 0, "附件大小限制必须是正数。")
+            .Validate(options => options.PresignedUrlSeconds is >= 1 and <= 604800,
+                "附件预签名地址有效期必须为 1 秒到 7 天。")
+            .Validate(options => options.Provider != "Minio" ||
+                (Uri.TryCreate(options.Endpoint, UriKind.Absolute, out var endpoint) &&
+                    endpoint.Scheme is "http" or "https" && endpoint.AbsolutePath == "/" &&
+                    endpoint.UserInfo.Length == 0 && endpoint.Query.Length == 0 && endpoint.Fragment.Length == 0 &&
+                    !string.IsNullOrWhiteSpace(options.Bucket) &&
+                    !string.IsNullOrWhiteSpace(options.AccessKey) && !string.IsNullOrWhiteSpace(options.SecretKey)),
+                "Minio 存储需要有效地址、桶和访问凭据。")
+            .ValidateOnStart();
+        services.AddSingleton(provider =>
+        {
+            var options = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<FileStorageOptions>>().Value;
+            return new FilePolicyOptions
+            {
+                MaxUploadBytes = options.MaxUploadBytes,
+                DownloadUrlLifetime = TimeSpan.FromSeconds(options.PresignedUrlSeconds),
+            };
+        });
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
+        services.AddSingleton<IFileStorage, MinioFileStorage>();
+        services.AddSingleton<IFileStorageSelector, FileStorageSelector>();
+        services.AddScoped<IStoredFileRepository, StoredFileRepository>();
+        services.AddScoped<LocalToMinioMigration>();
+        services.AddScoped<IFileMigrationService>(provider => provider.GetRequiredService<LocalToMinioMigration>());
+        services.AddHostedService<FileCleanupHostedService>();
         services.AddSingleton<OutboxQueue>();
         services.AddSingleton<ScheduledJobQueue>();
         services.AddHostedService<DurableJobWorker>();

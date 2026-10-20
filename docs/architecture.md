@@ -107,8 +107,14 @@
 
 - `src/model/`：纯逻辑模块，Node 下能直接运行，`tests/checks.ts` 里检查。
 - `src/api/`：调后端接口，统一的错误格式转成 `ApiError`。
-- `src/pages/`：页面；地址的 # 部分区分页面（`src/model/routes.ts`），手机端是 `#/m`。
-- 以后加：`src/designer/`（两种画法的设计器）、`src/composables/`、`src/stores/`。
+- `src/pages/`：页面；`WorkspacePage` 提供尚未接入业务的工作区，不能把未接入误显示为无数据。后续按模块接入独立页面。
+- `src/model/routes.ts`、`navigation.ts`：hash 路由与导航元数据；已登记路由严格匹配，未知地址显示未找到页面；手机端使用 `#/m` 独立外壳。导航只代表入口，不是权限控制。
+- `src/components/layout/`：桌面/手机外壳，统一顶栏、侧栏、抽屉和底部导航；`src/components/ui/`：公共图标、空状态、原生对话框、子页面错误恢复边界。
+- `src/composables/`：导航历史/滚动/焦点与服务连接生命周期；普通导航回到顶部，浏览器历史按条目恢复位置。服务信息重试取消旧请求，卸载后不再更新状态。
+- `src/api/`：通用 JSON 请求负责 HTTP/字段错误、状态码/链路信息、超时/取消和响应解析；服务信息入口额外验证响应结构。只发一次请求，不自动重试业务写操作，不实现令牌或鉴权。
+- `src/style.css`、`src/styles/`：沿用标签服务与原型的设计变量和公共样式；不从原型目录跨部分导入文件。
+- `tests/`：路由、HTTP 和组件场景检查，加上注释与规模检查；Vue 自带编译器/渲染器仅用于检查，不新增运行依赖。
+- 以后加：`src/designer/`（两种画法的设计器）、`src/stores/`（业务状态）；当前不放演示业务数据。
 
 ## 调用端
 

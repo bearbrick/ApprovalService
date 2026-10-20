@@ -31,6 +31,11 @@ internal static class FlowSemanticValidator
             Add(issues, null, "流程名称不能为空。");
         }
 
+        if (definition.ReturnMode is not (FlowReturnModes.Restart or FlowReturnModes.ReturnNode))
+        {
+            Add(issues, null, "退回后重新提交方式只能是 restart 或 returnNode。");
+        }
+
         var fields = CollectFields(definition.Data?.Fields ?? [], issues);
         foreach (var edge in definition.Canvas?.Edges ?? [])
         {

@@ -12,6 +12,22 @@ public static class FlowSchema
 }
 
 /// <summary>
+/// 流程级退回后重提交的走法。
+/// </summary>
+public static class FlowReturnModes
+{
+    /// <summary>
+    /// 从开始节点重新推进。
+    /// </summary>
+    public const string Restart = "restart";
+
+    /// <summary>
+    /// 回到发起退回的节点继续处理。
+    /// </summary>
+    public const string ReturnNode = "returnNode";
+}
+
+/// <summary>
 /// 自由画布支持的节点种类。
 /// </summary>
 public static class FlowNodeTypes

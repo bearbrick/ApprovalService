@@ -49,6 +49,13 @@ export const flowFieldAccess = {
   Editable: 'editable',
 } as const;
 /**
+ * 退回后重新提交的走法，与后端 FlowReturnModes 一一对应。
+ */
+export const flowReturnModes = {
+  Restart: 'restart',
+  ReturnNode: 'returnNode',
+} as const;
+/**
  * 画布节点种类的联合类型。
  */
 export type FlowNodeType = (typeof flowNodeTypes)[keyof typeof flowNodeTypes];
@@ -64,6 +71,10 @@ export type FlowGatewayDirection = (typeof flowGatewayDirections)[keyof typeof f
  * 字段访问级别的联合类型。
  */
 export type FlowFieldAccessType = (typeof flowFieldAccess)[keyof typeof flowFieldAccess];
+/**
+ * 退回后重新提交的走法。
+ */
+export type FlowReturnMode = (typeof flowReturnModes)[keyof typeof flowReturnModes];
 /**
  * 一个流程版本的完整自由画布定义。
  */
@@ -108,6 +119,14 @@ export interface FlowDefinition {
    * 可发起的角色编码；空集合表示不额外限制。
    */
   allowedInitiatorRoles: string[];
+  /**
+   * 首位人工处理人操作后是否禁止发起人撤回；省略时审批结束前均可撤回。
+   */
+  withdrawBeforeFirstDecision?: boolean;
+  /**
+   * 退回后重新提交的走法；省略时从头开始。
+   */
+  returnMode?: FlowReturnMode;
 }
 /**
  * 节点、连线及设计坐标。
@@ -472,27 +491,6 @@ export interface FlowPrintSettings {
   showWatermark: boolean;
 }
 /**
- * 编译后的运行图，不包含画布位置。
+ * 从独立模块转出编译后的运行图类型，保持旧导入路径可用。
  */
-export interface FlowExecutionGraph {
-  /**
-   * 格式版本。
-   */
-  schemaVersion: number;
-  /**
-   * 运行节点。
-   */
-  nodes: FlowExecutionNode[];
-  /**
-   * 运行连线。
-   */
-  edges: FlowExecutionEdge[];
-}
-/**
- * 运行节点，仅保留语义字段。
- */
-export type FlowExecutionNode = Omit<FlowNode, 'x' | 'y'>;
-/**
- * 运行连线，保留条件、优先级与兜底标记。
- */
-export type FlowExecutionEdge = FlowEdge;
+export type { FlowExecutionGraph, FlowExecutionNode, FlowExecutionEdge } from './flow-execution.ts';

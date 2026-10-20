@@ -60,8 +60,43 @@ internal static class FlowDefinitionChecks
             originalGraph is not null && JsonSerializer.Serialize(originalGraph, ApprovalJson.Options)
             == JsonSerializer.Serialize(FlowCompiler.Compile(layout).Graph, ApprovalJson.Options));
 
+        CheckOperationPolicies(flows, check);
         CheckInvalidDefinitions(flows, check);
         CheckBpmn(flows, check);
+    }
+
+    /// <summary>
+    /// 检查旧定义的缺省策略、新策略的发布固定值和非法模式。
+    /// </summary>
+    /// <param name="flows">未显式写策略的正式样例。</param>
+    /// <param name="check">记录检查结果。</param>
+    private static void CheckOperationPolicies(IReadOnlyList<FlowDefinition> flows, Action<string, bool> check)
+    {
+        check("旧流程定义省略策略时仍可在结束前撤回并从头重提",
+            flows.All(flow => !flow.WithdrawBeforeFirstDecision && flow.ReturnMode == FlowReturnModes.Restart
+                && FlowCompiler.Compile(flow).Graph is { WithdrawBeforeFirstDecision: false, ReturnMode: FlowReturnModes.Restart }));
+
+        var configured = Copy(flows[0]);
+        configured.WithdrawBeforeFirstDecision = true;
+        configured.ReturnMode = FlowReturnModes.ReturnNode;
+        var graph = FlowCompiler.Compile(configured).Graph;
+        check("流程级限制编译入发布图且不受草稿后续修改影响",
+            graph is { WithdrawBeforeFirstDecision: true, ReturnMode: FlowReturnModes.ReturnNode });
+        configured.WithdrawBeforeFirstDecision = false;
+        configured.ReturnMode = FlowReturnModes.Restart;
+        check("发布图保留原撤回和重提策略",
+            graph is { WithdrawBeforeFirstDecision: true, ReturnMode: FlowReturnModes.ReturnNode });
+
+        configured.ReturnMode = "unknown";
+        check("不支持的退回重提方式拒绝发布并给中文问题",
+            FlowCompiler.Compile(configured).Issues.Any(issue => issue.Message.Contains("退回后重新提交方式", StringComparison.Ordinal)));
+
+        configured.ReturnMode = FlowReturnModes.ReturnNode;
+        configured.WithdrawBeforeFirstDecision = true;
+        var imported = BpmnFlowCodec.Import(BpmnFlowCodec.Export(configured));
+        check("BPMN 往返保留流程级撤回和重提策略",
+            imported.WithdrawBeforeFirstDecision && imported.ReturnMode == FlowReturnModes.ReturnNode
+            && FlowCompiler.Compile(imported).Graph is { WithdrawBeforeFirstDecision: true, ReturnMode: FlowReturnModes.ReturnNode });
     }
 
     /// <summary>

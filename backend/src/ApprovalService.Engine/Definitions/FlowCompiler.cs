@@ -37,6 +37,8 @@ public static class FlowCompiler
         result.Graph = new FlowExecutionGraph
         {
             SchemaVersion = definition.SchemaVersion,
+            WithdrawBeforeFirstDecision = definition.WithdrawBeforeFirstDecision,
+            ReturnMode = definition.ReturnMode,
             Nodes = definition.Canvas.Nodes.Select(node => new FlowExecutionNode
             {
                 Id = node.Id,

@@ -52,7 +52,9 @@ internal static partial class ContractChecks
         CheckFlowKinds(flowKinds, flowCopy, "FlowFieldTypes", "flowFieldTypes", "字段类型", check);
         CheckFlowKinds(flowKinds, flowCopy, "FlowGatewayDirections", "flowGatewayDirections", "网关方向", check);
         CheckFlowKinds(flowKinds, flowCopy, "FlowFieldAccess", "flowFieldAccess", "字段权限", check);
-        CheckFlowProperties(flowCopy, check);
+        CheckFlowKinds(flowKinds, flowCopy, "FlowReturnModes", "flowReturnModes", "退回重提方式", check);
+        var flowExecutionCopy = Read(Path.Combine("frontend", "src", "model", "flow-execution.ts"));
+        CheckFlowProperties(flowCopy + "\n" + flowExecutionCopy, check);
 
         var approvalKinds = Read(Path.Combine("backend", "src", "ApprovalService.Contracts", "Flows", "FlowApprovalKinds.cs"));
         var approvalCopy = Read(Path.Combine("frontend", "src", "model", "flow-approval-kinds.ts"));
@@ -68,7 +70,7 @@ internal static partial class ContractChecks
         var frontendVersion = Regex.Match(flowCopy, @"export const flowSchemaVersion = (?<value>\d+) as const;").Groups["value"].Value;
         check("流程定义格式版本的前端副本和后端一致", backendVersion.Length > 0 && backendVersion == frontendVersion);
 
-        var missingFlowKinds = new[] { "FlowNodeTypes", "FlowFieldTypes" }
+        var missingFlowKinds = new[] { "FlowNodeTypes", "FlowFieldTypes", "FlowReturnModes" }
             .SelectMany(name => Constants(ClassBody(flowKinds, name)).Select(item => item.Value))
             .Where(value => !document.Contains($"`{value}`", StringComparison.Ordinal))
             .ToArray();

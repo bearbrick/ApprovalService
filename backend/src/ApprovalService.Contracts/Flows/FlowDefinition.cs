@@ -54,6 +54,19 @@ public sealed class FlowDefinition
     /// 可发起此流程的角色编码；空集合表示不额外限制角色。
     /// </summary>
     public List<string> AllowedInitiatorRoles { get; set; } = [];
+
+    /// <summary>
+    /// 是否仅在首位人工处理人操作前允许发起人撤回；省略时审批结束前均可撤回。
+    /// </summary>
+    public bool WithdrawBeforeFirstDecision
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 退回后重新提交的走法：restart 或 returnNode；省略时从头开始。
+    /// </summary>
+    public string ReturnMode { get; set; } = FlowReturnModes.Restart;
 }
 
 /// <summary>

@@ -1,9 +1,10 @@
 import { buildCondition } from '../src/designer/workbench/condition-model.ts'
+import { flowReturnModes } from '../src/model/flow.ts'
 import { fieldReferences } from '../src/designer/data/data-model.ts'
 import type { ConditionGroup } from '../src/designer/workbench/condition-model.ts'
 import { checkPublication } from '../src/designer/workbench/publication-check.ts'
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../src/designer/workbench/draft-history.ts'
-import { copyFlow, createEmptyFlow, flowTemplates, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
+import { copyFlow, createEmptyFlow, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
 import { actionsForNodeType, defaultActionsForNodeType } from '../src/designer/workbench/rule-options.ts'
 
 /**
@@ -12,6 +13,19 @@ import { actionsForNodeType, defaultActionsForNodeType } from '../src/designer/w
  */
 export function runWorkbenchChecks(check: (name: string, value: boolean) => void): void {
   const blank = createEmptyFlow('DEMO')
+  check('新流程默认审批结束前可撤回且退回后从头重提', blank.withdrawBeforeFirstDecision === false && blank.returnMode === flowReturnModes.Restart)
+  const legacy = copyFlow(blank)
+  delete legacy.withdrawBeforeFirstDecision
+  delete legacy.returnMode
+  const normalized = normalizeSample(legacy)
+  check('旧草稿省略流程级策略时恢复安全默认值', normalized.withdrawBeforeFirstDecision === false && normalized.returnMode === flowReturnModes.Restart)
+  const configured = copyFlow(blank)
+  configured.withdrawBeforeFirstDecision = true
+  configured.returnMode = flowReturnModes.ReturnNode
+  check('两种流程级策略能保留在独立草稿并通过发布预检', copyFlow(configured).withdrawBeforeFirstDecision === true && copyFlow(configured).returnMode === flowReturnModes.ReturnNode && checkPublication(configured).length === 0)
+  const invalidMode = JSON.parse(JSON.stringify(blank)) as typeof blank
+  invalidMode.returnMode = 'unknown' as typeof invalidMode.returnMode
+  check('不支持的退回重提方式被前端发布预检拒绝', checkPublication(invalidMode).some(issue => issue.message.includes('退回后重新提交方式')))
   check('空白自由画布具有唯一开始和结束且能通过结构预检', blank.canvas.nodes.length === 2 && checkPublication(blank).length === 0)
   check('三个正式示例模板覆盖采购、费用与质量异常且均能通过发布预检', flowTemplates.length === 3 && flowTemplates.every(template => checkPublication(template.definition).length === 0))
   check('正式示例可展开明细字段并显示节点字段权限', flowTemplates.every(template => fieldReferences(template.definition.data).length >= template.definition.data.fields.length))

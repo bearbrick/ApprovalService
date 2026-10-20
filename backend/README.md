@@ -29,7 +29,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | 接口 | 说明 |
 | --- | --- |
 | `GET /health/live` | 存活检查 |
-| `GET /health/ready` | 就绪检查（以后加上数据库连通性） |
+| `GET /health/ready` | 数据库可连接时返回 `ready`；不可连接时返回 503 |
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
@@ -51,5 +51,13 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Data:Provider` | `Sqlite` | 数据库：Sqlite、SqlServer、PostgreSql（MVP 用 SQLite） |
 | `Data:Directory` | `data` | 数据目录：SQLite 库、本地附件、备份 |
 | `Data:ConnectionString` | — | SQL Server、PostgreSQL 的连接字符串，不要提交到仓库 |
+
+## 持久化与后台任务
+
+流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。
+
+审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，可检查历史记录是否被改写。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，失败按退避表重试。出站回调等具体发送器由后续集成任务登记。
+
+新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。当前 `/health/ready` 只确认服务已启动；数据库连通性检查随持久化功能接入。

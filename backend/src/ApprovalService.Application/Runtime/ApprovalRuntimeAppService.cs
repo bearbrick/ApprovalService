@@ -11,6 +11,7 @@ namespace ApprovalService.Application.Runtime;
 /// <summary>
 /// 读取发布版本和状态，计算引擎结果，再以乐观锁原子提交事件与待发项。
 /// </summary>
+/// <param name="repository">原子保存状态和事件的仓储。</param>
 public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository) : IApprovalRuntimeAppService
 {
     /// <inheritdoc />

@@ -46,6 +46,7 @@ internal static class Program
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
         await EventAnchorChecks.RunAsync(Check);
+        await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);

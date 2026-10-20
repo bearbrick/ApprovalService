@@ -50,6 +50,15 @@ public sealed class OrganizationLookupAppService(IOrganizationRepository reposit
     }
 
     /// <inheritdoc />
+    public Task<string?> ResolveBoundDepartmentAsync(string clientAppCode, string externalDepartmentId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientAppCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(externalDepartmentId);
+        return repository.ResolveBoundDepartmentAsync(clientAppCode, externalDepartmentId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<AssigneeSnapshot> LoadAssigneeSnapshotAsync(string initiatorId,
         CancellationToken cancellationToken = default) =>
         repository.LoadAssigneeSnapshotAsync(initiatorId, cancellationToken);

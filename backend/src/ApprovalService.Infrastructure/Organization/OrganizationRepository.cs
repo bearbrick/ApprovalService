@@ -354,6 +354,18 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
     }
 
     /// <inheritdoc />
+    public async Task<string?> ResolveBoundDepartmentAsync(string clientAppCode, string externalDepartmentId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await (from binding in db.ExternalDepartmentBindings.AsNoTracking()
+                      join department in db.Departments.AsNoTracking() on binding.DepartmentId equals department.Id
+                      where binding.ClientAppCode == clientAppCode &&
+                          binding.ExternalDepartmentId == externalDepartmentId
+                      select department.Id).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<AssigneeSnapshot> LoadAssigneeSnapshotAsync(string initiatorId,
         CancellationToken cancellationToken = default)
     {

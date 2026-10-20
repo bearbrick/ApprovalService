@@ -38,6 +38,16 @@ public interface IOrganizationLookupAppService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 发起接口专用：仅解析该应用已绑定且仍存在的部门，不回退到全局编码或内部 ID。
+    /// </summary>
+    /// <param name="clientAppCode">已鉴权的接入应用编码。</param>
+    /// <param name="externalDepartmentId">本应用已绑定的业务部门 ID。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>有效内部部门 ID；未绑定或已失效时为空。</returns>
+    Task<string?> ResolveBoundDepartmentAsync(string clientAppCode, string externalDepartmentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 为节点到达构造可信的组织找人快照。
     /// </summary>
     /// <param name="initiatorId">已解析的内部发起人员 ID。</param>

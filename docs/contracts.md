@@ -82,6 +82,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 `POST /api/v1/org/bindings` 请求 `{kind, externalId, internalId, employeeNumber, phone, method, clientAppCode}`：`kind` 为 `person` 或 `department`。开放接口忽略请求里的 `clientAppCode` 和 `method`，始终使用 API Key 所属应用及 `push` 来源；人员不允许直接指定 `internalId`，只能按唯一工号或手机号匹配本接入应用来源且在职的人员，部门也仅能绑定本应用来源。审批服务或其他应用来源的人员和部门须由本地组织管理员在 `/api/v1/admin/org/bindings` 手工确认，管理员在请求体指定 `clientAppCode`，来源固定为 `manual`。人员绑定成功返回 `{personId}`，部门绑定成功返回 204。之后该接入应用可在开放接口中使用自己的人员和部门 ID。
 
+开放发起接口解析业务部门 ID 时必须使用该应用已建立且仍指向现有部门的绑定；未绑定、跨应用绑定或失效绑定返回可纠正的输入错误，不将该值回退为全局部门编码或内部 ID。既有的通用部门查询语义保持不变，严格查询由应用服务 `ResolveBoundDepartmentAsync` 单独提供。
+
 组织管理员以 `multipart/form-data` 的 `file` 字段调用 `POST /api/v1/admin/org/import?preview=true` 预检查，或省略 `preview` 真正导入。仅接受 UTF-8 CSV、XLSX，文件不超过 5 MB；Excel 最多 10,000 行且解压后字段总量不超过 10 MiB 字符。无效 UTF-8 返回 `VALIDATION_FAILED`。预检查不写库，响应仍为 `{applied:false, issues, departedPersonIds:[]}`。`GET /api/v1/admin/org/template?format=xlsx` 下载 Excel 模板，`format=csv` 下载同字段 CSV 模板；模板首列 `kind` 为 `department`、`person`、`membership`、`personBinding` 或 `departmentBinding`。绑定行使用 `clientAppCode`、`externalId`、`internalId` 三列，绑定方式记为 `import`；`clientAppCode` 必须是已登记的接入应用。导入会检查重复部门编码与字段列宽，正式写入在可串行化事务内按当前组织快照重验，绑定和主数据及每项来源、操作者、时间与前后快照一起提交。
 
 ## 规划中的接口

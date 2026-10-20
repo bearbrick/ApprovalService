@@ -112,7 +112,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
         {
             throw InvalidCredentials();
         }
-        return await IssueTokensAsync(snapshot, null, cancellationToken);
+        return await IssueTokensAsync(snapshot, null, null, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -137,7 +137,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             throw InvalidToken();
         }
 
-        return await IssueTokensAsync(snapshot, null, cancellationToken);
+        return await IssueTokensAsync(snapshot, null, consumed.ClientAppCode, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -247,7 +247,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             throw InvalidToken();
         }
 
-        return await IssueTokensAsync(snapshot, consumed.TargetPath, cancellationToken);
+        return await IssueTokensAsync(snapshot, consumed.TargetPath, consumed.ClientAppCode, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -269,10 +269,11 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
     /// </summary>
     /// <param name="snapshot">已通过账号状态检查的快照。</param>
     /// <param name="targetPath">嵌入交换的目标页面。</param>
+    /// <param name="clientAppCode">嵌入会话的接入应用；本地登录为空。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>原始访问与刷新令牌。</returns>
     private async Task<IdentityTokensDto> IssueTokensAsync(IdentityAccountSnapshot snapshot, string? targetPath,
-        CancellationToken cancellationToken)
+        string? clientAppCode, CancellationToken cancellationToken)
     {
         var account = snapshot.Account ?? throw new InvalidOperationException("令牌签发时账号为空。");
         var now = clock.GetUtcNow();
@@ -284,13 +285,14 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             TokenHash = HashToken(rawRefresh),
             PersonId = snapshot.Person.Id,
             TokenVersion = account.TokenVersion,
+            ClientAppCode = clientAppCode,
             ExpiresAt = refreshExpiresAt,
         }, cancellationToken);
         return new IdentityTokensDto
         {
             PersonId = snapshot.Person.Id,
             AccessToken = accessTokens.Issue(snapshot.Person.Id, account.TokenVersion,
-                account.MustChangePassword, now, accessExpiresAt),
+                account.MustChangePassword, clientAppCode, now, accessExpiresAt),
             AccessExpiresAt = accessExpiresAt,
             RefreshToken = rawRefresh,
             RefreshExpiresAt = refreshExpiresAt,

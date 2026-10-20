@@ -22,6 +22,7 @@ internal static class IdentityModelConfiguration
             entity.Property(item => item.PasswordHash).HasMaxLength(256).IsRequired();
             entity.Property(item => item.PasswordSalt).HasMaxLength(128).IsRequired();
             entity.Property(item => item.TokenVersion).IsConcurrencyToken();
+            entity.HasIndex(item => item.LockedUntil);
         });
 
         modelBuilder.Entity<RefreshTokenEntity>(entity =>
@@ -30,6 +31,7 @@ internal static class IdentityModelConfiguration
             entity.HasKey(item => item.TokenHash);
             entity.Property(item => item.TokenHash).HasMaxLength(64);
             entity.Property(item => item.PersonId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.ClientAppCode).HasMaxLength(128);
             entity.HasIndex(item => new { item.PersonId, item.ExpiresAt });
         });
 

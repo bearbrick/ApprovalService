@@ -10,6 +10,7 @@ using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace ApprovalService.Backend.Checks;
 
@@ -79,6 +80,11 @@ internal static class IdentityAppServiceChecks
                 login.RefreshToken.Length >= 40 && login.MustChangePassword &&
                 login.AccessExpiresAt == clock.GetUtcNow().AddMinutes(15) &&
                 login.RefreshExpiresAt == clock.GetUtcNow().AddDays(30));
+            var localJwt = new JsonWebTokenHandler().ReadJsonWebToken(login.AccessToken);
+            check("本地登录令牌声明本地会话且不带接入应用",
+                localJwt.TryGetPayloadValue(JwtIdentityTokenService.SessionKindClaim, out string? localKind) &&
+                localKind == JwtIdentityTokenService.LocalSessionKind &&
+                !localJwt.TryGetPayloadValue(JwtIdentityTokenService.ClientAppCodeClaim, out string? _));
             check("密码错误与不存在工号均返回未授权",
                 await FailsWithCodeAsync(() => service.LoginAsync("EMP-001", "wrong"), ErrorCodes.Unauthorized) &&
                 await FailsWithCodeAsync(() => service.LoginAsync("MISSING", "wrong"), ErrorCodes.Unauthorized));
@@ -117,6 +123,11 @@ internal static class IdentityAppServiceChecks
             check("嵌入交换绑定人员与站内路径且只能消费一次",
                 exchanged.PersonId == "person-1" && exchanged.TargetPath == "#/m/tasks" &&
                 await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(embed.Token), ErrorCodes.Unauthorized));
+            var embedJwt = new JsonWebTokenHandler().ReadJsonWebToken(exchanged.AccessToken);
+            var embedRefreshed = await service.RefreshAsync(exchanged.RefreshToken);
+            var refreshedEmbedJwt = new JsonWebTokenHandler().ReadJsonWebToken(embedRefreshed.AccessToken);
+            check("嵌入会话及刷新令牌始终绑定原接入应用，不能升级成本地管理员会话",
+                IsEmbedJwt(embedJwt, "demo") && IsEmbedJwt(refreshedEmbedJwt, "demo"));
             var expiring = await service.CreateEmbedTokenAsync("demo", "person-1", "#/m/tasks");
             clock.Advance(TimeSpan.FromMinutes(6));
             check("嵌入令牌过期后不能交换",
@@ -169,6 +180,18 @@ internal static class IdentityAppServiceChecks
             return error.Code == code;
         }
     }
+
+    /// <summary>
+    /// 检查签发令牌明确携带嵌入来源与应用编码。
+    /// </summary>
+    /// <param name="token">已读取的 JWT。</param>
+    /// <param name="clientAppCode">预期接入应用编码。</param>
+    /// <returns>来源与应用编码均一致为真。</returns>
+    private static bool IsEmbedJwt(JsonWebToken token, string clientAppCode) =>
+        token.TryGetPayloadValue(JwtIdentityTokenService.SessionKindClaim, out string? kind) &&
+        kind == JwtIdentityTokenService.EmbedSessionKind &&
+        token.TryGetPayloadValue(JwtIdentityTokenService.ClientAppCodeClaim, out string? code) &&
+        code == clientAppCode;
 
     /// <summary>
     /// 为检查程序创建独立数据库上下文。

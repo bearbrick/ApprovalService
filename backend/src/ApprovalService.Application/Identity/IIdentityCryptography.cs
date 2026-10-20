@@ -56,9 +56,10 @@ public interface IIdentityAccessTokenService
     /// <param name="personId">人员 ID。</param>
     /// <param name="tokenVersion">账号令牌版本。</param>
     /// <param name="mustChangePassword">首次登录是否必须修改密码。</param>
+    /// <param name="clientAppCode">嵌入会话的接入应用编码；本地密码登录时为空。</param>
     /// <param name="issuedAt">签发时间。</param>
     /// <param name="expiresAt">过期时间。</param>
     /// <returns>已签名的 JWT。</returns>
-    string Issue(string personId, long tokenVersion, bool mustChangePassword,
+    string Issue(string personId, long tokenVersion, bool mustChangePassword, string? clientAppCode,
         DateTimeOffset issuedAt, DateTimeOffset expiresAt);
 }

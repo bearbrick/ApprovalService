@@ -5,18 +5,40 @@ namespace ApprovalService.Domain.Identity;
 /// </summary>
 public sealed class LocalAccountEntity
 {
-    /// <summary>人员 ID。</summary>
+    /// <summary>
+    /// 人员 ID。
+    /// </summary>
     public string PersonId { get; set; } = string.Empty;
-    /// <summary>PBKDF2 密码摘要，Base64 编码。</summary>
+    /// <summary>
+    /// PBKDF2 密码摘要，Base64 编码。
+    /// </summary>
     public string PasswordHash { get; set; } = string.Empty;
-    /// <summary>随机盐，Base64 编码。</summary>
+    /// <summary>
+    /// 随机盐，Base64 编码。
+    /// </summary>
     public string PasswordSalt { get; set; } = string.Empty;
-    /// <summary>首次登录是否必须修改密码。</summary>
+    /// <summary>
+    /// 首次登录是否必须修改密码。
+    /// </summary>
     public bool MustChangePassword { get; set; } = true;
-    /// <summary>作废旧令牌用的版本。</summary>
+    /// <summary>
+    /// 作废旧令牌用的版本。
+    /// </summary>
     public long TokenVersion { get; set; }
-    /// <summary>账号是否启用。</summary>
+    /// <summary>
+    /// 账号是否启用。
+    /// </summary>
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// 连续密码失败次数。
+    /// </summary>
+    public int FailedLogins { get; set; }
+
+    /// <summary>
+    /// 暂时锁定到此时间；空值表示没有锁定。
+    /// </summary>
+    public DateTimeOffset? LockedUntil { get; set; }
 }
 
 /// <summary>
@@ -24,15 +46,29 @@ public sealed class LocalAccountEntity
 /// </summary>
 public sealed class RefreshTokenEntity
 {
-    /// <summary>随机令牌的 SHA-256 摘要。</summary>
+    /// <summary>
+    /// 随机令牌的 SHA-256 摘要。
+    /// </summary>
     public string TokenHash { get; set; } = string.Empty;
-    /// <summary>所属人员 ID。</summary>
+    /// <summary>
+    /// 所属人员 ID。
+    /// </summary>
     public string PersonId { get; set; } = string.Empty;
-    /// <summary>签发时的令牌版本。</summary>
+    /// <summary>
+    /// 嵌入会话来源的接入应用编码；本地登录时为空。
+    /// </summary>
+    public string? ClientAppCode { get; set; }
+    /// <summary>
+    /// 签发时的令牌版本。
+    /// </summary>
     public long TokenVersion { get; set; }
-    /// <summary>过期时间。</summary>
+    /// <summary>
+    /// 过期时间。
+    /// </summary>
     public DateTimeOffset ExpiresAt { get; set; }
-    /// <summary>已消费时间，非空表示不可再使用。</summary>
+    /// <summary>
+    /// 已消费时间，非空表示不可再使用。
+    /// </summary>
     public DateTimeOffset? ConsumedAt { get; set; }
 }
 
@@ -41,16 +77,28 @@ public sealed class RefreshTokenEntity
 /// </summary>
 public sealed class EmbedTokenEntity
 {
-    /// <summary>随机令牌的 SHA-256 摘要。</summary>
+    /// <summary>
+    /// 随机令牌的 SHA-256 摘要。
+    /// </summary>
     public string TokenHash { get; set; } = string.Empty;
-    /// <summary>接入应用编码。</summary>
+    /// <summary>
+    /// 接入应用编码。
+    /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;
-    /// <summary>绑定的人员 ID。</summary>
+    /// <summary>
+    /// 绑定的人员 ID。
+    /// </summary>
     public string PersonId { get; set; } = string.Empty;
-    /// <summary>目标相对页面路径。</summary>
+    /// <summary>
+    /// 目标相对页面路径。
+    /// </summary>
     public string TargetPath { get; set; } = string.Empty;
-    /// <summary>过期时间。</summary>
+    /// <summary>
+    /// 过期时间。
+    /// </summary>
     public DateTimeOffset ExpiresAt { get; set; }
-    /// <summary>消费时间。</summary>
+    /// <summary>
+    /// 消费时间。
+    /// </summary>
     public DateTimeOffset? ConsumedAt { get; set; }
 }

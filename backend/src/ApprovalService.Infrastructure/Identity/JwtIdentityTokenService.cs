@@ -30,6 +30,26 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
     public const string MustChangePasswordClaim = "mustChangePassword";
 
     /// <summary>
+    /// 区分本地密码会话和业务系统嵌入会话的声明名称。
+    /// </summary>
+    public const string SessionKindClaim = "sessionKind";
+
+    /// <summary>
+    /// 嵌入会话绑定的接入应用声明名称。
+    /// </summary>
+    public const string ClientAppCodeClaim = "clientAppCode";
+
+    /// <summary>
+    /// 本地密码会话的声明值。
+    /// </summary>
+    public const string LocalSessionKind = "local";
+
+    /// <summary>
+    /// 业务系统嵌入会话的声明值。
+    /// </summary>
+    public const string EmbedSessionKind = "embed";
+
+    /// <summary>
     /// 签名密钥文件名称。
     /// </summary>
     private const string KeyFileName = "identity-signing.key";
@@ -63,24 +83,33 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
     };
 
     /// <inheritdoc />
-    public string Issue(string personId, long tokenVersion, bool mustChangePassword,
-        DateTimeOffset issuedAt, DateTimeOffset expiresAt) =>
-        new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+    public string Issue(string personId, long tokenVersion, bool mustChangePassword, string? clientAppCode,
+        DateTimeOffset issuedAt, DateTimeOffset expiresAt)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, personId),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+            new(TokenVersionClaim, tokenVersion.ToString(CultureInfo.InvariantCulture)),
+            new(MustChangePasswordClaim, mustChangePassword ? "true" : "false"),
+            new(SessionKindClaim, clientAppCode is null ? LocalSessionKind : EmbedSessionKind),
+        };
+        if (clientAppCode is not null)
+        {
+            claims.Add(new Claim(ClientAppCodeClaim, clientAppCode));
+        }
+
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
         {
             Issuer = Issuer,
             Audience = Issuer,
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(JwtRegisteredClaimNames.Sub, personId),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
-                new Claim(TokenVersionClaim, tokenVersion.ToString(CultureInfo.InvariantCulture)),
-                new Claim(MustChangePasswordClaim, mustChangePassword ? "true" : "false"),
-            ]),
+            Subject = new ClaimsIdentity(claims),
             IssuedAt = issuedAt.UtcDateTime,
             NotBefore = issuedAt.UtcDateTime,
             Expires = expiresAt.UtcDateTime,
             SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256),
         });
+    }
 
     /// <summary>
     /// 优先使用部署配置，否则在数据目录中稳定保存随机密钥。

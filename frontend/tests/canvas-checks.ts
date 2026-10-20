@@ -3,7 +3,8 @@
  */
 import { flowNodeTypes, flowSchemaVersion } from '../src/model/flow.ts'
 import type { FlowDefinition } from '../src/model/flow.ts'
-import { addCanvasNode, canvasBounds, connectCanvasNodes, createCanvasNode, moveCanvasNode, nextCanvasId, removeCanvasElement, updateCanvasEdge } from '../src/designer/canvas/canvas-model.ts'
+import { reactive } from 'vue'
+import { addCanvasNode, canvasBounds, connectCanvasNodes, copyCanvasFlow, createCanvasNode, moveCanvasNode, nextCanvasId, removeCanvasElement, updateCanvasEdge } from '../src/designer/canvas/canvas-model.ts'
 import { edgeGeometry, screenToCanvas } from '../src/designer/canvas/canvas-geometry.ts'
 import { validateCanvasDefinition } from '../src/designer/canvas/canvas-validation.ts'
 import { exportBpmn } from '../src/designer/canvas/bpmn-codec.ts'
@@ -36,6 +37,8 @@ const simpleFlow: FlowDefinition = {
  * @param check 记录检查结果的函数。
  */
 export async function runCanvasChecks(check: (name: string, value: boolean) => void): Promise<void> {
+  const copiedProxy = copyCanvasFlow(reactive(simpleFlow))
+  check('画布历史能复制 Vue 响应式流程定义且不保留代理引用', copiedProxy.code === simpleFlow.code && copiedProxy !== simpleFlow && copiedProxy.canvas.nodes !== simpleFlow.canvas.nodes)
   check('完整顺序审批的画布静态校验通过', validateCanvasDefinition(simpleFlow).length === 0)
   const newNode = createCanvasNode(flowNodeTypes.Handling, 'handling', 407, 241)
   const added = addCanvasNode(simpleFlow.canvas, newNode)

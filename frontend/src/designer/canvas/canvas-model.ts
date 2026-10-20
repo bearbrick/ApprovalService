@@ -2,12 +2,21 @@
  * 自由画布的纯图操作；所有变更返回新模型，便于工作台保存、撤销和测试。
  */
 import { flowNodeTypes } from '../../model/flow.ts'
-import type { FlowCanvas, FlowEdge, FlowNode, FlowNodeType } from '../../model/flow.ts'
+import type { FlowCanvas, FlowDefinition, FlowEdge, FlowNode, FlowNodeType } from '../../model/flow.ts'
 
 /**
  * 画布网格间距，坐标始终存模型坐标而不是屏幕像素。
  */
 export const canvasGrid = 16
+
+/**
+ * 复制完整流程定义；Vue 的响应式代理不能直接交给 structuredClone。
+ * @param flow 当前流程定义。
+ * @returns 与响应式代理解除关联的副本。
+ */
+export function copyCanvasFlow(flow: FlowDefinition): FlowDefinition {
+  return JSON.parse(JSON.stringify(flow)) as FlowDefinition
+}
 
 /**
  * 节点工具箱的显示顺序和默认名称。

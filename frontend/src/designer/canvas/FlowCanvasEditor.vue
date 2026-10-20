@@ -4,11 +4,12 @@
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { FlowDefinition, FlowNode, FlowNodeType } from '../../model/flow.ts'
-import { addCanvasNode, canvasBounds, canvasPalette, connectCanvasNodes, createCanvasNode, moveCanvasNode, nextCanvasId, removeCanvasElement, updateCanvasEdge } from './canvas-model.ts'
+import { addCanvasNode, canvasPalette, connectCanvasNodes, copyCanvasFlow, createCanvasNode, moveCanvasNode, nextCanvasId, removeCanvasElement, updateCanvasEdge } from './canvas-model.ts'
 import { edgeGeometry, screenToCanvas } from './canvas-geometry.ts'
+import { useCanvasViewport } from './canvas-viewport.ts'
 import { validateCanvasDefinition } from './canvas-validation.ts'
 import type { CanvasIssue } from './canvas-validation.ts'
-import { exportBpmn, importBpmn } from './bpmn-codec.ts'
+import { downloadCanvasBpmn, readCanvasBpmn } from './canvas-file-actions.ts'
 import './canvas.css'
 
 /**
@@ -27,7 +28,11 @@ const props = withDefaults(defineProps<{
    * 是否允许编辑。
    */
   readonly?: boolean
-}>(), { readonly: false })
+  /**
+   * 历史记录的持有者；工作台统一撤销时使用 external。
+   */
+  historyMode?: 'internal' | 'external'
+}>(), { readonly: false, historyMode: 'internal' })
 
 /**
  * 向工作台报告新定义、当前选择和校验问题。
@@ -45,6 +50,18 @@ const emit = defineEmits<{
    * 用户执行本地发布检查。
    */
   validate: [issues: CanvasIssue[]]
+  /**
+   * 一次画布编辑完成；参数是编辑前的完整定义。
+   */
+  editCommitted: [previousDefinition: FlowDefinition]
+  /**
+   * 外部历史模式下请求工作台撤销。
+   */
+  undo: []
+  /**
+   * 外部历史模式下请求工作台重做。
+   */
+  redo: []
 }>()
 
 /**
@@ -75,6 +92,10 @@ const offsetX = ref(120)
  * 画布垂直平移。
  */
 const offsetY = ref(100)
+/**
+ * 视口操作绑定当前画布和缩放状态。
+ */
+const { onWheel, changeZoom, fit } = useCanvasViewport(stage, zoom, offsetX, offsetY, () => props.modelValue.canvas)
 /**
  * 当前指针拖动。
  */
@@ -148,9 +169,11 @@ const hasIssue = (id: string): boolean => visibleIssues.value.some(issue => issu
  */
 function publish(value: FlowDefinition, remember = true): void {
   if (props.readonly) return
-  if (remember) { undo.value.push(structuredClone(props.modelValue)); if (undo.value.length > 80) undo.value.shift(); redo.value = [] }
+  const previous = remember ? copyCanvasFlow(props.modelValue) : null
+  if (previous && props.historyMode === 'internal') { undo.value.push(previous); if (undo.value.length > 80) undo.value.shift(); redo.value = [] }
   checkedIssues.value = null
   emit('update:modelValue', value)
+  if (previous && props.historyMode === 'external') emit('editCommitted', previous)
 }
 
 /**
@@ -263,42 +286,12 @@ function onPointerUp(event: PointerEvent): void {
   if (current?.kind === 'node' && current.id && current.nodeX !== undefined && current.nodeY !== undefined) {
     const node = nodes.value.find(item => item.id === current.id)
     if (node && (node.x !== current.nodeX || node.y !== current.nodeY)) {
-      const previous = structuredClone(props.modelValue)
+      const previous = copyCanvasFlow(props.modelValue)
       previous.canvas = moveCanvasNode(previous.canvas, current.id, current.nodeX, current.nodeY)
-      undo.value.push(previous); redo.value = []
+      if (props.historyMode === 'external') emit('editCommitted', previous)
+      else { undo.value.push(previous); redo.value = [] }
     }
   }
-}
-
-/**
- * 鼠标滚轮以指针为中心缩放画布。
- * @param event 滚轮事件。
- */
-function onWheel(event: WheelEvent): void {
-  if (!stage.value) return
-  event.preventDefault()
-  const rect = stage.value.getBoundingClientRect()
-  const before = screenToCanvas(event.clientX, event.clientY, rect.left, rect.top, offsetX.value, offsetY.value, zoom.value)
-  zoom.value = Math.max(.35, Math.min(2, zoom.value * (event.deltaY > 0 ? .9 : 1.1)))
-  offsetX.value = event.clientX - rect.left - before.x * zoom.value
-  offsetY.value = event.clientY - rect.top - before.y * zoom.value
-}
-
-/**
- * 使用控制按钮改变缩放。
- * @param factor 缩放倍数。
- */
-function changeZoom(factor: number): void { zoom.value = Math.max(.35, Math.min(2, zoom.value * factor)) }
-
-/**
- * 让当前所有节点适配视口。
- */
-function fit(): void {
-  if (!stage.value) return
-  const bounds = canvasBounds(props.modelValue.canvas)
-  zoom.value = Math.max(.35, Math.min(1.35, Math.min(stage.value.clientWidth / bounds.width, stage.value.clientHeight / bounds.height)))
-  offsetX.value = (stage.value.clientWidth - bounds.width * zoom.value) / 2 - bounds.x * zoom.value
-  offsetY.value = (stage.value.clientHeight - bounds.height * zoom.value) / 2 - bounds.y * zoom.value
 }
 
 /**
@@ -315,9 +308,11 @@ function removeSelected(): void {
  * 还原上一步本组件内的编辑。
  */
 function undoChange(): void {
+  if (props.readonly) return
+  if (props.historyMode === 'external') { emit('undo'); return }
   const previous = undo.value.pop()
-  if (!previous || props.readonly) return
-  redo.value.push(structuredClone(props.modelValue))
+  if (!previous) return
+  redo.value.push(copyCanvasFlow(props.modelValue))
   emit('update:modelValue', previous)
 }
 
@@ -325,9 +320,11 @@ function undoChange(): void {
  * 重做刚刚撤销的编辑。
  */
 function redoChange(): void {
+  if (props.readonly) return
+  if (props.historyMode === 'external') { emit('redo'); return }
   const next = redo.value.pop()
-  if (!next || props.readonly) return
-  undo.value.push(structuredClone(props.modelValue))
+  if (!next) return
+  undo.value.push(copyCanvasFlow(props.modelValue))
   emit('update:modelValue', next)
 }
 
@@ -383,11 +380,7 @@ function check(): CanvasIssue[] {
  */
 async function exportFile(): Promise<void> {
   try {
-    const xml = await exportBpmn(props.modelValue)
-    const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url; link.download = `${props.modelValue.code || 'flow'}.bpmn`; link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    await downloadCanvasBpmn(props.modelValue)
     message.value = 'BPMN 文件已导出。'
   } catch (error) { message.value = error instanceof Error ? error.message : '导出失败。' }
 }
@@ -401,7 +394,7 @@ async function onImport(event: Event): Promise<void> {
   const file = input.files?.[0]
   if (!file) return
   try {
-    const imported = await importBpmn(await file.text())
+    const imported = await readCanvasBpmn(file)
     publish(imported)
     selected.value = null; emit('select', null); await nextTick(); fit()
     message.value = 'BPMN 文件已导入，请检查流程配置后保存或发布。'
@@ -440,8 +433,8 @@ onMounted(fit)
       <span class="flow-canvas-separator" aria-hidden="true"></span>
       <button type="button" class="btn" :disabled="readonly || !selectedNode" @click="connectFrom = selectedNode?.id ?? null">添加连线</button>
       <button type="button" class="btn" :disabled="readonly || !selected" @click="removeSelected">删除</button>
-      <button type="button" class="btn" :disabled="readonly || !undo.length" @click="undoChange">撤销</button>
-      <button type="button" class="btn" :disabled="readonly || !redo.length" @click="redoChange">重做</button>
+      <button type="button" class="btn" :disabled="readonly || historyMode === 'internal' && !undo.length" @click="undoChange">撤销</button>
+      <button type="button" class="btn" :disabled="readonly || historyMode === 'internal' && !redo.length" @click="redoChange">重做</button>
       <span class="flow-canvas-spacer"></span>
       <button type="button" class="btn" @click="fit">适应画布</button>
       <button type="button" class="btn" @click="exportFile">导出 BPMN</button>

@@ -78,9 +78,9 @@
 
 ## 附件接口
 
-`POST /api/v1/files?fileName=票据.png` 的请求体是文件原始字节，不是 JSON 或 multipart；返回 JSON：`{ "id": "...", "fileName": "票据.png", "size": 123, "contentType": "image/png", "sha256": "..." }`。服务按内容签名核对扩展名，默认单文件上限 20 MB。当前接受 PDF、PNG、JPEG、GIF、WebP，以及通过 ZIP 容器主部件识别的 DOCX、XLSX、PPTX；Office 文件只提供下载，不在线预览。其他类型返回 `VALIDATION_FAILED`。上传得到的文件 ID 可供审批数据引用；审批实例创建或审批意见保存时关联文件的业务入口由 T-006 接入。
+`POST /api/v1/files?fileName=票据.png` 的请求体是文件原始字节，不是 JSON 或 multipart；返回 JSON：`{ "id": "...", "fileName": "票据.png", "size": 123, "contentType": "image/png", "sha256": "..." }`。服务按内容签名核对扩展名，默认单文件上限 20 MB。当前接受 PDF、PNG、JPEG、GIF、WebP，以及具有有效包清单、入口关系和主部件 XML 的 DOCX、XLSX、PPTX；Office 文件只提供下载，不在线预览。其他类型返回 `VALIDATION_FAILED`。上传得到的文件 ID 可供审批数据引用；审批实例创建或审批意见保存时关联文件的业务入口由 T-006 接入。
 
-`GET /api/v1/files/{id}` 先校验可信身份及审批单可见性。本地文件与浏览器不可直连的 MinIO 由服务转发，浏览器可直连的 MinIO 返回短时预签名地址的 302 跳转。未关联审批单的附件只允许上传人下载；上传 24 小时后若仍未关联则自动清理。当前用户登录与接入应用鉴权尚未由 T-007、T-006 接入，公开路由默认返回 `UNAUTHORIZED`；客户端参数中的 `userId` 从不用于授权。
+`GET /api/v1/files/{id}` 先校验可信身份及审批单可见性。本地会话按人员权限访问；嵌入会话还必须带已验证的接入应用编码，且只能下载同一应用审批单的已关联附件。未关联附件尚无可信应用归属，嵌入会话暂不允许下载，本地会话仅上传人可下载。上传 24 小时后若仍未关联则自动清理。本地文件与浏览器不可直连的 MinIO 由服务转发，浏览器可直连的 MinIO 返回最长五分钟有效的预签名地址的 302 跳转。当前用户登录与接入应用鉴权尚未由 T-007、T-006 接入，公开路由默认返回 `UNAUTHORIZED`；客户端参数中的 `userId` 从不用于授权。
 
 ## 回调和业务系统提供的接口（规划中）
 

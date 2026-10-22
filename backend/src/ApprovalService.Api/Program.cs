@@ -2,8 +2,10 @@ using System.Globalization;
 using System.Security.Claims;
 using ApprovalService.Api.Endpoints;
 using ApprovalService.Api.Endpoints.OpenApi;
+using ApprovalService.Api.Endpoints.Files;
 using ApprovalService.Api.Hosting;
 using ApprovalService.Application;
+using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
@@ -14,7 +16,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
-var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args);
+var migrateFiles = args.Contains("--migrate-files", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args.Where(arg => arg != "--migrate-files").ToArray());
 if (bootstrapCommand)
 {
     // 首次迁移会执行大量 SQL，控制台只保留告警，避免冲掉交互提示。
@@ -92,6 +95,7 @@ app.MapOpenInstanceCommandEndpoints();
 app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+app.MapFileEndpoints();
 
 if (bootstrapCommand)
 {
@@ -103,6 +107,15 @@ if (bootstrapCommand)
     }
 
     Environment.ExitCode = await BootstrapAdminCommand.RunAsync(app.Services);
+    return;
+}
+
+if (migrateFiles)
+{
+    // 命令模式不启动 HTTP 监听；先使目标数据库处于当前迁移版本，再搬运内容。
+    await using var scope = app.Services.CreateAsyncScope();
+    var moved = await scope.ServiceProvider.GetRequiredService<IFileMigrationService>().MigrateAsync();
+    Console.WriteLine($"已迁移 {moved} 个附件。");
     return;
 }
 

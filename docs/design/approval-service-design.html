@@ -1136,8 +1136,8 @@ await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
               <tr><td><code>GET /api/v1/tasks/count?user=</code></td><td>待办数量：待处理、加急、超时（业务系统登录时调）</td></tr>
               <tr><td><code>GET /api/v1/tasks?user=</code></td><td>待办列表，带摘要字段和打开地址</td></tr>
               <tr><td><code>POST /api/v1/tasks/{id}/actions</code></td><td>同意、拒绝、退回、转交、加签等（带意见和可编辑字段的值）</td></tr>
-              <tr><td><code>POST /api/v1/files</code></td><td>上传附件，返回文件 ID</td></tr>
-              <tr><td><code>GET /api/v1/files/{id}</code></td><td>下载附件（要权限）</td></tr>
+              <tr><td><code>POST /api/v1/files?fileName=…</code></td><td>请求体为原始文件字节；校验大小和真实类型后返回文件 ID、名称、大小、类型和 SHA-256</td></tr>
+              <tr><td><code>GET /api/v1/files/{id}</code></td><td>验权下载附件；浏览器能访问对象存储时短时跳转，否则由服务转发</td></tr>
               <tr><td><code>POST /api/v1/embed-tokens</code></td><td>签发嵌入令牌，换成免登录打开地址（跳转、内嵌审批中心页面用）</td></tr>
               <tr><td><code>POST /api/v1/embed-tokens/exchange</code></td><td>一次性嵌入令牌换短期访问令牌和刷新令牌</td></tr>
               <tr><td><code>POST /api/v1/org/changes</code></td><td>推送人员、部门变更（新增、修改、调岗、离职）</td></tr>

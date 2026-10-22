@@ -42,7 +42,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `POST /api/v1/embed-tokens`、`/embed-tokens/exchange` | 已认证接入应用为已绑定人员签发一次性嵌入令牌并交换登录态 |
 | `POST /api/v1/org/changes`、`/org/bindings` | 接入应用推送本应用来源的组织数据并绑定自身人员、部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地组织管理员预检查、导入 CSV/XLSX、手工绑定、下载模板 |
-
+| `POST /api/v1/files?fileName=...` | 原始字节上传附件；需可信身份，当前默认拒绝未认证调用 |
+| `GET /api/v1/files/{id}` | 验权下载或短时跳转；当前默认拒绝未认证调用 |
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
@@ -80,7 +81,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Integration:SerialPrefix`、`SerialDatePattern`、`SerialDigits` | `SP`、`yyyyMM`、`6` | 部署级审批编号默认格式；流程级配置由管理后台后续接入 |
 | `Identity:SigningKey` | 数据目录内随机密钥文件 | 可选的 Base64 JWT 签名密钥；多实例部署须配置同一密钥 |
 | `Integration:MasterKey` | — | 接入应用签名密钥加密所需的 32 字节 Base64 主密钥；不要提交仓库 |
-
+| `Files:Provider` | `Local` | 新上传附件的存储：`Local` 或 `Minio`；历史文件按元数据读取 |
+| `Files:MaxUploadBytes` | `20971520` | 单文件大小限制，默认 20 MB |
+| `Files:Endpoint`、`Files:Bucket` | — | 使用 MinIO 时的绝对服务地址和私有桶名 |
+| `Files:AccessKey`、`Files:SecretKey` | — | 仅从部署环境提供的对象存储凭据，不要写入仓库 |
+| `Files:BrowserAccessible` | `false` | 浏览器可直连时签发短时地址，否则服务转发 |
+| `Files:PresignedUrlSeconds` | `300` | 预签名地址有效秒数，只能设为 1—300 秒 |
 
 ## 工作日历基础
 
@@ -109,5 +115,9 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 发起接口只接受当前应用已有人员/部门绑定，由服务端加载组织快照、重算公式和分支条件；编号以数据库唯一键和乐观版本分配，同日同前缀并发不会重号。编号先分配再提交审批，发起校验或并发冲突后允许留空号。业务取数、校验、业务取人和自动动作钩子的精确协议仍待 ADR 0010 确认；在此之前不接受只传单号，相关流程给出可纠正错误。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
+
+附件的文件字节不入数据库，`StoredFiles` 只保存名称、大小、内容类型、SHA-256、存储位置、上传人员或接入应用归属、所属审批单和清理租约。本地内容在数据目录的 `files/年/月/` 下，上传临时文件同目录原子转正。每小时扫描一次，清理上传超过 24 小时仍未关联的内容；多实例通过数据库条件更新抢租约。切换到 MinIO 时，先配置 `ApprovalService__Files__Provider=Minio` 和对象存储凭据，再运行 `powershell -NoProfile -ExecutionPolicy Bypass -File backend/tools/migrate-files.ps1` 搬运旧本地文件；中断后重跑会继续。真实对象存储检查需要设置 `APPROVAL_TEST_MINIO`（服务 URL）、`APPROVAL_TEST_MINIO_BUCKET`、`APPROVAL_TEST_MINIO_ACCESS_KEY`、`APPROVAL_TEST_MINIO_SECRET_KEY`，桶需事先存在。
+
+上传白名单是 PDF、PNG、JPEG、GIF、WebP、DOCX、XLSX、PPTX；Office 文件须具有有效包清单、入口关系和主部件 XML，只下载查看，不做在线预览。嵌入会话只可下载同一接入应用审批单的已关联附件；人员上传的未关联文件仅本人本地会话可读，应用上传的仅同一已认证应用可读。应用 API Key 路由与发起时同应用原子关联尚待开放接口分支集成。普通抄送人可见性尚缺持久化收件人投影，不能仅凭人员 ID 放开。OFD 和旧版 Office 文件的下载范围尚待单独确认。
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。`/health/ready` 会检查数据库连通性；数据库不可连接时返回 503。

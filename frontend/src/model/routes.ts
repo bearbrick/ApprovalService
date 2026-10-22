@@ -1,49 +1,98 @@
-/**
- * 页面路由：用地址的 # 部分区分页面（不依赖路由库，和标签服务一致）。纯逻辑，Node 下能直接运行，检查程序会核对。
- */
+import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS, TAB_TITLES } from './navigation.ts'
+import type { WorkspaceKey } from './navigation.ts'
 
 /**
- * 页面。
+ * 已知工作区与未找到页面。
  */
-export type PageKey = 'center' | 'designer' | 'admin' | 'mobile'
+export type PageKey = WorkspaceKey | 'not-found'
 
 /**
- * 顶栏上的一个导航项。
+ * 完整的界面路由，不包含鉴权或业务数据。
  */
-export interface NavItem {
+export interface AppRoute {
   /**
-   * 对应的页面。
+   * 页面工作区。
    */
-  key: PageKey
+  page: PageKey
   /**
-   * 显示的名称。
+   * 原始地址，供历史记录和页面重置使用。
+   */
+  hash: string
+  /**
+   * 当前子导航标识。
+   */
+  section: string
+  /**
+   * 当前二级页签。
+   */
+  tab: string
+  /**
+   * 流程编码或审批单标识，只作路由参数。
+   */
+  resourceId: string
+  /**
+   * 页面标题。
    */
   title: string
   /**
-   * 地址的 # 部分，如 #/designer。
+   * 页面用途说明。
    */
-  hash: string
+  description: string
+  /**
+   * 是否保留手机外壳，包括手机未知页面。
+   */
+  mobile: boolean
 }
 
 /**
- * 电脑端顶栏的导航项，按显示顺序。手机端（#/m）有自己的底部标签，不在这里。
+ * 桌面顶栏的主导航。
  */
-export const NAV_ITEMS: readonly NavItem[] = [
+export const NAV_ITEMS = [
   { key: 'center', title: '审批中心', hash: '#/' },
   { key: 'designer', title: '流程设计', hash: '#/designer' },
   { key: 'admin', title: '管理后台', hash: '#/admin' },
-]
+] as const
 
 /**
- * 按地址的 # 部分找页面：#/designer 开头是流程设计，#/admin 开头是管理后台，#/m 开头是手机端，其余（包括空的）是审批中心。
- * @param hash location.hash，如 #/designer/PURCHASE_REQUEST。
- * @returns 页面。
+ * 解析 hash 地址，严格匹配已登记路径并安全解码参数。
+ * @param hash 浏览器地址的 hash 部分。
+ * @returns 页面元数据；未知或编码损坏时返回未找到页面。
+ */
+export function resolveRoute(hash: string): AppRoute {
+  const raw = hash.replace(/^#/, '').split('?')[0]!.replace(/^\/+|\/+$/g, '')
+  const missing: AppRoute = { page: 'not-found', hash, section: '', tab: '', resourceId: '', title: '页面不存在', description: '地址可能已变更，请通过导航选择页面。', mobile: raw === 'm' || raw.startsWith('m/') }
+  let parts: string[]
+  try {
+    parts = raw ? raw.split('/').map(decodeURIComponent) : []
+    // 编码后的斜线和控制字符不能改变路径边界。
+    if (parts.some(part => !part || /[\/\\\u0000-\u001f]/.test(part))) return missing
+  } catch {
+    return missing
+  }
+  const first = parts[0] ?? 'center'
+  const page: WorkspaceKey | undefined = first === 'm' ? 'mobile' : first === 'center' || first === 'designer' || first === 'admin' ? first : undefined
+  if (!page) return missing
+  const section = parts[1] ?? SECTION_ITEMS[page][0]!.key
+  if ((page === 'center' || page === 'mobile') && section === 'approvals' && parts.length === 3) {
+    return { ...missing, page, section: 'todo', resourceId: parts[2]!, title: '审批详情', description: '审批数据与操作记录将在业务模块接入后展示。' }
+  }
+  const item = SECTION_ITEMS[page].find(candidate => candidate.key === section)
+  if (!item && page === 'designer' && parts.length >= 2 && parts.length <= 3) {
+    const tab = parts[2] ?? 'design'
+    if (!(DESIGNER_TABS as readonly string[]).includes(tab)) return missing
+    return { ...missing, page, section: 'flows', tab, resourceId: section, title: '流程工作区', description: '流程设计、数据与展示配置的工作区。' }
+  }
+  if (!item || parts.length > (page === 'admin' ? 3 : 2)) return missing
+  const tab = parts[2] ?? (page === 'admin' ? ADMIN_TABS[section]?.[0] ?? '' : '')
+  if (tab && !ADMIN_TABS[section]?.includes(tab)) return missing
+  return { ...missing, page, section, tab, title: tab ? TAB_TITLES[tab] ?? item.title : item.title, description: item.description }
+}
+
+/**
+ * 兼容骨架已有的工作区解析入口。
+ * @param hash 浏览器地址的 hash 部分。
+ * @returns 页面工作区。
  */
 export function parseRoute(hash: string): PageKey {
-  const path = hash.replace(/^#/, '').replace(/^\/+/, '')
-  const first = path.split(/[/?]/)[0]
-  if (first === 'designer') return 'designer'
-  if (first === 'admin') return 'admin'
-  if (first === 'm') return 'mobile'
-  return 'center'
+  return resolveRoute(hash).page
 }

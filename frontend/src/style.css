@@ -1,47 +1,70 @@
-/* 沿用公司 DB Studio、标签服务的界面风格：深蓝顶栏、浅色面板、蓝色强调。 */
+@import './styles/components.css';
+@import './styles/layout.css';
+
+/* 与标签服务保持一致的公共设计变量。 */
 :root {
   --navy: #071f46;
   --blue: #1555d4;
   --blue-soft: #eaf2ff;
   --line: #e4e9f1;
+  --sidebar: #f8faff;
   --ink: #1e293b;
-  --ink-2: #566174;
-  --muted: #7b8497;
-  --ok: #50856b;
-  --ok-bg: #eef8f4;
-  --danger: #b85862;
-  --danger-bg: #fdf1f2;
-  --canvas: #eef2f8;
-  --font-ui: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+  --muted: #68768a;
+  --danger: #a63d49;
+  --success: #267253;
+  --header-height: 56px;
+  --sidebar-width: 280px;
+  font-family: 'Segoe UI', 'Microsoft YaHei', Arial, sans-serif;
+  color: var(--ink);
   color-scheme: light;
+  font-synthesis: none;
 }
-
 * { box-sizing: border-box; }
-html, body { height: 100%; }
-body { margin: 0; background: var(--canvas); color: var(--ink); font: 14px/1.5 var(--font-ui); }
-#app { min-height: 100%; display: flex; flex-direction: column; }
-h1, h2, p { margin: 0; }
-
-.topbar { display: flex; align-items: center; gap: 24px; height: 52px; padding: 0 20px; background: var(--navy); color: #ffffff; }
-.topbar .brand { font-weight: 600; font-size: 16px; letter-spacing: 1px; white-space: nowrap; }
-.topbar nav { display: flex; gap: 4px; flex: 1 0 auto; }
-.topbar nav a { color: rgba(255, 255, 255, 0.78); text-decoration: none; padding: 6px 12px; border-radius: 6px; white-space: nowrap; }
-.topbar nav a.active, .topbar nav a:hover { color: #ffffff; background: rgba(255, 255, 255, 0.14); }
-/* 窄屏时导航保持完整，连接状态放不下就用省略号收起 */
-.status { font-size: 12px; padding: 2px 10px; border-radius: 10px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.status.ok { background: var(--ok-bg); color: var(--ok); }
-.status.bad { background: var(--danger-bg); color: var(--danger); }
-
-.page { flex: 1; padding: 24px; }
-.panel { background: #ffffff; border: 1px solid var(--line); border-radius: 10px; padding: 24px; max-width: 880px; }
-.panel h1 { font-size: 20px; margin-bottom: 8px; }
-.panel p { color: var(--ink-2); line-height: 1.8; }
-.panel ul { color: var(--ink-2); line-height: 1.9; margin: 12px 0 0; padding-left: 1.4em; }
-
-/* 手机端：单列，底部标签栏 */
-.mobile { min-height: 100vh; display: flex; flex-direction: column; background: var(--canvas); }
-.mobile header { padding: 14px 16px; background: var(--navy); color: #ffffff; font-weight: 600; }
-.mobile main { flex: 1; padding: 16px; }
-.mobile .tabs { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); background: #ffffff; }
-.mobile .tabs span { text-align: center; padding: 10px 0; color: var(--muted); font-size: 12px; }
-.mobile .tabs span.active { color: var(--blue); }
+body { margin: 0; min-width: 320px; font-size: 13px; line-height: 1.5; background: #fff; }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+button { cursor: pointer; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+a { color: var(--blue); text-decoration: none; }
+h1, h2, h3, p { margin: 0; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid #5189ef; outline-offset: 3px; }
+h1:focus, main:focus { outline: none; }
+.muted { color: var(--muted); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 34px; padding: 6px 12px; border: 1px solid #dbe1eb; border-radius: 5px; background: #fff; color: var(--ink); }
+.btn:hover:not(:disabled) { background: var(--sidebar); border-color: #becbe0; }
+.btn-primary { border-color: var(--blue); background: var(--blue); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #0d47bd; border-color: #0d47bd; }
+.icon-btn { display: inline-grid; width: 34px; height: 34px; padding: 0; place-items: center; border: 0; border-radius: 4px; background: transparent; color: inherit; }
+.icon-btn:hover { background: #8aa1c21c; }
+.badge { display: inline-flex; align-items: center; padding: 2px 7px; border: 1px solid var(--line); border-radius: 3px; font-size: 11px; font-weight: 400; color: var(--muted); background: var(--sidebar); white-space: nowrap; }
+.panel { border: 1px solid var(--line); border-radius: 5px; background: #fff; overflow: hidden; }
+.panel-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: #fafcff; }
+.panel-heading h2 { font-size: 14px; font-weight: 600; }
+.resource-id { color: var(--muted); font: 12px Consolas, monospace; overflow-wrap: anywhere; }
+.page-header { padding: 22px 30px 20px; border-bottom: 1px solid var(--line); }
+.breadcrumb { display: flex; gap: 10px; margin-bottom: 16px; font-size: 12px; color: var(--muted); }
+.breadcrumb a { color: inherit; }
+.page-title-row { display: flex; align-items: center; gap: 14px; }
+.page-title-row h1 { font-size: 25px; line-height: 1.4; font-weight: 650; }
+.page-header p { margin-top: 12px; color: var(--muted); }
+.page-body { padding: 0 22px 28px; }
+.page-tabs { display: flex; gap: 24px; min-height: 57px; margin-bottom: 20px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.page-tabs a { display: inline-flex; align-items: center; padding: 16px 0; border-bottom: 3px solid transparent; color: var(--muted); white-space: nowrap; }
+.page-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 600; }
+.page-body > .panel:first-child { margin-top: 22px; }
+.workspace-note { margin: 18px 0; color: var(--muted); font-size: 12px; }
+.connection-status { display: flex; align-items: center; gap: 10px; color: var(--blue); }
+.connection-status.connected { color: var(--success); }
+.connection-status.error { color: var(--danger); }
+.connection-description, .connection-error { margin-top: 15px; line-height: 1.8; }
+.service-details { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; margin: 20px 0; padding: 18px; border: 1px solid var(--line); border-radius: 4px; }
+.service-details dt { color: var(--muted); }
+.service-details dd { margin: 0; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+@media (max-width: 600px) {
+  .page-header { padding: 22px 18px; }
+  .page-title-row h1 { font-size: 22px; }
+  .page-body { padding: 0 16px 24px; }
+  .page-tabs { gap: 20px; }
+  .btn { min-height: 40px; }
+}

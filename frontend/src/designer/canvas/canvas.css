@@ -1,0 +1,64 @@
+/* 自由画布复用标签服务的海军蓝、浅蓝与细边框视觉。 */
+.flow-canvas-editor { display: flex; flex-direction: column; height: min(760px, calc(100dvh - 150px)); min-height: 540px; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: #fff; color: var(--ink); }
+.flow-canvas-toolbar { display: flex; align-items: center; gap: 7px; min-height: 53px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: #fff; overflow-x: auto; white-space: nowrap; }
+.flow-canvas-toolbar .btn { min-height: 30px; padding: 4px 9px; font-size: 12px; }
+.flow-canvas-title { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; color: var(--navy); }
+.flow-canvas-title-icon { display: grid; width: 22px; height: 22px; place-items: center; border: 1px solid #cddcf7; border-radius: 4px; background: var(--blue-soft); color: var(--blue); }
+.flow-canvas-separator { width: 1px; height: 20px; margin: 0 3px; background: var(--line); }
+.flow-canvas-spacer { flex: 1 0 18px; }
+.flow-canvas-hidden { display: none; }
+.flow-canvas-layout { display: grid; grid-template-columns: 158px minmax(0, 1fr) 270px; min-height: 0; flex: 1; }
+.flow-canvas-palette, .flow-canvas-inspector { min-height: 0; overflow-y: auto; background: #fff; }
+.flow-canvas-palette { border-right: 1px solid var(--line); }
+.flow-canvas-inspector { border-left: 1px solid var(--line); }
+.flow-canvas-pane-heading { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 11px 13px; border-bottom: 1px solid var(--line); font-weight: 650; color: var(--navy); }
+.flow-canvas-pane-heading small { font-size: 11px; font-weight: 400; color: var(--muted); }
+.flow-canvas-palette-group { padding: 11px 10px 5px; }
+.flow-canvas-palette-group h3 { margin: 0 0 7px; color: #8a97aa; font-size: 11px; font-weight: 650; }
+.flow-canvas-palette-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 30px; margin-bottom: 4px; padding: 4px 7px; border: 1px solid transparent; border-radius: 4px; background: #fff; text-align: left; color: #35445b; cursor: grab; }
+.flow-canvas-palette-item:hover { border-color: #c9daf5; background: var(--blue-soft); color: var(--blue); }
+.flow-canvas-palette-symbol { display: grid; width: 18px; height: 18px; place-items: center; border: 1px solid #acc4e6; border-radius: 3px; color: var(--blue); background: #f7faff; font-size: 13px; font-weight: 700; }
+.flow-canvas-palette-symbol.exclusiveGateway, .flow-canvas-palette-symbol.inclusiveGateway, .flow-canvas-palette-symbol.parallelGateway { transform: rotate(45deg); }
+.flow-canvas-viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #f8faff; }
+.flow-canvas-help { position: absolute; z-index: 1; top: 0; left: 0; right: 0; min-height: 33px; padding: 8px 12px; border-bottom: 1px solid #e8eef8; background: #ffffffed; color: #78869b; font-size: 11px; pointer-events: none; }
+.flow-canvas-stage { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.flow-canvas-stage:active { cursor: grabbing; }
+.flow-canvas-node { cursor: move; outline: none; }
+.flow-canvas-node.selected .flow-canvas-card, .flow-canvas-node.selected .flow-canvas-gateway, .flow-canvas-node.selected .flow-canvas-event { stroke: var(--blue); stroke-width: 2.5; filter: drop-shadow(0 2px 5px #1555d42b); }
+.flow-canvas-node.invalid .flow-canvas-card, .flow-canvas-node.invalid .flow-canvas-gateway, .flow-canvas-node.invalid .flow-canvas-event { stroke: #c3515a; stroke-width: 2.5; }
+.flow-canvas-node.connecting .flow-canvas-card, .flow-canvas-node.connecting .flow-canvas-gateway { stroke: #38a475; stroke-width: 3; }
+.flow-canvas-event { fill: #eaf7ef; stroke: #55a979; stroke-width: 2; }
+.flow-canvas-event-inner { fill: none; stroke: #55a979; stroke-width: 2; }
+.flow-canvas-event-text { fill: #267253; font-size: 14px; font-weight: 700; pointer-events: none; }
+.flow-canvas-gateway { fill: #fff8ed; stroke: #deb46b; stroke-width: 1.5; }
+.flow-canvas-gateway-sign { fill: #8e6b2d; font-size: 26px; font-weight: 500; pointer-events: none; }
+.flow-canvas-gateway-name { fill: #68768a; font-size: 11px; pointer-events: none; }
+.flow-canvas-card { fill: #fff; stroke: #becfe8; stroke-width: 1.4; }
+.flow-canvas-card-top { fill: #e9f1ff; stroke: none; }
+.flow-canvas-card-type { fill: #4775bd; font-size: 9px; pointer-events: none; }
+.flow-canvas-card-name { fill: #253957; font-size: 12px; font-weight: 650; pointer-events: none; }
+.flow-canvas-handle { fill: #fff; stroke: var(--blue); stroke-width: 3; cursor: crosshair; }
+.flow-canvas-edge { cursor: pointer; }
+.flow-canvas-edge-hit { fill: none; stroke: transparent; stroke-width: 16; }
+.flow-canvas-edge-path { fill: none; stroke: #8ba0bb; stroke-width: 1.6; pointer-events: none; }
+.flow-canvas-edge.selected .flow-canvas-edge-path { stroke: var(--blue); stroke-width: 2.5; }
+.flow-canvas-edge.invalid .flow-canvas-edge-path { stroke: #c3515a; stroke-width: 2.5; }
+.flow-canvas-edge-label rect { fill: #fff; stroke: #d8e3f2; }
+.flow-canvas-edge-label text { fill: #62748e; font-size: 10px; pointer-events: none; }
+.flow-canvas-controls { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 5px; background: #fff; box-shadow: 0 2px 8px #071f4615; color: var(--muted); }
+.flow-canvas-controls .btn { min-width: 27px; min-height: 27px; padding: 2px; }
+.flow-canvas-controls span { min-width: 34px; text-align: center; }
+.flow-canvas-inspector-body { display: grid; gap: 15px; padding: 17px 14px; }
+.flow-canvas-inspector-body label { display: grid; gap: 5px; color: #52647d; font-size: 12px; }
+.flow-canvas-inspector-body input:not([type=checkbox]), .flow-canvas-inspector-body textarea, .flow-canvas-inspector-body select { width: 100%; min-height: 33px; padding: 6px 8px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
+.flow-canvas-inspector-body textarea { resize: vertical; }
+.flow-canvas-inspector-body .flow-canvas-check { display: flex; align-items: center; gap: 6px; }
+.flow-canvas-inspector-body p { color: var(--muted); font-size: 11px; line-height: 1.7; }
+.flow-canvas-inspector-id { padding: 7px 9px; border-radius: 4px; background: #f5f8fd; color: #6f7d91; font: 11px Consolas, monospace; overflow-wrap: anywhere; }
+.flow-canvas-issues { border-top: 1px solid var(--line); padding: 12px 14px; }
+.flow-canvas-issues h3 { margin: 0 0 8px; font-size: 12px; color: #a63d49; }
+.flow-canvas-issues button { width: 100%; padding: 8px; border: 0; border-bottom: 1px solid #f0e2e4; background: #fff; color: #9b4650; text-align: left; line-height: 1.5; }
+.flow-canvas-issues button:hover { background: #fff5f5; }
+.flow-canvas-footer { display: flex; justify-content: space-between; gap: 10px; min-height: 28px; padding: 5px 12px; border-top: 1px solid var(--line); color: #8995a6; font-size: 11px; }
+@media (max-width: 1000px) { .flow-canvas-layout { grid-template-columns: 120px minmax(0, 1fr) 220px; } .flow-canvas-palette-item { font-size: 11px; } }
+@media (max-width: 720px) { .flow-canvas-editor { height: min(760px, calc(100dvh - 100px)); } .flow-canvas-layout { grid-template-columns: 74px minmax(0, 1fr); } .flow-canvas-palette-item { justify-content: center; font-size: 0; } .flow-canvas-palette-symbol { font-size: 13px; } .flow-canvas-inspector { display: none; } .flow-canvas-pane-heading { font-size: 11px; padding: 10px 5px; } .flow-canvas-pane-heading small { display: none; } }

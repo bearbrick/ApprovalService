@@ -46,7 +46,7 @@ internal static partial class OpenApiChecksStarts
                 [
                     new FlowFieldDefinition { Key = "amount", Name = "申请金额", Type = FlowFieldTypes.Money },
                     new FlowFieldDefinition { Key = "approvedAmount", Name = "核定金额", Type = FlowFieldTypes.Money,
-                        ApproverInput = true },
+                        ApproverInput = true, Required = true },
                     new FlowFieldDefinition { Key = "personInput", Name = "经办人", Type = FlowFieldTypes.Person,
                         ApproverInput = true },
                     new FlowFieldDefinition { Key = "secretNote", Name = "内部备注", Type = FlowFieldTypes.Text,
@@ -143,6 +143,34 @@ internal static partial class OpenApiChecksStarts
         using var detailResponse = await http.SendAsync(detailRequest);
         check("明细子字段缺行索引协议时明确拒绝", detailResponse.StatusCode == HttpStatusCode.BadRequest);
 
+        using var missingRequiredRequest = ActionRequest(taskId, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = EngineCommandKinds.Approve,
+        }, apiKey, "input-required-missing");
+        using var missingRequiredResponse = await http.SendAsync(missingRequiredRequest);
+        check("成功推进时必须提交当前节点的必填审批人字段",
+            missingRequiredResponse.StatusCode == HttpStatusCode.BadRequest);
+
+        using var partialRequiredRequest = ActionRequest(taskId, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = EngineCommandKinds.Approve,
+            FieldValues = JsonSerializer.SerializeToElement(new { personInput = "alice" }),
+        }, apiKey, "input-required-partial");
+        using var partialRequiredResponse = await http.SendAsync(partialRequiredRequest);
+        check("成功推进时提供其他字段也不能省略必填字段",
+            partialRequiredResponse.StatusCode == HttpStatusCode.BadRequest);
+
+        using var draftRequest = ActionRequest(taskId, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = "saveDraft",
+            Opinion = "稍后填写",
+        }, apiKey, "input-required-draft");
+        using var draftResponse = await http.SendAsync(draftRequest);
+        check("暂存意见无需填写必填审批人字段", draftResponse.StatusCode == HttpStatusCode.OK);
+
         using var validRequest = ActionRequest(taskId, new OpenTaskActionRequest
         {
             User = "bob",
@@ -158,6 +186,34 @@ internal static partial class OpenApiChecksStarts
         check("审批人填写值进入历史操作审计而不改业务数据快照",
             validResponse.StatusCode == HttpStatusCode.OK && audited && completed is not null &&
             !completed.Data.TryGetProperty("approvedAmount", out _));
+
+        using var secondStartRequest = Request(new OpenStartRequest
+        {
+            FlowCode = "INPUT",
+            BusinessKey = "INPUT-2",
+            Initiator = "alice",
+            Data = JsonSerializer.SerializeToElement(new { amount = 20 }),
+        }, apiKey, "input-start-reject");
+        using var secondStartResponse = await http.SendAsync(secondStartRequest);
+        var secondInstance = await secondStartResponse.Content.ReadFromJsonAsync<OpenInstanceResponse>(ApprovalJson.Options);
+        using var rejectInvalidRequest = ActionRequest(secondInstance!.Tasks.Single().Id, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = EngineCommandKinds.Reject,
+            Opinion = "不通过",
+            FieldValues = JsonSerializer.SerializeToElement(new { approvedAmount = "格式错误" }),
+        }, apiKey, "input-reject-invalid");
+        using var rejectInvalidResponse = await http.SendAsync(rejectInvalidRequest);
+        check("拒绝时若提交字段仍校验类型", rejectInvalidResponse.StatusCode == HttpStatusCode.BadRequest);
+        using var rejectRequest = ActionRequest(secondInstance!.Tasks.Single().Id, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = EngineCommandKinds.Reject,
+            Opinion = "不通过",
+        }, apiKey, "input-required-reject");
+        using var rejectResponse = await http.SendAsync(rejectRequest);
+        check("拒绝审批无需填写必填审批人字段",
+            secondStartResponse.StatusCode == HttpStatusCode.OK && rejectResponse.StatusCode == HttpStatusCode.OK);
 
         await using (var db = await factory.CreateDbContextAsync())
         {

@@ -339,10 +339,50 @@ internal static partial class OpenApiChecksStarts
                 withdrawn is { Status: EngineInstanceStatuses.Withdrawn } &&
                 withdrawn.Tasks.All(task => task.Status == EngineTaskStatuses.Cancelled));
 
+            using var foreignTerminateRequest = CommandRequest(OpenApiRoutes.InstanceTerminate.Replace("{id}", multi!.Id),
+                "alice", other.ApiKey, "terminate-foreign", "跨应用终止");
+            using var foreignTerminateResponse = await http.SendAsync(foreignTerminateRequest);
+            check("其他应用不能终止本应用审批单", foreignTerminateResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var unboundTerminateRequest = CommandRequest(OpenApiRoutes.InstanceTerminate.Replace("{id}", multi.Id),
+                "E001", demo.ApiKey, "terminate-unbound", "业务单据作废");
+            using var unboundTerminateResponse = await http.SendAsync(unboundTerminateRequest);
+            check("终止操作不能冒用本应用未绑定的全局工号",
+                unboundTerminateResponse.StatusCode == HttpStatusCode.Forbidden);
+
+            using var noReasonTerminateRequest = CommandRequest(OpenApiRoutes.InstanceTerminate.Replace("{id}", multi.Id),
+                "secretary", demo.ApiKey, "terminate-no-reason");
+            using var noReasonTerminateResponse = await http.SendAsync(noReasonTerminateRequest);
+            check("业务系统终止必须填写原因", noReasonTerminateResponse.StatusCode == HttpStatusCode.BadRequest);
+
+            using var terminateRequest = CommandRequest(OpenApiRoutes.InstanceTerminate.Replace("{id}", multi.Id),
+                "secretary", demo.ApiKey, "terminate-owned", "业务单据作废");
+            using var terminateResponse = await http.SendAsync(terminateRequest);
+            var terminated = JsonSerializer.Deserialize<OpenInstanceResponse>(
+                await terminateResponse.Content.ReadAsStringAsync(), ApprovalJson.Options);
+            check("所属应用可由已绑定非发起人终止并审计原因",
+                terminateResponse.StatusCode == HttpStatusCode.OK &&
+                terminated is { Status: EngineInstanceStatuses.Terminated } &&
+                terminated.Tasks.All(task => task.Status is not (EngineTaskStatuses.Pending or EngineTaskStatuses.Queued)) &&
+                terminated.Events.Any(item => item.Event == "instanceTerminate" &&
+                    item.Detail.GetProperty("audit").GetProperty("reason").GetString() == "业务单据作废"));
+            var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+            await using (var db = await dbFactory.CreateDbContextAsync())
+            {
+                var callbacks = await db.OutboxItems.AsNoTracking().Where(item =>
+                    (item.InstanceId == multi.Id || item.InstanceId == first.Id) &&
+                    item.Kind == "callback").Select(item => item.PayloadJson).ToArrayAsync();
+                check("撤回和终止均在审批事务中固定结果回调",
+                    callbacks.Any(body => body.Contains("instance.withdrawn", StringComparison.Ordinal)) &&
+                    callbacks.Any(body => body.Contains("instance.terminated", StringComparison.Ordinal)));
+            }
+
             await RunRoutingAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunApproverInputsAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunFlowPoliciesAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunRevokeAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunBatchAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunAwaitingTerminationAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally
@@ -376,12 +416,14 @@ internal static partial class OpenApiChecksStarts
     /// <param name="user">外部人员 ID。</param>
     /// <param name="apiKey">接入应用 Key。</param>
     /// <param name="requestId">请求 ID。</param>
+    /// <param name="reason">终止审批原因；其他命令可省略。</param>
     /// <returns>HTTP 请求。</returns>
-    private static HttpRequestMessage CommandRequest(string route, string user, string apiKey, string requestId)
+    private static HttpRequestMessage CommandRequest(string route, string user, string apiKey, string requestId,
+        string? reason = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, route)
         {
-            Content = JsonContent.Create(new OpenInstanceCommandRequest { User = user }),
+            Content = JsonContent.Create(new OpenInstanceCommandRequest { User = user, Reason = reason }),
         };
         request.Headers.Add(HeaderNames.ApiKey, apiKey);
         request.Headers.Add(HeaderNames.RequestId, requestId);

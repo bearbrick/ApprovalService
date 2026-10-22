@@ -21,6 +21,11 @@ public static class OpenApiRoutes
     public const string Instances = "/api/v1/instances";
 
     /// <summary>
+    /// 逐张独立处理的批量发起。
+    /// </summary>
+    public const string InstancesBatch = "/api/v1/instances/batch";
+
+    /// <summary>
     /// 按审批单 ID 读取状态、任务和操作记录。
     /// </summary>
     public const string Instance = "/api/v1/instances/{id}";
@@ -29,6 +34,11 @@ public static class OpenApiRoutes
     /// 发起人撤回在途审批。
     /// </summary>
     public const string InstanceWithdraw = "/api/v1/instances/{id}/withdraw";
+
+    /// <summary>
+    /// 所属接入应用以已绑定实际操作人终止在途审批。
+    /// </summary>
+    public const string InstanceTerminate = "/api/v1/instances/{id}/terminate";
 
     /// <summary>
     /// 发起人催办当前审批任务。

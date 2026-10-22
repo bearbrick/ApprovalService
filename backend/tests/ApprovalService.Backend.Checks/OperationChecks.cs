@@ -191,6 +191,21 @@ internal static class OperationChecks
             replied.State.Tasks.Single().Status == EngineTaskStatuses.Pending &&
             Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(replied.State,
                 Command(OperationKinds.Reply, "again", actor: "expert", opinion: "重复"), context)));
+        var laterContext = Context(EngineScenarioChecks.Chain(FlowNodeTypes.Approval, FlowNodeTypes.Approval));
+        var laterStarted = Start(laterContext);
+        var originalTask = laterStarted.State.Tasks.Single();
+        var laterConsulted = EngineRuntime.Execute(laterStarted.State,
+            Command(OperationKinds.Consult, "later-consult", originalTask.Id, originalTask.AssigneeId,
+                target: "expert"), laterContext);
+        var completedFirst = EngineRuntime.Execute(laterConsulted.State,
+            Command(EngineCommandKinds.Approve, "later-approve", originalTask.Id, originalTask.AssigneeId),
+            laterContext);
+        var lateReply = Command(OperationKinds.Reply, "late-reply", originalTask.Id, actor: "expert",
+            opinion: "迟到建议");
+        lateReply.Operation!.RelatedId = laterConsulted.State.Operations.Consultations.Single().Id;
+        check("原发问任务完成后即使后续节点仍在审批也拒绝迟到征询回复",
+            completedFirst.State.Status == EngineInstanceStatuses.Running &&
+            Throws(ErrorCodes.Conflict, () => EngineRuntime.Execute(completedFirst.State, lateReply, laterContext)));
         var supplement = EngineRuntime.Execute(started.State,
             Command(OperationKinds.RequestSupplement, "need", task.Id, task.AssigneeId), context);
         var supplied = EngineRuntime.Execute(supplement.State,

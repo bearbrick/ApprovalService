@@ -4,7 +4,7 @@ using ApprovalService.Contracts.Protocol;
 namespace ApprovalService.Api.Endpoints.OpenApi;
 
 /// <summary>
-/// 业务系统以接入应用和已绑定发起人的身份撤回或催办。
+/// 业务系统以接入应用和已绑定实际操作人的身份控制审批单。
 /// </summary>
 public static class OpenInstanceCommandEndpoints
 {
@@ -29,6 +29,14 @@ public static class OpenInstanceCommandEndpoints
         {
             var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
             return Results.Ok(await commands.RemindAsync(client, id, request,
+                http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
+        });
+        app.MapPost(OpenApiRoutes.InstanceTerminate, async (string id, OpenInstanceCommandRequest request,
+            HttpContext http, ClientAppAppService clients, OpenInstanceCommandAppService commands,
+            CancellationToken cancellationToken) =>
+        {
+            var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
+            return Results.Ok(await commands.TerminateAsync(client, id, request,
                 http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
         });
         return app;

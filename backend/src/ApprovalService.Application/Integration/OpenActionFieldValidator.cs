@@ -3,6 +3,7 @@ using ApprovalService.Application.Organization;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Execution;
 using ApprovalService.Engine.Expressions;
 
 namespace ApprovalService.Application.Integration;
@@ -18,16 +19,27 @@ public static class OpenActionFieldValidator
     /// <param name="appCode">已认证接入应用编码。</param>
     /// <param name="definition">审批单锁定的流程定义。</param>
     /// <param name="node">正在操作的执行图节点。</param>
+    /// <param name="action">人工任务命令。</param>
     /// <param name="values">请求提交的字段对象。</param>
     /// <param name="organization">本应用既有组织绑定查询。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>通过校验的独立字段快照；未提交时为空。</returns>
     public static async Task<JsonElement?> ValidateAsync(string appCode, FlowDefinition definition,
-        FlowExecutionNode node, JsonElement? values, IOrganizationLookupAppService organization,
+        FlowExecutionNode node, string action, JsonElement? values, IOrganizationLookupAppService organization,
         CancellationToken cancellationToken = default)
     {
+        var advancing = action is EngineCommandKinds.Approve or EngineCommandKinds.Handle or
+            EngineCommandKinds.Acknowledge;
         if (values is null)
         {
+            if (advancing && definition.Data.Fields.Any(field => field.ApproverInput && field.Required &&
+                string.IsNullOrWhiteSpace(field.Formula) && node.FieldPermissions.Count(permission =>
+                    permission.FieldKey == field.Key && permission.Access == FlowFieldAccess.Editable) == 1))
+            {
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                    "当前节点的必填审批人字段不能为空。");
+            }
+
             return null;
         }
 
@@ -81,7 +93,7 @@ public static class OpenActionFieldValidator
                 Key = field.Key,
                 Name = field.Name,
                 Type = field.Type,
-                Required = field.Required,
+                Required = advancing && field.Required,
             };
             var issue = ApprovalDataValidator.Validate(new FlowDataDefinition { Fields = [inputField] },
                 values.Value).FirstOrDefault();
@@ -110,6 +122,20 @@ public static class OpenActionFieldValidator
             {
                 throw new UserFriendlyException(ErrorCodes.ValidationFailed,
                     $"部门字段 {field.Key} 未在当前应用绑定或部门已不存在。");
+            }
+        }
+
+        if (advancing)
+        {
+            foreach (var field in definition.Data.Fields.Where(field => field.ApproverInput && field.Required &&
+                string.IsNullOrWhiteSpace(field.Formula) && node.FieldPermissions.Count(permission =>
+                    permission.FieldKey == field.Key && permission.Access == FlowFieldAccess.Editable) == 1))
+            {
+                if (!seen.Contains(field.Key))
+                {
+                    throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                        $"审批人填写字段 {field.Key} 为当前节点必填字段。");
+                }
             }
         }
 

@@ -201,6 +201,9 @@ internal static class OperationDispatcher
             throw new EngineException(ErrorCodes.Conflict, "征询回复必须使用原发问任务。");
         }
 
+        // 即使其他分支仍在运行，已完成的原任务也不能追加迟到回复。
+        var task = PendingTask(state, consultation.TaskId);
+
         if (input.FieldValues is not null)
         {
             // 受询人没有原审批任务的字段编辑权限，回复只能携带意见。
@@ -213,7 +216,6 @@ internal static class OperationDispatcher
         }
 
         consultation.Replied = true;
-        var task = state.Tasks.Single(item => item.Id == consultation.TaskId);
         work.Emit("consultationReplied", task.NodeId, task.TokenId, task.Id, consultation.Id);
     }
 

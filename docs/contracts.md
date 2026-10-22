@@ -6,7 +6,7 @@
 
 - 开放接口都在 `/api/v1` 下。不兼容的改动升版本号（`/api/v2`），老版本保留一段时间。
 - 请求和响应都是 JSON：属性名小驼峰；枚举写成小驼峰字符串；值为 null 的属性不输出；时间用带时区的 ISO 8601（如 `2026-10-13T09:30:00+08:00`）；金额用数字，不用字符串。
-- 人员用工号，或者业务系统自己的用户 ID（在审批服务里绑定过的）。
+- 开放接口代表人员时必须使用当前接入应用已绑定的业务用户 ID，不按全局工号回退；工号仅用于本地账号登录或管理员确认人员绑定。
 - 每个响应都带 `X-Request-Id` 和 `X-Trace-Id`。
 
 ## HTTP 头
@@ -79,9 +79,11 @@
 
 `POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 是审批数据对象，服务端按已发布定义校验并重算公式、分支条件，审批人填写值不接受业务系统自造；附件 ID 在同应用归属与原子关联接通前拒绝。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。只传单号取数、业务校验/取人/动作钩子的协议待 ADR 0010 确认，当前明确返回 `VALIDATION_FAILED` 而不猜测调用方式。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
 
-`POST /api/v1/instances/{id}/withdraw` 与 `POST /api/v1/instances/{id}/remind` 的 JSON 请求体为 `{user}`，`user` 必须是本应用已绑定的在职发起人；目标审批单也必须属于当前应用。前者按锁定流程的撤回规则执行，后者对当前待办催办，同一步每小时最多一次。`POST /api/v1/tasks/{id}/actions` 的请求体为 `{user, action, opinion?, targetUser?, targetNodeId?, relatedId?, mode?, mentionedUsers?, fieldValues?}`；`user`、`targetUser` 和 `mentionedUsers` 都须在本应用既有绑定且在职，目标任务须属于当前应用。`id` 是可能包含斜杠的不透明任务 ID，作为 URL 路径参数时应进行百分号编码。`action` 允许 `approve`、`reject`、`handle`、`acknowledge`、`return`、`transfer`、`addSigner`、`removeSigner`、`revokeApproval`、`comment`、`saveDraft`、`copyTo`、`consult`、`reply`、`requestSupplement`；节点权限、任务处理人、意见必填等仍由统一引擎校验。`fieldValues` 是按字段 key 的 JSON 对象，仅接受已发布定义标记 `approverInput=true` 且当前节点 `fieldPermissions` 显式为 `editable` 的顶层字段；类型沿用审批数据规则，人员和部门 ID 须在本应用既有绑定，附件 ID 暂不接受。明细子字段没有行索引协议，当前明确返回 `VALIDATION_FAILED`；业务原始字段、计算字段和无编辑权限字段不能提交。已核准值只写操作事件 `detail.audit.fieldValues` 及相关 `task.completed`、`instance.approved`、`instance.rejected` 回调的可选 `fieldValues`，原审批数据 `data` 不变，由业务系统决定是否回写业务单据。审批人必填字段在各人工命令中的生效边界待确认；当前严格校验已提交字段，不强制未提交字段。上述三个操作成功返回最新审批单详情。发起时选定部门、审批数据、自选审批/抄送人和业务数据找人标识保存为审批单快照；后续节点到达使用最新组织与审批矩阵重算，符合设计书第 4 节规则。
+`POST /api/v1/instances/batch` 需要同一 `X-Api-Key`，请求为 `{ "items": [单张发起请求, …] }`，每批 1 至 100 项。服务端按列表顺序逐张独立验证和提交，返回 `{ "results": [{ "index": 0, "instance": 审批单详情或 null, "error": { "code", "message" } 或 null }, …] }`；`index` 从 0 开始。单项业务校验失败只写该项 `error`，其他已成功的单据不回滚；无效的批次外形整体返回 400。每项使用由批次 `X-Request-Id` 和下标确定的独立请求 ID，重复批次中仍在途的同应用单据返回原审批单。程序缺陷不会被当作单项业务错误吞掉。
 
-`reply` 必须带原发问任务 ID 和该任务产生的 `relatedId` 征询 ID，实际受询人可以回复意见，但不能携带 `fieldValues`；不能借另一任务的节点权限写入征询审计。审批人实际处理任务时的意见进入任务详情的 `opinion` 并在后续状态更新中保留。退回发起人或要求补充操作若提交了合法 `fieldValues`，对应状态回调也会携带独立的填写值快照。
+`POST /api/v1/instances/{id}/withdraw` 与 `POST /api/v1/instances/{id}/remind` 的 JSON 请求体为 `{user}`，`user` 必须是本应用已绑定的在职发起人；目标审批单也必须属于当前应用。前者按锁定流程的撤回规则执行，后者对当前待办催办，同一步每小时最多一次。`POST /api/v1/instances/{id}/terminate` 也要求 `X-Api-Key`，请求为 `{user, reason}`；审批单必须属于当前应用，`user` 必须是本应用已绑定的在职实际操作人，`reason` 为非空终止原因。审批单处于 `running` 或 `awaitingInitiator`（退回待重提、待补充）时均可终止；终止会取消未处理任务、清除暂停入口、释放在途业务单号占用，审计实际操作人和原因，并在同一事务固定 `instance.terminated` 回调；不要求操作人是发起人，也不授予其他管理员干预权限。`POST /api/v1/tasks/{id}/actions` 的请求体为 `{user, action, opinion?, targetUser?, targetNodeId?, relatedId?, mode?, mentionedUsers?, fieldValues?}`；`user`、`targetUser` 和 `mentionedUsers` 都须在本应用既有绑定且在职，目标任务须属于当前应用。`id` 是可能包含斜杠的不透明任务 ID，作为 URL 路径参数时应进行百分号编码。`action` 允许 `approve`、`reject`、`handle`、`acknowledge`、`return`、`transfer`、`addSigner`、`removeSigner`、`revokeApproval`、`comment`、`saveDraft`、`copyTo`、`consult`、`reply`、`requestSupplement`；节点权限、任务处理人、意见必填等仍由统一引擎校验。`fieldValues` 是按字段 key 的 JSON 对象，仅接受已发布定义标记 `approverInput=true` 且当前节点 `fieldPermissions` 显式为 `editable` 的顶层字段；类型沿用审批数据规则，人员和部门 ID 须在本应用既有绑定，附件 ID 暂不接受。明细子字段没有行索引协议，当前明确返回 `VALIDATION_FAILED`；业务原始字段、计算字段和无编辑权限字段不能提交。已核准值只写操作事件 `detail.audit.fieldValues` 及相关 `task.completed`、`instance.approved`、`instance.rejected` 回调的可选 `fieldValues`，原审批数据 `data` 不变，由业务系统决定是否回写业务单据。当前节点显式可写且标记为必填的顶层审批人字段，只在 `approve`、`handle`、`acknowledge` 成功推进时必须提交；拒绝、评论、草稿和协作操作不强制填写，已提交的值仍按字段类型与授权校验。上述三个操作成功返回最新审批单详情。发起时选定部门、审批数据、自选审批/抄送人和业务数据找人标识保存为审批单快照；后续节点到达使用最新组织与审批矩阵重算，符合设计书第 4 节规则。
+
+`reply` 必须带原发问任务 ID 和该任务产生的 `relatedId` 征询 ID，实际受询人可以回复意见，但不能携带 `fieldValues`；不能借另一任务的节点权限写入征询审计；原发问任务一旦完成，即使审批单其他节点仍在运行，也拒绝迟到回复。审批人实际处理任务时的意见进入任务详情的 `opinion` 并在后续状态更新中保留。退回发起人或要求补充操作若提交了合法 `fieldValues`，对应状态回调也会携带独立的填写值快照。
 
 ## 组织和身份接口
 

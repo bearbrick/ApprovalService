@@ -18,11 +18,11 @@
 - `backend/src/ApprovalService.Application/Integration/ClientAppAppService.cs`
 - `backend/src/ApprovalService.Infrastructure/Integration/ClientAppRepository.cs`
 - `backend/src/ApprovalService.Domain/Identity/IdentityEntities.cs`、`IIdentityRepository.cs`
-- `backend/src/ApprovalService.Application/Identity/IIdentityAppService.cs`、`IdentityAppService.cs`、`IIdentityAccessTokenService.cs`
+- `backend/src/ApprovalService.Application/Identity/IIdentityAppService.cs`、`IdentityAppService.cs`、`IIdentityCryptography.cs`
 - `backend/src/ApprovalService.Infrastructure/Identity/IdentityRepository.cs`、`JwtIdentityTokenService.cs`
-- `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`IdentityModelConfiguration.cs`、`Migrations/**`
+- `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`Migrations/**`，以及 `backend/src/ApprovalService.Infrastructure/Identity/IdentityModelConfiguration.cs`
 - `backend/src/ApprovalService.Api/Program.cs`
-- `backend/tests/ApprovalService.Backend.Checks/IdentityAppServiceChecks.cs`、`IdentityEndpointChecks.cs`、`ClientAppAuthGenerationChecks.cs`、`Program.cs`
+- `backend/tests/ApprovalService.Backend.Checks/IdentityAppServiceChecks.cs`、`IdentityEndpointChecks.cs`、`OpenApiChecksClientApps.cs`、`ClientAppAuthGenerationChecks.cs`、`Program.cs`
 - `backend/README.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`、`docs/tasks/README.md`、本任务文件
 
 ## 共享文件

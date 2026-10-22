@@ -24,6 +24,8 @@ dotnet run --project backend/tests/ApprovalService.Backend.Checks -- docs    # �
 dotnet run --project backend/src/ApprovalService.Api                         # http://localhost:5280
 ```
 
+统一验证会在随机回环端口启动真实服务。后端检查程序的 `seed-sdk-e2e` 命令只供 `verify.ps1` 使用：在全新临时 SQLite 库中创建测试应用、发布流程和人员绑定，并将本次随机生成的 API Key 写进同目录的临时文件。它不注册生产 HTTP 路由；脚本完成后会停服并清理整个临时目录。
+
 ## 现在有的接口
 
 | 接口 | 说明 |

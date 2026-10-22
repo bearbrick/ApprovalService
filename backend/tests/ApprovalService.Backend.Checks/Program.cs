@@ -17,10 +17,21 @@ internal static class Program
     /// <summary>
     /// 运行全部检查。
     /// </summary>
-    /// <param name="args">命令行参数；含 docs 时只检查注释。</param>
+    /// <param name="args">命令行参数；docs 只检查注释，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
     /// <returns>全部通过时为 0；有失败时抛异常，进程以非零退出。</returns>
     private static async Task<int> Main(string[] args)
     {
+        if (args.FirstOrDefault() == "seed-sdk-e2e")
+        {
+            if (args.Length != 3)
+            {
+                throw new ArgumentException("SDK 测试种库命令需要数据目录和密钥文件路径。");
+            }
+
+            await SdkLiveFixture.SeedAsync(args[1], args[2]);
+            return 0;
+        }
+
         var backendRoot = Fixtures.BackendRoot();
         var repositoryRoot = Directory.GetParent(backendRoot)!.FullName;
         if (args.Contains("docs"))

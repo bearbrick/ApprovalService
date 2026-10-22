@@ -56,6 +56,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-036](T-036-ui-integration.md) | 已验收前端成果的可验证集成基线 | 全部 | M2～M4 | T-032、T-034、T-035 | backend、frontend、client、docs |
 | [T-038](T-038-verified-integration.md) | 已验证稳定分支整合快照 | 全部 | M2～M4 | T-036、T-006/T-007/T-037 稳定提交 | backend、frontend、client、docs |
 | [T-039](T-039-verified-integration.md) | 后续稳定功能集成与应用附件原子关联 | 全部 | M2～M4 | T-038、T-006/T-007/T-013/T-029 稳定提交 | backend、frontend、client、docs |
+| [T-040](T-040-sdk-live-fixture.md) | SDK 真实服务临时种库夹具 | 后端检查 + 调用端检查 | M4 | T-038、T-037 | backend/tests、client/tests、verify.ps1 |
 | [T-041](T-041-client-app-auth-generation.md) | 接入应用身份代际与嵌入会话永久失效 | 后端 | M4 | T-006、T-007、T-039、T-042 | Integration、Identity、Persistence |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。

@@ -63,3 +63,5 @@ dotnet build client/ApprovalService.Client.slnx
 dotnet format client/ApprovalService.Client.slnx --verify-no-changes --no-restore
 dotnet run --project client/tests/ApprovalService.Client.Checks
 ```
+
+从仓库根目录运行完整 `verify.ps1` 时，脚本创建一次性测试接入应用和已发布流程，通过真实 HTTP 验证 SDK 的发起、查询、待办、审批、催办与撤回。API Key 只放在该次运行的临时文件中；单独运行调用端检查而未提供测试夹具时，会跳过需要已登记应用的成功链路。

@@ -76,7 +76,18 @@ public static class EngineRuntime
                 return new EngineResult { State = state, Events = work.Events };
             }
 
-            RequireRunning(state);
+            if (command.Kind == EngineCommandKinds.Terminate)
+            {
+                if (state.Status is not (EngineInstanceStatuses.Running or EngineInstanceStatuses.AwaitingInitiator))
+                {
+                    throw new EngineException(ErrorCodes.Conflict, "审批单不在审批中。");
+                }
+            }
+            else
+            {
+                RequireRunning(state);
+            }
+
             state.Status = command.Kind switch
             {
                 EngineCommandKinds.Withdraw => EngineInstanceStatuses.Withdrawn,
@@ -88,6 +99,12 @@ public static class EngineRuntime
             }
 
             state.Tokens.Clear();
+            if (command.Kind == EngineCommandKinds.Terminate)
+            {
+                // 业务单据作废后不再存在待重提或待补充的入口。
+                state.Operations.Pause = null;
+            }
+
             work.Emit("instance" + command.Kind[..1].ToUpperInvariant() + command.Kind[1..]);
         }
         else if (command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or

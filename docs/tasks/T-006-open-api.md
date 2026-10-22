@@ -27,6 +27,7 @@
 - `backend/src/ApprovalService.Domain/Runtime/InstanceEntity.cs`：保存发起时规范化的自选审批/抄送人与审批数据找人标识；后续节点到达重新读取最新组织与矩阵时仍保留业务选择
 - `backend/src/ApprovalService.Application/Runtime/`：现有运行应用服务的发起、查询和更新数据接入
 - `backend/src/ApprovalService.Engine/Commands/OperationModels.cs`、`OperationGuard.cs`：审批人填写字段的纯命令/事件审计承载，不改变引擎流转规则
+- `backend/src/ApprovalService.Engine/Execution/EngineRuntime.cs`：仅放宽已授权终止命令可处理 `awaitingInitiator` 在途状态；撤回、审批及其他命令仍维持原状态限制
 - `backend/src/ApprovalService.Engine/Commands/OperationDispatcher.cs`：核对征询回复任务与允许填写字段的实际任务一致，防止借另一任务的权限写审计字段
 - `backend/tests/ApprovalService.Backend.Checks/OperationChecks.cs`、`OperationChecksBoundaries.cs`：征询回复合法路径与跨任务冒权回归场景
 - `backend/src/ApprovalService.Application/Integration/OpenActionFieldValidator.cs`：节点可写字段白名单和类型校验，复用已有审批字段验证器
@@ -74,6 +75,7 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-22 · Codex：只读复核发现本应用终止在 `awaitingInitiator`（退回待重提或待补充）时被引擎当成非 `running` 拒绝，但仓储仍将其计为在途并占用业务单号；业务原单此时作废无法释放占用。T-004 已验收且无人认领，已精确登记并修改上面的 `EngineRuntime.cs`：仅放宽 `terminate` 可处理两个在途状态，清除暂停入口，其他命令与原管理员/所属应用授权、必填原因保持不变。引擎覆盖待补充和退回待重提、撤回仍受限；真实 HTTP/SQLite 覆盖待补充终止及在途键释放。共享 `docs/contracts.md`、设计书 §api 和后端 README 已同步。完整 `verify.ps1` 通过：后端 566、调用端 33、前端 65 项，零构建警告，5289 已释放。状态保持进行中。
 - 2026-10-22 · Codex：完成批量发起 `POST /api/v1/instances/batch`，1–100 项复用单张发起流程与独立提交，每项使用由批次请求 ID 和下标确定的稳定命令 ID，按原序返回审批单或可修正业务错误；中间项目失败不回滚其他成功项目，重试返回原在途单。真实 HTTP/SQLite 覆盖空批次、有效/无效/null 混合、落库隔离和重复请求。共享 `OpenApiRoutes.cs`、新增批量契约模型、`docs/contracts.md` 及设计书 §api、后端 README 已同步；契约文档开头的人员 ID 约定也同步为所有代表人员的开放接口仅接受本应用绑定，工号只用于本地登录或管理员确认绑定。完整 `verify.ps1` 通过：后端 559、调用端 33、前端 65 项，零构建警告，5289 已释放。剩余 T-006 功能与下一步见下条，状态保持进行中。
 - 2026-10-22 · Codex：审批人必填字段仅在 `approve`、`handle`、`acknowledge` 成功推进时强制；拒绝和暂存不强制，提交值仍校验类型。已完成任务的迟到征询回复在其他节点仍运行时也拒绝。业务系统终止接口要求审批单属本应用、实际操作人在本应用绑定且填写原因；此授权不能用于管理员其他干预。修复了撤回/终止引擎事件名与回调映射不一致导致结果回调漏发的问题。共享 `OpenApiRoutes.cs`、`OpenInstanceCommandRequest.cs`、`docs/contracts.md`、设计书 §api 和后端 README 已同步；引擎和真实 HTTP/SQLite 场景覆盖权限、审计、回调。完整 `verify.ps1` 通过：后端 555、调用端 33、前端 65 项，零构建警告，5289 已释放。尚未处理 ADR 0010 四类钩子、PATCH、外部重提、批量发起、预览、附件事务关联及与 T-007 联动的 `AuthGeneration`；状态保持进行中。明细子字段和附件字段仍缺提交协议，本轮必填检查仅覆盖当前节点可写的顶层字段。
 - 2026-10-20 · Codex：按用户“把现有的工作弄完就行了，额度要不够用了”只收尾已在做的两处 P2：同意后撤销使原任务恢复 `pending` 时清空意见和完成时间，原同意仍保留在事件链；新增 `task.restored` 回调且只对该事件携带原 `taskId`，按既有出站队列失败重试同事件 ID、同正文。真实 HTTP/SQLite、回调出站重试与契约检查已覆盖，提交 `5be7c44`，完整 `verify.ps1` 通过：后端 540、调用端 33、前端 65 项，零构建警告；5289 已释放。用户已确认此前待决规则，但本轮未启动对应新功能：ADR 0010 的四类钩子按每应用完整 URL、POST JSON、双向 HMAC、5 秒；取数/校验/取人事务前同步调用，业务动作提交后进持久队列。终止要求本应用归属、已绑定实际操作人及必填原因。PATCH 仅 `BusinessUpdateAllowed=true` 字段可改（默认 false）并留痕、重算。退回重提清空当前审批人填写值但保留历史，补充恢复保留。批量发起逐单独立返回逐项结果；预览返回路径和当前候选审批人并说明到达时重算；`Required` 审批人字段只对成功推进的 approve/handle/acknowledge 强制；迟到征询回复一律拒绝。附件按 API Key 上传、仅接受同应用未关联文件，并在发起事务内原子绑定，需与 T-013 协调。接入应用代际 `AuthGeneration` 仍需 T-006/T-007 联合收口，防停用再启用旧令牌复活。上述均只记录未实施；按 §6.1 暂停时状态改回进行中，后续从此稳定提交继续。

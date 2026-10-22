@@ -64,6 +64,24 @@ internal static class OperationChecksBoundaries
             ownerTerminated.State.Status == EngineInstanceStatuses.Terminated &&
             ownerTerminated.Events.Any(item => item.Audit is
             { ActorId: "bound-operator", Reason: "业务单据作废" }));
+        var supplementPending = Execute(started.State, context,
+            Command(OperationKinds.RequestSupplement, "request-supplement", task.AssigneeId, task.Id));
+        var supplementTerminated = Execute(supplementPending.State, context, ownerTerminate);
+        check("所属应用可终止待补充的在途审批并清除暂停入口",
+            supplementPending.State.Status == EngineInstanceStatuses.AwaitingInitiator &&
+            supplementTerminated.State.Status == EngineInstanceStatuses.Terminated &&
+            supplementTerminated.State.Operations.Pause is null &&
+            supplementTerminated.State.Tasks.All(item => item.Status != EngineTaskStatuses.Pending));
+        var returnedPending = Execute(started.State, context,
+            Command(OperationKinds.Return, "return-to-initiator", task.AssigneeId, task.Id));
+        var returnedTerminated = Execute(returnedPending.State, context, ownerTerminate);
+        check("所属应用可终止退回待重提的在途审批",
+            returnedPending.State.Status == EngineInstanceStatuses.AwaitingInitiator &&
+            returnedTerminated.State.Status == EngineInstanceStatuses.Terminated &&
+            returnedTerminated.State.Operations.Pause is null);
+        check("等待发起人时撤回仍遵守原状态限制", Throws(ErrorCodes.Conflict, () =>
+            Execute(returnedPending.State, context,
+                Command(EngineCommandKinds.Withdraw, "awaiting-withdraw", "initiator"))));
         var unauthorizedTerminate = Command(EngineCommandKinds.Terminate, "unknown-terminate", "unknown");
         unauthorizedTerminate.Operation!.Reason = "作废";
         check("未核准管理员或所属应用时不能终止", Throws(ErrorCodes.Forbidden, () =>

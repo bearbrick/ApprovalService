@@ -21,6 +21,11 @@ public static class OpenApiRoutes
     public const string Instances = "/api/v1/instances";
 
     /// <summary>
+    /// 逐张独立处理的批量发起。
+    /// </summary>
+    public const string InstancesBatch = "/api/v1/instances/batch";
+
+    /// <summary>
     /// 按审批单 ID 读取状态、任务和操作记录。
     /// </summary>
     public const string Instance = "/api/v1/instances/{id}";

@@ -34,6 +34,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
 | `POST /api/v1/instances` | 传审批数据快照发起；已在途同号返回原审批单，需 API Key |
+| `POST /api/v1/instances/batch` | 1–100 张逐单独立发起，逐项返回成功审批单或业务错误 |
 | `POST /api/v1/instances/{id}/terminate` | 所属应用用 API Key、已绑定实际操作人和原因终止在途审批 |
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=` | 按本应用已绑定人员读取待办数量和列表，需 API Key |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/identity/change-password` | 工号密码登录、刷新令牌轮换、首次或日常改密 |

@@ -1118,7 +1118,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>GET /api/v1/flows/{code}/schema</code></td><td>流程要传的审批数据（含明细表的列）和 JSON 样例</td></tr>
               <tr><td><code>POST /api/v1/flows/{code}/preview</code></td><td>按单据数据预览会走哪些节点、审批人是谁</td></tr>
               <tr><td><code>POST /api/v1/instances</code></td><td>发起审批（传数据，或只传单号让服务去取）</td></tr>
-              <tr><td><code>POST /api/v1/instances/batch</code></td><td>批量发起</td></tr>
+              <tr><td><code>POST /api/v1/instances/batch</code></td><td>逐张独立发起，返回与输入同序的每项审批单或可修正错误；中途失败不回滚已成功的单据</td></tr>
               <tr><td><code>GET /api/v1/instances/{id}</code></td><td>状态、当前节点、审批记录；也可以按流程编码和业务单号查</td></tr>
               <tr><td><code>GET /api/v1/instances?flowCode=&amp;businessKey=</code></td><td>按流程编码和业务单号查本接入应用发起的历史审批单，最新的排在前面</td></tr>
               <tr><td><code>GET /api/v1/instances/{id}/print</code></td><td>审批单 PDF</td></tr>

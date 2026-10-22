@@ -14,6 +14,11 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
 var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args);
+if (bootstrapCommand)
+{
+    // 首次迁移会执行大量 SQL，控制台只保留告警，避免冲掉交互提示。
+    builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+}
 
 // 三层各一个注册入口（docs/architecture.md）；接口的 JSON 写法和 Contracts 的约定保持一致。
 builder.Services.AddApprovalApplication();
@@ -83,7 +88,14 @@ app.MapOrganizationEndpoints();
 
 if (bootstrapCommand)
 {
-    Environment.ExitCode = args.Length == 1 ? await BootstrapAdminCommand.RunAsync(app.Services) : 1;
+    if (args.Length != 1)
+    {
+        Console.Error.WriteLine("用法：dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    Environment.ExitCode = await BootstrapAdminCommand.RunAsync(app.Services);
     return;
 }
 

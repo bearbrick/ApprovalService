@@ -55,6 +55,7 @@
 
 ## 交接记录
 
+- 2026-10-22 · Codex · 首位管理员命令已通过真实空库迁移与交互式开通；为同步既有文档，登记共享文件 `docs/contracts.md` 的首位管理员运维入口说明，以及 `backend/src/ApprovalService.Api/Program.cs` 的命令行日志过滤和错误用法提示。开放人员标识的契约文字由 T-006 集成处理，不在本次改动中抢改。
 - 2026-10-22 · Codex · 已同 T-006 实现者确认当前开放发起、撤回、催办、任务操作及所属应用终止均调用 `ResolveBoundPersonAsync`；本轮在 T-007 内移除旧通用 `ResolvePersonAsync` 的全局工号回退，并补跨应用及工号冒用场景。ADR 0013 按用户确认改为已采纳；共享文件 `docs/adr/README.md` 仅同步该条状态。T-006 负责开放接口契约与 SDK 的语义同步，双方不交叉编辑端点文件。
 - 2026-10-22 · Codex · 已获用户确认首次管理员使用服务器本机一次性 CLI。本轮先在 `Infrastructure/Identity` 增加原子初始化，并在 `Api/Hosting` 提供交互式命令；共享文件 `backend/src/ApprovalService.Api/Program.cs` 与 `backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs` 只做 CLI 注册，`backend/tests/ApprovalService.Backend.Checks/Program.cs` 只登记新增真实 SQLite 场景。完成后同步 `backend/README.md` 与设计书 §org 的实际用法。此项不接触 T-006 认领的开放接口文件。
 - 2026-10-20 · Codex · 用户已确认两项原阻塞方案：空库首位管理员使用服务器本机一次性 CLI，原子创建人员、账号与组织管理员角色，不开放匿名 HTTP；所有代表人员的开放接口必须要求当前接入应用已有绑定，工号只用于管理员确认绑定或应用自有人员自动匹配。按用户“只收尾现有工作”要求，本轮记录决定但暂停新增实现；下次从 CLI 与严格绑定回退清理继续。另需与 T-006 协同处理应用停用再启用后的 AuthGeneration 令牌代际。产品代码未在本条修改，最近最终完整验证为后端 433、客户端 33、前端 54 项。

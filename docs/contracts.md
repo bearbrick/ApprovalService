@@ -74,7 +74,7 @@
 `POST /api/v1/embed-tokens/exchange` 接受 `{ "token": "..." }`。三者成功后都返回
 `{personId, accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, mustChangePassword, targetPath}`，普通登录的 `targetPath` 为 null 并按通用约定省略。访问令牌有效 15 分钟，刷新令牌有效 30 天、每次使用后立即轮换；数据库只存刷新令牌摘要。登录失败连续 5 次暂时锁定 15 分钟。管理员开通账号时通过 `POST /api/v1/identity/provision` 传 `{personId, temporaryPassword}`，首次登录必须改密码；`POST /api/v1/identity/change-password` 传 `{currentPassword, newPassword}`；管理员作废人员全部令牌时向 `/identity/revoke-all` 传 `{personId}`。改密和作废会使旧访问及刷新令牌失效。
 
-JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核对账号、在职状态和令牌版本。首次登录尚未改密码的访问令牌只能调用 `/identity/change-password`。JWT 内部 `sessionKind` 为 `local` 或 `embed`；嵌入交换和后续刷新保持 `embed` 来源、`clientAppCode` 及 `externalUserId`，只用于审批中心。每次交换、刷新和访问都重新核对接入应用仍启用且原绑定仍指向同一人员；改绑或停用应用立即使旧令牌失效。组织管理授权要求 `sessionKind=local` 且人员当前具有 `organization-admin` 角色；业务系统的外部用户绑定不能提升为管理员。首位管理员由本机部署引导流程开通，具体运维入口待确认，不提供匿名管理 HTTP 路由。
+JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核对账号、在职状态和令牌版本。首次登录尚未改密码的访问令牌只能调用 `/identity/change-password`。JWT 内部 `sessionKind` 为 `local` 或 `embed`；嵌入交换和后续刷新保持 `embed` 来源、`clientAppCode` 及 `externalUserId`，只用于审批中心。每次交换、刷新和访问都重新核对接入应用仍启用且原绑定仍指向同一人员；改绑或停用应用立即使旧令牌失效。组织管理授权要求 `sessionKind=local` 且人员当前具有 `organization-admin` 角色；业务系统的外部用户绑定不能提升为管理员。首位管理员在服务器本机交互式运行 `dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin` 开通；命令在串行化事务内创建或选用在职人员、开通需首次改密的账号并授予组织管理员角色，已有管理员时拒绝再次运行，不提供匿名管理 HTTP 路由。
 
 `POST /api/v1/embed-tokens` 由接入应用后端带 `X-Api-Key` 调用，请求为 `{userId, targetPath}`；`userId` 必须已在该应用自己的绑定表对应在职内部人员，嵌入签发不按全局工号回退，也不能使用别的应用的绑定。`targetPath` 只能是本站相对路由。响应为 `{token, expiresAt, targetPath}`；令牌绑定已认证接入应用和人员，5 分钟有效，只能原子交换一次，数据库只存摘要。嵌入令牌无效或已消费时返回 `UNAUTHORIZED`。
 

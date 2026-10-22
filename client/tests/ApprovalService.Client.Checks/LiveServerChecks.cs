@@ -39,5 +39,37 @@ internal static class LiveServerChecks
         }
 
         check("端到端：地址不对时得到 NOT_FOUND 和链路 ID", missing);
+
+        using var openClient = new ApprovalServiceClient(new ApprovalServiceClientOptions { BaseAddress = new Uri(url) });
+        var flowsUnauthorized = await IsUnauthorizedAsync(() => openClient.GetFlowsAsync());
+        var startUnauthorized = await IsUnauthorizedAsync(() => openClient.StartAsync(new StartApprovalRequest
+        {
+            FlowCode = "FLOW_A",
+            BusinessKey = "ORDER_A",
+            Title = "验证鉴权",
+            Initiator = "staff-a",
+            Data = new Dictionary<string, object?>(),
+        }));
+        var tasksUnauthorized = await IsUnauthorizedAsync(() => openClient.GetTaskCountAsync("staff-a"));
+        check("端到端：真实开放接口对流程、发起和待办均要求 API Key",
+            flowsUnauthorized && startUnauthorized && tasksUnauthorized);
+    }
+
+    /// <summary>
+    /// 检查真实 HTTP 调用在无 API Key 时被统一鉴权边界拒绝。
+    /// </summary>
+    /// <param name="call">要调用的 SDK 方法。</param>
+    /// <returns>收到带链路 ID 的未授权异常时为 true。</returns>
+    private static async Task<bool> IsUnauthorizedAsync(Func<Task> call)
+    {
+        try
+        {
+            await call();
+            return false;
+        }
+        catch (ApprovalServiceException ex)
+        {
+            return ex.ErrorCode == ApprovalErrorCodes.Unauthorized && !string.IsNullOrEmpty(ex.TraceId);
+        }
     }
 }

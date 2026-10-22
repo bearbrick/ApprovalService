@@ -54,6 +54,7 @@ internal static class Program
         await DeparturePersistenceChecks.RunAsync(Check);
         await DepartureJobChecks.RunAsync(Check);
         await OpenApiChecksClientApps.RunAsync(Check);
+        await FirstAdminBootstrapChecks.RunAsync(Check);
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);

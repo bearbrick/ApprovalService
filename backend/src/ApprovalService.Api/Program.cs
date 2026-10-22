@@ -12,7 +12,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 
-var builder = WebApplication.CreateBuilder(args);
+var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
+var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args);
 
 // 三层各一个注册入口（docs/architecture.md）；接口的 JSON 写法和 Contracts 的约定保持一致。
 builder.Services.AddApprovalApplication();
@@ -79,6 +80,12 @@ app.UseAuthorization();
 app.MapSystemEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+
+if (bootstrapCommand)
+{
+    Environment.ExitCode = args.Length == 1 ? await BootstrapAdminCommand.RunAsync(app.Services) : 1;
+    return;
+}
 
 app.Run();
 

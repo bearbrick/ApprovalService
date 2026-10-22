@@ -79,10 +79,16 @@ public sealed class SignedHttpOutboundAdapter(HttpClient client,
                 await buffer.WriteAsync(chunk.AsMemory(0, read), timeout.Token);
             }
 
+            var responseBytes = buffer.ToArray();
             return new OutboundHttpResponse
             {
                 StatusCode = (int)response.StatusCode,
-                Body = Encoding.UTF8.GetString(buffer.ToArray()),
+                BodyBytes = responseBytes,
+                Body = Encoding.UTF8.GetString(responseBytes),
+                Signature = response.Headers.TryGetValues(HeaderNames.Signature, out var signatures)
+                    ? signatures.Count() == 1 ? signatures.First() : null : null,
+                RequestId = response.Headers.TryGetValues(HeaderNames.RequestId, out var requestIds)
+                    ? requestIds.Count() == 1 ? requestIds.First() : null : null,
             };
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -122,4 +128,25 @@ public sealed class OutboundHttpResponse
     /// 原始响应正文；回调接收方可留空。
     /// </summary>
     public string Body { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 验证响应签名所需的原始正文；不能对重新编码的字符串验签。
+    /// </summary>
+    public byte[] BodyBytes { get; set; } = [];
+
+    /// <summary>
+    /// 业务系统对原始响应正文计算的签名。
+    /// </summary>
+    public string? Signature
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 业务系统回显的请求 ID。
+    /// </summary>
+    public string? RequestId
+    {
+        get; set;
+    }
 }

@@ -219,7 +219,7 @@ internal static partial class OpenApiChecksStarts
                 Initiator = "alice",
             }, demo.ApiKey, "start-missing-data");
             using var missingDataResponse = await http.SendAsync(missingDataRequest);
-            check("取数钩子协议未确认时只传单号发起给出可纠正错误",
+            check("未配置取数地址时只传单号发起给出可纠正错误",
                 missingDataResponse.StatusCode == HttpStatusCode.BadRequest);
 
             using var secondRequest = Request(new OpenStartRequest
@@ -383,6 +383,7 @@ internal static partial class OpenApiChecksStarts
             await RunRevokeAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunBatchAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunAwaitingTerminationAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunHooksAsync(scope.ServiceProvider, demo.ApiKey, demo.SigningSecret, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

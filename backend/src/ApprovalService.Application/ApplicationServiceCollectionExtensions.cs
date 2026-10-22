@@ -27,6 +27,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CallbackDeliveryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
+        services.AddScoped<BusinessHookAppService>();
         services.AddScoped<OpenInstanceCommandAppService>();
         services.AddScoped<OpenTaskActionAppService>();
         services.AddScoped<OpenStartContextBuilder>();

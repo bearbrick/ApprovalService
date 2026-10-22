@@ -67,6 +67,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<JwtIdentityTokenService>();
         services.AddSingleton<IIdentityAccessTokenService>(provider => provider.GetRequiredService<JwtIdentityTokenService>());
         services.AddSingleton<IIdentityPasswordService, Pbkdf2IdentityPasswordService>();
+        services.AddScoped<FirstAdminBootstrapper>();
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
         services.AddSingleton<OutboxQueue>();

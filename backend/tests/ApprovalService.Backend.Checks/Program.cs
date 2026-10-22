@@ -63,6 +63,7 @@ internal static class Program
         await OpenApiChecksTasks.RunAsync(backendRoot, Check);
         await OpenApiChecksStarts.RunAsync(backendRoot, Check);
         OpenApiChecksData.Run(Check);
+        await FirstAdminBootstrapChecks.RunAsync(Check);
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);

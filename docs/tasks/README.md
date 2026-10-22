@@ -24,7 +24,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-005](T-005-persistence.md) | 持久化：数据库、仓储、待发队列 | 后端 | M2 | T-002 | Domain、Infrastructure/Persistence、Infrastructure/Jobs |
 | [T-006](T-006-open-api.md) | 开放接口、接入应用、回调和钩子 | 后端 + 调用端副本 | M4 | T-004、T-005 | Api/Endpoints/OpenApi、Application/Integration、Infrastructure/Integration |
 | [T-007](T-007-organization-and-identity.md) | 组织架构、账号与嵌入令牌 | 后端 | M3 | T-005 | Organization、Identity 模块 |
-| [T-008](T-008-tree-designer.md) | 钉钉式流程设计器 | 前端 | M1 | T-001 | src/designer/tree、src/model |
+| [T-008](T-008-tree-designer.md) | 自由画布工作台与审批节点配置 | 前端 | M1 | T-001 | src/designer/workbench、src/model |
 | [T-009](T-009-canvas-designer.md) | 自由画布设计器（BPMN 子集） | 前端 | M1 | T-001 | src/designer/canvas |
 | [T-010](T-010-approval-data-and-layout.md) | 审批数据定义、表达式与详情排版 | 前端 + 后端 | M1 | T-001 | Engine/Expressions；frontend：src/designer/data |
 | [T-011](T-011-approval-center.md) | 审批中心（电脑网页） | 后端 + 前端 | M3 | T-004、T-005、T-007 | Api/Endpoints/Center；frontend：src/pages/center |
@@ -40,6 +40,22 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-021](T-021-deploy-and-load-test.md) | 部署、监控、备份与压测 | 后端 | M5 | T-005、T-006 | backend/deploy、backend/tests/load |
 | [T-022](T-022-templates-test-mode-wizard.md) | 流程模板库、测试模式与接入向导 | 后端 + 前端 | M4 | T-006、T-008、T-010 | Flows、Integration 模块；frontend：src/pages/admin |
 | [T-023](T-023-pilot.md) | 试点：费用报销和采购申请 | 全部 | M6 | T-006～T-022 | 全部 |
+| [T-037](T-037-sdk-open-api.md) | .NET SDK 首批开放接口 | 调用端 | M4 | T-027、T-006 稳定协议 | src/ApprovalService.Client、tests/ApprovalService.Client.Checks |
+| [T-024](T-024-high-fidelity-prototypes.md) | 全功能高保真交互原型 | 原型文档 | M1 | T-000 | docs/prototypes |
+| [T-029](T-029-work-calendar.md) | 工作日历与节点时限基础 | 后端 | M3 | T-005 | Domain/Notifications/Calendar |
+| [T-025](T-025-frontend-foundation.md) | 完善前端公共框架 | 前端 | M1 | T-000 | frontend/src、frontend/tests |
+| [T-026](T-026-backend-configuration-validation.md) | 后端数据配置启动校验 | 后端 | 框架完善 | T-000 | Infrastructure 配置、后端检查 |
+| [T-027](T-027-client-foundation.md) | 调用端基础连接与错误边界 | 调用端 | M4 前置框架 | T-000 | src/ApprovalService.Client、tests/ApprovalService.Client.Checks |
+| [T-028](T-028-departure-runtime.md) | 离职在途待办按节点策略处理 | 后端 | M2 / M3 | T-004、T-005、T-007 衔接 | Engine/Commands、Application/Runtime、Infrastructure/Persistence |
+| [T-030](T-030-notification-channels.md) | 消息渠道与持久发送基础 | 后端 | M3 | T-005 | Notifications 模块 |
+| [T-031](T-031-center-frontend.md) | 审批中心电脑前端基础 | 前端 | M3 | T-025、T-008、T-009、T-010 | frontend/src/pages/center、frontend/src/model/center.ts |
+| [T-032](T-032-integration-baseline.md) | 已验收功能的可验证集成基线 | 全部 | M2～M4 | T-001～T-005、T-008～T-010、T-025～T-028、T-030、T-031 | backend、frontend、client、docs |
+| [T-033](T-033-admin-frontend.md) | 管理后台前端基础 | 前端 | M3 | T-025、T-008、T-031 | frontend/src/pages/admin、frontend/src/model/admin.ts |
+| [T-034](T-034-flow-operation-policies.md) | 流程级撤回与退回重提策略 | 后端 + 前端 | M2 / M1 | T-001、T-004、T-008～T-010、T-032 | Contracts/Flows、Engine/Definitions、frontend/src/designer/workbench |
+| [T-035](T-035-mobile-frontend.md) | 手机审批中心前端基础 | 前端 | M3 | T-032、T-033 | frontend/src/pages/mobile、frontend/src/model/mobile.ts |
+| [T-036](T-036-ui-integration.md) | 已验收前端成果的可验证集成基线 | 全部 | M2～M4 | T-032、T-034、T-035 | backend、frontend、client、docs |
+| [T-038](T-038-verified-integration.md) | 已验证稳定分支整合快照 | 全部 | M2～M4 | T-036、T-006/T-007/T-037 稳定提交 | backend、frontend、client、docs |
+| [T-039](T-039-verified-integration.md) | 后续稳定功能集成与应用附件原子关联 | 全部 | M2～M4 | T-038、T-006/T-007/T-013/T-029 稳定提交 | backend、frontend、client、docs |
 | [T-041](T-041-client-app-auth-generation.md) | 接入应用身份代际与嵌入会话永久失效 | 后端 | M4 | T-006、T-007、T-039、T-042 | Integration、Identity、Persistence |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。

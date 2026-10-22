@@ -8,10 +8,10 @@ namespace ApprovalService.Application.Organization;
 public interface IOrganizationLookupAppService
 {
     /// <summary>
-    /// 将接入应用人员 ID 或工号解析为在职的内部人员 ID。
+    /// 仅将本应用已绑定的业务人员 ID 解析为在职的内部人员 ID。
     /// </summary>
     /// <param name="clientAppCode">已鉴权的接入应用编码。</param>
-    /// <param name="userId">业务系统人员 ID 或工号。</param>
+    /// <param name="userId">本应用已绑定的业务系统人员 ID。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>内部人员 ID；不存在或已离职时为空。</returns>
     Task<string?> ResolvePersonAsync(string clientAppCode, string userId,

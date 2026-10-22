@@ -15,11 +15,8 @@ public sealed class OrganizationLookupAppService(IOrganizationRepository reposit
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(clientAppCode);
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
-        var boundId = await repository.ResolvePersonAsync(clientAppCode, userId, cancellationToken);
-        var person = boundId is null
-            ? await repository.MatchPersonAsync(userId, null, cancellationToken)
-            : await repository.GetPersonAsync(boundId, cancellationToken);
-        return person is { IsActive: true } ? person.Id : null;
+        // API Key 只证明接入应用身份，不能凭全局工号代表未绑定人员。
+        return await ResolveBoundPersonAsync(clientAppCode, userId, cancellationToken);
     }
 
     /// <inheritdoc />

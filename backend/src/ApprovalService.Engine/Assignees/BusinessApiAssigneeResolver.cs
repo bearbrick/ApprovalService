@@ -11,8 +11,16 @@ internal sealed class BusinessApiAssigneeResolver : IAssigneeResolver
     public string Source => FlowAssigneeSources.BusinessApi;
 
     /// <inheritdoc />
-    public IReadOnlyList<string> Resolve(AssigneeRequest request, AssigneeSnapshot snapshot) =>
-        request.Configuration.Value is not null &&
-        snapshot.BusinessApiResults.TryGetValue(request.Configuration.Value, out var ids)
-            ? AssigneeLookup.Distinct(ids) : [];
+    public IReadOnlyList<string> Resolve(AssigneeRequest request, AssigneeSnapshot snapshot)
+    {
+        // 新取人结果按实际节点隔离；旧的纯引擎调用仍可按业务来源编码预取。
+        if (snapshot.BusinessApiResults.TryGetValue(request.NodeId, out var byNode))
+        {
+            return AssigneeLookup.Distinct(byNode);
+        }
+
+        return request.Configuration.Value is not null &&
+            snapshot.BusinessApiResults.TryGetValue(request.Configuration.Value, out var bySource)
+                ? AssigneeLookup.Distinct(bySource) : [];
+    }
 }

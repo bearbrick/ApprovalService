@@ -49,6 +49,14 @@ internal sealed class EngineWork
     public List<EngineEvent> Events { get; } = [];
 
     /// <summary>
+    /// 实际到达但尚未取得业务处理人的节点；调用方补齐后应从原状态重算。
+    /// </summary>
+    public BusinessAssigneeRequirement? RequiredBusinessAssignee
+    {
+        get; private set;
+    }
+
+    /// <summary>
     /// 从调用方的请求 ID 派生稳定 ID，不调用随机源。
     /// </summary>
     /// <param name="kind">ID 用途。</param>
@@ -149,6 +157,12 @@ internal sealed class EngineWork
                 default:
                     throw new EngineException(ErrorCodes.ValidationFailed, "节点行为返回了不支持的动作。");
             }
+
+            if (RequiredBusinessAssignee is not null)
+            {
+                // 本轮计算仅用于定位真正走到的节点，不能保存已有的临时推进。
+                return;
+            }
         }
     }
 
@@ -246,6 +260,19 @@ internal sealed class EngineWork
         AssigneePlan plan;
         if (context.AssigneeSnapshot is not null && node.Assignee is not null)
         {
+            if (node.Assignee.Source == FlowAssigneeSources.BusinessApi &&
+                !context.AssigneeSnapshot.BusinessApiResults.ContainsKey(node.Id) &&
+                (node.Assignee.Value is null ||
+                    !context.AssigneeSnapshot.BusinessApiResults.ContainsKey(node.Assignee.Value)))
+            {
+                RequiredBusinessAssignee = new BusinessAssigneeRequirement
+                {
+                    NodeId = node.Id,
+                    SourceValue = node.Assignee.Value,
+                };
+                return;
+            }
+
             plan = AssigneeRuleEngine.Resolve(node, state, context.AssigneeSnapshot, context.AssigneeResolvers);
         }
         else if (context.Assignees.TryGetValue(node.Id, out var assignee) && !string.IsNullOrWhiteSpace(assignee))

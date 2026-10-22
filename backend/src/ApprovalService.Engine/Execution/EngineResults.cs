@@ -86,6 +86,33 @@ public sealed class EngineResult
     {
         get; set;
     }
+
+    /// <summary>
+    /// 本次纯计算实际到达的业务取人节点；有值时不得提交中间状态。
+    /// </summary>
+    public BusinessAssigneeRequirement? RequiredBusinessAssignee
+    {
+        get; set;
+    }
+}
+
+/// <summary>
+/// 纯引擎在实际进入人工节点时请求调用方预取业务人员。
+/// </summary>
+public sealed class BusinessAssigneeRequirement
+{
+    /// <summary>
+    /// 实际到达的节点 ID。
+    /// </summary>
+    public string NodeId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 节点配置的业务来源值；可能为空。
+    /// </summary>
+    public string? SourceValue
+    {
+        get; set;
+    }
 }
 
 /// <summary>

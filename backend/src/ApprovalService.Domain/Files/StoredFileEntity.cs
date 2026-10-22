@@ -54,7 +54,18 @@ public sealed class StoredFileEntity
     /// <summary>
     /// 已认证上传人的 ID。
     /// </summary>
-    public string UploadedById { get; set; } = string.Empty;
+    public string? UploadedById
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 使用 API Key 上传时的接入应用编码；本地人员上传时为空。
+    /// </summary>
+    public string? UploadedByClientAppCode
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 上传完成时间。

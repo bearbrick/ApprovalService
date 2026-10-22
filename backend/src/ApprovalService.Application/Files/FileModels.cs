@@ -44,7 +44,18 @@ public sealed class UploadFileInput
     /// <summary>
     /// 已认证上传用户 ID。
     /// </summary>
-    public string UploaderId { get; set; } = string.Empty;
+    public string? UploaderId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 已认证接入应用编码；只允许与上传用户二选一。
+    /// </summary>
+    public string? ClientAppCode
+    {
+        get; set;
+    }
 }
 
 /// <summary>

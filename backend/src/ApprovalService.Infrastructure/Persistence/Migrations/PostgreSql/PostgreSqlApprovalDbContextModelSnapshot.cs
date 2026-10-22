@@ -73,8 +73,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
                     b.Property<string>("UploadedById")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 

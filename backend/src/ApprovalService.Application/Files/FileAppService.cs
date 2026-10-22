@@ -19,7 +19,10 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
     public async Task<StoredFileDto> UploadAsync(UploadFileInput input, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
-        RequireUser(input.UploaderId);
+        if (string.IsNullOrWhiteSpace(input.UploaderId) == string.IsNullOrWhiteSpace(input.ClientAppCode))
+        {
+            throw new UserFriendlyException(ErrorCodes.Unauthorized, "附件上传需要唯一的已认证人员或接入应用身份。");
+        }
         if (!input.Content.CanRead || policy.MaxUploadBytes <= 0)
         {
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "附件内容或大小限制无效。");
@@ -82,6 +85,7 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
             StorageKind = storage.Kind,
             StorageKey = key,
             UploadedById = input.UploaderId,
+            UploadedByClientAppCode = input.ClientAppCode,
             UploadedAt = now,
         };
         try
@@ -141,6 +145,37 @@ public sealed class FileAppService(IStoredFileRepository repository, IFileStorag
             throw new UserFriendlyException(ErrorCodes.Forbidden, "无权查看这张审批单的附件。");
         }
 
+        return await CopyAuthorizedAsync(file, destination, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<FileDownloadDto> DownloadUnlinkedForClientAppAsync(string fileId, string clientAppCode,
+        Stream destination, CancellationToken cancellationToken = default)
+    {
+        RequireUser(clientAppCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileId);
+        ArgumentNullException.ThrowIfNull(destination);
+        var file = await repository.FindAsync(fileId, cancellationToken)
+            ?? throw new UserFriendlyException(ErrorCodes.NotFound, "附件不存在。");
+        if (file.InstanceId is not null || file.CleanupOwner is not null ||
+            file.UploadedByClientAppCode != clientAppCode)
+        {
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "无权查看这张审批单的附件。");
+        }
+
+        return await CopyAuthorizedAsync(file, destination, cancellationToken);
+    }
+
+    /// <summary>
+    /// 权限确认后读取文件，避免将对象存储位置暴露给未授权方。
+    /// </summary>
+    /// <param name="file">已完成授权检查的文件元数据。</param>
+    /// <param name="destination">服务转发的目标流。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>下载信息。</returns>
+    private async Task<FileDownloadDto> CopyAuthorizedAsync(StoredFileEntity file, Stream destination,
+        CancellationToken cancellationToken)
+    {
         var storage = storageSelector.Resolve(file.StorageKind);
         var directUrl = await storage.CreateDownloadUrlAsync(file.StorageKey,
             policy.DownloadUrlLifetime, cancellationToken);

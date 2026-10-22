@@ -68,8 +68,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("UploadedById")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 

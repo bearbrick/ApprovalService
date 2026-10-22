@@ -73,8 +73,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<string>("UploadedById")
-                        .IsRequired()
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 

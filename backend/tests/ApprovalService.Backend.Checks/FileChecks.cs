@@ -71,6 +71,36 @@ internal static class FileChecks
             check("嵌入会话不能凭同一人员 ID 读取无应用归属的未关联附件",
                 await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "requester", new MemoryStream(),
                     "other-app"), ErrorCodes.Forbidden));
+            var appUpload = await service.UploadAsync(new UploadFileInput
+            {
+                Content = new MemoryStream(png),
+                FileName = "应用票据.png",
+                ClientAppCode = "demo",
+            });
+            var appMetadata = await repository.FindAsync(appUpload.Id);
+            check("接入应用上传只记录应用归属，不伪造人员身份",
+                appMetadata?.UploadedByClientAppCode == "demo" && appMetadata.UploadedById is null);
+            await using var appOutput = new MemoryStream();
+            await service.DownloadUnlinkedForClientAppAsync(appUpload.Id, "demo", appOutput);
+            check("所属应用可以读取自己的未关联附件", appOutput.ToArray().SequenceEqual(png));
+            check("其他应用和本地人员不能读取应用上传的未关联附件",
+                await ThrowsCodeAsync(() => service.DownloadUnlinkedForClientAppAsync(appUpload.Id,
+                    "other-app", new MemoryStream()), ErrorCodes.Forbidden) &&
+                await ThrowsCodeAsync(() => service.DownloadAsync(appUpload.Id,
+                    "requester", new MemoryStream()), ErrorCodes.Forbidden));
+            check("没有身份或混用人员与应用身份的上传被拒绝",
+                await ThrowsCodeAsync(() => service.UploadAsync(new UploadFileInput
+                {
+                    Content = new MemoryStream(png),
+                    FileName = "无身份.png",
+                }), ErrorCodes.Unauthorized) &&
+                await ThrowsCodeAsync(() => service.UploadAsync(new UploadFileInput
+                {
+                    Content = new MemoryStream(png),
+                    FileName = "双身份.png",
+                    UploaderId = "requester",
+                    ClientAppCode = "demo",
+                }), ErrorCodes.Unauthorized));
             check("附件根据文件签名而不是扩展名识别类型",
                 await ThrowsCodeAsync(() => service.UploadAsync(Input(png, "假票据.pdf", "requester")),
                     ErrorCodes.ValidationFailed));

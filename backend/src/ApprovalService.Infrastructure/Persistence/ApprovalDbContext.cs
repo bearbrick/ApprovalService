@@ -221,7 +221,8 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.StorageKind).HasMaxLength(32).IsRequired();
             entity.Property(item => item.StorageKey).HasMaxLength(512).IsRequired();
             entity.Property(item => item.InstanceId).HasMaxLength(64);
-            entity.Property(item => item.UploadedById).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.UploadedById).HasMaxLength(128);
+            entity.Property(item => item.UploadedByClientAppCode).HasMaxLength(128);
             entity.Property(item => item.CleanupOwner).HasMaxLength(64);
             entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId)
                 .OnDelete(DeleteBehavior.Restrict);

@@ -36,6 +36,17 @@ public interface IFileAppService
         string? clientAppCode = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 已认证接入应用读取自己尚未关联审批单的附件。
+    /// </summary>
+    /// <param name="fileId">附件 ID。</param>
+    /// <param name="clientAppCode">已验证 API Key 对应的应用编码。</param>
+    /// <param name="destination">转发下载时写入的目标流。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>下载文件信息。</returns>
+    Task<FileDownloadDto> DownloadUnlinkedForClientAppAsync(string fileId, string clientAppCode,
+        Stream destination, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 删除超过保留期且未被任何审批单使用的附件。
     /// </summary>
     /// <param name="cancellationToken">取消信号。</param>

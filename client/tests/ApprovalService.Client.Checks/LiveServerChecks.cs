@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApprovalService.Demo.Integration;
 
 namespace ApprovalService.Client.Checks;
@@ -53,6 +54,81 @@ internal static class LiveServerChecks
         var tasksUnauthorized = await IsUnauthorizedAsync(() => openClient.GetTaskCountAsync("staff-a"));
         check("端到端：真实开放接口对流程、发起和待办均要求 API Key",
             flowsUnauthorized && startUnauthorized && tasksUnauthorized);
+
+        var fixtureFile = Environment.GetEnvironmentVariable("APPROVAL_TEST_FIXTURE_PATH");
+        if (string.IsNullOrWhiteSpace(fixtureFile))
+        {
+            Console.WriteLine("SKIP: 未设置 APPROVAL_TEST_FIXTURE_PATH，跳过需测试接入应用的成功链路");
+            return;
+        }
+
+        using var fixture = JsonDocument.Parse(await File.ReadAllTextAsync(fixtureFile));
+        var apiKey = fixture.RootElement.GetProperty("apiKey").GetString()
+            ?? throw new InvalidOperationException("临时测试夹具缺少 API Key。");
+        var flowCode = fixture.RootElement.GetProperty("flowCode").GetString()
+            ?? throw new InvalidOperationException("临时测试夹具缺少流程编码。");
+        var initiator = fixture.RootElement.GetProperty("initiator").GetString()
+            ?? throw new InvalidOperationException("临时测试夹具缺少发起人。");
+        var approver = fixture.RootElement.GetProperty("approver").GetString()
+            ?? throw new InvalidOperationException("临时测试夹具缺少审批人。");
+        using var client = new ApprovalServiceClient(new ApprovalServiceClientOptions
+        {
+            BaseAddress = new Uri(url),
+            ApiKey = apiKey,
+        });
+        var flows = await client.GetFlowsAsync();
+        var schema = await client.GetFlowSchemaAsync(flowCode);
+        check("端到端：随机 API Key 只能读取已授权发布流程与结构",
+            flows.Any(flow => flow.Code == flowCode && flow.Version == 1) &&
+            schema.FlowCode == flowCode && schema.Version == 1);
+
+        var businessKey = "SDK-" + Guid.NewGuid().ToString("N");
+        var started = await client.StartAsync(new StartApprovalRequest
+        {
+            FlowCode = flowCode,
+            BusinessKey = businessKey,
+            Title = "SDK 端到端验证",
+            Initiator = initiator,
+            Data = new Dictionary<string, object?>(),
+        });
+        var detail = await client.GetInstanceAsync(started.Id);
+        var history = await client.FindInstancesAsync(flowCode, businessKey);
+        check("端到端：SDK 发起后可按 ID 与业务单号读取同一在途审批",
+            started.Status == "running" && started.ClientAppCode == "sdk-e2e" &&
+            detail.Id == started.Id && detail.Tasks.Count == 1 &&
+            history.Count == 1 && history[0].Id == started.Id);
+
+        var count = await client.GetTaskCountAsync(approver);
+        var tasks = await client.GetTasksAsync(approver);
+        check("端到端：绑定审批人能通过 SDK 看到待办数量和完整任务 ID",
+            count.Pending == 1 && tasks.Count == 1 && tasks[0].InstanceId == started.Id &&
+            tasks[0].Id == detail.Tasks[0].Id);
+
+        var approved = await client.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
+        {
+            User = approver,
+            Action = "approve",
+            Opinion = "同意",
+        });
+        var completed = await client.GetInstanceAsync(started.Id);
+        var after = await client.GetTaskCountAsync(approver);
+        check("端到端：SDK 审批后实例与待办投影同步完成",
+            approved.Status == "approved" && completed.Status == "approved" &&
+            completed.Tasks.Single().Status == "approved" && after.Pending == 0);
+
+        var second = await client.StartAsync(new StartApprovalRequest
+        {
+            FlowCode = flowCode,
+            BusinessKey = businessKey + "-withdraw",
+            Title = "SDK 催办撤回验证",
+            Initiator = initiator,
+            Data = new Dictionary<string, object?>(),
+        });
+        var reminded = await client.RemindAsync(second.Id, initiator);
+        var withdrawn = await client.WithdrawAsync(second.Id, initiator);
+        check("端到端：SDK 催办后发起人可撤回未决审批",
+            reminded.Status == "running" && withdrawn.Status == "withdrawn" &&
+            (await client.GetTaskCountAsync(approver)).Pending == 0);
     }
 
     /// <summary>

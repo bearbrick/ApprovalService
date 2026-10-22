@@ -1126,7 +1126,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>POST /api/v1/instances/{id}/withdraw</code></td><td>撤回</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/resubmit</code></td><td>被退回或被要求补充后重新提交（带新数据）</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/remind</code></td><td>催办</td></tr>
-              <tr><td><code>POST /api/v1/instances/{id}/terminate</code></td><td>业务单据作废时，所属接入应用传本应用已绑定的实际操作人和必填原因终止审批，记录操作人并回调结果</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/terminate</code></td><td>业务单据作废时，所属接入应用传本应用已绑定的实际操作人和必填原因终止审批；运行中、退回待重提和待补充均可终止，记录操作人并回调结果</td></tr>
               <tr><td><code>GET /api/v1/tasks/count?user=</code></td><td>待办数量：待处理、加急、超时（业务系统登录时调）</td></tr>
               <tr><td><code>GET /api/v1/tasks?user=</code></td><td>待办列表，带摘要字段和打开地址</td></tr>
               <tr><td><code>POST /api/v1/tasks/{id}/actions</code></td><td>同意、拒绝、退回、转交、加签等（带意见和可编辑字段的值）</td></tr>

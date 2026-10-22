@@ -15,6 +15,8 @@ using ApprovalService.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -170,6 +172,7 @@ internal static class FileChecks
                 await ApiRejectsInvalidSessionAsync(backendRoot, png, null, null) &&
                 await ApiRejectsInvalidSessionAsync(backendRoot, png, "embed", null));
             await CheckMigrationAsync(check);
+            await CheckOwnershipUpgradeAsync(check);
 
             if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("APPROVAL_TEST_MINIO")))
             {
@@ -506,6 +509,38 @@ internal static class FileChecks
         finally
         {
             await storage.DeleteAsync(key);
+        }
+    }
+
+    /// <summary>
+    /// 从已有附件表升级时保留旧文件的人员归属。
+    /// </summary>
+    /// <param name="check">检查结果记录器。</param>
+    /// <returns>异步操作。</returns>
+    private static async Task CheckOwnershipUpgradeAsync(Action<string, bool> check)
+    {
+        var directory = TempDataDirectory.Create();
+        try
+        {
+            var options = new DbContextOptionsBuilder<SqliteApprovalDbContext>()
+                .UseSqlite("Data Source=" + Path.Combine(directory, "ownership-upgrade.db")).Options;
+            await using var context = new SqliteApprovalDbContext(options);
+            var migrator = context.GetService<IMigrator>();
+            await migrator.MigrateAsync("20261020044809_AddStoredFiles");
+            await context.Database.ExecuteSqlRawAsync("""
+                INSERT INTO StoredFiles (Id, FileName, Size, ContentType, Sha256, StorageKind,
+                    StorageKey, UploadedById, UploadedAt)
+                VALUES ('old-file', 'old.png', 1, 'image/png', 'old-hash', 'Local',
+                    '2026/10/old-file', 'requester', '2026-10-20 00:00:00')
+                """);
+            await migrator.MigrateAsync();
+            var preserved = await context.StoredFiles.AsNoTracking().SingleAsync(item => item.Id == "old-file");
+            check("旧 SQLite 附件升级后保留上传人并将应用归属留空",
+                preserved.UploadedById == "requester" && preserved.UploadedByClientAppCode is null);
+        }
+        finally
+        {
+            TempDataDirectory.Delete(directory);
         }
     }
 

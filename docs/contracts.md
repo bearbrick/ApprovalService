@@ -16,7 +16,7 @@
 | `X-Api-Key` | 请求 | 接入应用的 API Key（管理后台“接入应用”里生成，服务端只存 SHA-256） |
 | `X-Request-Id` | 请求、响应 | 调用方生成的请求 ID，原样返回并记进日志；没传或不合规（超过 64 个字符，或含字母数字和 `- _ . :` 以外的字符）时服务生成一个 32 位的 |
 | `X-Trace-Id` | 响应 | 本次请求的链路 ID，和错误体里的 `traceId` 相同，反馈问题时提供 |
-| `X-Approval-Signature` | 回调请求 | 回调请求体的签名：`sha256=` 加上用接入应用的签名密钥对请求体做 HMAC-SHA256 的十六进制小写 |
+| `X-Approval-Signature` | 回调与钩子请求、钩子响应 | `sha256=` 加上用接入应用的签名密钥对原始 UTF-8 正文做 HMAC-SHA256 的十六进制小写；钩子双方都验签 |
 
 ## 错误格式
 
@@ -40,6 +40,7 @@
 | `NOT_FOUND` | 404 | 地址不存在，或流程、审批单、任务不存在；方法不对时状态码是 405，错误码也是它 |
 | `INVALID_JSON` | 400 | 请求体不是合法的 JSON |
 | `VALIDATION_FAILED` | 400 | 数据不符合要求，具体字段在 `errors` 里 |
+| `BUSINESS_HOOK_FAILED` | 400 | 业务系统钩子超时、网络或 HTTP 失败、响应签名、请求 ID 或 JSON 格式不正确 |
 | `CONFLICT` | 409 | 和当前状态冲突，如审批单已经结束、任务刚被别人处理 |
 | `INTERNAL_ERROR` | 500 | 服务内部错误（程序缺陷），带 `traceId` 反馈 |
 | `NETWORK_ERROR` | — | SDK 自己的：连不上服务 |
@@ -77,7 +78,7 @@
 
 待办摘要还必须按锁定发布图中该待办的当前节点权限过滤：`fieldPermissions` 显式为 `hidden` 的字段不返回；未配置节点权限的字段沿用默认可见语义。同一节点重复配置同一字段权限时拒绝发布，查询旧异常图也拒绝投影，避免权限冲突导致泄露。
 
-`POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 是审批数据对象，服务端按已发布定义校验并重算公式、分支条件，审批人填写值不接受业务系统自造；顶层及明细附件 ID 只能引用本应用上传且尚未关联的文件，文件归属与实例状态在同一事务内确认和保存，任何一项失败都回滚整笔发起。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。只传单号取数、业务校验/取人/动作钩子的协议待 ADR 0010 确认，当前明确返回 `VALIDATION_FAILED` 而不猜测调用方式。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
+`POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data?, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 可直接提供审批数据对象；未传时要求当前应用配置取数地址，并在审批事务前调用取数钩子。服务端按已发布定义校验、重算公式与分支条件，再在写事务前调用已配置的发起校验钩子；拒绝时返回业务原因且不创建审批单。审批人填写值不接受业务系统自造；顶层及明细附件 ID 只能引用本应用上传且尚未关联的文件，文件归属与实例状态在同一事务内确认和保存，任何一项失败都回滚整笔发起。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。取人与自动动作仍待按 ADR 0010 的节点到达和提交后持久队列接线。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
 
 `POST /api/v1/instances/batch` 需要同一 `X-Api-Key`，请求为 `{ "items": [单张发起请求, …] }`，每批 1 至 100 项。服务端按列表顺序逐张独立验证和提交，返回 `{ "results": [{ "index": 0, "instance": 审批单详情或 null, "error": { "code", "message" } 或 null }, …] }`；`index` 从 0 开始。单项业务校验失败只写该项 `error`，其他已成功的单据不回滚；无效的批次外形整体返回 400。每项使用由批次 `X-Request-Id` 和下标确定的独立请求 ID，重复批次中仍在途的同应用单据返回原审批单。程序缺陷不会被当作单项业务错误吞掉。
 
@@ -138,7 +139,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - **取人接口**：审批人来源选“业务系统接口”时返回用户 ID 列表。
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
 
-四类钩子的精确请求/响应与双向验签协议尚待确认，提议见 [ADR 0010](adr/0010-outbound-hook-protocol.md)，确认前不实现。
+四类钩子按已采纳的 [ADR 0010](adr/0010-outbound-hook-protocol.md) 使用各应用分别登记的完整 URL、POST 小驼峰 JSON，默认 5 秒超时；未配置地址时不调用该类钩子。审批服务用 `X-Approval-Signature` 对原始 UTF-8 请求体签名，业务系统须以同一密钥对原始响应字节签名并原样回显 `X-Request-Id`；审批服务在解析 JSON 前恒定时间验签并核对请求 ID。非 2xx、超时、网络故障、无效签名、请求 ID 或 JSON 均返回 `BUSINESS_HOOK_FAILED`；钩子明确拒绝返回 `VALIDATION_FAILED` 和业务原因。取数请求 `{flowCode,businessKey,requestId}`，响应 `{data:{…},title?,detailUrl?}` 且 `data` 必须为对象；校验请求 `{phase:"start"/"approve",flowCode,businessKey,instanceId?,taskId?,actor,data}`，响应 `{allowed,reason?}`，拒绝时 `reason` 必填。取人请求 `{flowCode,businessKey,nodeId,sourceValue?,initiator,data}`、响应 `{userIds:[…]}`；动作请求 `{eventId,actionCode,instanceId,flowCode,businessKey,data}`、响应 `{success,message?,result?}`。取数和校验在审批写事务前同步调用；取人于目标节点前取得；业务动作经提交后持久待发队列执行。当前代码已接通发起前取数和校验，其余两类及节点同意前校验仍待接线。
 
 ## 流程定义 JSON
 

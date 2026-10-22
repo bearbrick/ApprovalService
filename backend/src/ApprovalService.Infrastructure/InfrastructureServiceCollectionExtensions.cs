@@ -64,6 +64,7 @@ public static class InfrastructureServiceCollectionExtensions
         // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
         services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
         services.AddSingleton<SignedHttpOutboundAdapter>();
+        services.AddScoped<IApprovalHookClient, ApprovalHookClient>();
         services.AddScoped<IOutboxHandler, CallbackOutboxHandler>();
         services.AddScoped<IOutboxHandler, EngineEventOutboxHandler>();
         services.Configure<IdentityTokenOptions>(configuration.GetSection(IdentityTokenOptions.SectionName));

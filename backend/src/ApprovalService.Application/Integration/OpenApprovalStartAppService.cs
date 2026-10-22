@@ -25,6 +25,7 @@ namespace ApprovalService.Application.Integration;
 /// <param name="serialNumbers">持久流水号分配器。</param>
 /// <param name="serialOptions">部署级编号默认格式。</param>
 /// <param name="transport">业务原单 URL 的传输策略。</param>
+/// <param name="hooks">事务前的业务取数和校验钩子。</param>
 /// <param name="timeProvider">固定发生时间。</param>
 public sealed class OpenApprovalStartAppService(
     FlowCatalogAppService flows,
@@ -35,6 +36,7 @@ public sealed class OpenApprovalStartAppService(
     IApprovalSerialNumberRepository serialNumbers,
     OpenStartSerialOptions serialOptions,
     IntegrationTransportPolicy transport,
+    BusinessHookAppService hooks,
     TimeProvider timeProvider)
 {
     /// <summary>
@@ -69,6 +71,8 @@ public sealed class OpenApprovalStartAppService(
             (await organization.ResolveBoundPersonAsync(app.Code, request.SubmittedBy, cancellationToken)
                 ?? throw new UserFriendlyException(ErrorCodes.ValidationFailed,
                     "代发人员未在当前接入应用绑定或已经离职，请先维护人员绑定。"));
+        await hooks.FillStartDataAsync(app, request, requestId, cancellationToken);
+        Validate(request, requestId);
         var definition = JsonSerializer.Deserialize<FlowDefinition>(published.Version.DefinitionJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布流程定义为空。");
         var graph = JsonSerializer.Deserialize<FlowExecutionGraph>(published.Version.GraphJson, ApprovalJson.Options)
@@ -85,6 +89,14 @@ public sealed class OpenApprovalStartAppService(
         var data = prepared.Data;
         var context = await contextBuilder.BuildAsync(app.Code, definition, graph, request, initiatorId,
             data, now, cancellationToken);
+        await hooks.ValidateAsync(app, new ValidationHookRequest
+        {
+            Phase = "start",
+            FlowCode = request.FlowCode,
+            BusinessKey = request.BusinessKey,
+            Actor = request.Initiator,
+            Data = data,
+        }, requestId, cancellationToken);
         var dateBucket = now.ToString(serialOptions.DatePattern, CultureInfo.InvariantCulture);
         ApprovalSerialNumber.Format(serialOptions.Prefix, serialOptions.DatePattern, serialOptions.Digits, 1, now);
         var sequence = await serialNumbers.AllocateAsync(serialOptions.Prefix, dateBucket, cancellationToken);
@@ -214,12 +226,6 @@ public sealed class OpenApprovalStartAppService(
         if (request.SubmittedBy is not null && string.IsNullOrWhiteSpace(request.SubmittedBy))
         {
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "代发人员 ID 不能为空。");
-        }
-
-        if (request.Data is null || request.Data.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
-        {
-            throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                "只传单号取数的钩子协议尚未确认；请先传审批数据快照。");
         }
 
         if (request.DetailUrl is not null &&

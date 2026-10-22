@@ -19,10 +19,12 @@ namespace ApprovalService.Application.Integration;
 /// <param name="contextBuilder">最新组织与矩阵的引擎输入。</param>
 /// <param name="runtime">唯一命令入口。</param>
 /// <param name="queries">操作后的审批单详情。</param>
+/// <param name="hooks">节点同意前的业务校验。</param>
 /// <param name="timeProvider">固定操作时间。</param>
 public sealed class OpenTaskActionAppService(IApprovalOpenQueryRepository repository,
     IOrganizationLookupAppService organization, OpenStartContextBuilder contextBuilder,
-    IApprovalRuntimeAppService runtime, OpenApprovalQueryAppService queries, TimeProvider timeProvider)
+    IApprovalRuntimeAppService runtime, OpenApprovalQueryAppService queries, BusinessHookAppService hooks,
+    TimeProvider timeProvider)
 {
     /// <summary>
     /// 开放接口允许的人工任务命令；管理员和实例级命令须走各自权限入口。
@@ -92,6 +94,21 @@ public sealed class OpenTaskActionAppService(IApprovalOpenQueryRepository reposi
             input.Action, input.FieldValues, organization, cancellationToken);
         var context = await contextBuilder.BuildContinuationAsync(record.Instance, definition, graph,
             timeProvider.GetUtcNow(), cancellationToken);
+        if (input.Action == EngineCommandKinds.Approve)
+        {
+            using var dataDocument = JsonDocument.Parse(record.Instance.ApprovalDataJson);
+            await hooks.ValidateAsync(app, new ValidationHookRequest
+            {
+                Phase = "approve",
+                FlowCode = record.Instance.FlowCode,
+                BusinessKey = record.Instance.BusinessKey,
+                InstanceId = record.Instance.Id,
+                TaskId = taskId,
+                Actor = input.User,
+                Data = dataDocument.RootElement,
+            }, requestId, cancellationToken);
+        }
+
         await runtime.ExecuteAsync(new RuntimeCommandInput
         {
             Command = new EngineCommand

@@ -130,6 +130,9 @@ internal static class FileChecks
                     ErrorCodes.ValidationFailed));
 
             await SeedInstanceAsync(factory);
+            check("人员不能把应用上传的附件关联到自己的审批单",
+                await ThrowsCodeAsync(() => service.LinkAsync(appUpload.Id, "instance", "requester"),
+                    ErrorCodes.Conflict));
             await service.LinkAsync(uploaded.Id, "instance", "requester");
             check("非审批单可见用户不能在关联后下载",
                 await ThrowsCodeAsync(() => service.DownloadAsync(uploaded.Id, "intruder", new MemoryStream()),

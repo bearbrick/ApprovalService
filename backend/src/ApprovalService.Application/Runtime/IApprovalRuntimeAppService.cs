@@ -87,4 +87,9 @@ public sealed class RuntimeCommandInput
     {
         get; set;
     }
+
+    /// <summary>
+    /// 发起时必须与审批单、任务和事件同事务提交的附件关联。
+    /// </summary>
+    public IReadOnlyList<RuntimeFileLink> FileLinks { get; set; } = [];
 }

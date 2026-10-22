@@ -69,6 +69,12 @@ internal static partial class OpenApiChecksStarts
                         new FlowFieldDefinition { Key = "amount", Name = "金额", Type = FlowFieldTypes.Money, Required = true },
                         new FlowFieldDefinition { Key = "doubleAmount", Name = "双倍金额", Type = FlowFieldTypes.Money,
                             Formula = "${amount} * 2" },
+                        new FlowFieldDefinition { Key = "proof", Name = "凭证", Type = FlowFieldTypes.Attachment },
+                        new FlowFieldDefinition
+                        {
+                            Key = "items", Name = "明细", Type = FlowFieldTypes.DetailTable,
+                            Children = [new FlowFieldDefinition { Key = "receipt", Name = "行凭证", Type = FlowFieldTypes.Attachment }],
+                        },
                     ],
                 },
             };
@@ -132,6 +138,13 @@ internal static partial class OpenApiChecksStarts
                 db.ExternalPersonBindings.Add(new ExternalPersonBindingEntity
                 {
                     ClientAppCode = "demo",
+                    ExternalUserId = "alice",
+                    PersonId = "requester",
+                    Method = "manual",
+                });
+                db.ExternalPersonBindings.Add(new ExternalPersonBindingEntity
+                {
+                    ClientAppCode = "other",
                     ExternalUserId = "alice",
                     PersonId = "requester",
                     Method = "manual",
@@ -382,6 +395,7 @@ internal static partial class OpenApiChecksStarts
             await RunFlowPoliciesAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunRevokeAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunBatchAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunFilesAsync(scope.ServiceProvider, http, demo.ApiKey, other.ApiKey, check);
             await RunAwaitingTerminationAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }

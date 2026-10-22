@@ -21,7 +21,30 @@ public static class OpenApprovalDataPreparer
     /// <param name="context">服务端生成的发起人上下文。</param>
     /// <returns>可供条件求值和持久化的独立数据快照。</returns>
     public static JsonElement Prepare(FlowDataDefinition definition, JsonElement data,
-        IReadOnlyDictionary<string, object?>? context = null)
+        IReadOnlyDictionary<string, object?>? context = null) =>
+        PrepareCore(definition, data, context, allowAttachments: false).Data;
+
+    /// <summary>
+    /// 发起审批时保留已通过数据格式校验的附件 ID，供提交事务核对应用归属。
+    /// </summary>
+    /// <param name="definition">已发布流程的数据定义。</param>
+    /// <param name="data">业务系统原始审批数据。</param>
+    /// <param name="context">服务端生成的发起人上下文。</param>
+    /// <returns>计算后的快照及按首次出现顺序去重的附件 ID。</returns>
+    public static PreparedApprovalData PrepareWithAttachments(FlowDataDefinition definition, JsonElement data,
+        IReadOnlyDictionary<string, object?>? context = null) =>
+        PrepareCore(definition, data, context, allowAttachments: true);
+
+    /// <summary>
+    /// 共享字段校验和公式准备逻辑，只有发起事务允许携带附件。
+    /// </summary>
+    /// <param name="definition">已发布流程的数据定义。</param>
+    /// <param name="data">业务系统原始审批数据。</param>
+    /// <param name="context">服务端生成的发起人上下文。</param>
+    /// <param name="allowAttachments">是否将附件交给后续原子归属校验。</param>
+    /// <returns>计算后的快照及附件 ID。</returns>
+    private static PreparedApprovalData PrepareCore(FlowDataDefinition definition, JsonElement data,
+        IReadOnlyDictionary<string, object?>? context, bool allowAttachments)
     {
         ArgumentNullException.ThrowIfNull(definition);
         var issues = ApprovalDataValidator.Validate(definition, data);
@@ -33,7 +56,10 @@ public static class OpenApprovalDataPreparer
 
         var root = JsonNode.Parse(data.GetRawText()) as JsonObject
             ?? throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批数据必须是对象。");
-        RejectAttachments(definition.Fields, root, "data");
+        if (!allowAttachments)
+        {
+            RejectAttachments(definition.Fields, root, "data");
+        }
         foreach (var field in definition.Fields)
         {
             if (field.ApproverInput || !string.IsNullOrWhiteSpace(field.Formula))
@@ -56,7 +82,67 @@ public static class OpenApprovalDataPreparer
             ComputeTopLevel(field, fields, root, context, visiting, finished);
         }
 
-        return JsonSerializer.SerializeToElement(root, ApprovalJson.Options);
+        var attachmentIds = new List<string>();
+        if (allowAttachments)
+        {
+            CollectAttachments(definition.Fields, root, attachmentIds, new HashSet<string>(StringComparer.Ordinal));
+        }
+
+        return new PreparedApprovalData
+        {
+            Data = JsonSerializer.SerializeToElement(root, ApprovalJson.Options),
+            AttachmentIds = attachmentIds,
+        };
+    }
+
+    /// <summary>
+    /// 按发布字段递归读取顶层与明细附件，不把未知业务字段误当成文件引用。
+    /// </summary>
+    /// <param name="fields">当前层的字段定义。</param>
+    /// <param name="container">当前层的业务数据。</param>
+    /// <param name="ids">按首次出现顺序保留的附件 ID。</param>
+    /// <param name="seen">跨字段去重集合。</param>
+    private static void CollectAttachments(IEnumerable<FlowFieldDefinition> fields, JsonObject container,
+        List<string> ids, HashSet<string> seen)
+    {
+        foreach (var field in fields)
+        {
+            if (field.Type == FlowFieldTypes.Attachment)
+            {
+                if (container[field.Key] is JsonArray array)
+                {
+                    foreach (var item in array)
+                    {
+                        AddAttachment(item?.GetValue<string>(), ids, seen);
+                    }
+                }
+                else if (container[field.Key] is JsonValue value)
+                {
+                    AddAttachment(value.GetValue<string>(), ids, seen);
+                }
+            }
+            else if (field.Type == FlowFieldTypes.DetailTable && container[field.Key] is JsonArray rows)
+            {
+                foreach (var row in rows.OfType<JsonObject>())
+                {
+                    CollectAttachments(field.Children, row, ids, seen);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 附件格式已由校验器确认，此处只做去重。
+    /// </summary>
+    /// <param name="id">本次引用的文件 ID。</param>
+    /// <param name="ids">按首次出现顺序保留的附件 ID。</param>
+    /// <param name="seen">跨字段去重集合。</param>
+    private static void AddAttachment(string? id, List<string> ids, HashSet<string> seen)
+    {
+        if (id is not null && seen.Add(id))
+        {
+            ids.Add(id);
+        }
     }
 
     /// <summary>
@@ -228,4 +314,20 @@ public static class OpenApprovalDataPreparer
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, $"{path}：计算失败，{error.Message}");
         }
     }
+}
+
+/// <summary>
+/// 发起前准备好的业务快照和待由同一事务关联的附件 ID。
+/// </summary>
+public sealed class PreparedApprovalData
+{
+    /// <summary>
+    /// 已校验并重算公式的审批数据。
+    /// </summary>
+    public JsonElement Data { get; set; }
+
+    /// <summary>
+    /// 按首次出现顺序去重的附件 ID。
+    /// </summary>
+    public IReadOnlyList<string> AttachmentIds { get; set; } = [];
 }

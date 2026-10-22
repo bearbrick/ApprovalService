@@ -150,4 +150,30 @@ public sealed class RuntimeCommit
     /// 与事件同事务写入的待发项。
     /// </summary>
     public IReadOnlyList<OutboxItemEntity> OutboxItems { get; set; } = [];
+
+    /// <summary>
+    /// 与发起审批同事务关联的接入应用附件。
+    /// </summary>
+    public IReadOnlyList<RuntimeFileLink> FileLinks { get; set; } = [];
+}
+
+/// <summary>
+/// 一份待在审批提交事务中核对归属并关联的附件。
+/// </summary>
+public sealed class RuntimeFileLink
+{
+    /// <summary>
+    /// 已上传文件 ID。
+    /// </summary>
+    public string FileId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 已认证接入应用编码。
+    /// </summary>
+    public string ClientAppCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 发起命令的固定 UTC 时间。
+    /// </summary>
+    public DateTimeOffset LinkedAt { get; set; }
 }

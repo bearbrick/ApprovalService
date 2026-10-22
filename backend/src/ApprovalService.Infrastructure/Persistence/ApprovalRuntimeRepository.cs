@@ -1,5 +1,7 @@
 using System.Data;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Execution;
 using Microsoft.EntityFrameworkCore;
 
@@ -76,6 +78,12 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
 
         commit.Instance.LastEventSequence = lastSequence;
         commit.Instance.LastEventHash = lastHash;
+        if (commit.FileLinks.Any(link => string.IsNullOrWhiteSpace(link.FileId) ||
+                link.ClientAppCode != commit.Instance.ClientAppCode) ||
+            commit.FileLinks.Select(link => link.FileId).Distinct(StringComparer.Ordinal).Count() != commit.FileLinks.Count)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "附件引用或接入应用归属不正确。");
+        }
 
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         if (commit.ExpectedVersion is null)
@@ -145,18 +153,52 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
 
         db.OperationEvents.AddRange(commit.Events);
         db.OutboxItems.AddRange(commit.OutboxItems);
+        // 文件关联含条件更新，需要显式事务覆盖实例插入、事件和全部文件；先写实例以满足外键。
+        await using var fileTransaction = commit.FileLinks.Count > 0
+            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         try
         {
             // EF Core 在一次 SaveChanges 中为多表写入建立数据库事务，冲突时全部回滚。
             await db.SaveChangesAsync(cancellationToken);
+            foreach (var link in commit.FileLinks)
+            {
+                // 条件更新避免并发发起或清理抢先时覆盖已经关联到其他审批单的文件。
+                var updated = await db.StoredFiles.Where(item => item.Id == link.FileId &&
+                        item.UploadedByClientAppCode == link.ClientAppCode && item.UploadedById == null &&
+                        item.InstanceId == null && item.CleanupOwner == null)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(item => item.InstanceId, commit.Instance.Id)
+                        .SetProperty(item => item.LinkedAt, link.LinkedAt), cancellationToken);
+                if (updated != 1)
+                {
+                    throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                        "附件不存在、已被使用或不属于当前接入应用。");
+                }
+            }
+
+            if (fileTransaction is not null)
+            {
+                await fileTransaction.CommitAsync(cancellationToken);
+            }
+
             return true;
         }
         catch (DbUpdateConcurrencyException)
         {
+            if (fileTransaction is not null)
+            {
+                await fileTransaction.RollbackAsync(cancellationToken);
+            }
+
             return false;
         }
         catch (DbUpdateException) when (commit.ExpectedVersion is null && IsActive(commit.Instance.Status))
         {
+            if (fileTransaction is not null)
+            {
+                await fileTransaction.RollbackAsync(cancellationToken);
+            }
+
             // 只有确认另一审批单已占用在途键时才转成可恢复的冲突；其他数据库错误原样暴露。
             await using var check = await factory.CreateDbContextAsync(cancellationToken);
             if (await check.ActiveInstanceKeys.AsNoTracking().AnyAsync(item =>

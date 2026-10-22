@@ -59,6 +59,13 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         ArgumentNullException.ThrowIfNull(input.Context);
 
         var command = input.Command;
+        if (input.FileLinks.Count > 0 &&
+            (command.Kind != EngineCommandKinds.Start || input.StartInstance is null ||
+                input.FileLinks.Any(link => link.ClientAppCode != input.StartInstance.ClientAppCode)))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "附件只能由所属接入应用在发起审批时关联。");
+        }
+
         RuntimeSnapshot? snapshot = null;
         FlowVersionEntity flowVersion;
         InstanceEntity instance;
@@ -194,6 +201,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             Tasks = tasks,
             Events = events,
             OutboxItems = outbox,
+            FileLinks = input.FileLinks,
         }, cancellationToken);
         if (!saved)
         {

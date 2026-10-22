@@ -112,7 +112,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
         {
             throw InvalidCredentials();
         }
-        return await IssueTokensAsync(snapshot, null, null, null, cancellationToken);
+        return await IssueTokensAsync(snapshot, null, null, null, null, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -137,16 +137,22 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             throw InvalidToken();
         }
 
+        if (consumed.ClientAppCode is null &&
+            (consumed.ExternalUserId is not null || consumed.AuthGeneration is not null))
+        {
+            throw InvalidToken();
+        }
+
         if (consumed.ClientAppCode is not null &&
-            (string.IsNullOrWhiteSpace(consumed.ExternalUserId) ||
-                !await repository.IsEmbedSubjectActiveAsync(consumed.ClientAppCode, consumed.ExternalUserId,
-                    consumed.PersonId, cancellationToken)))
+            (string.IsNullOrWhiteSpace(consumed.ExternalUserId) || consumed.AuthGeneration is not > 0 ||
+                await repository.FindActiveEmbedSubjectGenerationAsync(consumed.ClientAppCode,
+                    consumed.ExternalUserId, consumed.PersonId, cancellationToken) != consumed.AuthGeneration))
         {
             throw InvalidToken();
         }
 
         return await IssueTokensAsync(snapshot, null, consumed.ClientAppCode, consumed.ExternalUserId,
-            cancellationToken);
+            consumed.AuthGeneration, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -223,8 +229,9 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
         }
 
         EnsureEnabled(snapshot);
-        if (!await repository.IsEmbedSubjectActiveAsync(clientAppCode, externalUserId, personId,
-            cancellationToken))
+        var authGeneration = await repository.FindActiveEmbedSubjectGenerationAsync(clientAppCode, externalUserId,
+            personId, cancellationToken);
+        if (authGeneration is not > 0)
         {
             throw new UserFriendlyException(ErrorCodes.Forbidden, "接入应用的人员绑定已失效。");
         }
@@ -238,6 +245,7 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             ExternalUserId = externalUserId,
             PersonId = personId,
             TokenVersion = snapshot.Account.TokenVersion,
+            AuthGeneration = authGeneration,
             TargetPath = targetPath,
             ExpiresAt = expiresAt,
         }, cancellationToken);
@@ -267,20 +275,20 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             throw InvalidToken();
         }
 
-        if (string.IsNullOrWhiteSpace(consumed.ExternalUserId) ||
-            !await repository.IsEmbedSubjectActiveAsync(consumed.ClientAppCode, consumed.ExternalUserId,
-                consumed.PersonId, cancellationToken))
+        if (string.IsNullOrWhiteSpace(consumed.ExternalUserId) || consumed.AuthGeneration is not > 0 ||
+            await repository.FindActiveEmbedSubjectGenerationAsync(consumed.ClientAppCode,
+                consumed.ExternalUserId, consumed.PersonId, cancellationToken) != consumed.AuthGeneration)
         {
             throw InvalidToken();
         }
 
         return await IssueTokensAsync(snapshot, consumed.TargetPath, consumed.ClientAppCode,
-            consumed.ExternalUserId, cancellationToken);
+            consumed.ExternalUserId, consumed.AuthGeneration, cancellationToken);
     }
 
     /// <inheritdoc />
     public async Task<bool> ValidateAccessPrincipalAsync(string personId, long tokenVersion, string? sessionKind,
-        string? clientAppCode, string? externalUserId,
+        string? clientAppCode, string? externalUserId, long? authGeneration = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(personId))
@@ -297,11 +305,11 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
 
         return sessionKind switch
         {
-            IdentitySessionKinds.Local => clientAppCode is null && externalUserId is null,
+            IdentitySessionKinds.Local => clientAppCode is null && externalUserId is null && authGeneration is null,
             IdentitySessionKinds.Embed => !string.IsNullOrWhiteSpace(clientAppCode) &&
-                !string.IsNullOrWhiteSpace(externalUserId) &&
-                await repository.IsEmbedSubjectActiveAsync(clientAppCode, externalUserId, personId,
-                    cancellationToken),
+                !string.IsNullOrWhiteSpace(externalUserId) && authGeneration is > 0 &&
+                await repository.FindActiveEmbedSubjectGenerationAsync(clientAppCode, externalUserId, personId,
+                    cancellationToken) == authGeneration,
             _ => false,
         };
     }
@@ -313,10 +321,12 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
     /// <param name="targetPath">嵌入交换的目标页面。</param>
     /// <param name="clientAppCode">嵌入会话的接入应用；本地登录为空。</param>
     /// <param name="externalUserId">嵌入会话的外部人员 ID；本地登录为空。</param>
+    /// <param name="authGeneration">嵌入会话签发时的应用身份代际；本地登录为空。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>原始访问与刷新令牌。</returns>
     private async Task<IdentityTokensDto> IssueTokensAsync(IdentityAccountSnapshot snapshot, string? targetPath,
-        string? clientAppCode, string? externalUserId, CancellationToken cancellationToken)
+        string? clientAppCode, string? externalUserId, long? authGeneration,
+        CancellationToken cancellationToken)
     {
         var account = snapshot.Account ?? throw new InvalidOperationException("令牌签发时账号为空。");
         var now = clock.GetUtcNow();
@@ -330,13 +340,14 @@ public sealed class IdentityAppService(IIdentityRepository repository, IIdentity
             TokenVersion = account.TokenVersion,
             ClientAppCode = clientAppCode,
             ExternalUserId = externalUserId,
+            AuthGeneration = authGeneration,
             ExpiresAt = refreshExpiresAt,
         }, cancellationToken);
         return new IdentityTokensDto
         {
             PersonId = snapshot.Person.Id,
             AccessToken = accessTokens.Issue(snapshot.Person.Id, account.TokenVersion,
-                account.MustChangePassword, clientAppCode, externalUserId, now, accessExpiresAt),
+                account.MustChangePassword, clientAppCode, externalUserId, authGeneration, now, accessExpiresAt),
             AccessExpiresAt = accessExpiresAt,
             RefreshToken = rawRefresh,
             RefreshExpiresAt = refreshExpiresAt,

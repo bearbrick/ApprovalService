@@ -99,6 +99,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ClientAppCode")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -180,6 +183,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ClientAppCode")
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
@@ -231,6 +237,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.Property<string>("AssigneeUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
+
+                    b.Property<long>("AuthGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
 
                     b.Property<string>("CallbackUrl")
                         .HasMaxLength(2048)

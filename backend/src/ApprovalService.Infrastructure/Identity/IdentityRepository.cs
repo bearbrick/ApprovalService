@@ -34,7 +34,8 @@ public sealed class IdentityRepository(IDbContextFactory<ApprovalDbContext> fact
     }
 
     /// <inheritdoc />
-    public async Task<bool> IsEmbedSubjectActiveAsync(string clientAppCode, string externalUserId, string personId,
+    public async Task<long?> FindActiveEmbedSubjectGenerationAsync(string clientAppCode, string externalUserId,
+        string personId,
         CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
@@ -42,7 +43,7 @@ public sealed class IdentityRepository(IDbContextFactory<ApprovalDbContext> fact
                       join app in db.ClientApps.AsNoTracking() on binding.ClientAppCode equals app.Code
                       where binding.ClientAppCode == clientAppCode && binding.ExternalUserId == externalUserId &&
                           binding.PersonId == personId && app.IsEnabled
-                      select binding.PersonId).AnyAsync(cancellationToken);
+                      select (long?)app.AuthGeneration).SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <inheritdoc />

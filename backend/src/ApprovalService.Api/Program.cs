@@ -43,11 +43,25 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
                 var sessionKind = context.Principal?.FindFirstValue(JwtIdentityTokenService.SessionKindClaim);
                 var clientAppCode = context.Principal?.FindFirstValue(JwtIdentityTokenService.ClientAppCodeClaim);
                 var externalUserId = context.Principal?.FindFirstValue(JwtIdentityTokenService.ExternalUserIdClaim);
+                var generationText = context.Principal?.FindFirstValue(JwtIdentityTokenService.AuthGenerationClaim);
+                long? authGeneration = null;
+                if (generationText is not null)
+                {
+                    if (!long.TryParse(generationText, NumberStyles.None, CultureInfo.InvariantCulture,
+                        out var parsedGeneration))
+                    {
+                        context.Fail("访问令牌中的应用身份代际无效。");
+                        return;
+                    }
+
+                    authGeneration = parsedGeneration;
+                }
+
                 if (string.IsNullOrWhiteSpace(personId) ||
                     !long.TryParse(versionText, NumberStyles.None, CultureInfo.InvariantCulture, out var version) ||
                     !await context.HttpContext.RequestServices.GetRequiredService<IIdentityAppService>()
                         .ValidateAccessPrincipalAsync(personId, version, sessionKind, clientAppCode,
-                            externalUserId, context.HttpContext.RequestAborted))
+                            externalUserId, authGeneration, context.HttpContext.RequestAborted))
                 {
                     context.Fail("访问令牌已作废或人员已停用。");
                     return;

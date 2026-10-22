@@ -94,6 +94,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ClientAppCode")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -175,6 +178,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ClientAppCode")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
@@ -226,6 +232,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<string>("AssigneeUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("AuthGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1L);
 
                     b.Property<string>("CallbackUrl")
                         .HasMaxLength(2048)

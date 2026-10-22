@@ -177,13 +177,51 @@ internal static class IdentityEndpointChecks
                 check("嵌入会话即使绑定管理员也不能访问管理接口", template.StatusCode == HttpStatusCode.Forbidden);
             }
 
+            string refreshedEmbedToken;
             using (var refresh = await client.PostAsJsonAsync(ApiRoutes.IdentityRefresh,
                 new IdentityRefreshRequest(embedded.RefreshToken)))
             {
                 var refreshed = (await refresh.Content.ReadFromJsonAsync<IdentityTokensResponse>())!;
+                refreshedEmbedToken = refreshed.RefreshToken;
                 using var template = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate, refreshed.AccessToken);
                 check("刷新嵌入会话不会洗成管理员权限", refresh.IsSuccessStatusCode &&
                     template.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            var localAfterBinding = await LoginAsync(client, "new-password-123");
+            using (var scope = factory.Services.CreateScope())
+            {
+                var appService = scope.ServiceProvider.GetRequiredService<ClientAppAppService>();
+                await appService.SetEnabledAsync("demo", false);
+                await appService.SetEnabledAsync("demo", true);
+            }
+
+            using (var oldAccess = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate, embedded.AccessToken))
+            using (var localAccess = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate,
+                localAfterBinding.AccessToken))
+            using (var oldRefresh = await client.PostAsJsonAsync(ApiRoutes.IdentityRefresh,
+                new IdentityRefreshRequest(refreshedEmbedToken)))
+            {
+                check("HTTP 认证在应用重启用后拒绝旧嵌入 JWT 和刷新令牌但保留本地会话",
+                    oldAccess.StatusCode == HttpStatusCode.Unauthorized &&
+                    oldRefresh.StatusCode == HttpStatusCode.Unauthorized &&
+                    localAccess.StatusCode == HttpStatusCode.OK);
+            }
+
+            using (var request = new HttpRequestMessage(HttpMethod.Post, ApiRoutes.EmbedTokens))
+            {
+                request.Headers.Add(HeaderNames.ApiKey, secrets.ApiKey);
+                request.Content = JsonContent.Create(new EmbedTokenRequest("external-admin", "#/m/tasks"));
+                using var response = await client.SendAsync(request);
+                var newEmbed = await response.Content.ReadFromJsonAsync<EmbedTokenResponse>();
+                using var exchange = await client.PostAsJsonAsync(ApiRoutes.EmbedTokenExchange,
+                    new EmbedTokenExchangeRequest(newEmbed!.Token));
+                var newSession = await exchange.Content.ReadFromJsonAsync<IdentityTokensResponse>();
+                using var access = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate,
+                    newSession!.AccessToken);
+                check("HTTP 接口在应用重启用后可签发和兑换新嵌入会话",
+                    response.IsSuccessStatusCode && exchange.IsSuccessStatusCode &&
+                    access.StatusCode == HttpStatusCode.Forbidden);
             }
         }
         finally

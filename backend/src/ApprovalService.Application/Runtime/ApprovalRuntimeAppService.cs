@@ -13,7 +13,9 @@ namespace ApprovalService.Application.Runtime;
 /// 读取发布版本和状态，计算引擎结果，再以乐观锁原子提交事件与待发项。
 /// </summary>
 /// <param name="repository">原子保存状态和事件的仓储。</param>
-public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository) : IApprovalRuntimeAppService
+/// <param name="businessAssignees">实际节点到达前的业务取人服务。</param>
+public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository,
+    BusinessAssigneeAppService? businessAssignees = null) : IApprovalRuntimeAppService
 {
     /// <inheritdoc />
     public async Task<EngineResult> ExecuteAsync(RuntimeCommandInput input, CancellationToken cancellationToken = default)
@@ -81,13 +83,37 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         }
 
         EngineResult result;
-        try
+        var requestedNodes = new HashSet<string>(StringComparer.Ordinal);
+        while (true)
         {
-            result = EngineRuntime.Execute(current, command, input.Context);
-        }
-        catch (EngineException error)
-        {
-            throw new UserFriendlyException(error.Code, error.Message);
+            try
+            {
+                result = EngineRuntime.Execute(current, command, input.Context);
+            }
+            catch (EngineException error)
+            {
+                throw new UserFriendlyException(error.Code, error.Message);
+            }
+
+            var requirement = result.RequiredBusinessAssignee;
+            if (requirement is null)
+            {
+                break;
+            }
+
+            // 引擎只报告实际命中的节点；每次重算沿用原状态、请求 ID、时间及执行图。
+            if (!requestedNodes.Add(requirement.NodeId) || requestedNodes.Count > input.Context.Graph.Nodes.Count)
+            {
+                throw new InvalidOperationException("业务取人节点预取出现重复或超出执行图范围。");
+            }
+
+            if (businessAssignees is null)
+            {
+                throw new InvalidOperationException("运行时缺少业务取人服务登记。");
+            }
+
+            await businessAssignees.PrepareAsync(instance, requirement, input.Context, command.RequestId,
+                cancellationToken);
         }
 
         if (result.IsReplay)

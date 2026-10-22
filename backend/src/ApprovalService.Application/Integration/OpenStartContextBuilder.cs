@@ -117,17 +117,6 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
                 await AddMatrixMatchAsync(snapshot, assignee.Value ?? string.Empty, initiatorId, data,
                     cancellationToken);
             }
-            else if (assignee.Source == FlowAssigneeSources.BusinessApi)
-            {
-                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                    "该流程使用业务系统取人接口；取人钩子协议确认并配置前暂不能发起。");
-            }
-        }
-
-        if (graph.Nodes.Any(node => node.Type == FlowNodeTypes.Automatic))
-        {
-            throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                "该流程含业务自动动作；动作钩子协议确认并配置前暂不能发起。");
         }
 
         return BuildEngineContext(definition, graph, snapshot, initiator, data, now);
@@ -162,11 +151,6 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
                 await AddMatrixMatchAsync(snapshot, node.Assignee.Value ?? string.Empty,
                     instance.InitiatorId, data, cancellationToken);
             }
-            else if (node.Assignee?.Source == FlowAssigneeSources.BusinessApi)
-            {
-                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                    "该流程使用业务系统取人接口；取人钩子协议确认并配置前暂不能继续。");
-            }
         }
 
         return BuildEngineContext(definition, graph, snapshot, initiator, data, now);
@@ -186,7 +170,11 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
     {
         var previous = JsonSerializer.Deserialize<OpenRoutingInputs>(previousJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("审批单发起路由快照为空。");
-        var result = new OpenRoutingInputs { InitiatorSelections = previous.InitiatorSelections };
+        var result = new OpenRoutingInputs
+        {
+            InitiatorExternalId = previous.InitiatorExternalId,
+            InitiatorSelections = previous.InitiatorSelections,
+        };
         foreach (var node in graph.Nodes)
         {
             var assignee = node.Assignee;

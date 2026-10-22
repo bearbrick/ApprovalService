@@ -44,7 +44,7 @@ internal static partial class OpenApiChecksStarts
             {
                 Code = "demo",
                 Name = "示例",
-                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY", "REVOKE"],
+                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY", "REVOKE", "HOOK_ASSIGN", "HOOK_ACTION"],
             });
             var other = await clients.CreateAsync(new CreateClientAppInput
             {

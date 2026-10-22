@@ -1,12 +1,12 @@
 namespace ApprovalService.Domain.Notifications.Calendar;
 
 /// <summary>
-/// 工作日历的确定性日期规则；调用方负责提供本地节假日与调休清单。
+/// 工作日历的确定性日期与期限规则；调用方负责提供节假日、调休和时区配置。
 /// </summary>
 public sealed class WorkCalendarRules
 {
     /// <summary>
-    /// 防止错误配置造成不受限的日期扫描。
+    /// 防止错误配置造成不受限的日期扫描和期限计算。
     /// </summary>
     private const int MaximumScanDays = 36600;
 
@@ -92,5 +92,90 @@ public sealed class WorkCalendarRules
     {
         ArgumentNullException.ThrowIfNull(calendarTimeZone);
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(instant, calendarTimeZone).DateTime);
+    }
+
+    /// <summary>
+    /// 从任务开始时间累计工作分钟，返回所在时区的到期时刻。
+    /// </summary>
+    /// <param name="startAt">任务开始的绝对时间点。</param>
+    /// <param name="dueMinutes">需要累计的工作分钟数，必须大于零。</param>
+    /// <param name="calendarTimeZone">工作日历所属的时区。</param>
+    /// <param name="workingHours">每天的工作时段；空值使用九点到十八点。</param>
+    /// <returns>累计完工作分钟时，在日历时区表示的时间点。</returns>
+    public DateTimeOffset GetDueAt(
+        DateTimeOffset startAt,
+        int dueMinutes,
+        TimeZoneInfo calendarTimeZone,
+        WorkCalendarWorkingHours? workingHours = null)
+    {
+        if (dueMinutes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dueMinutes), "节点时限必须大于零分钟。");
+        }
+
+        ArgumentNullException.ThrowIfNull(calendarTimeZone);
+        var hours = workingHours ?? WorkCalendarWorkingHours.Default;
+        var cursor = startAt.ToUniversalTime();
+        var date = GetLocalDate(cursor, calendarTimeZone);
+        var remaining = TimeSpan.FromMinutes(dueMinutes);
+
+        for (var scanned = 0; scanned < MaximumScanDays; scanned++)
+        {
+            if (IsWorkingDay(date))
+            {
+                var begin = ResolveBoundary(date.ToDateTime(hours.Start), calendarTimeZone, true);
+                var end = ResolveBoundary(date.ToDateTime(hours.End), calendarTimeZone, false);
+                var effectiveStart = cursor > begin ? cursor : begin;
+                if (effectiveStart < end)
+                {
+                    var available = end - effectiveStart;
+                    if (remaining <= available)
+                    {
+                        return TimeZoneInfo.ConvertTime(effectiveStart + remaining, calendarTimeZone);
+                    }
+
+                    remaining -= available;
+                }
+            }
+
+            // 非工作日期和每天工作时段之外不消耗分钟数。
+            if (date == DateOnly.MaxValue)
+            {
+                break;
+            }
+
+            date = date.AddDays(1);
+        }
+
+        throw new ArgumentException("工作日历在可计算的日期范围内没有足够的工作分钟。", nameof(dueMinutes));
+    }
+
+    /// <summary>
+    /// 将本地时段边界确定地转换为绝对时间，处理夏令时缺口与重复时刻。
+    /// </summary>
+    /// <param name="localTime">未指定时区的本地日期时间。</param>
+    /// <param name="calendarTimeZone">工作日历所属的时区。</param>
+    /// <param name="isStart">开始边界选重复时刻中较早的一次，结束边界选较晚的一次。</param>
+    /// <returns>边界对应的 UTC 时间点。</returns>
+    private static DateTimeOffset ResolveBoundary(DateTime localTime, TimeZoneInfo calendarTimeZone, bool isStart)
+    {
+        // 春季跳时形成的无效本地时刻顺延到第一个有效分钟。
+        while (calendarTimeZone.IsInvalidTime(localTime))
+        {
+            localTime = localTime.AddMinutes(1);
+        }
+
+        TimeSpan offset;
+        if (calendarTimeZone.IsAmbiguousTime(localTime))
+        {
+            var offsets = calendarTimeZone.GetAmbiguousTimeOffsets(localTime);
+            offset = isStart ? offsets.Max() : offsets.Min();
+        }
+        else
+        {
+            offset = calendarTimeZone.GetUtcOffset(localTime);
+        }
+
+        return new DateTimeOffset(localTime, offset).ToUniversalTime();
     }
 }

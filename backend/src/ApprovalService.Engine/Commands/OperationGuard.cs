@@ -106,7 +106,20 @@ internal static class OperationGuard
             }
         }
 
-        if (command.Kind is EngineCommandKinds.Terminate or OperationKinds.Reassign or OperationKinds.Jump or
+        if (command.Kind == EngineCommandKinds.Terminate)
+        {
+            if (!input.IsAdministrator && !input.IsOwningClientApp)
+            {
+                throw new EngineException(ErrorCodes.Forbidden, "只有管理员或审批单所属应用可以终止审批。");
+            }
+
+            if (string.IsNullOrWhiteSpace(input.Reason))
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "终止审批必须填写原因。");
+            }
+        }
+
+        if (command.Kind is OperationKinds.Reassign or OperationKinds.Jump or
             OperationKinds.Handover or OperationKinds.Resend)
         {
             if (!input.IsAdministrator)

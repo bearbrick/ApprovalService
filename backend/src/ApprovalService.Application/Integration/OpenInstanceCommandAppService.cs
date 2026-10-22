@@ -48,7 +48,20 @@ public sealed class OpenInstanceCommandAppService(IApprovalRuntimeRepository rep
         ExecuteAsync(app, instanceId, OperationKinds.Remind, input, requestId, cancellationToken);
 
     /// <summary>
-    /// 仅发起人可撤回或催办本应用的审批单。
+    /// 本应用以已绑定的实际操作人和原因终止在途审批。
+    /// </summary>
+    /// <param name="app">已认证接入应用。</param>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <param name="input">实际操作人和终止原因。</param>
+    /// <param name="requestId">链路中的稳定请求 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>终止后的审批单。</returns>
+    public Task<OpenInstanceResponse> TerminateAsync(ClientAppEntity app, string instanceId,
+        OpenInstanceCommandRequest input, string requestId, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(app, instanceId, EngineCommandKinds.Terminate, input, requestId, cancellationToken);
+
+    /// <summary>
+    /// 核对审批单归属和人员绑定；撤回与催办还要求实际操作人是发起人。
     /// </summary>
     /// <param name="app">已认证接入应用。</param>
     /// <param name="instanceId">审批单 ID。</param>
@@ -61,11 +74,16 @@ public sealed class OpenInstanceCommandAppService(IApprovalRuntimeRepository rep
         OpenInstanceCommandRequest input, string requestId, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(app);
-        if (kind is not (EngineCommandKinds.Withdraw or OperationKinds.Remind) ||
+        if (kind is not (EngineCommandKinds.Withdraw or EngineCommandKinds.Terminate or OperationKinds.Remind) ||
             string.IsNullOrWhiteSpace(instanceId) || input is null || string.IsNullOrWhiteSpace(input.User) ||
             string.IsNullOrWhiteSpace(requestId))
         {
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批操作参数不正确。");
+        }
+
+        if (kind == EngineCommandKinds.Terminate && string.IsNullOrWhiteSpace(input.Reason))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "终止审批必须填写原因。");
         }
 
         var snapshot = await repository.LoadAsync(instanceId, cancellationToken)
@@ -77,7 +95,7 @@ public sealed class OpenInstanceCommandAppService(IApprovalRuntimeRepository rep
 
         var actorId = await organization.ResolveBoundPersonAsync(app.Code, input.User, cancellationToken)
             ?? throw new UserFriendlyException(ErrorCodes.Forbidden, "操作人员未在当前接入应用绑定或已离职。");
-        if (actorId != snapshot.Instance.InitiatorId)
+        if (kind != EngineCommandKinds.Terminate && actorId != snapshot.Instance.InitiatorId)
         {
             throw new UserFriendlyException(ErrorCodes.Forbidden, "只有审批发起人可以执行此操作。");
         }
@@ -89,7 +107,12 @@ public sealed class OpenInstanceCommandAppService(IApprovalRuntimeRepository rep
                 Kind = kind,
                 InstanceId = instanceId,
                 RequestId = requestId,
-                Operation = new OperationInput { ActorId = actorId },
+                Operation = new OperationInput
+                {
+                    ActorId = actorId,
+                    Reason = kind == EngineCommandKinds.Terminate ? input.Reason : null,
+                    IsOwningClientApp = kind == EngineCommandKinds.Terminate,
+                },
             },
             Context = new EngineContext
             {

@@ -54,6 +54,26 @@ internal static class OperationChecksBoundaries
         check("管理员终止留下原因且取消任务", terminated.State.Status == EngineInstanceStatuses.Terminated &&
             terminated.State.Tasks.Single().Status == EngineTaskStatuses.Cancelled &&
             terminated.Events.Any(item => item.Audit?.Reason == "异常单据"));
+        var ownerTerminate = Command(EngineCommandKinds.Terminate, "owner-terminate", "bound-operator");
+        ownerTerminate.Operation!.IsOwningClientApp = true;
+        check("所属应用终止缺少原因会被拒绝", Throws(ErrorCodes.ValidationFailed, () =>
+            Execute(started.State, context, ownerTerminate)));
+        ownerTerminate.Operation.Reason = "业务单据作废";
+        var ownerTerminated = Execute(started.State, context, ownerTerminate);
+        check("所属应用可终止并记录实际操作人和原因",
+            ownerTerminated.State.Status == EngineInstanceStatuses.Terminated &&
+            ownerTerminated.Events.Any(item => item.Audit is
+            { ActorId: "bound-operator", Reason: "业务单据作废" }));
+        var unauthorizedTerminate = Command(EngineCommandKinds.Terminate, "unknown-terminate", "unknown");
+        unauthorizedTerminate.Operation!.Reason = "作废";
+        check("未核准管理员或所属应用时不能终止", Throws(ErrorCodes.Forbidden, () =>
+            Execute(started.State, context, unauthorizedTerminate)));
+        var ownerJump = Command(OperationKinds.Jump, "owner-jump", "bound-operator");
+        ownerJump.Operation!.IsOwningClientApp = true;
+        ownerJump.Operation.Reason = "尝试越权";
+        ownerJump.Operation.TargetNodeId = "n1";
+        check("所属应用终止权限不能扩展成管理员跳转", Throws(ErrorCodes.Forbidden, () =>
+            Execute(started.State, context, ownerJump)));
 
         var handover = Admin(OperationKinds.Handover, "handover", "人员离职");
         handover.Operation!.RelatedId = task.AssigneeId;

@@ -164,6 +164,13 @@ public sealed class OperationInput
         get; set;
     }
     /// <summary>
+    /// 应用层已核对本接入应用拥有审批单且实际操作人已绑定，仅可用于终止。
+    /// </summary>
+    public bool IsOwningClientApp
+    {
+        get; set;
+    }
+    /// <summary>
     /// 本次同意来自批量操作。
     /// </summary>
     public bool IsBulkApproval

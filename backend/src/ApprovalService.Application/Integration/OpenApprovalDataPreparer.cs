@@ -324,7 +324,10 @@ public sealed class PreparedApprovalData
     /// <summary>
     /// 已校验并重算公式的审批数据。
     /// </summary>
-    public JsonElement Data { get; set; }
+    public JsonElement Data
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 按首次出现顺序去重的附件 ID。

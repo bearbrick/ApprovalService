@@ -175,5 +175,8 @@ public sealed class RuntimeFileLink
     /// <summary>
     /// 发起命令的固定 UTC 时间。
     /// </summary>
-    public DateTimeOffset LinkedAt { get; set; }
+    public DateTimeOffset LinkedAt
+    {
+        get; set;
+    }
 }

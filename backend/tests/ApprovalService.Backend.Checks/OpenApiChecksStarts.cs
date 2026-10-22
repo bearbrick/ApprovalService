@@ -381,6 +381,7 @@ internal static partial class OpenApiChecksStarts
             await RunApproverInputsAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunFlowPoliciesAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunRevokeAsync(scope.ServiceProvider, http, demo.ApiKey, check);
+            await RunBatchAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

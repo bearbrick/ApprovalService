@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using ApprovalService.Application.Organization;
 using ApprovalService.Application.Runtime;
@@ -137,6 +139,53 @@ public sealed class OpenApprovalStartAppService(
         }
 
         return await queries.GetInstanceAsync(app, instanceId, cancellationToken);
+    }
+
+    /// <summary>
+    /// 批量发起时逐张提交，单项业务错误不回滚已成功的审批单。
+    /// </summary>
+    /// <param name="app">已认证接入应用。</param>
+    /// <param name="request">待发起的审批单列表。</param>
+    /// <param name="requestId">批次的稳定请求 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>顺序与请求一致的逐项结果。</returns>
+    public async Task<OpenBatchStartResponse> StartBatchAsync(ClientAppEntity app, OpenBatchStartRequest request,
+        string requestId, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        if (request?.Items is null || request.Items.Count is < 1 or > 100 ||
+            string.IsNullOrWhiteSpace(requestId))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "批量发起必须包含 1 至 100 张审批单。");
+        }
+
+        var results = new List<OpenBatchStartItemResponse>(request.Items.Count);
+        for (var index = 0; index < request.Items.Count; index++)
+        {
+            var item = request.Items[index];
+            if (item is null)
+            {
+                results.Add(new OpenBatchStartItemResponse(index, null,
+                    new OpenBatchStartError(ErrorCodes.ValidationFailed, "批量发起的单项请求不能为空。")));
+                continue;
+            }
+
+            // 每项使用独立且重试稳定的引擎请求 ID，不能把整个批次共享为一次命令。
+            var itemRequestId = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                requestId + ":" + index.ToString(CultureInfo.InvariantCulture))));
+            try
+            {
+                var instance = await StartAsync(app, item, itemRequestId, cancellationToken);
+                results.Add(new OpenBatchStartItemResponse(index, instance, null));
+            }
+            catch (UserFriendlyException error)
+            {
+                results.Add(new OpenBatchStartItemResponse(index, null,
+                    new OpenBatchStartError(error.Code, error.Message)));
+            }
+        }
+
+        return new OpenBatchStartResponse(results);
     }
 
     /// <summary>

@@ -26,6 +26,10 @@ internal static partial class OpenApiChecksStarts
     private static async Task RunBatchAsync(IServiceProvider services, HttpClient http, string apiKey,
         Action<string, bool> check)
     {
+        using var emptyRequest = BatchRequest(new OpenBatchStartRequest(), apiKey, "batch-empty");
+        using var emptyResponse = await http.SendAsync(emptyRequest);
+        check("批量发起的空批次整体返回可修正错误", emptyResponse.StatusCode == HttpStatusCode.BadRequest);
+
         var batch = new OpenBatchStartRequest
         {
             Items =

@@ -82,6 +82,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Integration:MasterKey` | — | 接入应用签名密钥加密所需的 32 字节 Base64 主密钥；不要提交仓库 |
 
 
+## 工作日历基础
+
+`Domain/Notifications/Calendar` 提供纯日历规则：默认周一至周五为工作日，调用方可传入本地日期覆盖清单，将节假日设为休息日、调休周末设为工作日。`GetWorkingDateAfter` 从指定日期之后计数，不把起点算作第一个工作日；`GetLocalDate` 按指定时区将时间点换成本地日期，避免使用服务器本地时区或固定 UTC 偏移。配置清单由调用方提供，规则本身不访问数据库。
+
+`GetDueAt` 从任务开始的实际时间点累计节点 `DueMinutes`，只计入工作日每天的工作时段，默认 09:00–18:00，也可以传 `WorkCalendarWorkingHours` 指定当天的起止时间。提前开始从当日开工起算；下班后、周末和节假日顺延到下个工作时段；恰好在下班时到期则保留该时刻。夏令时缺口中的时段边界顺延到第一个有效本地分钟，重复的开始边界取较早一次、结束边界取较晚一次，累计的是实际经过的分钟。通知任务负责提供日历配置、把结果写入任务期限并安排提醒。
+
 ## 持久化与后台任务
 
 流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。

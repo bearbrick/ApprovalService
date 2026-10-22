@@ -42,6 +42,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-023](T-023-pilot.md) | 试点：费用报销和采购申请 | 全部 | M6 | T-006～T-022 | 全部 |
 | [T-037](T-037-sdk-open-api.md) | .NET SDK 首批开放接口 | 调用端 | M4 | T-027、T-006 稳定协议 | src/ApprovalService.Client、tests/ApprovalService.Client.Checks |
 | [T-024](T-024-high-fidelity-prototypes.md) | 全功能高保真交互原型 | 原型文档 | M1 | T-000 | docs/prototypes |
+| [T-029](T-029-work-calendar.md) | 工作日历与节点时限基础 | 后端 | M3 | T-005 | Domain/Notifications/Calendar |
 | [T-025](T-025-frontend-foundation.md) | 完善前端公共框架 | 前端 | M1 | T-000 | frontend/src、frontend/tests |
 | [T-026](T-026-backend-configuration-validation.md) | 后端数据配置启动校验 | 后端 | 框架完善 | T-000 | Infrastructure 配置、后端检查 |
 | [T-027](T-027-client-foundation.md) | 调用端基础连接与错误边界 | 调用端 | M4 前置框架 | T-000 | src/ApprovalService.Client、tests/ApprovalService.Client.Checks |

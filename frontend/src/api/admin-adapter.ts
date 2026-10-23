@@ -1,7 +1,7 @@
 import type { AdminViewData } from '../model/admin.ts'
 import { clientAppsViewData, directoryViewData } from '../model/admin-data.ts'
 import type { AdminClientApp, AdminDirectory } from '../model/admin-data.ts'
-import { ApiError, getJson } from './http.ts'
+import { ApiError, getJson, requestJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
 
 /**
@@ -134,4 +134,49 @@ export async function downloadOrganizationTemplate(): Promise<Blob> {
   })
   if (!response.ok) throw new ApiError(`HTTP_${response.status}`, '组织模板下载失败。', '', { status: response.status })
   return response.blob()
+}
+
+/**
+ * 接入应用允许嵌入的可信网站来源。
+ */
+export interface AdminEmbedOrigins {
+  /**
+   * 接入应用编码。
+   */
+  code: string
+  /**
+   * 完整来源列表，不包含通配符。
+   */
+  origins: string[]
+}
+
+/**
+ * 读取指定应用允许嵌入的网站来源。
+ * @param code 接入应用编码。
+ * @returns 当前来源设置。
+ */
+export async function getAdminEmbedOrigins(code: string): Promise<AdminEmbedOrigins> {
+  const token = await adminAccessToken()
+  const result = await getJson<AdminEmbedOrigins>(`/api/v1/admin/apps/${encodeURIComponent(code)}/embed-origins`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  })
+  if (!result || result.code !== code || !Array.isArray(result.origins)
+    || result.origins.some(origin => typeof origin !== 'string')) throw new Error('允许嵌入来源响应不完整。')
+  return result
+}
+
+/**
+ * 保存指定应用的允许嵌入来源，并提供必填的管理操作原因。
+ * @param code 接入应用编码。
+ * @param origins 完整可信来源列表。
+ * @param reason 本次变更原因。
+ * @returns 服务端重新读取的设置。
+ */
+export async function saveAdminEmbedOrigins(code: string, origins: readonly string[], reason: string): Promise<AdminEmbedOrigins> {
+  const token = await adminAccessToken()
+  const result = await requestJson<AdminEmbedOrigins>(`/api/v1/admin/apps/${encodeURIComponent(code)}/embed-origins`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: { origins, reason }, cache: 'no-store',
+  })
+  if (!result || result.code !== code || !Array.isArray(result.origins)) throw new Error('来源保存响应不完整。')
+  return result
 }

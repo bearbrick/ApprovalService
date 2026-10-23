@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 using ApprovalService.Api.Endpoints;
+using ApprovalService.Api.Endpoints.Center;
 using ApprovalService.Api.Endpoints.Files;
 using ApprovalService.Api.Endpoints.OpenApi;
 using ApprovalService.Api.Hosting;
@@ -110,6 +111,7 @@ app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
 app.MapFileEndpoints();
+app.MapCenterQueryEndpoints();
 
 if (bootstrapCommand)
 {

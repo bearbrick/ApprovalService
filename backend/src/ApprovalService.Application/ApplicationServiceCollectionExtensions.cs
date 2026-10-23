@@ -1,3 +1,4 @@
+using ApprovalService.Application.Center;
 using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
@@ -28,6 +29,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<FlowCatalogAppService>();
         services.AddScoped<CallbackDeliveryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
+        services.AddScoped<CenterQueryAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
         services.AddScoped<BusinessHookAppService>();
         services.AddScoped<BusinessAssigneeAppService>();

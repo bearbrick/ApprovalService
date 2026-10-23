@@ -2,11 +2,13 @@ using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Application.Notifications;
+using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Files;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Integration;
@@ -48,6 +50,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
+        services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
         services.AddSingleton(new IntegrationTransportPolicy
         {

@@ -1,3 +1,10 @@
+using ApprovalService.Application.Center;
+using ApprovalService.Application.Files;
+using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
+using ApprovalService.Application.Organization;
+using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,6 +23,25 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddApprovalApplication(this IServiceCollection services)
     {
         services.AddSingleton<IServiceInfoAppService, ServiceInfoAppService>();
+        services.AddScoped<IServiceReadinessAppService, ServiceReadinessAppService>();
+        services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
+        services.AddScoped<ClientAppAppService>();
+        services.AddScoped<FlowCatalogAppService>();
+        services.AddScoped<CallbackDeliveryAppService>();
+        services.AddScoped<OpenApprovalQueryAppService>();
+        services.AddScoped<CenterQueryAppService>();
+        services.AddScoped<OpenApprovalStartAppService>();
+        services.AddScoped<BusinessHookAppService>();
+        services.AddScoped<BusinessAssigneeAppService>();
+        services.AddScoped<OpenInstanceCommandAppService>();
+        services.AddScoped<OpenTaskActionAppService>();
+        services.AddScoped<OpenStartContextBuilder>();
+        services.AddSingleton<IMatrixMatchProvider, UnconfiguredMatrixMatchProvider>();
+        services.AddScoped<IOrganizationAppService, OrganizationAppService>();
+        services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
+        services.AddScoped<IIdentityAppService, IdentityAppService>();
+        services.AddScoped<INotificationAppService, NotificationAppService>();
+        services.AddScoped<IFileAppService, FileAppService>();
         return services;
     }
 }

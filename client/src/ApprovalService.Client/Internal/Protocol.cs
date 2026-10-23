@@ -24,4 +24,5 @@ internal static class Protocol
     /// 回调请求体的签名（sha256=十六进制小写）。
     /// </summary>
     public const string Signature = "X-Approval-Signature";
+
 }

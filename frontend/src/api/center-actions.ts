@@ -52,9 +52,27 @@ export interface CenterBatchResult {
    */
   succeeded: boolean
   /**
+   * 成功办理时对应的审批单 ID。
+   */
+  instanceId?: string | null
+  /**
    * 失败时的中文说明。
    */
   message?: string | null
+}
+
+/**
+ * 单任务成功提交后服务端返回的安全标识。
+ */
+export interface CenterActionResult {
+  /**
+   * 本次办理的任务 ID。
+   */
+  taskId: string
+  /**
+   * 本次办理的审批单 ID。
+   */
+  instanceId: string
 }
 
 /**
@@ -70,13 +88,17 @@ async function actionHeaders(): Promise<Record<string, string>> {
  * 使用当前 JWT 身份办理一项任务。
  * @param taskId 服务端返回的任务 ID。
  * @param input 任务命令。
- * @returns 服务端完成时返回。
+ * @returns 服务端确认的任务和审批单 ID。
  */
-export async function executeCenterAction(taskId: string, input: CenterActionInput): Promise<void> {
-  await requestJson(`/api/v1/center/tasks/${encodeURIComponent(taskId)}/actions`, {
+export async function executeCenterAction(taskId: string, input: CenterActionInput): Promise<CenterActionResult> {
+  const result = await requestJson<CenterActionResult>(`/api/v1/center/tasks/${encodeURIComponent(taskId)}/actions`, {
     method: 'POST', headers: await actionHeaders(),
     body: { ...input, mentionedPersonIds: input.mentionedPersonIds ?? [] }, cache: 'no-store',
   })
+  if (!result || result.taskId !== taskId || typeof result.instanceId !== 'string' || !result.instanceId) {
+    throw new Error('审批操作响应不完整，请刷新后核对处理结果。')
+  }
+  return result
 }
 
 /**
@@ -90,7 +112,8 @@ export async function batchApproveCenter(taskIds: readonly string[], opinion: st
     method: 'POST', headers: await actionHeaders(), body: { taskIds, opinion }, cache: 'no-store',
   })
   if (!result || !Array.isArray(result.items) || result.items.some(row =>
-    !row || typeof row.taskId !== 'string' || typeof row.succeeded !== 'boolean')) {
+    !row || typeof row.taskId !== 'string' || typeof row.succeeded !== 'boolean' ||
+    (row.succeeded && (typeof row.instanceId !== 'string' || !row.instanceId)))) {
     throw new Error('批量同意响应不完整，请刷新待办核对处理结果。')
   }
   return result.items

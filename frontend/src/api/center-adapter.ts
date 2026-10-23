@@ -1,5 +1,6 @@
 import { getJson } from './http.ts'
 import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
+import type { CenterActionResult } from './center-actions.ts'
 import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 import { centerAccessToken, centerSession } from './center-session.ts'
 import type { CenterAction, CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
@@ -244,9 +245,9 @@ export interface CenterDataAdapter {
    * 使用当前 JWT 身份办理一项任务。
    * @param taskId 服务端返回的任务 ID。
    * @param input 任务命令。
-   * @returns 服务端完成时返回。
+   * @returns 服务端确认的任务和审批单 ID。
    */
-  executeAction(taskId: string, input: CenterActionInput): Promise<void>
+  executeAction(taskId: string, input: CenterActionInput): Promise<CenterActionResult>
   /**
    * 按任务 ID 逐项批量同意。
    * @param taskIds 服务端声明可批量同意的任务。

@@ -159,7 +159,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <div><dt>技术栈</dt><dd>沿用标签服务</dd></div>
     </dl>
     <ol class="steps">
-      <li><div class="no">01</div><b>画流程</b><p>钉钉式点“+”加节点，复杂的用自由画布按 BPMN 画；定义业务系统要传的审批数据和审批人看到的样子。常用流程从模板库复制。</p></li>
+      <li><div class="no">01</div><b>画流程</b><p>统一自由画布拖节点、连线，按 BPMN 常用子集绘制；定义业务系统要传的审批数据和审批人看到的样子。常用流程从模板库复制。</p></li>
       <li><div class="no">02</div><b>业务系统发起</b><p>单据在业务系统里，提交时调接口发起审批，撤回、重新提交也在业务系统里；登录后显示待审批数量，点开直接审批。</p></li>
       <li><div class="no">03</div><b>审批、打印与回写</b><p>审批人看摘要就能判断；每一步留痕；结果回调或回写业务系统；审批单一键打印 PDF。</p></li>
     </ol>
@@ -217,7 +217,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <div class="pane">
             <h3>初版做</h3>
             <ul>
-              <li>流程：钉钉式和自由画布（BPMN 常用子集）两种画法；审批、办理、抄送、条件、包容、并行分支、子流程、自动节点（第 3 节）</li>
+              <li>流程：统一自由画布（BPMN 常用子集）；审批、办理、抄送、条件、包容、并行分支、子流程、自动节点（第 3 节）</li>
               <li>审批规则：按第 4 节的需求清单全部做，标“二期”的除外</li>
               <li>示例业务系统（WinUI 3 界面 + 单独的对接类库）：费用报销、采购申请两种单据，演示对接全流程和业务系统要改多少（第 14 节）</li>
               <li>引擎内核和扩展点按平台化要求做：执行图加令牌、操作都是命令、事件留底、可插拔的扩展点（第 9、10 节）</li>
@@ -299,7 +299,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
 
               <rect x="48" y="264" width="664" height="44" rx="8" class="d-accent"/>
               <text x="380" y="282" text-anchor="middle" class="d-name">流程引擎</text>
-              <text x="380" y="299" text-anchor="middle" class="d-sub">两种画法编译成同一种执行图；按发起时的版本推进节点、计算审批人、记录每一步操作</text>
+              <text x="380" y="299" text-anchor="middle" class="d-sub">自由画布编译成执行图；按发起时的版本推进节点、计算审批人、记录每一步操作</text>
 
               <rect x="48" y="332" width="184" height="48" rx="8" class="d-box"/>
               <text x="140" y="352" text-anchor="middle" class="d-name">组织架构</text>
@@ -347,7 +347,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <table>
             <thead><tr><th>部分</th><th>选型</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>钉钉式设计器是树形布局，用 HTML、CSS 画；自由画布用开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
+              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>统一自由画布，候选开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
               <tr><td>后端</td><td>.NET 10，ASP.NET Core</td><td>领域、应用、基础设施、接口四层，命名和标签服务一致；流程引擎自己写，不用 Elsa、Camunda 这类通用引擎（中国式审批规则要深度定制，套通用引擎反而绕）</td></tr>
               <tr><td>数据库</td><td>EF Core；MVP 用 SQLite</td><td>和标签服务一样，SQLite、SQL Server、PostgreSQL 三种的迁移都生成，不写某一种数据库特有的 SQL；MVP 只在 SQLite 上测透，需要时改配置切换</td></tr>
               <tr><td>附件</td><td>本地文件或 MinIO / S3</td><td>统一的存储接口，改配置切换；数据库只存文件信息（第 9 节）</td></tr>
@@ -361,82 +361,19 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <!-- 3 -->
       <section id="designer">
         <h2><span class="n">3</span>流程设计器</h2>
-        <p class="lead">提供两种画法。简单的流程用钉钉式：从上往下像一棵树，点两个节点之间的“+”加节点，业务人员看得懂、改得动。流程复杂（要返工重审、跨分支跳转）时用自由画布，按 BPMN 2.0 画。两种画法发布后编译成同一种执行图，引擎、审批规则、审批数据定义都一样。</p>
-        <div class="tw">
-          <table>
-            <thead><tr><th></th><th>钉钉式</th><th>自由画布（BPMN）</th></tr></thead>
-            <tbody>
-              <tr><td>适合谁</td><td>业务人员、行政</td><td>实施人员、流程复杂的业务</td></tr>
-              <tr><td>怎么画</td><td>从上往下，点“+”加节点，点节点在右侧抽屉里设置</td><td>拖节点、随意连线，连线上写条件</td></tr>
-              <tr><td>能画什么</td><td>顺序、条件、包容、并行分支，子流程，自动节点</td><td>以上全部，加回路（返工后重新审）、跨分支跳转</td></tr>
-              <tr><td>导入导出</td><td>流程文件（本系统的格式）</td><td>BPMN 2.0 文件，加本系统的扩展信息；只能导入本系统导出的，其他工具画的暂不支持</td></tr>
-              <tr><td>互相转换</td><td>可以一键转成自由画布继续画</td><td>不能转回钉钉式（回路等表达不了）</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <p class="lead">所有流程统一使用自由画布，按 BPMN 2.0 常用子集绘制。简单流程从模板开始，复杂流程直接配置条件、并行、回路和子流程，不再区分画法。节点属性、审批规则、业务数据和发布检查在同一工作台完成。</p>
+        <div class="callout"><b>已确认调整 · 2026-10-13</b>用户要求取消钉钉式设计，一步到位使用自由画布。详见 ADR 0007；执行图和纯引擎架构保持不变。</div>
+        <div class="tw"><table>
+          <thead><tr><th>能力</th><th>统一自由画布</th></tr></thead>
+          <tbody>
+            <tr><td>基本操作</td><td>拖动节点、连线、缩放和平移、适配视图、对齐吸附、撤销重做；选中节点或连线后在属性面板配置。</td></tr>
+            <tr><td>常见路径</td><td>顺序审批、金额与组织条件、会签与票签、并行会审和汇合、条件包容分支、返工重审、子流程、办理、抄送、自动业务动作。</td></tr>
+            <tr><td>业务人员使用</td><td>从报销、采购、合同、质量异常模板复制；属性说明提示规则后果；校验问题直接定位对应节点与连线。</td></tr>
+            <tr><td>条件与汇合</td><td>条件写在线上，排他分支按优先级命中一条，包容分支可命中多条；显式设置兜底线和配对汇合，避免漏配后卡住。</td></tr>
+            <tr><td>导入导出</td><td>BPMN 2.0 文件加本系统扩展信息，只支持本系统导出的兼容版本。原型草稿 JSON 与正式文件明确区分。</td></tr>
+          </tbody>
+        </table></div>
         <p>导入导出主要用来在测试环境和正式环境之间搬流程，以及给新客户装常用流程；导入时检查文件是本系统导出的、版本兼容，不认的直接提示。</p>
-        <figure>
-          <div class="fig">
-            <svg viewBox="0 0 760 548" role="img" aria-labelledby="flow-t">
-              <title id="flow-t">钉钉式例子：采购申请，金额 1 万元以上要总经理和财务总监会签</title>
-              <defs><marker id="arr-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="d-head"/></marker></defs>
-              <text x="24" y="32" class="d-title">钉钉式：采购申请，金额 1 万元以上要总经理和财务总监会签</text>
-              <text x="24" y="52" class="d-note">实心框是要处理的节点，虚线框是分支条件</text>
-
-              <g class="d-edges">
-                <path d="M380 120V144" marker-end="url(#arr-f)"/>
-                <path d="M380 192V212"/>
-                <path d="M220 224H540"/>
-                <path d="M220 224V252" marker-end="url(#arr-f)"/>
-                <path d="M540 224V252" marker-end="url(#arr-f)"/>
-                <path d="M220 300V324" marker-end="url(#arr-f)"/>
-                <path d="M220 372V400"/>
-                <path d="M540 300V400"/>
-                <path d="M220 400H540"/>
-                <path d="M380 400V428" marker-end="url(#arr-f)"/>
-                <path d="M380 476V500" marker-end="url(#arr-f)"/>
-              </g>
-
-              <rect x="280" y="72" width="200" height="48" rx="8" class="d-group"/>
-              <text x="380" y="90" text-anchor="middle" class="d-note">发起人</text>
-              <text x="380" y="110" text-anchor="middle" class="d-name">业务系统提交</text>
-              <text x="264" y="100" text-anchor="end" class="d-note">业务系统提交单据时进入流程</text>
-
-              <rect x="280" y="144" width="200" height="48" rx="8" class="d-accent"/>
-              <text x="380" y="162" text-anchor="middle" class="d-note">审批人 · 依次审批</text>
-              <text x="380" y="182" text-anchor="middle" class="d-name">直属上级 → 部门负责人</text>
-              <text x="500" y="162" class="d-note">审批人按规则自动算：上级、部门负责人、</text>
-              <text x="500" y="178" class="d-note">角色、审批矩阵、业务系统接口……</text>
-
-              <rect x="336" y="212" width="88" height="24" rx="12" class="d-box"/>
-              <text x="380" y="228" text-anchor="middle" class="d-sub">条件分支</text>
-              <text x="208" y="218" text-anchor="end" class="d-note">从左到右判断，</text>
-              <text x="208" y="234" text-anchor="end" class="d-note">走第一条满足的</text>
-
-              <rect x="120" y="252" width="200" height="48" rx="8" class="d-cond"/>
-              <text x="220" y="270" text-anchor="middle" class="d-note">条件 1</text>
-              <text x="220" y="290" text-anchor="middle" class="d-name">金额 ≥ 10000 元</text>
-              <rect x="440" y="252" width="200" height="48" rx="8" class="d-cond"/>
-              <text x="540" y="270" text-anchor="middle" class="d-note">条件 2（兜底，必须有）</text>
-              <text x="540" y="290" text-anchor="middle" class="d-name">其他情况</text>
-
-              <rect x="120" y="324" width="200" height="48" rx="8" class="d-accent"/>
-              <text x="220" y="342" text-anchor="middle" class="d-note">审批人 · 会签</text>
-              <text x="220" y="362" text-anchor="middle" class="d-name">总经理、财务总监都同意</text>
-              <text x="556" y="352" class="d-note">不满足条件 1 时直接往下走</text>
-              <text x="208" y="420" text-anchor="end" class="d-note">分支走完后汇合</text>
-
-              <rect x="280" y="428" width="200" height="48" rx="8" class="d-box"/>
-              <text x="380" y="446" text-anchor="middle" class="d-note">抄送人</text>
-              <text x="380" y="466" text-anchor="middle" class="d-name">采购部</text>
-              <text x="500" y="456" class="d-note">抄送只通知，不用处理</text>
-
-              <rect x="340" y="500" width="80" height="24" rx="12" class="d-box"/>
-              <text x="380" y="516" text-anchor="middle" class="d-sub">结束</text>
-            </svg>
-          </div>
-          <figcaption>钉钉式只能从上往下走，不会画出死循环，适合大多数审批。</figcaption>
-        </figure>
         <figure>
           <div class="fig">
             <svg viewBox="0 0 760 320" role="img" aria-labelledby="canvas-t">
@@ -495,7 +432,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
               <text x="706" y="246" text-anchor="middle" class="d-note">结束</text>
             </svg>
           </div>
-          <figcaption>钉钉式画不出“返工后回到前面重新确认”这种回路，自由画布可以。发布时检查：每个节点都能从开始走到、也都能走到结束，并行网关的分叉和汇合成对出现，排他网关除了兜底的那条线，其他线都有条件。</figcaption>
+          <figcaption>自由画布同时表达常规顺序审批和“返工后回到前面重新确认”的回路。发布时检查：每个节点都能从开始走到、也都能走到结束，并行网关的分叉和汇合成对出现，排他网关除了兜底的那条线，其他线都有条件。</figcaption>
         </figure>
         <h3>节点</h3>
         <div class="tw">
@@ -506,7 +443,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
               <tr><td>审批人</td><td>同意或拒绝</td><td>找审批人、多人审批方式、自动处理、能用哪些操作、能看能改哪些字段（第 4、5 节）</td></tr>
               <tr><td>办理人</td><td>只办理、不能拒绝，如财务付款、仓库发货</td><td>和审批人一样，按钮是“提交”</td></tr>
               <tr><td>抄送人</td><td>只通知，不用处理</td><td>抄送给谁；可以让发起人自己选；可以要求点“已阅”</td></tr>
-              <tr><td>条件分支 / 排他网关</td><td>按条件走一条路线</td><td>条件用审批数据（含明细合计、计算字段）、发起人的部门、角色、职级；钉钉式从左到右取第一条满足的，自由画布写在连线上；都要有“其他情况”兜底</td></tr>
+              <tr><td>条件分支 / 排他网关</td><td>按条件走一条路线</td><td>条件用审批数据（含明细合计、计算字段）、发起人的部门、角色、职级；条件写在连线上，按优先级取第一条满足的；必须有“其他情况”兜底</td></tr>
               <tr><td>包容分支 / 包容网关</td><td>满足条件的路线都走</td><td>如“金额超过 5 万要法务看”“涉及进口要关务看”，两个都满足就两条都走，全部走完再汇合</td></tr>
               <tr><td>并行分支 / 并行网关</td><td>几条路线同时走，如技术、质量同时会审</td><td>全部走完才往下</td></tr>
               <tr><td>子流程</td><td>调用另一个流程</td><td>如采购审批里调合同审批；把哪些字段带过去；等子流程结束再往下，或者不等</td></tr>
@@ -562,6 +499,8 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           </table>
         </div>
 
+        <p>流程定义按上述规则保存可选参数：角色限定发起部门、连续上级的截止职级，以及“找不到审批人时转交指定的人”的目标人员。旧流程未设置这些参数时继续使用原有默认行为。</p>
+
         <h3>审批人能做的</h3>
         <div class="tw">
           <table>
@@ -603,7 +542,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
             <thead><tr><th>操作</th><th>说明</th></tr></thead>
             <tbody>
               <tr><td>修改审批人</td><td>改在途审批单当前或后面节点的审批人</td></tr>
-              <tr><td>跳转</td><td>把审批单跳到任意节点（如走错了分支）</td></tr>
+              <tr><td>跳转</td><td>把审批单跳到指定节点（如走错了分支）；不能直接跳到并行或包容汇合网关，避免缺少分支令牌而卡住</td></tr>
               <tr><td>终止</td><td>强制结束，结果是“已终止”</td></tr>
               <tr><td>离职交接</td><td>一键把某人的待办、以及所有流程里写死的这个人，转给接手的人</td></tr>
               <tr><td>重发</td><td>重发提醒、重发回调</td></tr>
@@ -820,13 +759,13 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
       <!-- 9 -->
       <section id="engine">
         <h2><span class="n">9</span>引擎、数据与文件</h2>
-        <p class="lead">两种画法发布时都编译成同一种执行图（节点、连线、网关），引擎只认执行图。审批人一操作，引擎判断当前节点是否完成、下一步去哪、新任务给谁，在一个数据库事务里写完。</p>
+        <p class="lead">自由画布发布时编译成执行图（节点、连线、网关），引擎只认执行图。审批人一操作，引擎判断当前节点是否完成、下一步去哪、新任务给谁，在一个数据库事务里写完。</p>
         <h3>引擎内核（要做扎实的部分）</h3>
         <div class="tw">
           <table>
             <thead><tr><th>做法</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>执行图 + 令牌</td><td>运行时用“令牌”标记走到哪：并行分叉生出几个令牌，汇合时等齐；包容网关只等真正走了的分支；回路、子流程都用同一套机制。钉钉式、自由画布和以后加的节点都跑在这一套上</td></tr>
+              <tr><td>执行图 + 令牌</td><td>运行时用“令牌”标记走到哪：并行分叉生出几个令牌，汇合时等齐；包容网关只等真正走了的分支；回路、子流程都用同一套机制。自由画布及以后扩展的节点都跑在这一套上</td></tr>
               <tr><td>操作都是命令</td><td>同意、拒绝、退回、转交、加签、撤回、跳转……每个操作是一条命令：引擎检查能不能做 → 改状态 → 产生事件，一个事务写完。审批中心、开放接口、管理员干预、定时任务都走这一个入口，规则只写一处</td></tr>
               <tr><td>事件留底</td><td>每条命令产生的事件写进操作记录（只追加、带校验值）；回调、消息、统计都从事件来，出了问题能按事件重放、核对状态对不对</td></tr>
               <tr><td>幂等</td><td>命令带请求 ID，网络重试、连点造成的重复提交只生效一次</td></tr>
@@ -872,8 +811,8 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <table>
             <thead><tr><th>表</th><th>内容</th></tr></thead>
             <tbody>
-              <tr><td>流程</td><td>流程编码、名称、分组、画法（钉钉式或自由画布）、管理员、当前发布的版本</td></tr>
-              <tr><td>流程版本</td><td>设计内容（钉钉式 JSON 或自由画布 JSON）、编译后的执行图、审批数据定义和详情排版、打印设置，发布后不能改</td></tr>
+              <tr><td>流程</td><td>流程编码、名称、分组、设计格式版本、管理员、当前发布的版本</td></tr>
+              <tr><td>流程版本</td><td>设计内容（自由画布 JSON）、编译后的执行图、审批数据定义和详情排版、打印设置，发布后不能改</td></tr>
               <tr><td>审批单</td><td>编号、流程编码、版本、业务单号、标题、发起人、发起部门、代发人、来源接入应用、业务数据快照、详情链接、加急、状态、父审批单（子流程）、发起和结束时间</td></tr>
               <tr><td>任务</td><td>审批单、节点、处理人、代谁处理、状态、意见、签名、到期时间、处理时间</td></tr>
               <tr><td>操作记录</td><td>每一次操作（含打印），只追加，带校验值</td></tr>
@@ -1016,13 +955,16 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <li>谁说了算：人员、部门这类数据指定一个可信来源（现在是审批服务自己），其他业务系统推送的只更新绑定关系和补充字段，不覆盖可信来源的数据，避免几个系统互相改乱。</li>
           <li>组织架构的每次改动留记录（谁、哪个来源、改了什么），算审批人时有疑问能查当时的组织。</li>
         </ul>
+        <p>初版接口提供 CSV、XLSX 模板与导入前预检查；同一模板可导入部门、人员、所属关系和每个接入应用的外部人员、部门 ID 绑定。文件上传上限 5 MB，Excel 最多 10,000 行。接入应用的 API Key 只能推送和绑定本应用来源的数据；跨来源绑定须由本地组织管理员确认。正式导入与推送在可串行化事务中按当前数据重新校验，每项改动在同一事务留下操作者、来源和前后快照，离职时生成交接提醒。</p>
         <h3>账号</h3>
+        <p>空库的首位组织管理员由部署人员在服务器本机控制台运行一次性命令开通：输入人员 ID、工号、姓名和临时密码，也可选用已导入的在职人员 ID。人员、需首次改密的账号及组织管理员角色在同一串行化事务中写入；已有管理员角色时命令拒绝再次执行，不开放匿名 HTTP 初始化接口。</p>
         <ul>
           <li>现在独立：人员开通账号后用工号和密码登录审批中心，首次登录要改密码；登录、改密码、权限沿用标签服务的做法。</li>
           <li>从业务系统进来不用再登录：业务系统后端用 SDK 签发嵌入令牌（几分钟有效，绑定用户和接入应用），打开待办、审批页面就是这个人。</li>
           <li>手机网页和以后的 App 用同一套登录令牌：短期访问令牌加刷新令牌，可以记住登录；手机丢了，管理员可以在后台把这个人的令牌全部作废。</li>
           <li>为统一登录预留：登录这一层按标准协议（OIDC）设计，公司统一登录上线后，审批服务和标签服务作为它的客户端接进去，账号按工号对上；到时候可以关掉本地密码登录。</li>
         </ul>
+        <p>初版访问令牌有效 15 分钟，刷新令牌有效 30 天并逐次轮换；连续 5 次密码错误暂时锁定 15 分钟。首次登录令牌只能用于改密。嵌入令牌由有效 API Key 为本应用已绑定且已开通本地账号的业务人员签发，5 分钟内只能交换一次，不按全局工号回退；嵌入会话及其刷新令牌保留应用和业务人员来源，应用停用或改绑即失效，不能获得组织管理权限。接入应用启停或轮换密钥时应用身份代际单调递增，旧嵌入访问、刷新和未兑换令牌在重新启用后仍无效，本地登录不受影响。可信人员离职、复职及外部人员绑定换人时，旧账号令牌代际不可恢复，尚未兑换的嵌入令牌也按签发代际核验。组织管理员权限以本地登录会话和当前组织角色共同核对。</p>
       </section>
 
       <!-- 12 -->
@@ -1108,31 +1050,37 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <li>点开有三种做法：跳到审批中心（免登录链接，新窗口）；在业务系统里内嵌审批中心的页面（网页用 iframe，WinForms 用 WebView2）；或者用待办列表、审批操作接口自己画列表和审批窗口。</li>
           <li>内嵌的审批页面审批完会发一条消息给外面（网页里是 postMessage，WebView2 里是 WebMessage），业务系统收到后刷新待办数和单据状态。</li>
           <li>多久刷新一次由业务系统定（比如每分钟查一次）；要实时提醒时，订阅回调事件“新待办”“待办已处理”。</li>
+          <li>审批人撤销上一条同意时，原审批任务恢复待办；订阅方收到 <code>task.restored</code> 及其原 <code>taskId</code> 后刷新待办列表。下一步被取消的任务仍用 <code>task.cancelled</code> 通知。</li>
           <li>待办列表接口带摘要字段和免登录打开地址。</li>
         </ul>
 
-        <h3>SDK 用法（示意，具体写法开发时定）</h3>
-<pre><code>var approval = new ApprovalClient(new ApprovalClientOptions
+        <h3>SDK 用法（首批开放接口）</h3>
+<pre><code>using var approval = new ApprovalServiceClient(new ApprovalServiceClientOptions
 {
     BaseAddress = new Uri("http://approval.example.com/"),
     ApiKey = Environment.GetEnvironmentVariable("APPROVAL_API_KEY"),
 });
 
-// 提交审批：只传单号，单据数据由审批服务回业务系统的取数接口取
-var instance = await approval.StartAsync(new StartRequest("PURCHASE_REQUEST", order.No) { Initiator = currentUser.Code });
+// 当前发起接口需传审批数据快照；只传单号取数待钩子协议确认。
+var instance = await approval.StartAsync(new StartApprovalRequest
+{
+    FlowCode = "PURCHASE_REQUEST", BusinessKey = order.No,
+    Title = order.Title, Initiator = currentUser.Code,
+    Data = new Dictionary&lt;string, object?&gt; { ["amount"] = order.Amount },
+});
 order.ApprovalId = instance.Id;
 
 // 登录后：当前用户的待办数，角标自己画
 var count = await approval.GetTaskCountAsync(currentUser.Code);
 todoBadge.Text = count.Pending.ToString();
 
-// 点开待办：拿免登录地址，用浏览器或 WebView2 打开审批中心的页面
-webView.Source = await approval.CreateOpenUrlAsync(taskId, currentUser.Code);
-
-// 回调（业务系统后端）：先验签，再改单据状态
-if (!ApprovalCallback.Verify(body, signatureHeader, callbackSecret)) return Results.Unauthorized();
-var e = ApprovalCallback.Parse(body);
-await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
+// 自画待办时读取列表；任务 ID 即使包含斜杠，SDK 也会正确编码。
+var tasks = await approval.GetTasksAsync(currentUser.Code);
+await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
+{
+    User = currentUser.Code, Action = "approve", Opinion = "同意",
+});</code></pre>
+        <p>已实现的 SDK 方法另含流程列表与数据定义、审批单按 ID 或业务单号查询、撤回和催办；免登录地址、回调验签及未确认协议由后续任务补齐。各操作仍由服务端核对人员绑定与权限。</p>
 
         <h3>审批人看得快</h3>
         <ul>
@@ -1176,27 +1124,37 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>GET /api/v1/flows/{code}/schema</code></td><td>流程要传的审批数据（含明细表的列）和 JSON 样例</td></tr>
               <tr><td><code>POST /api/v1/flows/{code}/preview</code></td><td>按单据数据预览会走哪些节点、审批人是谁</td></tr>
               <tr><td><code>POST /api/v1/instances</code></td><td>发起审批（传数据，或只传单号让服务去取）</td></tr>
-              <tr><td><code>POST /api/v1/instances/batch</code></td><td>批量发起</td></tr>
+              <tr><td><code>POST /api/v1/instances/batch</code></td><td>逐张独立发起，返回与输入同序的每项审批单或可修正错误；中途失败不回滚已成功的单据</td></tr>
               <tr><td><code>GET /api/v1/instances/{id}</code></td><td>状态、当前节点、审批记录；也可以按流程编码和业务单号查</td></tr>
+              <tr><td><code>GET /api/v1/instances?flowCode=&amp;businessKey=</code></td><td>按流程编码和业务单号查本接入应用发起的历史审批单，最新的排在前面</td></tr>
               <tr><td><code>GET /api/v1/instances/{id}/print</code></td><td>审批单 PDF</td></tr>
               <tr><td><code>PATCH /api/v1/instances/{id}/data</code></td><td>审批中更新允许更新的字段（留痕）</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/withdraw</code></td><td>撤回</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/resubmit</code></td><td>被退回或被要求补充后重新提交（带新数据）</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/remind</code></td><td>催办</td></tr>
-              <tr><td><code>POST /api/v1/instances/{id}/terminate</code></td><td>业务单据作废时终止审批</td></tr>
+              <tr><td><code>POST /api/v1/instances/{id}/terminate</code></td><td>业务单据作废时，所属接入应用传本应用已绑定的实际操作人和必填原因终止审批；运行中、退回待重提和待补充均可终止，记录操作人并回调结果</td></tr>
               <tr><td><code>GET /api/v1/tasks/count?user=</code></td><td>待办数量：待处理、加急、超时（业务系统登录时调）</td></tr>
               <tr><td><code>GET /api/v1/tasks?user=</code></td><td>待办列表，带摘要字段和打开地址</td></tr>
               <tr><td><code>POST /api/v1/tasks/{id}/actions</code></td><td>同意、拒绝、退回、转交、加签等（带意见和可编辑字段的值）</td></tr>
-              <tr><td><code>POST /api/v1/files</code></td><td>上传附件，返回文件 ID</td></tr>
-              <tr><td><code>GET /api/v1/files/{id}</code></td><td>下载附件（要权限）</td></tr>
+              <tr><td><code>POST /api/v1/files?fileName=…</code></td><td>接入应用 API Key 或可信人员会话上传原始文件字节；校验大小和真实类型后返回文件 ID、名称、大小、类型和 SHA-256</td></tr>
+              <tr><td><code>GET /api/v1/files/{id}</code></td><td>同应用可读取自己上传的未关联附件；已关联附件按人员权限验权下载，浏览器能访问对象存储时短时跳转，否则由服务转发</td></tr>
               <tr><td><code>POST /api/v1/embed-tokens</code></td><td>签发嵌入令牌，换成免登录打开地址（跳转、内嵌审批中心页面用）</td></tr>
+              <tr><td><code>POST /api/v1/embed-tokens/exchange</code></td><td>一次性嵌入令牌换短期访问令牌和刷新令牌</td></tr>
               <tr><td><code>POST /api/v1/org/changes</code></td><td>推送人员、部门变更（新增、修改、调岗、离职）</td></tr>
               <tr><td><code>POST /api/v1/org/bindings</code></td><td>绑定业务系统的用户 ID、部门 ID</td></tr>
             </tbody>
           </table>
+          <p>流程目录只返回当前已发布、接入应用获授权且流程定义允许该应用使用的版本；每项给出编码、名称、版本号。数据定义接口返回当前版本的字段定义与按同一字段生成的 JSON 样例，样例不含计算字段和审批人填写字段。</p>
+          <p>审批单查询按 API Key 对应的接入应用隔离：按 ID 读取详情时返回状态、审批数据快照、任务和操作记录；按流程编码与业务单号读取时返回该应用的历史审批单列表，不透出其他接入应用的记录。</p>
+          <p>待办数量和列表要求 <code>user</code> 是当前接入应用已绑定的在职业务人员 ID，不按全局工号回退。默认仅统计本应用的待办；接入应用获跨应用待办授权后可显式传 <code>scope=all</code>。列表按 <code>skip</code>、<code>take</code> 分页，每页最多一百条，摘要只包含流程版本指定且当前节点未显式隐藏的字段；重复字段权限在发布时拒绝。</p>
+          <p>当前发起接口要求已授权流程和本应用已绑定的在职发起人；可直接传审批数据快照，未传时由本应用登记的取数钩子取得。服务端按发布版本校验、重算公式与条件，调用已配置的发起校验钩子，再交统一引擎入口原子保存审批单和在途唯一键；业务钩子拒绝或故障时不写部分审批。顶层和明细附件须由该应用预先上传；发起时去重，并在同一数据库事务内按应用归属与未关联状态有条件地关联到新审批单。任一附件不存在、属于其他应用或已被占用，整笔发起回滚。同一应用的在途同号返回原审批单，其他应用占用同号只返回冲突。编号目前用可配置的部署级前缀、日期格式和流水号位数，数据库分配时保证不重号；流程级编号配置待管理后台接入。取人与自动动作仍待按节点到达和提交后的持久队列接线，未配置的矩阵流程也会给出可纠正错误。</p>
+          <p>当前已接通撤回、催办和人工任务操作：业务系统 Key 只能操作本应用审批单，实际操作人必须是本应用已绑定人员；撤回/催办只能由发起人发出。任务 ID 可能包含斜杠，放入 URL 时需编码。引擎继续核对节点权限、任务处理人及意见要求。发起自选人员和业务数据找人 ID 保存为固定快照；后续节点到达按最新组织与矩阵重新找人。开放终止的管理员权限语义仍待确认，暂未开放该路径。</p>
+          <p>人工任务操作可选传 <code>fieldValues</code> 对象填写顶层审批人字段；字段须在锁定流程定义中标为 <code>approverInput</code>，且当前节点明确授予 <code>editable</code> 权限。字段类型和本应用人员、部门绑定在服务端核对；明细子字段缺少行索引协议、附件缺少归属校验时明确拒绝。已核准值进入操作记录和相关回调的独立 <code>fieldValues</code>，不覆盖原业务数据 <code>data</code>，由业务系统决定回写。当前节点显式可写且标记必填的顶层审批人字段，只在同意、办理完成、确认已阅等成功推进时强制填写；拒绝、评论、暂存与协作操作不强制填写，提交的值仍须通过类型与授权校验。</p>
+          <p>征询回复须引用原发问任务与征询 ID，受询人只能提交意见，不能借其他任务的字段权限填写审批人字段；原发问任务完成后即使其他节点仍在运行，也不能补交征询回复。退回发起人和要求补充分别发 <code>instance.returnedToInitiator</code>、<code>instance.supplementRequested</code> 回调，均保存当时的 <code>awaitingInitiator</code> 状态和独立的审批人填写值；待发正文固定，重试保持原事件 ID 与正文。</p>
         </div>
         <h3>业务系统按需提供的接口</h3>
-        <p>都由审批服务的后端调用，带签名，默认 5 秒超时（可以设）。都不是必须的，用到哪个功能才提供哪个。</p>
+        <p>都由审批服务的后端调用，带签名，默认 5 秒超时。都不是必须的，用到哪个功能才提供哪个。</p>
+        <p>已采纳的 ADR 0010 规定各接入应用分别配置四个完整 URL，以 POST 发送小驼峰 JSON；请求与响应正文均按原始字节使用同一密钥计算 HMAC-SHA256，业务系统须回显请求 ID，审批服务验签后才解析响应。取数请求含流程编码、业务单号和请求 ID，返回 <code>data</code> 对象及可选标题、详情地址；校验请求含 <code>phase</code>、业务身份、操作人和数据快照，返回 <code>allowed</code> 以及拒绝原因。取人只接受当前应用已有的在职人员绑定，不按全局工号回退；业务动作由事务提交后待发队列调用。</p>
         <div class="tw">
           <table>
             <thead><tr><th>接口</th><th>返回</th><th>什么时候用</th></tr></thead>
@@ -1218,6 +1176,8 @@ X-Api-Key: …
   "businessKey": "PR20261013001",
   "title": "采购申请 · 电源适配器 500 个",
   "initiator": "E10023",
+  "initiatingDepartment": "RD-DEPT",
+  "submittedBy": "E10024",
   "data": {
     "supplier": "华强电子",
     "reason": "产线备料",
@@ -1227,9 +1187,12 @@ X-Api-Key: …
   },
   "detailUrl": "https://mes.example.com/purchase/PR20261013001"
 }</code></pre>
-        <p>“金额”是公式字段（明细的数量 × 单价求和），不用传，服务端算出 12800.00 后再判断走哪条分支。配了取数接口时 <code>data</code> 可以不传。</p>
+        <p>“金额”是公式字段（明细的数量 × 单价求和），不用传，服务端算出 12800.00 后再判断走哪条分支。发起人、代发人、选定发起部门和自选审批/抄送人员的业务 ID 均需先与当前接入应用建立绑定；选定部门还必须属于发起人。流程允许部门只按可信组织主数据解析，不能被外部绑定替换。未传 <code>data</code> 时必须已配置取数钩子，否则返回可纠正错误。</p>
         <h3>结果回调</h3>
         <p>请求体用接入应用的签名密钥做 HMAC-SHA256 签名，业务系统先验签再处理（SDK 里有验签方法）；同一事件可能重发，按 <code>eventId</code> 去重。事件有：发起、每个节点完成（可选）、通过、拒绝、撤回、退回给发起人、终止、撤销、数据被更新，以及（可选订阅）新待办、待办已处理。</p>
+        <p>登记回调与钩子地址默认必须使用 HTTPS，签名不替代传输加密；只有可信内网部署显式开启时允许 HTTP。出站发送不跟随重定向，接入应用停用后暂停发送并保留待发事件。</p>
+        <p>当前实现把发起、通过、拒绝、撤回、终止、撤销、退回发起人、要求补充及待办创建/完成/取消事件固定为事务待发快照，再由后台任务带签名发送。撤销同意另发 <code>task.restored</code>，可选 <code>taskId</code> 指向恢复的原待办；其他回调不带此字段。失败重试或管理端重排仍保留原 <code>eventId</code> 和请求正文。发送日志只记状态与错误类别，不保存审批正文。其余事件随相应业务用例接入。</p>
+        <p>当任务完成或审批结果回调对应审批人填写操作时，请求体另外带可选 <code>fieldValues</code>；它来自操作审计并与 <code>data</code> 分开，重发时仍使用首次入队的固定正文。</p>
 <pre><code>POST {业务系统登记的回调地址}
 X-Approval-Signature: sha256=…
 
@@ -1295,6 +1258,10 @@ X-Approval-Signature: sha256=…
           </div>
           <figcaption>和审批有关的代码都在“对接类库”里，不依赖 WinUI；“对接改动”页按文件列出来，一眼看出业务系统要改多少。</figcaption>
         </figure>
+
+        <h3 id="winui-client">WinUI 3 客户端与对接原型</h3>
+        <p>客户端采用独立的桌面导航、业务单据和待办窗口；既演示自己画审批界面，也演示 WebView2 内嵌审批中心。<a href="../prototypes/winui.html">打开 WinUI 3 客户端交互原型</a>，查看费用报销、采购申请、待办、连接同步与对接说明。此处是 HTML 界面评审，不是已完成的 WinUI 程序；真实 SDK、令牌交换、回调验签和客户端打包按调用端任务实现。</p>
+        <p>依赖方向固定为 WinUI 界面 → 对接类库 → .NET SDK → 审批服务 HTTP 接口。对接类库承载业务数据转换、状态回写和回调处理，界面只负责输入与展示。有业务后端时由后端接收回调，无业务后端时打开单据查询并定时刷新；两种模式都在原型中标明。</p>
 
         <h3>示例系统有什么</h3>
         <ul>
@@ -1423,7 +1390,7 @@ X-Approval-Signature: sha256=…
               <rect x="24" y="72" width="224" height="116" rx="8" class="d-accent"/>
               <text x="40" y="98" class="d-name">M1 设计器原型</text>
               <text x="40" y="116" class="d-note">评审：画流程、配审批数据的体验</text>
-              <text x="40" y="140" class="d-sub">钉钉式和自由画布</text>
+              <text x="40" y="140" class="d-sub">统一自由画布</text>
               <text x="40" y="158" class="d-sub">审批数据和详情排版</text>
               <text x="40" y="176" class="d-sub">流程 JSON 定稿</text>
 
@@ -1478,6 +1445,7 @@ X-Approval-Signature: sha256=…
           <li><span class="tag done">已定</span><span>业务系统都是 .NET：Web 是 Vue + .NET 10，另有 WinForms。只出 .NET SDK（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>组织架构审批服务自己维护，业务系统绑定关联、接口推送变更；以后由主数据系统统一管理（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>账号先独立；公司以后做统一登录，审批服务和标签服务一起接进产品平台（2026-10-13）。</span></li>
+          <li><span class="tag done">已定</span><span>设计器统一为自由画布，不再开发树形设计与画法转换；简单和复杂流程均从同一工作台完成（2026-10-13，ADR 0007）。</span></li>
           <li><span class="tag done">已定</span><span>消息先做邮件；企业微信、钉钉预留。要给业务系统待办数量、跳转和内嵌审批的接口（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>内网服务器，能访问外网（2026-10-13）。</span></li>
           <li><span class="tag done">已定</span><span>手机端：初版只做手机网页适配；App（原生或 H5 套壳）以后再讨论，现在把接口、登录、推送、设备能力预留好（2026-10-13）。</span></li>

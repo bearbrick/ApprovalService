@@ -86,6 +86,21 @@ public static class ApiRoutes
     public const string IdentityProvision = OpenApiPrefix + "/identity/provision";
 
     /// <summary>
+    /// 已登录人员的提醒渠道偏好。
+    /// </summary>
+    public const string NotificationPreferences = OpenApiPrefix + "/notifications/preferences";
+
+    /// <summary>
+    /// 已登录人员按提醒类别修改渠道偏好。
+    /// </summary>
+    public const string NotificationPreferenceByCategory = NotificationPreferences + "/{category}";
+
+    /// <summary>
+    /// 组织管理员设置每日待办汇总的本地发送时刻。
+    /// </summary>
+    public const string AdminDailyDigest = OpenApiPrefix + "/admin/notifications/daily-digest";
+
+    /// <summary>
     /// 接入应用签发一次性嵌入令牌。
     /// </summary>
     public const string EmbedTokens = OpenApiPrefix + "/embed-tokens";

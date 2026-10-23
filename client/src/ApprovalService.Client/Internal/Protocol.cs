@@ -25,4 +25,9 @@ internal static class Protocol
     /// </summary>
     public const string Signature = "X-Approval-Signature";
 
+    /// <summary>
+    /// 服务端 HTML 文档的内嵌来源策略。
+    /// </summary>
+    public const string ContentSecurityPolicy = "Content-Security-Policy";
+
 }

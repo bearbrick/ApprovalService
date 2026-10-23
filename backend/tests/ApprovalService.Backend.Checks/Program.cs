@@ -90,6 +90,7 @@ internal static class Program
         await CenterQueryChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
+        await FrontendHostingChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);
         await FileChecks.RunAsync(backendRoot, Check);
         await ConfidentialVisibilityChecks.RunAsync(Check);

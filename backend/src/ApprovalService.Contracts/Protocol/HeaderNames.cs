@@ -24,4 +24,9 @@ public static class HeaderNames
     /// 回调请求体的签名：sha256=请求体用接入应用的签名密钥做 HMAC-SHA256 的十六进制小写。
     /// </summary>
     public const string Signature = "X-Approval-Signature";
+
+    /// <summary>
+    /// HTML 文档的内嵌来源策略，审批中心默认拒绝被嵌入。
+    /// </summary>
+    public const string ContentSecurityPolicy = "Content-Security-Policy";
 }

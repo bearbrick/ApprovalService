@@ -956,6 +956,35 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("Instances", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.InstanceParticipantEntity", b =>
+                {
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("GrantedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("InstanceId", "PersonId", "Kind");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("InstanceParticipants", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.OperationEventEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -1151,6 +1180,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasOne("ApprovalService.Domain.Runtime.FlowVersionEntity", null)
                         .WithMany()
                         .HasForeignKey("FlowVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.InstanceParticipantEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

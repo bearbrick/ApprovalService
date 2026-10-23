@@ -1,7 +1,4 @@
 /**
- * 后端流程定义 JSON 的前端镜像；权威定义在 Contracts/Flows。
- */
-/**
  * 当前自由画布格式版本。
  */
 export const flowSchemaVersion = 1 as const;
@@ -119,6 +116,10 @@ export interface FlowDefinition {
    * 可发起的角色编码；空集合表示不额外限制。
    */
   allowedInitiatorRoles: string[];
+  /**
+   * 发布后仅参与人可见；旧版本缺省为非保密。
+   */
+  isConfidential?: boolean;
   /**
    * 首位人工处理人操作后是否禁止发起人撤回；省略时审批结束前均可撤回。
    */

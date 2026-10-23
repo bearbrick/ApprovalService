@@ -155,6 +155,22 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
 
         db.OperationEvents.AddRange(commit.Events);
         db.OutboxItems.AddRange(commit.OutboxItems);
+        if (commit.Participants.Count > 0)
+        {
+            if (commit.Participants.Any(item => item.InstanceId != commit.Instance.Id ||
+                    string.IsNullOrWhiteSpace(item.PersonId) ||
+                    item.Kind is not (InstanceParticipantKinds.CopyRecipient or InstanceParticipantKinds.TaskActor) ||
+                    !commit.Events.Any(operationEvent => operationEvent.Id == item.EventId)))
+            {
+                throw new InvalidOperationException("参与人投影必须来源于本次审批事件。");
+            }
+
+            var existingParticipants = await db.InstanceParticipants.Where(item =>
+                    item.InstanceId == commit.Instance.Id)
+                .Select(item => new { item.PersonId, item.Kind }).ToArrayAsync(cancellationToken);
+            var known = existingParticipants.Select(item => (item.PersonId, item.Kind)).ToHashSet();
+            db.InstanceParticipants.AddRange(commit.Participants.Where(item => known.Add((item.PersonId, item.Kind))));
+        }
         // 文件关联含条件更新，需要显式事务覆盖实例插入、事件和全部文件；先写实例以满足外键。
         await using var fileTransaction = commit.FileLinks.Count > 0
             ? await db.Database.BeginTransactionAsync(cancellationToken) : null;

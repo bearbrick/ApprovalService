@@ -58,6 +58,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<ApprovalTaskEntity> ApprovalTasks => Set<ApprovalTaskEntity>();
 
     /// <summary>
+    /// 已发生任务动作或送达抄送的历史参与人。
+    /// </summary>
+    public DbSet<InstanceParticipantEntity> InstanceParticipants => Set<InstanceParticipantEntity>();
+
+    /// <summary>
     /// 只追加的操作记录。
     /// </summary>
     public DbSet<OperationEventEntity> OperationEvents => Set<OperationEventEntity>();
@@ -187,9 +192,10 @@ public class ApprovalDbContext : DbContext
     private void GuardImmutableRecords()
     {
         if (ChangeTracker.Entries<FlowVersionEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
-            ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
+            ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<InstanceParticipantEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
-            throw new InvalidOperationException("已发布版本和操作记录只能追加，不能修改或删除。");
+            throw new InvalidOperationException("已发布版本、操作记录和历史参与人只能追加，不能修改或删除。");
         }
     }
 
@@ -320,6 +326,19 @@ public class ApprovalDbContext : DbContext
             entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.AssigneeId, item.Status, item.DueAt });
             entity.HasIndex(item => new { item.InstanceId, item.NodeId });
+        });
+
+        modelBuilder.Entity<InstanceParticipantEntity>(entity =>
+        {
+            entity.ToTable("InstanceParticipants");
+            entity.HasKey(item => new { item.InstanceId, item.PersonId, item.Kind });
+            entity.Property(item => item.InstanceId).HasMaxLength(64);
+            entity.Property(item => item.PersonId).HasMaxLength(128);
+            entity.Property(item => item.Kind).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.EventId).HasMaxLength(256).IsRequired();
+            entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.PersonId);
         });
 
         modelBuilder.Entity<OperationEventEntity>(entity =>

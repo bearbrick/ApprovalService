@@ -24,6 +24,14 @@ public sealed class FlowExecutionGraph
     public string ReturnMode { get; set; } = FlowReturnModes.Restart;
 
     /// <summary>
+    /// 发布时锁定的保密标记；旧执行图缺省为非保密。
+    /// </summary>
+    public bool IsConfidential
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 可执行的节点。
     /// </summary>
     public List<FlowExecutionNode> Nodes { get; set; } = [];

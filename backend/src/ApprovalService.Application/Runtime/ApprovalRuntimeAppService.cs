@@ -241,6 +241,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             Tasks = tasks,
             Events = events,
             OutboxItems = outbox,
+            Participants = BuildParticipants(instance.Id, result.Events),
             FileLinks = input.FileLinks,
         }, cancellationToken);
         if (!saved)
@@ -249,6 +250,46 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 只从已成功执行的事件提取实际任务处理人和已送达抄送收件人。
+    /// </summary>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <param name="events">本次引擎事件。</param>
+    /// <returns>同一命令内按人员去重的历史参与人。</returns>
+    private static IReadOnlyList<InstanceParticipantEntity> BuildParticipants(string instanceId,
+        IReadOnlyList<EngineEvent> events)
+    {
+        var participants = new Dictionary<(string PersonId, string Kind), InstanceParticipantEntity>();
+        foreach (var item in events)
+        {
+            IEnumerable<(string PersonId, string Kind)> recipients = item.Kind switch
+            {
+                "ccDelivered" => item.ResolvedAssigneeIds.Select(personId =>
+                    (personId, InstanceParticipantKinds.CopyRecipient)),
+                "copyRequested" when item.Audit?.TargetUserId is not null =>
+                    [(item.Audit.TargetUserId, InstanceParticipantKinds.CopyRecipient)],
+                "taskCompleted" or "taskTransferred" or "returnedToInitiator" or "returnedToNode" or
+                    "supplementRequested" when item.TaskId is not null && item.Audit?.ActorId is not null =>
+                    [(item.Audit.ActorId, InstanceParticipantKinds.TaskActor)],
+                _ => [],
+            };
+            foreach (var (personId, kind) in recipients.Where(recipient =>
+                !string.IsNullOrWhiteSpace(recipient.PersonId)))
+            {
+                participants.TryAdd((personId, kind), new InstanceParticipantEntity
+                {
+                    InstanceId = instanceId,
+                    PersonId = personId,
+                    Kind = kind,
+                    EventId = item.Id,
+                    GrantedAt = item.OccurredAt,
+                });
+            }
+        }
+
+        return participants.Values.ToArray();
     }
 
     /// <inheritdoc />

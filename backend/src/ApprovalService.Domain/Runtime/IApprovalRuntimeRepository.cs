@@ -157,6 +157,11 @@ public sealed class RuntimeCommit
     public IReadOnlyList<OutboxItemEntity> OutboxItems { get; set; } = [];
 
     /// <summary>
+    /// 本次实际处理任务或收到抄送的人员，随事件原子保存。
+    /// </summary>
+    public IReadOnlyList<InstanceParticipantEntity> Participants { get; set; } = [];
+
+    /// <summary>
     /// 与发起审批同事务关联的接入应用附件。
     /// </summary>
     public IReadOnlyList<RuntimeFileLink> FileLinks { get; set; } = [];

@@ -109,6 +109,7 @@ export function validateCanvasDefinition(definition: FlowDefinition): CanvasIssu
   if (!definition.name?.trim()) add(null, '流程名称不能为空。')
   if (definition.withdrawBeforeFirstDecision !== undefined && typeof definition.withdrawBeforeFirstDecision !== 'boolean') add(null, '发起人撤回限制必须为布尔值。')
   if (definition.returnMode !== undefined && definition.returnMode !== flowReturnModes.Restart && definition.returnMode !== flowReturnModes.ReturnNode) add(null, '退回后重新提交方式只能是 restart 或 returnNode。')
+  if (definition.isConfidential !== undefined && typeof definition.isConfidential !== 'boolean') add(null, '保密流程标记必须为布尔值。')
   const canvas: FlowCanvas | undefined = definition.canvas
   if (!canvas) { add(null, '流程缺少自由画布。'); return issues }
   const nodes = canvas.nodes ?? []

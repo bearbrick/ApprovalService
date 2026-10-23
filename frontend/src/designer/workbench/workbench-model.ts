@@ -65,7 +65,7 @@ export function createEmptyFlow(code = 'NEW_FLOW'): FlowDefinition {
     printSettings: { orientation: 'portrait', fieldKeys: [], showComments: true, showSignatures: true,
       includeReceiptPages: false, showLogo: true, showQrCode: true, showWatermark: false },
     allowedClientApps: [], allowedInitiatorDepartments: [], allowedInitiatorRoles: [],
-    withdrawBeforeFirstDecision: false, returnMode: flowReturnModes.Restart,
+    withdrawBeforeFirstDecision: false, returnMode: flowReturnModes.Restart, isConfidential: false,
   }
 }
 
@@ -90,6 +90,7 @@ export function normalizeSample(source: FlowDefinition): FlowDefinition {
   next.allowedInitiatorRoles ??= []
   next.withdrawBeforeFirstDecision ??= false
   next.returnMode ??= flowReturnModes.Restart
+  next.isConfidential ??= false
   next.data ??= { fields: [], summaryFields: [] }
   next.data.fields ??= []
   next.data.summaryFields ??= []

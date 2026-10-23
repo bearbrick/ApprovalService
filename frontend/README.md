@@ -42,7 +42,7 @@
 
 ## 自由画布组件
 
-自由画布组件位于 `src/designer/canvas/FlowCanvasEditor.vue`。工作台传入完整 `FlowDefinition`，通过 `inspector` 插槽挂载统一的节点和路线属性面板，并将发布问题高亮到画布；`focusElement(id)` 供检查列表定位。独立使用时组件自己维护撤销栈；工作台传入 `history-mode="external"` 后，每次完整编辑通过 `editCommitted(previousDefinition)` 提交旧快照，撤销与重做按钮和快捷键分别发 `undo`、`redo` 事件，由工作台统一管理历史。节点拖动只在松开时提交一次历史，拖动中的 `update:modelValue` 只更新当前画面。组件支持拖节点、连任意有向线、缩放平移和网格吸附。连线端点贴合矩形、圆形和菱形轮廓，同节点多条边分开端口，正交路径避让中间节点并为条件标签留白。BPMN 导出包含标准图形与本服务完整扩展，导入只接受版本兼容且图形、摘要都一致的本服务文件。前端发布预检统一复用画布的静态校验，镜像后端的图结构、字段引用和受限表达式语法规则，并对纯常量表达式提前检查除零等可求值错误；最终发布仍由后端再次校验。
+正式画布组件位于 `src/designer/canvas/BpmnCanvasEditor.vue`，使用固定版本的 `bpmn-js` Modeler 绘制标准 BPMN 常用子集；必须让右下角 bpmn.io 标识保持可见。工作台传入完整 `FlowDefinition`，通过 `inspector` 插槽挂载统一的节点与路线属性面板，并将发布问题高亮到图形；`focusElement(id)` 供问题列表定位。节点与连线由建模器创建、拖动和自动布线，`bpmn-modeler-adapter.ts` 只把图元的 ID、类型、中心坐标与连接关系写回现有审批 JSON，已有审批人规则和字段权限始终保留。工作台通过 `editCommitted(previousDefinition)`、`undo`、`redo` 统一管理撤销历史。现有 JSON 不含连线折点，重新打开草稿时由建模器按节点坐标重新布线；折点持久化需后续扩展流程契约。BPMN 导出仍使用与后端兼容的标准图形加审批扩展，只接受本服务导出的兼容文件。前端发布预检镜像后端校验，正式发布以服务端为准。
 
 ## 命令
 
@@ -58,7 +58,7 @@ npm run build     # vue-tsc 类型检查 + 打包
 | 目录 | 内容 |
 | --- | --- |
 | `src/model/` | 纯逻辑模块，Node 下能直接运行，在 `tests/checks.ts` 里检查 |
-| `src/designer/canvas/` | SVG 自由画布、图操作、发布静态校验镜像和 BPMN 文件处理 |
+| `src/designer/canvas/` | bpmn-js 自由画布适配、发布静态校验镜像和 BPMN 文件处理 |
 | `src/api/` | 调后端接口 |
 | `src/pages/` | 页面 |
 | `src/components/layout/` | 桌面/手机外壳，不承载业务数据 |

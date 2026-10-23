@@ -347,7 +347,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <table>
             <thead><tr><th>部分</th><th>选型</th><th>说明</th></tr></thead>
             <tbody>
-              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>统一自由画布，候选开源流程图库（候选 LogicFlow，Apache-2.0，选型时核对协议；bpmn-js 要求保留 bpmn.io 标志，做产品不合适）；详情排版设计自己做，审批数据定义（JSON）自己定，方便后端校验；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
+              <tr><td>前端</td><td>Vue 3 + TypeScript + Vite</td><td>统一自由画布采用 bpmn-js Modeler 编辑 BPMN 2.0 常用子集，并按许可要求保留可见的 bpmn.io 标志；审批规则和数据定义仍由本服务 JSON、属性面板及后端执行图处理。详情排版设计自己做；手机页面候选 Vant（MIT 协议的 Vue 3 手机组件库，引入时写 ADR）</td></tr>
               <tr><td>后端</td><td>.NET 10，ASP.NET Core</td><td>领域、应用、基础设施、接口四层，命名和标签服务一致；流程引擎自己写，不用 Elsa、Camunda 这类通用引擎（中国式审批规则要深度定制，套通用引擎反而绕）</td></tr>
               <tr><td>数据库</td><td>EF Core；MVP 用 SQLite</td><td>和标签服务一样，SQLite、SQL Server、PostgreSQL 三种的迁移都生成，不写某一种数据库特有的 SQL；MVP 只在 SQLite 上测透，需要时改配置切换</td></tr>
               <tr><td>附件</td><td>本地文件或 MinIO / S3</td><td>统一的存储接口，改配置切换；数据库只存文件信息（第 9 节）</td></tr>

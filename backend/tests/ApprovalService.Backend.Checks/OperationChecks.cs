@@ -305,15 +305,31 @@ internal static class OperationChecks
         var context = Context(EngineScenarioChecks.Chain(FlowNodeTypes.Approval, FlowNodeTypes.Approval));
         var started = Start(context);
         var first = started.State.Tasks.Single();
-        var advanced = EngineRuntime.Execute(started.State,
-            Command(EngineCommandKinds.Approve, "first", first.Id, first.AssigneeId), context);
+        var firstApproval = Command(EngineCommandKinds.Approve, "first", first.Id, first.AssigneeId);
+        firstApproval.Operation!.FieldValues = JsonSerializer.SerializeToElement(new
+        {
+            approvedAmount = 12.5m
+        });
+        var advanced = EngineRuntime.Execute(started.State, firstApproval, context);
+        check("成功推进的审批人填写值形成独立当前投影", advanced.State.Operations.CurrentApproverFieldValues
+            .TryGetValue("approvedAmount", out var approvedAmount) && approvedAmount.GetDecimal() == 12.5m);
         var second = advanced.State.Tasks.Last();
+        var supplement = EngineRuntime.Execute(advanced.State,
+            Command(OperationKinds.RequestSupplement, "preserve-request", second.Id, second.AssigneeId), context);
+        var supplied = EngineRuntime.Execute(supplement.State,
+            Command(OperationKinds.Supplement, "preserve-submit", actor: "initiator"), context);
+        check("补充后保留审批人当前填写值和原任务", supplied.State.Operations.CurrentApproverFieldValues
+            .TryGetValue("approvedAmount", out var retained) && retained.GetDecimal() == 12.5m &&
+            supplied.State.Tasks.Last().Id == second.Id);
         var returned = EngineRuntime.Execute(advanced.State,
             Command(OperationKinds.Return, "return", second.Id, second.AssigneeId), context);
         var restarted = EngineRuntime.Execute(returned.State,
             Command(OperationKinds.Resubmit, "restart", actor: "initiator"), context);
         check("退回给发起人再提交可从头开始", returned.State.Status == EngineInstanceStatuses.AwaitingInitiator &&
-            restarted.State.Tasks.Last().NodeId == "n1" && restarted.State.Status == EngineInstanceStatuses.Running);
+            restarted.State.Tasks.Last().NodeId == "n1" && restarted.State.Tasks.Last().Status == EngineTaskStatuses.Pending &&
+            restarted.State.Status == EngineInstanceStatuses.Running);
+        check("退回重提清空当前审批人填写值但保留历史审计", restarted.State.Operations.CurrentApproverFieldValues.Count == 0 &&
+            advanced.Events.Any(item => item.Audit?.FieldValues?.GetProperty("approvedAmount").GetDecimal() == 12.5m));
         var resumeContext = Context(EngineScenarioChecks.Chain(FlowNodeTypes.Approval, FlowNodeTypes.Approval));
         resumeContext.Operations.ReturnMode = "returnNode";
         var resumeStart = Start(resumeContext);

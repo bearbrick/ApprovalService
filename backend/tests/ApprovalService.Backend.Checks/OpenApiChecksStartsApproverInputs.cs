@@ -186,6 +186,9 @@ internal static partial class OpenApiChecksStarts
         check("审批人填写值进入历史操作审计而不改业务数据快照",
             validResponse.StatusCode == HttpStatusCode.OK && audited && completed is not null &&
             !completed.Data.TryGetProperty("approvedAmount", out _));
+        check("审批人成功推进后查询返回独立当前填写值", completed is not null &&
+            completed.ApproverFieldValues.GetProperty("approvedAmount").GetDecimal() == 12.5m &&
+            completed.ApproverFieldValues.GetProperty("personInput").GetString() == "alice");
 
         using var secondStartRequest = Request(new OpenStartRequest
         {

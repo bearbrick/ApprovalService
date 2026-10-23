@@ -223,6 +223,67 @@ internal static partial class OpenApiChecksStarts
             advanceResponse.StatusCode == HttpStatusCode.OK && advanced is not null &&
             advanced.Tasks.Any(task => task.NodeId == "high" && task.Status == EngineTaskStatuses.Pending) &&
             !advanced.Tasks.Any(task => task.NodeId == "low"));
+
+        var highTask = advanced!.Tasks.Single(task => task.NodeId == "high");
+        using var returnRequest = ActionRequest(highTask.Id, new OpenTaskActionRequest
+        {
+            User = "alice",
+            Action = "return",
+        }, apiKey, "patch-return");
+        using var returnResponse = await http.SendAsync(returnRequest);
+        check("数据更新流程可退回原发起人", returnResponse.StatusCode == HttpStatusCode.OK);
+
+        using var invalidResubmit = ResubmitRequest(started.Id, "alice", apiKey, "patch-resubmit-invalid",
+            new
+            {
+                amount = "bad",
+                locked = "original"
+            });
+        using var invalidResponse = await http.SendAsync(invalidResubmit);
+        check("重新提交完整新数据时仍须通过锁定字段类型校验",
+            invalidResponse.StatusCode == HttpStatusCode.BadRequest);
+
+        var replacement = new
+        {
+            amount = 2,
+            locked = "revised",
+            lines = new[] { new { qty = 7, code = "a" } },
+        };
+        using var foreignResubmit = ResubmitRequest(started.Id, "alice", foreignKey,
+            "patch-resubmit-foreign", replacement);
+        using var foreignResubmitResponse = await http.SendAsync(foreignResubmit);
+        check("其他接入应用不能重新提交审批数据", foreignResubmitResponse.StatusCode == HttpStatusCode.Forbidden);
+
+        using var resubmitRequest = ResubmitRequest(started.Id, "alice", apiKey, "patch-resubmit", replacement);
+        using var resubmitResponse = await http.SendAsync(resubmitRequest);
+        var resubmitted = await resubmitResponse.Content.ReadFromJsonAsync<OpenInstanceResponse>(ApprovalJson.Options);
+        check("退回后完整新数据、公式与任务一同提交并从头审批",
+            resubmitResponse.StatusCode == HttpStatusCode.OK &&
+            resubmitted is { Status: EngineInstanceStatuses.Running } &&
+            resubmitted.Data.GetProperty("amount").GetDecimal() == 2 &&
+            resubmitted.Data.GetProperty("doubleAmount").GetDecimal() == 4 &&
+            resubmitted.Tasks.Any(task => task.NodeId == "n1" && task.Status == EngineTaskStatuses.Pending) &&
+            resubmitted.Events.Any(item => item.Event == "instanceResubmitted"));
+
+        using var replayResubmit = ResubmitRequest(started.Id, "alice", apiKey, "patch-resubmit", replacement);
+        using var replayResubmitResponse = await http.SendAsync(replayResubmit);
+        var replayedResubmit = await replayResubmitResponse.Content.ReadFromJsonAsync<OpenInstanceResponse>(ApprovalJson.Options);
+        check("重新提交同请求 ID 重试不重复创建审批事件",
+            replayResubmitResponse.StatusCode == HttpStatusCode.OK &&
+            replayedResubmit?.Events.Count(item => item.Event == "instanceResubmitted") == 1);
+
+        var restartedTask = resubmitted!.Tasks.Single(task => task.NodeId == "n1" &&
+            task.Status == EngineTaskStatuses.Pending);
+        using var secondAdvance = ActionRequest(restartedTask.Id, new OpenTaskActionRequest
+        {
+            User = "bob",
+            Action = EngineCommandKinds.Approve,
+        }, apiKey, "patch-second-advance");
+        using var secondAdvanceResponse = await http.SendAsync(secondAdvance);
+        var rerouted = await secondAdvanceResponse.Content.ReadFromJsonAsync<OpenInstanceResponse>(ApprovalJson.Options);
+        check("重新提交后的网关使用新金额选择后续节点",
+            secondAdvanceResponse.StatusCode == HttpStatusCode.OK &&
+            rerouted!.Tasks.Any(task => task.NodeId == "low" && task.Status == EngineTaskStatuses.Pending));
     }
 
     /// <summary>

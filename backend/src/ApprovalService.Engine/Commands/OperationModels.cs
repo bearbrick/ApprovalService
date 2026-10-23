@@ -385,6 +385,10 @@ public sealed class OperationState
     /// </summary>
     public Dictionary<string, string> DraftOpinions { get; set; } = new(StringComparer.Ordinal);
     /// <summary>
+    /// 审批人成功推进后留下的当前填写值；历史值始终保留在事件中。
+    /// </summary>
+    public Dictionary<string, JsonElement> CurrentApproverFieldValues { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>
     /// 管理员对尚未到达节点设置的审批人覆盖值。
     /// </summary>
     public Dictionary<string, string> AssigneeOverrides { get; set; } = new(StringComparer.Ordinal);

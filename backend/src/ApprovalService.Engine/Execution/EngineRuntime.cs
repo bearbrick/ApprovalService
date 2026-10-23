@@ -124,6 +124,10 @@ public static class EngineRuntime
 
             var undo = command.Kind == EngineCommandKinds.Approve && command.Operation is not null
                 ? OperationUndo.Capture(state, command) : null;
+            if (command.Kind != EngineCommandKinds.Reject)
+            {
+                OperationCurrentValues.Merge(state.Operations, command.Operation?.FieldValues);
+            }
             work.CompleteTask(task, token, node, command.Kind);
             if (undo is not null && state.Status == EngineInstanceStatuses.Running)
             {

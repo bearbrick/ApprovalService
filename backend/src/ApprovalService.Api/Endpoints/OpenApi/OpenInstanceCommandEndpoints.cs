@@ -31,6 +31,14 @@ public static class OpenInstanceCommandEndpoints
             return Results.Ok(await commands.WithdrawAsync(client, id, request,
                 http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
         });
+        app.MapPost(OpenApiRoutes.InstanceResubmit, async (string id, OpenResubmitRequest request,
+            HttpContext http, ClientAppAppService clients, OpenResubmitAppService submissions,
+            CancellationToken cancellationToken) =>
+        {
+            var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
+            return Results.Ok(await submissions.SubmitAsync(client, id, request,
+                http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
+        });
         app.MapPost(OpenApiRoutes.InstanceRemind, async (string id, OpenInstanceCommandRequest request,
             HttpContext http, ClientAppAppService clients, OpenInstanceCommandAppService commands,
             CancellationToken cancellationToken) =>

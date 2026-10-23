@@ -46,6 +46,11 @@ public static class OpenApiRoutes
     public const string InstanceWithdraw = "/api/v1/instances/{id}/withdraw";
 
     /// <summary>
+    /// 发起人提交退回后的新数据，或补充当前审批数据。
+    /// </summary>
+    public const string InstanceResubmit = "/api/v1/instances/{id}/resubmit";
+
+    /// <summary>
     /// 所属接入应用以已绑定实际操作人终止在途审批。
     /// </summary>
     public const string InstanceTerminate = "/api/v1/instances/{id}/terminate";

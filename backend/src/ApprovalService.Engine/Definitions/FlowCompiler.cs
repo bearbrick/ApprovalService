@@ -39,6 +39,7 @@ public static class FlowCompiler
             SchemaVersion = definition.SchemaVersion,
             WithdrawBeforeFirstDecision = definition.WithdrawBeforeFirstDecision,
             ReturnMode = definition.ReturnMode,
+            IsConfidential = definition.IsConfidential,
             Nodes = definition.Canvas.Nodes.Select(node => new FlowExecutionNode
             {
                 Id = node.Id,

@@ -61,8 +61,31 @@ internal static class FlowDefinitionChecks
             == JsonSerializer.Serialize(FlowCompiler.Compile(layout).Graph, ApprovalJson.Options));
 
         CheckOperationPolicies(flows, check);
+        CheckConfidentialPolicy(flows, check);
         CheckInvalidDefinitions(flows, check);
         CheckBpmn(flows, check);
+    }
+
+    /// <summary>
+    /// 检查保密标记与发布版本和旧定义的兼容性。
+    /// </summary>
+    /// <param name="flows">旧样例定义。</param>
+    /// <param name="check">记录检查结果。</param>
+    private static void CheckConfidentialPolicy(IReadOnlyList<FlowDefinition> flows, Action<string, bool> check)
+    {
+        check("旧流程与执行图省略保密标记时默认非保密",
+            flows.All(flow => !flow.IsConfidential && FlowCompiler.Compile(flow).Graph?.IsConfidential == false) &&
+            JsonSerializer.Deserialize<FlowExecutionGraph>("{}", ApprovalJson.Options)?.IsConfidential == false);
+        var draft = Copy(flows[0]);
+        draft.IsConfidential = true;
+        var published = FlowCompiler.Compile(draft).Graph;
+        draft.IsConfidential = false;
+        check("保密标记编译进不可变执行图且草稿后续修改不影响版本",
+            published?.IsConfidential == true);
+        draft.IsConfidential = true;
+        var imported = BpmnFlowCodec.Import(BpmnFlowCodec.Export(draft));
+        check("BPMN 往返保留保密标记", imported.IsConfidential &&
+            FlowCompiler.Compile(imported).Graph?.IsConfidential == true);
     }
 
     /// <summary>

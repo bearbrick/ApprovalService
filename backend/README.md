@@ -120,6 +120,6 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 附件的文件字节不入数据库，`StoredFiles` 只保存名称、大小、内容类型、SHA-256、存储位置、上传人员或接入应用归属、所属审批单和清理租约。本地内容在数据目录的 `files/年/月/` 下，上传临时文件同目录原子转正。每小时扫描一次，清理上传超过 24 小时仍未关联的内容；多实例通过数据库条件更新抢租约。切换到 MinIO 时，先配置 `ApprovalService__Files__Provider=Minio` 和对象存储凭据，再运行 `powershell -NoProfile -ExecutionPolicy Bypass -File backend/tools/migrate-files.ps1` 搬运旧本地文件；中断后重跑会继续。真实对象存储检查需要设置 `APPROVAL_TEST_MINIO`（服务 URL）、`APPROVAL_TEST_MINIO_BUCKET`、`APPROVAL_TEST_MINIO_ACCESS_KEY`、`APPROVAL_TEST_MINIO_SECRET_KEY`，桶需事先存在。
 
-上传白名单是 PDF、PNG、JPEG、GIF、WebP、DOCX、XLSX、PPTX；Office 文件须具有有效包清单、入口关系和主部件 XML，只下载查看，不做在线预览。嵌入会话只可下载同一接入应用审批单的已关联附件；人员上传的未关联文件仅本人本地会话可读，应用上传的仅同一已认证应用可读。接入应用可用 API Key 上传并读取本应用尚未关联的附件；发起审批时只接受该应用上传且未被占用的文件，附件与审批单在同一数据库事务中关联。普通抄送人可见性尚缺持久化收件人投影，不能仅凭人员 ID 放开。OFD 和旧版 Office 文件的下载范围尚待单独确认。
+上传白名单是 PDF、PNG、JPEG、GIF、WebP、DOCX、XLSX、PPTX；Office 文件须具有有效包清单、入口关系和主部件 XML，只下载查看，不做在线预览。嵌入会话只可下载同一接入应用审批单的已关联附件；人员上传的未关联文件仅本人本地会话可读，应用上传的仅同一已认证应用可读。接入应用可用 API Key 上传并读取本应用尚未关联的附件；发起审批时只接受该应用上传且未被占用的文件，附件与审批单在同一数据库事务中关联。普通抄送到达、人工抄送及实际任务完成的人员按来源写入只追加参与人投影；附件权限使用发起人、实际代发人、任务及此投影，保密版本不会让仅有已取消或转交任务的人员继续查看，管理员与额外查看人也无自动权限。旧版本缺少保密标记时仍按非保密处理。OFD 和旧版 Office 文件的下载范围尚待单独确认。
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。`/health/ready` 会检查数据库连通性；数据库不可连接时返回 503。

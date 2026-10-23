@@ -13,19 +13,24 @@ import { actionsForNodeType, defaultActionsForNodeType } from '../src/designer/w
  */
 export function runWorkbenchChecks(check: (name: string, value: boolean) => void): void {
   const blank = createEmptyFlow('DEMO')
-  check('新流程默认审批结束前可撤回且退回后从头重提', blank.withdrawBeforeFirstDecision === false && blank.returnMode === flowReturnModes.Restart)
+  check('新流程默认审批结束前可撤回、退回后从头重提且不保密', blank.withdrawBeforeFirstDecision === false && blank.returnMode === flowReturnModes.Restart && blank.isConfidential === false)
   const legacy = copyFlow(blank)
   delete legacy.withdrawBeforeFirstDecision
   delete legacy.returnMode
+  delete legacy.isConfidential
   const normalized = normalizeSample(legacy)
-  check('旧草稿省略流程级策略时恢复安全默认值', normalized.withdrawBeforeFirstDecision === false && normalized.returnMode === flowReturnModes.Restart)
+  check('旧草稿省略流程级策略时恢复安全默认值', normalized.withdrawBeforeFirstDecision === false && normalized.returnMode === flowReturnModes.Restart && normalized.isConfidential === false)
   const configured = copyFlow(blank)
   configured.withdrawBeforeFirstDecision = true
   configured.returnMode = flowReturnModes.ReturnNode
-  check('两种流程级策略能保留在独立草稿并通过发布预检', copyFlow(configured).withdrawBeforeFirstDecision === true && copyFlow(configured).returnMode === flowReturnModes.ReturnNode && checkPublication(configured).length === 0)
+  configured.isConfidential = true
+  check('三种流程级策略能保留在独立草稿并通过发布预检', copyFlow(configured).withdrawBeforeFirstDecision === true && copyFlow(configured).returnMode === flowReturnModes.ReturnNode && copyFlow(configured).isConfidential === true && checkPublication(configured).length === 0)
   const invalidMode = JSON.parse(JSON.stringify(blank)) as typeof blank
   invalidMode.returnMode = 'unknown' as typeof invalidMode.returnMode
   check('不支持的退回重提方式被前端发布预检拒绝', checkPublication(invalidMode).some(issue => issue.message.includes('退回后重新提交方式')))
+  const invalidConfidential = copyFlow(blank)
+  invalidConfidential.isConfidential = 'yes' as unknown as boolean
+  check('非布尔保密标记被前端发布预检拒绝', checkPublication(invalidConfidential).some(issue => issue.message.includes('保密流程标记')))
   check('空白自由画布具有唯一开始和结束且能通过结构预检', blank.canvas.nodes.length === 2 && checkPublication(blank).length === 0)
   check('三个正式示例模板覆盖采购、费用与质量异常且均能通过发布预检', flowTemplates.length === 3 && flowTemplates.every(template => checkPublication(template.definition).length === 0))
   check('正式示例可展开明细字段并显示节点字段权限', flowTemplates.every(template => fieldReferences(template.definition.data).length >= template.definition.data.fields.length))

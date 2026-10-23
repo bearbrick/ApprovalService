@@ -61,6 +61,15 @@ function setReturnMode(value: string): void {
   next.returnMode = value
   emit('update', next)
 }
+/**
+ * 设置发布版本的附件可见范围。
+ * @param value 是否只允许实际参与人查看。
+ */
+function setConfidential(value: boolean): void {
+  const next = copyFlow(props.definition)
+  next.isConfidential = value
+  emit('update', next)
+}
 </script>
 
 <template>
@@ -71,6 +80,8 @@ function setReturnMode(value: string): void {
     <div class="rules-grid"><label>允许接入应用<textarea rows="4" :value="definition.allowedClientApps.join('\n')" placeholder="每行一个应用编码；留空不额外限制" @change="setScope('allowedClientApps', ($event.target as HTMLTextAreaElement).value)" /></label><label>允许部门<textarea rows="4" :value="definition.allowedInitiatorDepartments.join('\n')" placeholder="每行一个部门编码；留空不额外限制" @change="setScope('allowedInitiatorDepartments', ($event.target as HTMLTextAreaElement).value)" /></label><label>允许角色<textarea rows="4" :value="definition.allowedInitiatorRoles.join('\n')" placeholder="每行一个角色编码；留空不额外限制" @change="setScope('allowedInitiatorRoles', ($event.target as HTMLTextAreaElement).value)" /></label></div>
     <h3>撤回与退回</h3>
     <div class="rules-grid"><label>发起人撤回限制<select :value="definition.withdrawBeforeFirstDecision ? 'beforeFirstDecision' : 'beforeCompletion'" @change="setWithdrawPolicy(($event.target as HTMLSelectElement).value)"><option value="beforeCompletion">审批结束前可撤回（默认）</option><option value="beforeFirstDecision">首位处理人操作前可撤回</option></select><small>由业务系统调用撤回接口；审批中心不提供发起入口。</small></label><label>退回后重新提交<select :value="definition.returnMode ?? flowReturnModes.Restart" @change="setReturnMode(($event.target as HTMLSelectElement).value)"><option :value="flowReturnModes.Restart">从头重新走（默认）</option><option :value="flowReturnModes.ReturnNode">回到发起退回的节点</option></select><small>发起人在业务系统修改单据，再由业务系统调用重新提交接口。</small></label></div>
+    <h3>附件可见范围</h3>
+    <div class="rules-grid"><label>流程保密设置<select :value="definition.isConfidential ? 'confidential' : 'normal'" @change="setConfidential(($event.target as HTMLSelectElement).value === 'confidential')"><option value="normal">普通流程（默认）</option><option value="confidential">仅实际参与人可查看附件</option></select><small>保密流程只允许发起人、实际代发人、实际任务处理人及已送达抄送收件人查看附件，历史参与人保留权限。</small></label></div>
     <p class="notice">实际接入授权和人员权限仍由服务端校验。草稿在当前页面编辑；正式版本需经过服务端发布。</p>
   </section>
 </template>

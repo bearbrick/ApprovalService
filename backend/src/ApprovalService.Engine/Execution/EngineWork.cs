@@ -115,6 +115,11 @@ internal sealed class EngineWork
             if (decision.EventKind is not null)
             {
                 Emit(decision.EventKind, node.Id, token.Id, targetCode: decision.TargetCode);
+                if (node.Type == FlowNodeTypes.Cc && decision.EventKind == "ccDelivered")
+                {
+                    // 普通抄送不创建任务，必须把到达时确定的收件人固定在事件中。
+                    Events[^1].ResolvedAssigneeIds.AddRange(ResolveCopyRecipients(node));
+                }
             }
 
             switch (decision.Action)
@@ -150,6 +155,32 @@ internal sealed class EngineWork
                     throw new EngineException(ErrorCodes.ValidationFailed, "节点行为返回了不支持的动作。");
             }
         }
+    }
+
+    /// <summary>
+    /// 按当前组织快照解析普通抄送收件人，旧单人输入继续兼容。
+    /// </summary>
+    /// <param name="node">已经到达的抄送节点。</param>
+    /// <returns>本次实际送达的内部人员 ID。</returns>
+    private IReadOnlyList<string> ResolveCopyRecipients(FlowExecutionNode node)
+    {
+        if (state.Operations.AssigneeOverrides.TryGetValue(node.Id, out var overridden))
+        {
+            return [overridden];
+        }
+
+        if (context.AssigneeSnapshot is not null && node.Assignee is not null)
+        {
+            return AssigneeRuleEngine.Resolve(node, state, context.AssigneeSnapshot,
+                context.AssigneeResolvers).AssigneeIds;
+        }
+
+        if (context.Assignees.TryGetValue(node.Id, out var assignee) && !string.IsNullOrWhiteSpace(assignee))
+        {
+            return [assignee];
+        }
+
+        throw new EngineException(ErrorCodes.ValidationFailed, "抄送节点缺少已解析的收件人。");
     }
 
     /// <summary>

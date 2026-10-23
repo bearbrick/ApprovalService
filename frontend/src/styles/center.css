@@ -70,6 +70,13 @@
 .center-action-bar > div { display: flex; flex-wrap: wrap; gap: 7px; }
 .center-detail-empty { margin-bottom: 18px; }
 .center-settings-empty { margin-bottom: 18px; }
+.center-login { max-width: 440px; margin: 38px auto; padding: 28px; }
+.center-login h2 { font-size: 20px; }
+.center-login > p { margin: 12px 0 20px; color: var(--muted); }
+.center-login form { display: grid; gap: 18px; }
+.center-login label { display: grid; gap: 7px; color: #34435a; font-size: 13px; }
+.center-login input { min-height: 39px; padding: 8px 10px; border: 1px solid #dbe2ec; border-radius: 4px; }
+.center-login-error { color: #b34b57 !important; }
 @media (max-width: 1100px) { .center-detail-grid { grid-template-columns: minmax(0, 1fr); } .center-detail-side { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .center-page-body { padding-inline: 12px; } .center-tabs a { padding-inline: 12px; } .center-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .center-detail-side { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .center-filterbar { padding-inline: 12px; } .center-date { flex: 1 1 100%; justify-content: space-between; } .center-date input { flex: 1; } .center-data-grid { grid-template-columns: 1fr; } }

@@ -1,6 +1,7 @@
 import { canSelectBatchApprove, eligibleBatchIds, filterCenterItems, visibleCenterActions } from '../src/model/center.ts'
 import type { CenterFilters, CenterItem } from '../src/model/center.ts'
 import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-adapter.ts'
+import { loginCenter, logoutCenter } from '../src/api/center-session.ts'
 
 /**
  * 供场景检查使用的完整摘要，绝不会进入产品运行时。
@@ -42,9 +43,40 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   check('我发起的仅可展示服务端准许的催办与评论',
     visibleCenterActions(item({ section: 'started', allowedActions: ['approve', 'remind', 'comment'] })).join(',') === 'remind,comment'
     && visibleCenterActions(item({ section: 'cc', allowedActions: ['approve', 'comment'] })).join(',') === 'comment')
-  const controller = new AbortController()
-  let unavailable = 0
-  try { await centerAdapter.loadList('todo', controller.signal) } catch (error) { unavailable += Number(error instanceof CenterAdapterUnavailableError) }
-  try { await centerAdapter.loadDetail('a', controller.signal) } catch (error) { unavailable += Number(error instanceof CenterAdapterUnavailableError) }
-  check('尚未接入的列表与详情明确报未接入，不返回伪造数据', unavailable === 2)
+  const originalFetch = globalThis.fetch
+  const requests: { path: string, authorization: string }[] = []
+  const summary = {
+    id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
+    title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
+    startedAt: '2026-10-19T10:00:00+08:00', summary: { amount: 200 }, pendingTaskIds: ['task-1'],
+  }
+  try {
+    globalThis.fetch = async (input, init) => {
+      const path = String(input)
+      requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '' })
+      const body = path.endsWith('/identity/login')
+        ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
+        : path.includes('instances/instance-1')
+          ? { instance: summary, data: { amount: 200 }, tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null }], events: [], activeNodeIds: ['approval'] }
+          : { total: 1, skip: 0, take: 100, items: [summary] }
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
+    const controller = new AbortController()
+    let denied = false
+    try { await centerAdapter.loadList('todo', controller.signal) } catch (cause) { denied = cause instanceof CenterAdapterUnavailableError }
+    check('未登录时不会向中心接口发送匿名查询', denied && requests.length === 0)
+    await loginCenter('employee', 'password')
+    const list = await centerAdapter.loadList('todo', controller.signal)
+    const detail = await centerAdapter.loadDetail('instance-1', controller.signal)
+    check('审批中心用人员令牌读取真实列表和详情，不向匿名端点取伪数据',
+      requests.length === 3 && requests.slice(1).every(request => request.authorization === 'Bearer test-token')
+      && list.length === 1 && list[0]?.title === '采购申请' && list[0]?.initiatorName === '张三'
+      && list[0]?.sourceName === '采购系统' && detail.item.currentStep === '经理审批')
+    check('中心适配仅使用服务端裁剪字段，缺少许可协议时不会凭待办推断可操作',
+      list[0]?.summary[0]?.value === '200' && detail.fields[0]?.value === '200'
+      && detail.item.allowedActions.length === 0 && !detail.item.allowsBatchApprove)
+  } finally {
+    globalThis.fetch = originalFetch
+    logoutCenter()
+  }
 }

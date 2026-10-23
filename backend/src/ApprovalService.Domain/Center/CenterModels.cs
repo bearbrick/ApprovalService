@@ -109,6 +109,16 @@ public sealed class CenterRecord
     public string FlowName { get; set; } = string.Empty;
 
     /// <summary>
+    /// 来源接入应用的显示名称。
+    /// </summary>
+    public string SourceName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 发起人的显示名称。
+    /// </summary>
+    public string InitiatorName { get; set; } = string.Empty;
+
+    /// <summary>
     /// 该审批单任务投影。
     /// </summary>
     public IReadOnlyList<ApprovalTaskEntity> Tasks { get; set; } = [];

@@ -56,6 +56,7 @@ internal static class Program
         ApprovalPolicyChecks.Run(Check);
         WorkCalendarChecks.Run(Check);
         await NotificationRulesChecks.RunAsync(Check);
+        await NotificationDeadlineSchedulerChecks.RunAsync(Check);
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
         await EventAnchorChecks.RunAsync(Check);

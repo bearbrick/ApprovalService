@@ -116,6 +116,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
         services.AddScoped<INotificationChannel, InAppNotificationChannel>();
         services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();
+        services.AddScoped<IOutboxHandler, DeadlineReminderOutboxHandler>();
         return services;
     }
 }

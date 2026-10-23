@@ -120,6 +120,11 @@ public sealed class ApprovalInstance
     public Dictionary<string, object?> Data { get; set; } = new();
 
     /// <summary>
+    /// 已成功推进的审批人填写字段当前值，不覆盖原业务数据。
+    /// </summary>
+    public Dictionary<string, object?> ApproverFieldValues { get; set; } = new();
+
+    /// <summary>
     /// 发起时间。
     /// </summary>
     public DateTimeOffset StartedAt

@@ -15,7 +15,7 @@
 
 公司暂时没有私有的 NuGet 源，SDK 先不发布：业务系统按接口文档直接调，或者把 SDK 的 DLL 拷进项目引用。
 
-## 用法（首批开放接口）
+## 用法（已实现开放接口）
 
 ```csharp
 using var client = new ApprovalServiceClient(new ApprovalServiceClientOptions
@@ -46,9 +46,13 @@ await client.RemindAsync(instance.Id, currentUser.Code);
 await client.WithdrawAsync(instance.Id, currentUser.Code);
 ```
 
-以上为各方法的独立用法示例；催办、撤回和审批操作仍受服务端当前状态与人员权限限制。`StartAsync` 当前必须提供 `Data` 快照，只传单号取数的钩子协议尚待确认。`GetTaskCountAsync` 与 `GetTasksAsync` 默认只看本应用，接入应用获授权时可传 `allApps: true`。任务 ID 可能包含斜杠，SDK 会正确编码。`FieldValues` 仅提交当前节点允许审批人填写的顶层字段，不修改原业务数据快照。错误响应统一抛 `ApprovalServiceException`。
+以上为各方法的独立用法示例；催办、撤回和审批操作仍受服务端当前状态与人员权限限制。`StartAsync` 可以提供 `Data` 快照，也可以在接入应用已登记取数钩子时省略；重试时可使用接受稳定 `requestId` 的重载。`GetTaskCountAsync` 与 `GetTasksAsync` 默认只看本应用，接入应用获授权时可传 `allApps: true`。任务 ID 可能包含斜杠，SDK 会正确编码。`FieldValues` 仅提交当前节点允许审批人填写的顶层字段，不修改原业务数据快照。错误响应统一抛 `ApprovalServiceException`。
 
-尚未确认的更新数据、重新提交、终止、批量、预览与钩子等接口由后续 SDK 任务补齐；本批方法不包含界面组件。
+SDK 还提供 `PreviewAsync`、`StartBatchAsync`（逐张独立返回结果）、`PatchDataAsync`（只改流程显式允许的字段）、`ResubmitAsync`、`TerminateAsync`、`CreateEmbedTokenAsync`、`PushOrganizationChangesAsync`、`BindOrganizationIdAsync`。这些方法分别遵守后端的流程、人员绑定和接入应用权限；批量、PATCH、重新提交和终止均可传稳定 `requestId` 用于网络失败重试。后端尚未实现的打印 PDF 接口不在 SDK 中。
+
+附件使用 `UploadFileAsync(fileName, stream)` 发送原始字节，服务器按内容识别文件类型；上传流仍由调用方释放。`DownloadUnlinkedFileAsync(fileId)` 只允许当前 API Key 获取本应用上传且尚未关联审批单的附件；已关联附件必须调用 `DownloadFileAsync(fileId, accessToken)`，由服务端按人员会话验权。服务器返回对象存储预签名跳转时，SDK 跟随一次跳转且不向目标转发 API Key 或人员令牌。
+
+业务系统收到回调时，把 HTTP 原始正文、唯一 `X-Approval-Signature` 头值和登记的签名密钥交给 `ApprovalCallbackVerifier.VerifyAndParse(body, signature, secret)`；验签后按 `EventId` 去重。不要先把正文重新序列化。自动业务动作结果位于 `ActionResults`，不覆盖 `Data`。
 
 出错时抛 `ApprovalServiceException`，`ErrorCode` 是服务端的错误码，或者 SDK 自己的 `NETWORK_ERROR`（连不上）、`TIMEOUT`（超时）。
 
@@ -64,4 +68,4 @@ dotnet format client/ApprovalService.Client.slnx --verify-no-changes --no-restor
 dotnet run --project client/tests/ApprovalService.Client.Checks
 ```
 
-从仓库根目录运行完整 `verify.ps1` 时，脚本创建一次性测试接入应用和已发布流程，通过真实 HTTP 验证 SDK 的发起、查询、待办、审批、催办与撤回。API Key 只放在该次运行的临时文件中；单独运行调用端检查而未提供测试夹具时，会跳过需要已登记应用的成功链路。
+从仓库根目录运行完整 `verify.ps1` 时，脚本创建一次性测试接入应用和已发布流程，通过真实 HTTP 验证 SDK 的预览、发起、批量发起、查询、待办、审批、催办、撤回和附件上传下载；临时人员没有登录账号，因此令牌接口验证明确的未开通错误。API Key 只放在该次运行的临时文件中；单独运行调用端检查而未提供测试夹具时，会跳过需要已登记应用的成功链路。

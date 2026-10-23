@@ -12,7 +12,7 @@ namespace ApprovalService.Backend.Checks;
 /// <summary>
 /// 使用真实 SQLite 文件检查待发队列和定时任务的租约、重试与重启恢复。
 /// </summary>
-internal static class JobChecks
+internal static partial class JobChecks
 {
     /// <summary>
     /// 运行持久任务的场景检查。
@@ -41,6 +41,7 @@ internal static class JobChecks
             }
 
             await CheckOutboxAsync(options, check);
+            await CheckActionRetryAsync(options, check);
             await CheckScheduledJobsAsync(options, check);
             await CheckWorkerAsync(options, check);
             await JobReadbackRaceChecks.RunAsync(options, check);

@@ -19,4 +19,9 @@ public static class JobStatuses
     /// 已成功处理。
     /// </summary>
     public const string Completed = "completed";
+
+    /// <summary>
+    /// 自动动作达到失败上限，暂停自动领取并等待管理员处理。
+    /// </summary>
+    public const string NeedsAttention = "needsAttention";
 }

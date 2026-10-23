@@ -195,8 +195,10 @@ export function edgeGeometry(edge: FlowEdge, source: FlowNode, target: FlowNode,
     const minX = Math.min(from.x, to.x)
     const maxX = Math.max(from.x, to.x)
     const relevant = nodes.filter(node => node.x + nodeSize(node).width >= minX - 35 && node.x - nodeSize(node).width <= maxX + 35)
-    const top = Math.min(...relevant.map(node => node.y - nodeSize(node).height)) - 48 - Math.max(0, edge.priority) * 12
-    const bottom = Math.max(...relevant.map(node => node.y + nodeSize(node).height + (node.type.endsWith('Gateway') ? 22 : 0))) + 48 + Math.max(0, edge.priority) * 12
+    // 导入的旧样例可能省略 priority；不能让 NaN 进入 SVG path，否则整条回路消失。
+    const laneOffset = (Number.isFinite(edge.priority) ? Math.max(0, edge.priority) : 0) * 12
+    const top = Math.min(...relevant.map(node => node.y - nodeSize(node).height)) - 48 - laneOffset
+    const bottom = Math.max(...relevant.map(node => node.y + nodeSize(node).height + (node.type.endsWith('Gateway') ? 22 : 0))) + 48 + laneOffset
     const detour = (lane: number, gap: number): CanvasPoint[] => [from, { x: from.x + gap, y: from.y }, { x: from.x + gap, y: lane }, { x: to.x - gap, y: lane }, { x: to.x - gap, y: to.y }, to]
     const choices = [top, bottom].flatMap(lane => [26, 38, 50, 66].map(gap => detour(lane, gap)))
     points = choices.filter(candidate => !intersectsNode(candidate, nodes, source.id, target.id))

@@ -78,6 +78,13 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
       : previous.x < 212 || previous.x > 388 || Math.max(previous.y, point.y) <= 119 || Math.min(previous.y, point.y) >= 201
   })
   check('跨越中间节点的连线和条件标签绕开节点', avoidsObstacle && (bypass.labelX + 53 < 224 || bypass.labelX - 53 > 376 || bypass.labelY + 13 < 131 || bypass.labelY - 13 > 189))
+  const inspection = { ...simpleFlow.canvas.nodes[1]!, id: 'inspection', x: 300, y: 250 }
+  const rework = { ...newNode, id: 'rework', x: 740, y: 90 }
+  const split = { ...gateway, id: 'reworkSplit', x: 530, y: 250 }
+  // 正式质量异常样例的返工边省略 priority，曾让回路路径出现 NaN，只剩孤立箭头。
+  const reworkEdge = { id: 'q04', sourceId: rework.id, targetId: inspection.id, priority: undefined as unknown as number, isDefault: false }
+  const reworkPath = edgeGeometry(reworkEdge, rework, inspection, [inspection, split, rework], [reworkEdge])
+  check('未写优先级的返工回路仍绘出完整且有限的绕行线', reworkPath.points.length >= 6 && reworkPath.points.every(point => Number.isFinite(point.x) && Number.isFinite(point.y)) && !reworkPath.path.includes('NaN') && reworkPath.points[2]!.y < rework.y - 29 && reworkPath.points.at(-1)?.x === inspection.x - 76)
   check('不能直接自连或连接不存在的节点', ['handling', 'missing'].every(target => { try { connectCanvasNodes(added, 'handling', target); return false } catch { return true } }))
   const conditioned = updateCanvasEdge(simpleFlow.canvas, 'edge_1', '${amount} > 50000', false, 2)
   check('连线条件和优先级可修改，发布校验定位不存在字段', conditioned.edges[0]?.priority === 2 && validateCanvasDefinition({ ...simpleFlow, canvas: conditioned }).some(issue => issue.elementId === 'edge_1' && issue.message.includes('amount')))

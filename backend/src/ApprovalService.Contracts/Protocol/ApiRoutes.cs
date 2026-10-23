@@ -51,6 +51,11 @@ public static class ApiRoutes
     public const string AdminOrgBindings = OpenApiPrefix + "/admin/org/bindings";
 
     /// <summary>
+    /// 当前流程管理员人工重排达到自动尝试上限的业务动作。
+    /// </summary>
+    public const string AdminActionRetry = OpenApiPrefix + "/admin/actions/retry";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

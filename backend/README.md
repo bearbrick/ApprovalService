@@ -42,11 +42,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `POST /api/v1/embed-tokens`、`/embed-tokens/exchange` | 已认证接入应用为已绑定人员签发一次性嵌入令牌并交换登录态 |
 | `POST /api/v1/org/changes`、`/org/bindings` | 接入应用推送本应用来源的组织数据并绑定自身人员、部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地组织管理员预检查、导入 CSV/XLSX、手工绑定、下载模板 |
+| `POST /api/v1/admin/actions/retry` | 本地登录的所属流程管理员以原事件 ID 人工重试自动动作 |
 
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
-身份访问令牌为 15 分钟 JWT，刷新令牌可轮换且有效 30 天；首次开通账号后只能先改密码。嵌入令牌 5 分钟内只能交换一次，必须先通过接入应用 API Key 验证并找到本应用绑定。嵌入会话不能使用组织管理接口，刷新后仍保留应用来源。组织主数据存部门、人员、角色、外部 ID 绑定与每次变更的前后快照；CSV/XLSX 模板可同时导入主数据及外部绑定，预览一次返回可定位的组织问题，正式保存会在事务中按最新主数据重验。管理接口要求本地登录 JWT 及当前 `organization-admin` 角色。首次管理员引导方式仍待确认，当前不开放匿名管理入口。
+身份访问令牌为 15 分钟 JWT，刷新令牌可轮换且有效 30 天；首次开通账号后只能先改密码。嵌入令牌 5 分钟内只能交换一次，必须先通过接入应用 API Key 验证并找到本应用绑定。嵌入会话不能使用管理接口，刷新后仍保留应用来源。组织主数据存部门、人员、角色、外部 ID 绑定与每次变更的前后快照；CSV/XLSX 模板可同时导入主数据及外部绑定，预览一次返回可定位的组织问题，正式保存会在事务中按最新主数据重验。组织管理接口要求本地登录 JWT 及当前 `organization-admin` 角色；动作人工重试按所属流程单独授权。首次管理员引导方式仍待确认，当前不开放匿名管理入口。
 
 ## 流程定义
 
@@ -105,7 +106,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 业务动作成功响应的可选 `result` 进入独立的 `actionCompleted` 事件与按原动作事件 ID 保存的运行投影；后续审批终态回调可选带 `actionResults`，原审批数据 `data` 不变。
 
-业务自动动作第十次失败转 `needsAttention`，停止后台自动领取，保留原令牌和待发正文。内部管理用例可按原 `eventId` 排入一次人工重试；再次失败仍待管理员处理。管理 HTTP 路由需等流程管理员权限点接通后开放。
+业务自动动作第十次失败转 `needsAttention`，停止后台自动领取，保留原令牌和待发正文。本地登录的流程管理员以当前工号匹配事件审批单所属流程的 `AdministratorId` 后，可向管理路由提交 `{eventId}`，按原事件排入一次人工重试；再次失败仍待管理员处理。组织管理员角色不自动拥有其他流程权限。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
 

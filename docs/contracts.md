@@ -61,6 +61,7 @@
 | `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
+| `POST /api/v1/admin/actions/retry` | 本地 JWT + 原动作所属流程的当前流程管理员 | 人工重排达到自动上限的原业务动作 |
 
 `GET /api/v1/info` 的响应：
 
@@ -143,7 +144,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 动作响应的可选 `result` 不改审批数据。成功时 `actionCompleted` 事件独立保存 `actionResult`，引擎状态按原动作 `eventId` 保存结果；后续审批终态回调在可选 `actionResults` 对象中按该 `eventId` 带出结果，`data` 仍是业务审批数据快照。无结果时省略 `actionResults`，重发回调使用首次入队时固定的正文。
 
-自动动作待发项最多自动尝试 10 次；第 10 次失败后转为 `needsAttention`，后台不再领取，原审批令牌继续等待动作结果。内部管理用例可对该原 `eventId` 排一次人工重试，不产生新的事件或正文；若这一次仍失败，立即回到待管理员处理。普通结果回调和其他待发事件不适用此上限。管理 HTTP 路由须待流程管理员权限边界明确后接入，不能把组织管理员权限默认当作流程管理员权限。
+自动动作待发项最多自动尝试 10 次；第 10 次失败后转为 `needsAttention`，后台不再领取，原审批令牌继续等待动作结果。流程管理员向 `POST /api/v1/admin/actions/retry` 提交 `{eventId}`；该事件 ID 可含斜杠，故放在 JSON 正文中。服务仅接受本地登录 JWT，并从当前在职人员的工号与原事件审批单所属流程的 `AdministratorId` 核对管理范围；组织管理员角色本身不授予其他流程权限。成功返回 204，仅将原事件排入一次人工重试，不产生新事件或正文；若这一次仍失败，立即回到待管理员处理。无令牌返回 401、无流程管理权返回 403、非自动动作事件返回 404、未处于待管理员处理返回 409。普通结果回调和其他待发事件不适用此上限。
 
 ## 流程定义 JSON
 

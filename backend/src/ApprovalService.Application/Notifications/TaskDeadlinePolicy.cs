@@ -25,6 +25,11 @@ public sealed class TaskDeadlinePolicy
     private readonly WorkCalendarWorkingHours workingHours;
 
     /// <summary>
+    /// 使用同一份日历向前计算提醒时刻。
+    /// </summary>
+    private readonly DeadlineReminderClock reminderClock;
+
+    /// <summary>
     /// 建立一份固定的期限计算配置。
     /// </summary>
     /// <param name="calendar">节假日与调休快照。</param>
@@ -36,6 +41,7 @@ public sealed class TaskDeadlinePolicy
         this.calendar = calendar ?? throw new ArgumentNullException(nameof(calendar));
         this.timeZone = timeZone ?? throw new ArgumentNullException(nameof(timeZone));
         this.workingHours = workingHours ?? throw new ArgumentNullException(nameof(workingHours));
+        reminderClock = new DeadlineReminderClock(this.calendar, this.timeZone, this.workingHours);
     }
 
     /// <summary>
@@ -72,4 +78,12 @@ public sealed class TaskDeadlinePolicy
 
         return calendar.GetDueAt(startedAt, dueMinutes.Value, timeZone, workingHours);
     }
+
+    /// <summary>
+    /// 从已经固定的任务期限向前计算一个工作小时。
+    /// </summary>
+    /// <param name="dueAt">任务到期时刻。</param>
+    /// <returns>快到期提醒的绝对时刻。</returns>
+    public DateTimeOffset CalculateReminderAt(DateTimeOffset dueAt) =>
+        reminderClock.GetBeforeDueAt(dueAt, 60);
 }

@@ -103,6 +103,15 @@ internal static class NotificationRulesChecks
                 check("新待办按实际开始时间将工作分钟期限与审批状态原子写入 SQLite",
                     await db.ApprovalTasks.Where(task => task.Id == firstId)
                         .Select(task => task.DueAt).SingleAsync() == firstDue);
+                var reminders = await db.OutboxItems.AsNoTracking()
+                    .Where(item => item.Kind == DeadlineReminderPlanner.OutboxKind).ToArrayAsync();
+                check("新待办的提前一个工作小时与超时提醒随审批事务固定排期",
+                    reminders.Length == 2 && reminders.All(item =>
+                    {
+                        var payload = JsonSerializer.Deserialize<DeadlineReminderPayload>(item.PayloadJson);
+                        return payload is not null && payload.TaskId == firstId && payload.DueAt == firstDue &&
+                            payload.ScheduledAt == item.AvailableAt;
+                    }));
             }
 
             var nextContext = EngineScenarioChecks.Context(graph);
@@ -120,6 +129,8 @@ internal static class NotificationRulesChecks
                 check("前一任务的期限不随下一节点推进重算，下一待办从实际激活时刻起算",
                     projections[firstId].DueAt == firstDue &&
                     projections[secondId].DueAt == new DateTimeOffset(2026, 10, 16, 16, 0, 0, TimeSpan.FromHours(8)));
+                check("下一任务独立产生两条提醒而不重复安排旧任务",
+                    await db.OutboxItems.CountAsync(item => item.Kind == DeadlineReminderPlanner.OutboxKind) == 4);
             }
         }
         finally

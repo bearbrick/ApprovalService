@@ -228,7 +228,10 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
                 PayloadJson = JsonSerializer.Serialize(item, ApprovalJson.Options),
                 AvailableAt = item.OccurredAt,
             };
-        }).ToArray();
+        }).ToList();
+        // 延迟提醒与状态、任务、事件在同一事务固定；进程重启也不会漏排期。
+        outbox.AddRange(new DeadlineReminderPlanner(deadlinePolicy).Plan(instance.Id, tasks,
+            previousStatuses, input.Context.OccurredAt));
 
         // 仓储在同一个事务中更新版本、任务投影、事件链和待发项；抢输乐观锁时不重算命令。
         var saved = await repository.CommitAsync(new RuntimeCommit

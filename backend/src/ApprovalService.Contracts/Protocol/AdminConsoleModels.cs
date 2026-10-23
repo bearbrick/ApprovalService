@@ -139,3 +139,38 @@ public sealed class AdminClientAppResponse
         get; set;
     }
 }
+
+/// <summary>
+/// 接入应用的可信嵌入来源设置。
+/// </summary>
+public sealed class AdminEmbedOriginsResponse
+{
+    /// <summary>
+    /// 接入应用编码。
+    /// </summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 完整可信网站来源列表。
+    /// </summary>
+    public IReadOnlyList<string> Origins { get; set; } = [];
+}
+
+/// <summary>
+/// 管理员修改接入应用可信嵌入来源的请求。
+/// </summary>
+public sealed class UpdateAdminEmbedOriginsRequest
+{
+    /// <summary>
+    /// 新的完整来源列表；空列表表示不允许外部网站嵌入。
+    /// </summary>
+    public IReadOnlyList<string>? Origins
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 必填的变更原因。
+    /// </summary>
+    public string Reason { get; set; } = string.Empty;
+}

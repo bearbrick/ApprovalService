@@ -13,6 +13,20 @@ public interface IClientAppRepository
     Task<IReadOnlyList<ClientAppEntity>> ListAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 有条件地更新嵌入来源，并在同一事务写入管理员变更记录。
+    /// </summary>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="expectedJson">读取时的原始来源 JSON。</param>
+    /// <param name="updatedJson">新的来源 JSON。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">本次操作原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>应用仍处于读取时状态且完成保存时为真。</returns>
+    Task<bool> UpdateAllowedEmbedOriginsAsync(string code, string expectedJson, string updatedJson,
+        string actorId, string reason, DateTimeOffset occurredAt, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 按编码读取接入应用。
     /// </summary>
     /// <param name="code">应用编码。</param>

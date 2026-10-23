@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using ApprovalService.Application.Identity;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
@@ -129,6 +130,77 @@ internal static class AdminConsoleChecks
                     !raw.Contains(new string('a', 64), StringComparison.Ordinal) &&
                     !raw.Contains("sensitive-ciphertext", StringComparison.Ordinal));
             }
+
+            var originsPath = ApiRoutes.AdminAppEmbedOrigins.Replace("{code}", "sample", StringComparison.Ordinal);
+            using (var forbidden = await GetAuthorizedAsync(client, originsPath, viewer.AccessToken))
+            {
+                check("普通人员不能读取应用嵌入来源设置", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var invalid = await PutAuthorizedAsync(client, originsPath,
+                new UpdateAdminEmbedOriginsRequest
+                {
+                    Origins = ["https://erp.example.com/path"],
+                    Reason = "试点接入",
+                }, admin.AccessToken))
+            {
+                check("嵌入来源拒绝带路径的网站地址", invalid.StatusCode == HttpStatusCode.BadRequest);
+            }
+
+            using (var invalid = await PutAuthorizedAsync(client, originsPath,
+                new UpdateAdminEmbedOriginsRequest
+                {
+                    Origins = ["http://erp.example.com"],
+                    Reason = "试点接入",
+                }, admin.AccessToken))
+            {
+                check("嵌入来源拒绝非本机 HTTP 网站", invalid.StatusCode == HttpStatusCode.BadRequest);
+            }
+
+            using (var invalid = await PutAuthorizedAsync(client, originsPath,
+                new UpdateAdminEmbedOriginsRequest
+                {
+                    Origins = ["https://erp.example.com"],
+                    Reason = "",
+                }, admin.AccessToken))
+            {
+                check("修改嵌入来源必须填写原因", invalid.StatusCode == HttpStatusCode.BadRequest);
+            }
+
+            using (var saved = await PutAuthorizedAsync(client, originsPath,
+                new UpdateAdminEmbedOriginsRequest
+                {
+                    Origins = ["https://erp.example.com", "https://erp.example.com", "http://localhost:5273"],
+                    Reason = "试点系统嵌入审批中心",
+                }, admin.AccessToken))
+            {
+                var body = await saved.Content.ReadFromJsonAsync<AdminEmbedOriginsResponse>();
+                check("管理员保存合法嵌入来源时去重并允许本机开发地址",
+                    saved.IsSuccessStatusCode && body?.Origins.Count == 2 &&
+                    body.Origins.Contains("https://erp.example.com") && body.Origins.Contains("http://localhost:5273"));
+            }
+
+            using (var response = await GetAuthorizedAsync(client, originsPath, admin.AccessToken))
+            {
+                var body = await response.Content.ReadFromJsonAsync<AdminEmbedOriginsResponse>();
+                check("重新读取应用嵌入来源返回持久设置",
+                    response.IsSuccessStatusCode && body?.Code == "sample" && body.Origins.Count == 2);
+            }
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var audit = await db.OrganizationChanges.AsNoTracking()
+                    .SingleAsync(item => item.EntityKind == "clientApp" && item.EntityId == "sample");
+                var auditJson = audit.AfterJson ?? "{}";
+                using var auditSnapshot = JsonDocument.Parse(auditJson);
+                check("来源变更与管理员、原因和不含密钥的快照一起持久留痕",
+                    audit.ActorId == "admin" &&
+                    auditSnapshot.RootElement.GetProperty("reason").GetString() == "试点系统嵌入审批中心" &&
+                    !auditJson.Contains("sensitive-ciphertext", StringComparison.Ordinal) &&
+                    !auditJson.Contains(new string('a', 64), StringComparison.Ordinal));
+            }
         }
         finally
         {
@@ -162,6 +234,23 @@ internal static class AdminConsoleChecks
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        return await client.SendAsync(request);
+    }
+
+    /// <summary>
+    /// 带管理员访问令牌提交 JSON 设置。
+    /// </summary>
+    /// <param name="client">进程内 HTTP 客户端。</param>
+    /// <param name="path">管理设置地址。</param>
+    /// <param name="body">待保存请求。</param>
+    /// <param name="token">访问令牌。</param>
+    /// <returns>未释放的 HTTP 响应。</returns>
+    private static async Task<HttpResponseMessage> PutAuthorizedAsync(HttpClient client, string path,
+        UpdateAdminEmbedOriginsRequest body, string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = JsonContent.Create(body);
         return await client.SendAsync(request);
     }
 }

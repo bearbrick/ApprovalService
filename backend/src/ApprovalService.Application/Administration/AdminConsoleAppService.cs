@@ -2,6 +2,7 @@ using System.Text.Json;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Shared;
 
 namespace ApprovalService.Application.Administration;
 
@@ -72,5 +73,99 @@ public sealed class AdminConsoleAppService(IOrganizationRepository organization,
                 AllowedFlowCodes = JsonSerializer.Deserialize<string[]>(item.AllowedFlowCodesJson) ?? [],
                 IsEnabled = item.IsEnabled,
             }).ToArray();
+    }
+
+    /// <summary>
+    /// 读取指定应用当前允许嵌入审批中心的网站来源。
+    /// </summary>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>完整来源列表。</returns>
+    public async Task<AdminEmbedOriginsResponse> GetEmbedOriginsAsync(string code,
+        CancellationToken cancellationToken = default)
+    {
+        var app = await clientApps.FindByCodeAsync(code, cancellationToken) ??
+            throw new UserFriendlyException(ErrorCodes.NotFound, "接入应用不存在。");
+        return new AdminEmbedOriginsResponse
+        {
+            Code = app.Code,
+            Origins = JsonSerializer.Deserialize<string[]>(app.AllowedEmbedOriginsJson) ?? [],
+        };
+    }
+
+    /// <summary>
+    /// 保存完整可信来源列表并在同一事务留下操作者和原因。
+    /// </summary>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="input">完整来源列表与变更原因。</param>
+    /// <param name="actorId">当前本地管理员人员 ID。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>规范化后的来源列表。</returns>
+    public async Task<AdminEmbedOriginsResponse> SetEmbedOriginsAsync(string code,
+        UpdateAdminEmbedOriginsRequest input, string actorId, DateTimeOffset occurredAt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var origins = ValidateOrigins(input.Origins);
+        var reason = input.Reason?.Trim() ?? string.Empty;
+        if (reason.Length is < 2 or > 200)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "请填写 2 到 200 个字符的变更原因。");
+        }
+
+        if (string.IsNullOrWhiteSpace(actorId))
+        {
+            throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录。");
+        }
+
+        var app = await clientApps.FindByCodeAsync(code, cancellationToken) ??
+            throw new UserFriendlyException(ErrorCodes.NotFound, "接入应用不存在。");
+        var json = JsonSerializer.Serialize(origins);
+        if (!await clientApps.UpdateAllowedEmbedOriginsAsync(app.Code, app.AllowedEmbedOriginsJson,
+            json, actorId, reason, occurredAt, cancellationToken))
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "接入应用设置已变化，请刷新后重试。");
+        }
+
+        return new AdminEmbedOriginsResponse { Code = app.Code, Origins = origins };
+    }
+
+    /// <summary>
+    /// 只保留完整 HTTPS 来源，开发时允许本机 HTTP；拒绝路径和通配符。
+    /// </summary>
+    /// <param name="origins">调用方提交的来源列表。</param>
+    /// <returns>去重后的规范来源。</returns>
+    private static IReadOnlyList<string> ValidateOrigins(IReadOnlyList<string>? origins)
+    {
+        if (origins is null || origins.Count > 20)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "允许嵌入来源最多 20 项。");
+        }
+
+        var normalized = new List<string>();
+        foreach (var origin in origins)
+        {
+            var candidate = origin?.Trim() ?? string.Empty;
+            if (candidate.Length is < 8 or > 256 || candidate.Contains('*') ||
+                !Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
+                (!string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                    !(string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+                        (string.Equals(uri.Host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(uri.Host, "127.0.0.1", StringComparison.Ordinal)))) ||
+                uri.UserInfo.Length != 0 ||
+                !string.Equals(candidate, uri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                    "允许嵌入来源须为完整 HTTPS 网站来源；本机开发可用 HTTP localhost，不能包含路径或通配符。");
+            }
+
+            if (!normalized.Contains(uri.GetLeftPart(UriPartial.Authority), StringComparer.OrdinalIgnoreCase))
+            {
+                normalized.Add(uri.GetLeftPart(UriPartial.Authority));
+            }
+        }
+
+        return normalized;
     }
 }

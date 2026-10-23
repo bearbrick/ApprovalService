@@ -17,6 +17,12 @@
 .admin-import-content p { color: #375c8a; font-size: 13px; }
 .admin-import-actions { display: flex; gap: 9px; }
 .admin-import-issues { margin: 0; padding-left: 18px; color: #ad3030; font-size: 13px; }
+.admin-origins-panel { margin-bottom: 16px; }
+.admin-origins-content { display: grid; gap: 14px; padding: 18px 20px; }
+.admin-origins-content label { display: grid; gap: 7px; max-width: 620px; color: #46556b; font-size: 13px; }
+.admin-origins-content select, .admin-origins-content textarea, .admin-origins-content input { width: 100%; min-height: 39px; padding: 8px 11px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
+.admin-origins-content textarea { resize: vertical; font-family: inherit; }
+.admin-origins-hint { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .admin-guard-note { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid #d8e5f7; border-radius: 5px; background: #f0f6ff; color: #375c8a; }
 .admin-guard-note strong { font-weight: 600; }
 .admin-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }

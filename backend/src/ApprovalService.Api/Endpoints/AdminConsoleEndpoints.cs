@@ -28,6 +28,14 @@ internal static class AdminConsoleEndpoints
         app.MapGet(ApiRoutes.AdminClientApps, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetClientAppsAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapGet(ApiRoutes.AdminAppEmbedOrigins, (string code, AdminConsoleAppService service,
+            CancellationToken cancellationToken) => service.GetEmbedOriginsAsync(code, cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPut(ApiRoutes.AdminAppEmbedOrigins, (HttpContext http, string code,
+            UpdateAdminEmbedOriginsRequest request, AdminConsoleAppService service,
+            CancellationToken cancellationToken) => service.SetEmbedOriginsAsync(code, request,
+                PersonId(http), DateTimeOffset.UtcNow, cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
         return app;
     }
 

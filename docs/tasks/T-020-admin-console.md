@@ -33,7 +33,7 @@
 - [ ] 密钥只在生成时显示一次
 - [ ] 管理员干预都记进操作记录
 - [ ] 页面截图检查
-- [ ] `verify.ps1` 通过（见 AGENTS.md）
+- [x] `verify.ps1` 通过（见 AGENTS.md）
 - [ ] 相关文档已更新（README、架构、契约、设计书受影响的部分）
 
 ## 不做
@@ -41,6 +41,8 @@
 - 统计报表（T-019）
 
 ## 交接记录
+
+- 2026-10-23 · Codex · 已接通本地管理员会话、组织与应用安全摘要、组织文件预检/导入、每应用允许嵌入来源的配置 UI 和 GET/PUT；来源验证限制 HTTPS 或本机开发 HTTP、上限 20 项，保存实际修改时带原因与管理员 ID 在同一事务脱敏审计，并用旧值条件更新拒绝并发覆盖。已同步 Contracts、副本、README、架构和设计书，真实 HTTP/SQLite 场景检查与 `verify.ps1` 全量通过。T-020 的流程/角色/矩阵/日历/应用密钥与回调/系统信息/操作日志/运行干预等管理写入仍未接线；本任务保持进行中，页面将这些入口明确禁用，不制造假数据。管理页面尚未在外置 Chrome 做截图检查。T-011 的实体字段与三库迁移以 `61bdb52` 的 cherry-pick `bb98972` 纳入本分支；后续整合时注意避免重复应用。
 
 - 2026-10-23 · Codex · 新增接入应用允许嵌入来源的管理配置接口/UI 时，拟再次修改共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs` 和 `docs/contracts.md`，保持前后端契约同步。来源字段与三库迁移由 T-011 负责，字段定为 `ClientAppEntity.AllowedEmbedOriginsJson`；本任务只接受本地组织管理员配置完整 HTTPS origin（开发时 HTTP 仅本机）、至多 20 项，保存时记录操作者及原因。
 

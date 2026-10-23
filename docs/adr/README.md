@@ -51,3 +51,4 @@
 | [0012](0012-miniexcel-organization-import.md) | 组织 Excel 导入导出使用 MiniExcel | 已采纳 |
 | [0013](0013-bound-user-id-for-open-api.md) | 开放接口只接受接入应用已绑定的人员 ID | 已采纳 |
 | [0014](0014-confidential-participant-visibility.md) | 保密流程按发布版本和实际参与记录控制附件可见性 | 已采纳 |
+| [0015](0015-bpmn-js-modeler.md) | 标准 BPMN 建模器负责流程图编辑 | 已采纳 |

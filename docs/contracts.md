@@ -55,6 +55,7 @@
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
 | `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
 | `GET /api/v1/info` | 无 | 服务信息 |
+| `GET /api/v1/center/instances`、`/center/instances/{id}` | 本地或嵌入 JWT | 当前人员的四类只读列表和已授权详情；不接受 API Key 代替人员登录 |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
@@ -105,6 +106,25 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 组织管理员以 `multipart/form-data` 的 `file` 字段调用 `POST /api/v1/admin/org/import?preview=true` 预检查，或省略 `preview` 真正导入。仅接受 UTF-8 CSV、XLSX，文件不超过 5 MB；Excel 最多 10,000 行且解压后字段总量不超过 10 MiB 字符。无效 UTF-8 返回 `VALIDATION_FAILED`。预检查不写库，响应仍为 `{applied:false, issues, departedPersonIds:[]}`。`GET /api/v1/admin/org/template?format=xlsx` 下载 Excel 模板，`format=csv` 下载同字段 CSV 模板；模板首列 `kind` 为 `department`、`person`、`membership`、`personBinding` 或 `departmentBinding`。绑定行使用 `clientAppCode`、`externalId`、`internalId` 三列，绑定方式记为 `import`；`clientAppCode` 必须是已登记的接入应用。导入会检查重复部门编码与字段列宽，正式写入在可串行化事务内按当前组织快照重验，绑定和主数据及每项来源、操作者、时间与前后快照一起提交。
 
+
+## 审批中心只读查询
+
+中心接口使用 `Authorization: Bearer <访问令牌>`；人员 ID 和嵌入来源应用只从已验证 JWT 读取，不提供 `user`、`personId`、`scope=all` 或 `clientAppCode` 切换身份的能力。只有 API Key、未改初始密码、账号或应用代际失效的请求均返回 `UNAUTHORIZED`。响应设置 `Cache-Control: no-store`。
+
+`GET /api/v1/center/instances` 参数：`section=todo|done|cc|started`（默认 `todo`）、可选 `flowCode`、`status`、`search`、`from`（发起时间含起点）、`to`（不含终点）、`skip=0`、`take=20`（1～100）。搜索当前支持标题、审批编号和业务单号，最长 200 字；不搜索原始业务 JSON，避免隐藏字段通过是否命中搜索泄露。时间范围必须递增。返回 `{total, skip, take, items}`，总数、筛选、去重和分页均在人员及应用授权之后计算；加急优先，其后按发起时间倒序和 ID 稳定排序。同一单据有多项本人任务也只列一次。
+
+- `todo`：当前 `pending` 任务的处理人或被代理的原审批人。
+- `done`：可信持久参与者投影中的实际处理人，包括完成、转交、退回和要求补充；不会把代理前原审批人误当作实际处理人。
+- `cc`：普通抄送节点实际送达或人工抄送的收件人；未到达的将来抄送不授予可见性。
+- `started`：发起人或实际代发人，只供看进度。
+
+摘要字段为 `id, serialNo, flowCode, flowName, businessKey, title, status, clientAppCode, initiatorId, submittedById?, isUrgent, startedAt, endedAt?, summary, pendingTaskIds`。`pendingTaskIds` 仅说明当前任务关系，不替代后续操作接口的状态、节点权限和业务校验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。
+
+`GET /api/v1/center/instances/{id}` 返回 `{instance, data, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段；`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?}`；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。该切片尚未提供图布局、详情排版和读标记协议。
+
+可见详情限发起人、实际代发人、当前本人或代理关系中的待办，以及持久化的历史实际处理人/已送达抄送人。保密流程不因管理员身份或仅有未到达、已取消任务自动开放；本切片不开放额外查看人或管理查询。嵌入会话的应用条件与人员条件共同下推到数据库查询，跨应用详情和其他不可见或不存在的单据统一返回 `NOT_FOUND`。列表与详情分别在一个一致读事务中读取计数、版本、任务和事件。
+
+没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；前端接入、字段搜索、未读、批量操作和完整审批操作仍由后续中心切片实现。本切片不供业务 SDK 调用，尚无客户端或前端协议副本。
 
 ## 规划中的接口
 

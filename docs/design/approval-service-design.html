@@ -628,6 +628,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <li>打印审批单：一键生成 PDF（第 7 节）。</li>
           <li>审批中心不能发起审批，也不能改业务数据；这里只做审批、看进度、设置委托代理、维护自己的签名和常用语。</li>
         </ul>
+        <p>已实现的中心只读接口使用登录 JWT：按实际人员参与关系查询待办、已办、已送达抄送、发起或代发记录；嵌入会话同时限定来源应用。授权过滤先于计数和分页，保密详情不会因管理员身份或尚未到达、已取消的任务自动开放。响应按节点权限隐藏业务字段和明细列，不返回内部状态、原始审计正文或私人暂存意见；无权详情与不存在统一返回 404。当前支持标题和编号搜索，字段搜索、未读、审批写操作及前端接入仍待完成。</p>
         <h3>手机端</h3>
         <p>现在做手机网页；以后安卓、iOS 都要上线，做原生 App 还是把手机网页套一个壳（H5 套壳），到时候再定。不管选哪种，现在都按下面的方式把路铺好，到时候不用返工。</p>
         <div class="tw">
@@ -1113,6 +1114,7 @@ await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
 
       <!-- 13 -->
       <section id="api">
+        <p>审批中心人员查询与业务系统开放接口分开：<code>GET /api/v1/center/instances</code> 和 <code>GET /api/v1/center/instances/{id}</code> 只接受已验证登录 JWT，不把 API Key 交给网页；详细筛选和安全投影格式见契约文档。</p>
         <h2><span class="n">13</span>接口清单</h2>
         <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。人员用工号，或者业务系统自己的用户 ID（绑定过的）。</p>
         <h3>审批服务提供的接口</h3>

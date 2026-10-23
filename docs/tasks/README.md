@@ -40,6 +40,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-021](T-021-deploy-and-load-test.md) | 部署、监控、备份与压测 | 后端 | M5 | T-005、T-006 | backend/deploy、backend/tests/load |
 | [T-022](T-022-templates-test-mode-wizard.md) | 流程模板库、测试模式与接入向导 | 后端 + 前端 | M4 | T-006、T-008、T-010 | Flows、Integration 模块；frontend：src/pages/admin |
 | [T-023](T-023-pilot.md) | 试点：费用报销和采购申请 | 全部 | M6 | T-006～T-022 | 全部 |
+| [T-044](T-044-verified-hooks-generation.md) | 钩子与应用身份代际集成验证 | 全部 | M2～M4 | T-041、T-006 | 已验证来源的稳定集成 |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

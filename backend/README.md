@@ -41,6 +41,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /api/v1/tasks/count?user=`、`GET /api/v1/tasks?user=` | 按本应用已绑定人员读取待办数量和列表，需 API Key |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/identity/change-password` | 工号密码登录、刷新令牌轮换、首次或日常改密 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地组织管理员开通账号、作废人员全部令牌 |
+| `GET /api/v1/notifications/preferences`、`PUT /api/v1/notifications/preferences/{category}`、`GET/PUT /api/v1/admin/notifications/daily-digest` | 个人提醒类别开关和管理员每日汇总时间 |
 | `POST /api/v1/embed-tokens`、`/embed-tokens/exchange` | 已认证接入应用为已绑定人员签发一次性嵌入令牌并交换登录态 |
 | `POST /api/v1/org/changes`、`/org/bindings` | 接入应用推送本应用来源的组织数据并绑定自身人员、部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地组织管理员预检查、导入 CSV/XLSX、手工绑定、下载模板 |
@@ -104,7 +105,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试并只保存有界错误码，成功后清除旧错误码。接入应用的 API Key 只存 SHA-256 摘要，回调签名密钥使用部署主密钥加密。回调正文在审批事务中固定，后台发送器用 HMAC-SHA256 签名、5 秒超时；每次发送留不含正文的结果日志，管理用例可重排原事件且不改变 `eventId`。四类业务钩子按已采纳的 ADR 0010 使用 POST JSON、双向 HMAC、请求 ID 回显与 5 秒超时；目前发起前取数、发起前和同意前校验已接通，取人与自动动作待后续接线。
 
-通知传输基础在 `Notifications/`：`INotificationAppService.QueueAsync` 把稳定 ID、渠道编码、收件人和站内路径写入待发队列；后台处理器在事务外选择 `INotificationChannel`，发送 SMTP 邮件或写入站内收件箱。站内消息按 ID 幂等，按人员读取和标记已读。邮件在 SMTP 接收后、待发确认前故障时可能重发，邮件带稳定的 `X-Approval-Notification-Id` 供下游去重。当前没有业务事件自动产生通知；后续接入审批事件时，应在审批事务的 `RuntimeCommit.OutboxItems` 中一并写入通知待发项，避免提交后进程退出漏发。
+通知传输基础在 `Notifications/`：新待办、催办、审批结果、抄送和评论提及依实际引擎事件规划，收件人须是能查看该审批单的在职人员；保密流程只对发起人、代发人、当前待办人和实际历史参与人发送。站内和邮件待发项与审批状态、任务、事件一起提交，发送失败由持久队列退避重试。后台处理器在事务外选择 `INotificationChannel`，发送 SMTP 邮件或按稳定 ID 写入站内收件箱；邮件正文包含审批编号、标题及需登录的审批中心链接，不含免登录令牌。邮件在 SMTP 接收后、待发确认前故障时可能重发，带稳定的 `X-Approval-Notification-Id` 供下游去重。个人可按类别分别关闭邮件或站内提醒，投递前再次读取最新开关；组织管理员可配置每日待办汇总的当地 `HH:mm` 时刻，未配置则不发送，每人每天最多一封且可单独关闭。
 
 在途业务单号按全局 `(flowCode, businessKey)` 唯一，接入应用不能把其他应用占用的单据当作幂等结果。审批详情在同一数据库快照读取状态、任务和事件。出站地址默认要求 HTTPS，回调应用停用时保留待发项并记录原因；HTTP 重定向不会把签名正文转发到其他地址。
 

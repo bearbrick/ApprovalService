@@ -114,6 +114,8 @@ internal static partial class OpenApiChecksStarts
         check("节点同意前校验通过后才由统一引擎提交审批",
             approved.Status == EngineInstanceStatuses.Approved &&
             handler.Requests.Last().Body.Contains("\"taskId\"", StringComparison.Ordinal));
+
+        await RunAssigneeActionHooksAsync(services, app, hookClient, handler, check);
     }
 
     /// <summary>
@@ -175,9 +177,16 @@ internal static partial class OpenApiChecksStarts
             var signature = request.Headers.GetValues(HeaderNames.Signature).Single();
             Requests.Add((path, body, signature == SignedHttpOutboundAdapter.Sign(body, secret)));
             var requestId = request.Headers.GetValues(HeaderNames.RequestId).Single();
-            var responseBody = path == "/data"
-                ? "{\"data\":{\"amount\":13},\"title\":\"业务取数采购\"}"
-                : Mode == "reject" ? "{\"allowed\":false,\"reason\":\"预算不足\"}" : "{\"allowed\":true}";
+            var responseBody = path switch
+            {
+                "/data" => "{\"data\":{\"amount\":13},\"title\":\"业务取数采购\"}",
+                "/assignee" when Mode == "unbound-assignee" => "{\"userIds\":[\"E002\"]}",
+                "/assignee" => "{\"userIds\":[\"bob\"]}",
+                "/action" when Mode == "reject-action" => "{\"success\":false}",
+                "/action" => "{\"success\":true}",
+                _ when Mode == "reject" => "{\"allowed\":false,\"reason\":\"预算不足\"}",
+                _ => "{\"allowed\":true}",
+            };
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(Encoding.UTF8.GetBytes(responseBody)),

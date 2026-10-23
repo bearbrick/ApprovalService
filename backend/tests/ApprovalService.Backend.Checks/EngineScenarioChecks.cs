@@ -19,6 +19,7 @@ internal static class EngineScenarioChecks
         CheckHumanNodes(check);
         CheckGateways(check);
         CheckExternalNodes(check);
+        EngineScenarioChecksBusinessApi.Run(check);
         CheckNodeExtensions(check);
         CheckLimits(check);
     }

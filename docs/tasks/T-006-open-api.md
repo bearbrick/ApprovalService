@@ -21,6 +21,9 @@
 - `frontend/src/model/flow-execution.ts`、`frontend/src/model/flow.ts`：仅从 T-034 已验收提交取独立的执行图类型拆分，保持源码少于 500 行和旧导入路径兼容
 - `backend/src/ApprovalService.Api/Endpoints/OpenApi/`；`Application/Integration/`（接入应用、API Key 只存 SHA-256、流程授权）
 - `backend/src/ApprovalService.Infrastructure/Integration/`：出站适配层（HMAC 签名、5 秒超时、按 1 分钟 / 5 分钟 / 30 分钟 / 2 小时重试、发送日志）、钩子调用（取数、校验、取人、业务动作）
+- `backend/src/ApprovalService.Engine/Execution/EngineWork.cs`、`EngineRuntime.cs`、`EngineResults.cs` 与 `backend/src/ApprovalService.Engine/Assignees/BusinessApiAssigneeResolver.cs`、`AssigneeModels.cs`：仅为业务接口找人增加纯计算的“实际命中节点待预取”结果，发现缺失时不提交状态，补齐可信快照后以同一命令重算；不在引擎做网络访问
+- `backend/src/ApprovalService.Application/Runtime/ApprovalRuntimeAppService.cs`、`backend/src/ApprovalService.Application/Integration/OpenStartContextBuilder.cs`、`OpenRoutingInputs.cs`、`BusinessHookAppService.cs`、`BusinessAssigneeAppService.cs` 与 `backend/src/ApprovalService.Infrastructure/Integration/EngineEventOutboxHandler.cs`：事务前按实际节点取人、在路由快照保存发起时本应用外部人员 ID、提交后持久业务动作及同一事件 ID 的结果回写
+- `backend/tests/ApprovalService.Backend.Checks/EngineScenarioChecks*.cs`、`AssigneeChecks.cs` 与 `OpenApiChecks*.cs`：分支实际到达取人、严格绑定、动作重试和结果恢复场景
 - `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
 - `backend/src/ApprovalService.Domain/Runtime/IApprovalRuntimeRepository.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalRuntimeRepository.cs`：审批单和任务查询、在途唯一性与数据更新所需仓储能力
 - `backend/src/ApprovalService.Domain/Runtime/ActiveInstanceKeyEntity.cs`：跨三种数据库保证在途“流程编码 + 业务单号”唯一的独立键
@@ -45,6 +48,7 @@
 
 - `docs/contracts.md`：写全请求、响应、回调格式
 - `backend/src/ApprovalService.Contracts/**`
+- `backend/src/ApprovalService.Contracts/Protocol/BusinessHookModels.cs`：补齐业务取人/动作的请求响应模型
 - `ApprovalErrorCodes.cs`
 - `Program.cs`（Api、检查程序）
 - `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`：接入服务登记
@@ -75,6 +79,8 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-22 · Codex：ADR 0010 取人与自动动作的最小完整切片已实现。纯引擎仅在实际命中 BusinessApi 节点且可信快照缺结果时报告该节点，无待提交事件；运行应用服务按原状态、请求 ID、固定时间与图有界重算，业务人员只经当前应用既有在职绑定解析，取人拒绝时无部分审批状态。发起路由快照保存本应用外部发起人 ID。自动节点继续使用原子写入的 `actionPending` 待发项，后台事务外双向验签发送，以 `eventId` 让业务系统去重；成功后同 ID 幂等提交 `ActionSucceeded`，远端失败/非成功响应保留队列重试，确认待发项失败后重领不重复出站。纯引擎分支场景与真实 SQLite/假签名业务端覆盖严格绑定、失败隔离、动作失败重试及回写；完整 `verify.ps1` 通过：后端 583、调用端 33、前端 65 项，零构建警告，5289 已释放。Contracts、契约、架构、设计书与后端 README 已同步。状态保持进行中：动作响应的可选 `result` 如何进入回调或审批数据、无限重试后的管理员处理边界，设计仍不明确，本轮只回写成功结论，不猜测业务结果持久语义；开放 PATCH、重新提交、预览、附件原子关联、`AuthGeneration` 仍未完成。
+- 2026-10-22 · Codex：继续 ADR 0010 后两类钩子前已复核：T-002 状态已完成，当前无并行认领；`EngineWork.Advance` 会在一个纯命令里跨过多个实际分支并创建任务，应用层无法从整图安全预取取人结果。按主任务同意，本轮精确扩范围到上列 Engine/Runtime/出站与场景文件：引擎遇缺少的业务节点取人输入返回实际命中节点请求、无任何持久提交，应用层用同一命令和固定时间重新计算；自动动作使用已有 `actionPending` 待发事件及 `ActionSucceeded/Failed` 恢复命令。先完成纯引擎最小切片，随后补严格本应用绑定和持久动作；状态保持进行中。
 - 2026-10-22 · Codex：已采纳 ADR 0010，接入应用四个完整 URL 保持默认 HTTPS、可信内网显式开启 HTTP。提交 `be8f839` 接通未传 `data` 时的发起前取数、发起前与任务同意前的业务校验；统一出站层对原始响应字节做 HMAC-SHA256 恒定时间核对，校验回显的请求 ID 后才解析 JSON，网络/超时/HTTP/签名/格式错误统一为 `BUSINESS_HOOK_FAILED`。真实数据库和假业务端场景证明签名错误或校验拒绝不保存部分审批，拒绝同意后任务仍待办；Contracts、SDK 错误码、DI 和契约/架构/设计/README 已同步。完整 `verify.ps1` 通过：后端 572、调用端 33、前端 65 项，零构建警告；5289 已释放。状态保持进行中：业务取人必须仅在即将进入目标节点前预取，并严格按当前应用已有人员绑定解析，不能全图预取未走分支；自动动作须从持久引擎待发事件在提交后发送，并以同一 `eventId` 幂等地把执行结果送回引擎，不能在写事务中等待网络。PATCH、外部重提、预览、附件原子关联仍待接线。T-007 已记录的停用再启用可能复活旧嵌入访问/刷新/未兑换令牌问题，需要接入应用启停/密钥轮换路径与身份令牌联合引入单调 `AuthGeneration`，本次未单方修改，不得把 T-006 标完成。
 - 2026-10-22 · Codex：用户已确认 ADR 0010；本轮登记共享 `backend/src/ApprovalService.Contracts/Protocol/ErrorCodes.cs`、调用端错误码副本、应用/基础设施 DI、检查入口、`docs/contracts.md` 与 `docs/architecture.md`，用于四类钩子协议和发起前取数/校验接线。先完成独立可验证的双向 HMAC、响应请求 ID 核对、5 秒超时及同步钩子，后续继续取人和自动动作；状态保持进行中。
 - 2026-10-22 · Codex：只读复核发现本应用终止在 `awaitingInitiator`（退回待重提或待补充）时被引擎当成非 `running` 拒绝，但仓储仍将其计为在途并占用业务单号；业务原单此时作废无法释放占用。T-004 已验收且无人认领，已精确登记并修改上面的 `EngineRuntime.cs`：仅放宽 `terminate` 可处理两个在途状态，清除暂停入口，其他命令与原管理员/所属应用授权、必填原因保持不变。引擎覆盖待补充和退回待重提、撤回仍受限；真实 HTTP/SQLite 覆盖待补充终止及在途键释放。共享 `docs/contracts.md`、设计书 §api 和后端 README 已同步。完整 `verify.ps1` 通过：后端 566、调用端 33、前端 65 项，零构建警告，5289 已释放。状态保持进行中。

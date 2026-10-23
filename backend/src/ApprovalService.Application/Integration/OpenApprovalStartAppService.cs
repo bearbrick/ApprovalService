@@ -136,6 +136,7 @@ public sealed class OpenApprovalStartAppService(
                     ApprovalDataJson = data.GetRawText(),
                     RoutingInputsJson = JsonSerializer.Serialize(new OpenRoutingInputs
                     {
+                        InitiatorExternalId = request.Initiator,
                         InitiatorSelections = context.AssigneeSnapshot?.InitiatorSelections ?? new(StringComparer.Ordinal),
                         DataValues = context.AssigneeSnapshot?.DataValues ?? new(StringComparer.Ordinal),
                     }, ApprovalJson.Options),

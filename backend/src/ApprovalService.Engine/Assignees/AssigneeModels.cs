@@ -131,7 +131,7 @@ public sealed class AssigneeSnapshot
     /// </summary>
     public List<AssigneeMatrixMatch> MatrixMatches { get; set; } = [];
     /// <summary>
-    /// 业务系统接口的预取人员，键为接口编码。
+    /// 业务系统接口的预取人员，键为实际到达的节点 ID；旧纯引擎调用可按来源编码提供。
     /// </summary>
     public Dictionary<string, List<string>> BusinessApiResults { get; set; } = new(StringComparer.Ordinal);
     /// <summary>

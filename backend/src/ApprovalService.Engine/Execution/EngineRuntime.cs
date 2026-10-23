@@ -166,6 +166,16 @@ public static class EngineRuntime
             OperationGuard.AttachAudit(work.Events, command, auditTask);
         }
 
+        if (work.RequiredBusinessAssignee is not null)
+        {
+            // 只报告本次真实到达的节点；前面纯计算的状态和事件全部丢弃，取人后从原命令重算。
+            return new EngineResult
+            {
+                State = current is null ? new EngineState { InstanceId = command.InstanceId } : EngineStateCopy.Copy(current),
+                RequiredBusinessAssignee = work.RequiredBusinessAssignee,
+            };
+        }
+
         if (command.Kind is EngineCommandKinds.Withdraw or EngineCommandKinds.Terminate or EngineCommandKinds.Cancel or
             EngineCommandKinds.Start)
         {

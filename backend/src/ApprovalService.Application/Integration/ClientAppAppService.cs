@@ -69,6 +69,61 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     }
 
     /// <summary>
+    /// 读取已启用应用允许嵌入审批中心的网站来源，拒绝损坏或不符合当前部署环境的配置。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="allowLocalHttp">开发环境是否允许本机 HTTP 来源。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>规范化且无重复的来源列表。</returns>
+    public async Task<IReadOnlyList<string>> GetAllowedEmbedOriginsAsync(string code, bool allowLocalHttp,
+        CancellationToken cancellationToken = default)
+    {
+        var app = await repository.FindByCodeAsync(code, cancellationToken);
+        if (app is null || !app.IsEnabled)
+        {
+            throw new UserFriendlyException(ErrorCodes.NotFound, "接入应用不存在或已停用。");
+        }
+
+        string[] origins;
+        try
+        {
+            origins = JsonSerializer.Deserialize<string[]>(app.AllowedEmbedOriginsJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用允许嵌入来源配置无效。");
+        }
+
+        if (origins.Length > 20 || origins.Any(origin => !IsSafeEmbedOrigin(origin, allowLocalHttp)))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用允许嵌入来源配置无效。");
+        }
+
+        return origins.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
+    /// <summary>
+    /// 在构造安全响应头前再次检查持久化来源，防止损坏数据注入 CSP 指令。
+    /// </summary>
+    /// <param name="origin">待检查的来源。</param>
+    /// <param name="allowLocalHttp">是否在开发环境。</param>
+    /// <returns>仅含协议、主机和可选端口的可信来源为真。</returns>
+    private static bool IsSafeEmbedOrigin(string? origin, bool allowLocalHttp)
+    {
+        if (string.IsNullOrWhiteSpace(origin) || origin.Length > 256 ||
+            !Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
+            !string.Equals(origin, uri.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase) ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            return false;
+        }
+
+        return uri.Scheme == Uri.UriSchemeHttps ||
+            (allowLocalHttp && uri.Scheme == Uri.UriSchemeHttp &&
+                (uri.Host == "localhost" || uri.Host == "127.0.0.1"));
+    }
+
+    /// <summary>
     /// 供已授权管理用例启用或停用应用，实际状态切换使旧嵌入会话永久失效。
     /// </summary>
     /// <param name="code">接入应用编码。</param>

@@ -113,6 +113,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddOptions<SmtpNotificationOptions>()
             .Bind(configuration.GetSection(SmtpNotificationOptions.SectionName));
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationSettingsRepository, NotificationSettingsRepository>();
+        services.AddScoped<DailyDigestScheduler>();
+        services.AddScoped<IScheduledJobHandler, DailyDigestJobHandler>();
+        services.AddHostedService<DailyDigestHostedService>();
         services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
         services.AddScoped<INotificationChannel, InAppNotificationChannel>();
         services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();

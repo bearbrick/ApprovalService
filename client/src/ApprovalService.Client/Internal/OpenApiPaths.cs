@@ -16,9 +16,19 @@ internal static class OpenApiPaths
     public const string FlowSchema = "/api/v1/flows/{code}/schema";
 
     /// <summary>
+    /// 按当前数据和组织预览预计路径。
+    /// </summary>
+    public const string FlowPreview = "/api/v1/flows/{code}/preview";
+
+    /// <summary>
     /// 发起审批和按业务单号查询历史。
     /// </summary>
     public const string Instances = "/api/v1/instances";
+
+    /// <summary>
+    /// 逐张独立发起审批。
+    /// </summary>
+    public const string InstancesBatch = "/api/v1/instances/batch";
 
     /// <summary>
     /// 按审批单 ID 查询详情。
@@ -26,9 +36,24 @@ internal static class OpenApiPaths
     public const string Instance = "/api/v1/instances/{id}";
 
     /// <summary>
+    /// 审批中更新允许修改的业务字段。
+    /// </summary>
+    public const string InstanceData = "/api/v1/instances/{id}/data";
+
+    /// <summary>
     /// 发起人撤回在途审批。
     /// </summary>
     public const string InstanceWithdraw = "/api/v1/instances/{id}/withdraw";
+
+    /// <summary>
+    /// 退回或补充后重新提交完整业务数据。
+    /// </summary>
+    public const string InstanceResubmit = "/api/v1/instances/{id}/resubmit";
+
+    /// <summary>
+    /// 所属应用以已绑定人员终止在途审批。
+    /// </summary>
+    public const string InstanceTerminate = "/api/v1/instances/{id}/terminate";
 
     /// <summary>
     /// 发起人催办当前任务。

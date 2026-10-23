@@ -79,7 +79,9 @@ public sealed partial class ApprovalServiceClient : IDisposable
         apiKey = configuredApiKey;
         timeout = configuredTimeout;
 
-        http = handler == null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
+        // 文件下载的对象存储跳转必须由 SDK 显式跟随，不能把 API Key 带到目标地址。
+        http = handler == null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
+            : new HttpClient(handler, disposeHandler: false);
         // 地址末尾补上斜杠，相对路径才会拼在后面而不是替换最后一段。
         var address = baseAddress.ToString();
         http.BaseAddress = new Uri(address.EndsWith("/", StringComparison.Ordinal) ? address : address + "/");
@@ -109,9 +111,11 @@ public sealed partial class ApprovalServiceClient : IDisposable
     /// <param name="path">相对服务地址的路径，如 api/v1/info。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="payload">可选的 JSON 请求体。</param>
+    /// <param name="requestId">可选的稳定请求 ID。</param>
     /// <returns>解析后的 JSON（对象是字典，数组是列表）；响应体为空时为 null。</returns>
     /// <exception cref="ApprovalServiceException">服务返回错误、连不上或超时。</exception>
-    private async Task<object?> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken, object? payload = null)
+    private async Task<object?> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken, object? payload = null,
+        string? requestId = null)
     {
         using (var request = new HttpRequestMessage(method, path))
         {
@@ -126,7 +130,7 @@ public sealed partial class ApprovalServiceClient : IDisposable
                 request.Headers.TryAddWithoutValidation(Protocol.ApiKey, apiKey);
             }
 
-            request.Headers.TryAddWithoutValidation(Protocol.RequestId, Guid.NewGuid().ToString("N"));
+            request.Headers.TryAddWithoutValidation(Protocol.RequestId, ValidRequestId(requestId));
             HttpResponseMessage response;
             try
             {
@@ -162,6 +166,27 @@ public sealed partial class ApprovalServiceClient : IDisposable
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// 使用调用方稳定请求 ID，或为单次调用生成新 ID。
+    /// </summary>
+    /// <param name="requestId">可选请求 ID。</param>
+    /// <returns>符合服务端协议的请求 ID。</returns>
+    private static string ValidRequestId(string? requestId)
+    {
+        if (requestId == null)
+        {
+            return Guid.NewGuid().ToString("N");
+        }
+
+        if (requestId.Length == 0 || requestId.Length > 64 || requestId.Any(character =>
+            !(character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '-' or '_' or '.' or ':')))
+        {
+            throw new ArgumentException("请求 ID 只能包含字母、数字及 - _ . :，最长 64 个字符。", nameof(requestId));
+        }
+
+        return requestId;
     }
 
     /// <summary>

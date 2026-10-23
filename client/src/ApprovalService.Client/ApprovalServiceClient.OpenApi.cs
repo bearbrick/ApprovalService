@@ -31,27 +31,31 @@ public sealed partial class ApprovalServiceClient
     /// <param name="input">业务单号、人员及数据快照。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>创建或复用的审批单。</returns>
-    public async Task<ApprovalInstance> StartAsync(StartApprovalRequest input, CancellationToken cancellationToken = default)
-    {
-        if (input == null)
-        {
-            throw new ArgumentNullException(nameof(input));
-        }
+    public Task<ApprovalInstance> StartAsync(StartApprovalRequest input, CancellationToken cancellationToken = default) =>
+        StartCoreAsync(input, null, cancellationToken);
 
-        var body = new Dictionary<string, object?>
-        {
-            ["flowCode"] = Required(input.FlowCode, nameof(input.FlowCode)),
-            ["businessKey"] = Required(input.BusinessKey, nameof(input.BusinessKey)),
-            ["title"] = Required(input.Title, nameof(input.Title)),
-            ["initiator"] = Required(input.Initiator, nameof(input.Initiator)),
-            ["initiatingDepartment"] = input.InitiatingDepartment,
-            ["submittedBy"] = input.SubmittedBy,
-            ["data"] = input.Data ?? throw new ArgumentException("发起审批必须提供数据快照。", nameof(input)),
-            ["detailUrl"] = input.DetailUrl,
-            ["isUrgent"] = input.IsUrgent,
-            ["selectedAssignees"] = input.SelectedAssignees,
-        };
-        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, Relative(OpenApiPaths.Instances), cancellationToken, body).ConfigureAwait(false));
+    /// <summary>
+    /// 用稳定请求 ID 发起审批，网络失败后可用相同 ID 安全重试。
+    /// </summary>
+    /// <param name="input">业务单号、人员及数据快照。</param>
+    /// <param name="requestId">调用方在重试中保持不变的请求 ID。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>创建或复用的审批单。</returns>
+    public Task<ApprovalInstance> StartAsync(StartApprovalRequest input, string requestId,
+        CancellationToken cancellationToken = default) => StartCoreAsync(input, requestId, cancellationToken);
+
+    /// <summary>
+    /// 发送单张发起请求并解析审批单。
+    /// </summary>
+    /// <param name="input">发起输入。</param>
+    /// <param name="requestId">可选稳定请求 ID。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>审批单。</returns>
+    private async Task<ApprovalInstance> StartCoreAsync(StartApprovalRequest input, string? requestId,
+        CancellationToken cancellationToken)
+    {
+        return OpenApiJson.Instance(await SendAsync(HttpMethod.Post, Relative(OpenApiPaths.Instances),
+            cancellationToken, StartBody(input), requestId).ConfigureAwait(false));
     }
 
     /// <summary>

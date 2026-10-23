@@ -129,6 +129,48 @@ internal static class LiveServerChecks
         check("端到端：SDK 催办后发起人可撤回未决审批",
             reminded.Status == "running" && withdrawn.Status == "withdrawn" &&
             (await client.GetTaskCountAsync(approver)).Pending == 0);
+
+        var preview = await client.PreviewAsync(flowCode, new ApprovalPreviewRequest { Initiator = initiator });
+        check("端到端：流程预览返回当前组织中的候选审批人",
+            preview.Nodes.Any(node => node.CandidateAssigneeIds.Contains("approver")));
+
+        var batch = await client.StartBatchAsync(new StartApprovalRequest?[]
+        {
+            new()
+            {
+                FlowCode = flowCode,
+                BusinessKey = businessKey + "-batch",
+                Title = "SDK 批量发起验证",
+                Initiator = initiator,
+                Data = new Dictionary<string, object?>(),
+            },
+            null,
+        });
+        check("端到端：批量发起逐项返回成功审批单和业务错误",
+            batch.Count == 2 && batch[0].Instance?.Status == "running" &&
+            batch[1].Error?.Code == ApprovalErrorCodes.ValidationFailed);
+        await client.WithdrawAsync(batch[0].Instance!.Id, initiator);
+
+        // 临时夹具只建立人员和应用绑定，没有创建登录账号；服务必须明确拒绝发令牌。
+        var embedNeedsAccount = false;
+        try
+        {
+            await client.CreateEmbedTokenAsync(initiator, "/#/m/tasks");
+        }
+        catch (ApprovalServiceException error)
+        {
+            embedNeedsAccount = error.ErrorCode == ApprovalErrorCodes.NotFound;
+        }
+
+        check("端到端：已绑定但未开通账号时嵌入令牌明确返回 NOT_FOUND", embedNeedsAccount);
+
+        var png = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 };
+        using var image = new MemoryStream(png);
+        var uploaded = await client.UploadFileAsync("SDK验证.png", image);
+        var downloaded = await client.DownloadUnlinkedFileAsync(uploaded.Id);
+        check("端到端：应用上传后只能按未关联文件权限取回原始字节",
+            uploaded.ContentType == "image/png" && uploaded.Size == png.Length &&
+            downloaded.Content.SequenceEqual(png));
     }
 
     /// <summary>

@@ -65,6 +65,7 @@ internal static class OpenApiJson
             ClientAppCode = String(row, "clientAppCode"),
             Status = String(row, "status"),
             Data = Object(Field(row, "data"), "data"),
+            ApproverFieldValues = OptionalObject(row, "approverFieldValues"),
             StartedAt = Date(row, "startedAt"),
             EndedAt = OptionalDate(row, "endedAt"),
             Tasks = Array(Field(row, "tasks"), "tasks").Select(InstanceTask).ToArray(),
@@ -151,8 +152,17 @@ internal static class OpenApiJson
     /// <param name="value">待验证值。</param>
     /// <param name="name">字段名。</param>
     /// <returns>对象。</returns>
-    private static Dictionary<string, object?> Object(object? value, string name) =>
+    internal static Dictionary<string, object?> Object(object? value, string name) =>
         value as Dictionary<string, object?> ?? Invalid<Dictionary<string, object?>>(name);
+
+    /// <summary>
+    /// 读取兼容新增的可选 JSON 对象。
+    /// </summary>
+    /// <param name="row">父对象。</param>
+    /// <param name="name">属性名。</param>
+    /// <returns>对象；未提供时为空对象。</returns>
+    internal static Dictionary<string, object?> OptionalObject(Dictionary<string, object?> row, string name) =>
+        !row.TryGetValue(name, out var value) || value == null ? new Dictionary<string, object?>() : Object(value, name);
 
     /// <summary>
     /// 要求 JSON 值为数组。
@@ -160,7 +170,7 @@ internal static class OpenApiJson
     /// <param name="value">待验证值。</param>
     /// <param name="name">字段名。</param>
     /// <returns>数组。</returns>
-    private static List<object?> Array(object? value, string name) =>
+    internal static List<object?> Array(object? value, string name) =>
         value as List<object?> ?? Invalid<List<object?>>(name);
 
     /// <summary>
@@ -169,7 +179,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>字段值。</returns>
-    private static object? Field(Dictionary<string, object?> row, string name) =>
+    internal static object? Field(Dictionary<string, object?> row, string name) =>
         row.TryGetValue(name, out var value) ? value : Invalid<object?>(name);
 
     /// <summary>
@@ -178,7 +188,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>字符串。</returns>
-    private static string String(Dictionary<string, object?> row, string name) =>
+    internal static string String(Dictionary<string, object?> row, string name) =>
         Field(row, name) as string ?? Invalid<string>(name);
 
     /// <summary>
@@ -187,7 +197,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>字符串或 null。</returns>
-    private static string? OptionalString(Dictionary<string, object?> row, string name) =>
+    internal static string? OptionalString(Dictionary<string, object?> row, string name) =>
         !row.TryGetValue(name, out var value) || value == null ? null : value as string ?? Invalid<string>(name);
 
     /// <summary>
@@ -196,7 +206,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>整数。</returns>
-    private static int Int(Dictionary<string, object?> row, string name)
+    internal static int Int(Dictionary<string, object?> row, string name)
     {
         var value = Long(row, name);
         return value >= int.MinValue && value <= int.MaxValue ? (int)value : Invalid<int>(name);
@@ -208,7 +218,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>长整数。</returns>
-    private static long Long(Dictionary<string, object?> row, string name)
+    internal static long Long(Dictionary<string, object?> row, string name)
     {
         var value = Field(row, name);
         return value is decimal number && number == decimal.Truncate(number) && number >= long.MinValue && number <= long.MaxValue
@@ -221,7 +231,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>布尔值。</returns>
-    private static bool Bool(Dictionary<string, object?> row, string name) =>
+    internal static bool Bool(Dictionary<string, object?> row, string name) =>
         Field(row, name) is bool value ? value : Invalid<bool>(name);
 
     /// <summary>
@@ -230,7 +240,7 @@ internal static class OpenApiJson
     /// <param name="row">对象。</param>
     /// <param name="name">字段名。</param>
     /// <returns>时间。</returns>
-    private static DateTimeOffset Date(Dictionary<string, object?> row, string name) =>
+    internal static DateTimeOffset Date(Dictionary<string, object?> row, string name) =>
         DateTimeOffset.TryParse(String(row, name), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var value)
             ? value : Invalid<DateTimeOffset>(name);
 

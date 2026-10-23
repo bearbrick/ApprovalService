@@ -61,6 +61,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-041](T-041-client-app-auth-generation.md) | 接入应用身份代际与嵌入会话永久失效 | 后端 | M4 | T-006、T-007、T-039、T-042 | Integration、Identity、Persistence |
 | [T-042](T-042-verified-hook-integration.md) | 钩子与 SDK 夹具稳定集成快照 | 全部 | M2～M4 | T-039、T-040、T-006 稳定提交 | backend、frontend、client、docs |
 | [T-043](T-043-confidential-visibility.md) | 保密流程与抄送收件人附件可见性 | 后端 + 契约镜像 | M3 | T-013、T-041、T-042 | Runtime、Files、Contracts/Flows、frontend/src/model |
+| [T-045](T-045-canvas-polish.md) | 自由画布走线与评审预览 | 前端 | M1 | T-009、T-011 | src/designer/canvas |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

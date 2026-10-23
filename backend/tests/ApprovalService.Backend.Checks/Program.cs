@@ -57,6 +57,7 @@ internal static class Program
         WorkCalendarChecks.Run(Check);
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
+        await ReportingChecks.RunAsync(Check);
         await EventAnchorChecks.RunAsync(Check);
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);

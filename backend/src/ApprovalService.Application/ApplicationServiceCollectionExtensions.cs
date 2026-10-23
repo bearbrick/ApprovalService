@@ -26,6 +26,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<FlowCatalogAppService>();
         services.AddScoped<OpenFlowPreviewAppService>();
         services.AddScoped<CallbackDeliveryAppService>();
+        services.AddScoped<ActionRetryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
         services.AddScoped<BusinessHookAppService>();

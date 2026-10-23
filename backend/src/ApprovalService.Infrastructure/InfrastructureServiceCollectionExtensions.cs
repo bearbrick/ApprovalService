@@ -61,6 +61,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton(NotificationCalendarSettings.Create(configuration));
         // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
         services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
         services.AddSingleton<SignedHttpOutboundAdapter>();

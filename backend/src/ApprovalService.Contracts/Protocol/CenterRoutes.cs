@@ -6,6 +6,18 @@ namespace ApprovalService.Contracts.Protocol;
 public static class CenterRoutes
 {
     /// <summary>
+    /// 普通审批中心页面入口，不允许被其他页面嵌入。
+    /// </summary>
+    public const string Home = "/";
+    /// <summary>
+    /// 按接入应用编码限制内嵌来源的审批中心页面入口。
+    /// </summary>
+    public const string EmbedDocument = "/embed/{clientAppCode}";
+    /// <summary>
+    /// 已验证嵌入会话可读取本应用允许的消息目标来源。
+    /// </summary>
+    public const string EmbedContext = "/api/v1/center/embed-context";
+    /// <summary>
     /// 按分组分页查询当前登录人员的审批单。
     /// </summary>
     public const string Instances = "/api/v1/center/instances";

@@ -100,6 +100,12 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Files:BrowserAccessible` | `false` | 浏览器可直连时签发短时地址，否则服务转发 |
 | `Files:PresignedUrlSeconds` | `300` | 预签名地址有效秒数，只能设为 1—300 秒 |
 
+## 审批中心同源托管
+
+正式部署先构建 `frontend/`，再发布 `ApprovalService.Api`，将 `frontend/dist/` 的内容复制到发布目录的 `wwwroot/`。服务默认从自身内容根目录的 `wwwroot/index.html` 提供页面；也可用环境变量 `ApprovalService__Frontend__DistPath` 指向完整的前端构建目录。生产环境找不到 `index.html` 时启动失败；开发环境未配置构建目录时可单独运行 API。前端文件必须经本服务或等效保留安全头的同源反向代理提供，不可另开放一个不受策略保护的静态入口。
+
+普通页面为 `/`，响应禁止被 iframe 嵌入。接入应用专属入口为 `/embed/{clientAppCode}`，只允许该应用登记的来源嵌入；来源配置不包含路径、查询或通配符，未配置时仅允许同源。业务系统应从后端签发一次性令牌，并把它放在片段里，例如 `/embed/erp#/center/approvals/instance-id?embedToken=...`。片段不会发送到服务器；页面兑换后立即清理。审批中心的接口与资源同源，嵌入上下文接口仅接受该应用的已验证嵌入 JWT。直接访问 `/index.html` 等静态 HTML 仍为禁止嵌入，不能绕过专用入口。
+
 ## 工作日历基础
 
 `Domain/Notifications/Calendar` 提供纯日历规则：默认周一至周五为工作日，调用方可传入本地日期覆盖清单，将节假日设为休息日、调休周末设为工作日。`GetWorkingDateAfter` 从指定日期之后计数，不把起点算作第一个工作日；`GetLocalDate` 按指定时区将时间点换成本地日期，避免使用服务器本地时区或固定 UTC 偏移。配置清单由调用方提供，规则本身不访问数据库。

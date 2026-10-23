@@ -17,6 +17,7 @@
 | `X-Request-Id` | 请求、响应 | 调用方生成的请求 ID，原样返回并记进日志；没传或不合规（超过 64 个字符，或含字母数字和 `- _ . :` 以外的字符）时服务生成一个 32 位的 |
 | `X-Trace-Id` | 响应 | 本次请求的链路 ID，和错误体里的 `traceId` 相同，反馈问题时提供 |
 | `X-Approval-Signature` | 回调与钩子请求、钩子响应 | `sha256=` 加上用接入应用的签名密钥对原始 UTF-8 正文做 HMAC-SHA256 的十六进制小写；钩子双方都验签 |
+| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源 |
 
 ## 错误格式
 
@@ -57,6 +58,8 @@
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}` | 本地或嵌入 JWT | 当前人员的四类列表和已授权详情；不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
+| `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
+| `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
@@ -130,6 +133,14 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 可见详情限发起人、实际代发人、当前本人或代理关系中的待办，以及持久化的历史实际处理人/已送达抄送人。保密流程不因管理员身份或仅有未到达、已取消任务自动开放；本切片不开放额外查看人或管理查询。嵌入会话的应用条件与人员条件共同下推到数据库查询，跨应用详情和其他不可见或不存在的单据统一返回 `NOT_FOUND`。列表与详情分别在一个一致读事务中读取计数、版本、任务和事件。
 
 没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表、详情、任务操作与逐项批量同意，`frontend/src/api/center-adapter.ts` 是中心响应副本。字段搜索和未读仍由后续中心切片实现。本切片不供业务 SDK 调用。
+
+## 同源审批中心内嵌
+
+业务系统后端先用本应用 API Key 调 `POST /api/v1/embed-tokens`，`targetPath` 示例为 `#/center/approvals/{instanceId}`。业务页面把收到的一次性令牌放在审批服务同源地址的片段中，例如 `/embed/{clientAppCode}#/center/approvals/{instanceId}?embedToken=...`。片段不发送给服务端；页面读取后立即从地址栏和历史条目清除，并调用令牌交换接口。路径中的 `clientAppCode` 只选择 HTML 的来源策略，不作为人员或应用认证。跳转新窗口也可用普通 `/` 入口。
+
+普通 `GET /`、直接 `GET /index.html` 和其他静态 HTML 由同一服务返回 `Content-Security-Policy: frame-ancestors 'none'`；应用专属 `GET /embed/{clientAppCode}` 返回 `frame-ancestors 'self'` 加该应用登记的 `allowedOrigins`。未登记来源无法在 iframe 中打开，未配置来源时仅允许同源，停用或不存在应用返回 404。静态文件不会提供可绕过该策略的 HTML 入口。登记来源仅接受完整 HTTPS origin，开发环境允许本机 HTTP；读取持久化配置时再次验证，损坏值不进入 CSP。部署时前端 `dist` 必须由审批服务同源托管，反向代理不得另行暴露不带此响应头的 HTML 副本。
+
+`GET /api/v1/center/embed-context` 必须带令牌交换后得到的嵌入 Bearer JWT。服务端每次重验人员、应用、外部绑定及身份代际，仅 `sessionKind=embed` 返回 `{clientAppCode, allowedOrigins:["https://business.example"]}`，来源按当前应用配置读取；匿名为 401，本地登录令牌为 403。响应不可缓存。前端只从 `document.referrer` 提取完整 origin 且与此列表严格匹配后，才以该 origin 为 `targetOrigin` 发送完成消息；空来源或未匹配绝不发送。消息不含令牌和审批数据。
 
 ## 规划中的接口
 

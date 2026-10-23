@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ApprovalService.Api.Hosting;
 using ApprovalService.Application.Administration;
+using ApprovalService.Application.Integration;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
 
@@ -31,6 +32,16 @@ internal static class AdminConsoleEndpoints
         app.MapGet(ApiRoutes.AdminAudit, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetAuditAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapGet(ApiRoutes.AdminOutbox, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
+            service.GetOutboxAsync(cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPost(ApiRoutes.AdminCallbackRetry, async (HttpContext http, string eventId,
+            AdminCallbackRetryRequest request, CallbackDeliveryAppService service,
+            CancellationToken cancellationToken) =>
+        {
+            await service.ResendAdminAsync(eventId, PersonId(http), request.Reason, cancellationToken);
+            return Results.NoContent();
+        }).RequireAuthorization(OrganizationAdminRequirement.PolicyName);
         app.MapGet(ApiRoutes.AdminClientApps, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetClientAppsAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);

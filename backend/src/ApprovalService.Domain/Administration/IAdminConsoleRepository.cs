@@ -13,12 +13,64 @@ public interface IAdminConsoleRepository
     Task<IReadOnlyList<AdminBindingRecord>> ListBindingsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 读取最近的组织及接入应用操作记录，不读取完整前后数据快照。
+    /// 读取最近的组织、接入应用及回调重发记录，不读取完整前后数据快照。
     /// </summary>
     /// <param name="limit">最多读取条数。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>审计摘要。</returns>
     Task<IReadOnlyList<AdminAuditRecord>> ListAuditAsync(int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 读取最近的待发队列摘要，不读取业务正文。
+    /// </summary>
+    /// <param name="limit">最多读取条数。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>待发项摘要。</returns>
+    Task<IReadOnlyList<AdminOutboxRecord>> ListOutboxAsync(int limit, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// 管理端可见的待发队列元数据。
+/// </summary>
+public sealed class AdminOutboxRecord
+{
+    /// <summary>
+    /// 稳定事件 ID。
+    /// </summary>
+    public string EventId { get; set; } = string.Empty;
+    /// <summary>
+    /// 所属接入应用编码。
+    /// </summary>
+    public string ClientAppCode { get; set; } = string.Empty;
+    /// <summary>
+    /// 待发项类型。
+    /// </summary>
+    public string Kind { get; set; } = string.Empty;
+    /// <summary>
+    /// 队列状态。
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+    /// <summary>
+    /// 已尝试次数。
+    /// </summary>
+    public int Attempts
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 下次可发送时间。
+    /// </summary>
+    public DateTimeOffset AvailableAt
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 最近错误类别。
+    /// </summary>
+    public string? ErrorCode
+    {
+        get; set;
+    }
 }
 
 /// <summary>

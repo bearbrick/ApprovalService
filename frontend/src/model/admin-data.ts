@@ -153,6 +153,40 @@ export interface AdminAudit {
 }
 
 /**
+ * 仅含可安全展示元数据的待发项。
+ */
+export interface AdminOutbox {
+  /**
+   * 稳定事件 ID。
+   */
+  eventId: string
+  /**
+   * 所属接入应用编码。
+   */
+  clientAppCode: string
+  /**
+   * 待发类型。
+   */
+  kind: string
+  /**
+   * 当前队列状态。
+   */
+  status: string
+  /**
+   * 已尝试次数。
+   */
+  attempts: number
+  /**
+   * 下次可发送时间。
+   */
+  availableAt: string
+  /**
+   * 最近错误类别。
+   */
+  errorCode?: string | null
+}
+
+/**
  * 把受保护目录响应映射到部门、人员列表已有的安全列。
  * @param viewKey 当前管理页面编码。
  * @param directory 服务端目录。
@@ -250,7 +284,7 @@ export function auditViewData(audit: readonly AdminAudit[]): AdminViewData {
  */
 function auditActionLabel(action: string): string {
   return ({ created: '新增', create: '新增', updated: '修改', update: '修改',
-    embedOriginsUpdated: '修改允许嵌入来源' } as Record<string, string>)[action] ?? action
+    embedOriginsUpdated: '修改允许嵌入来源', retried: '手动重发' } as Record<string, string>)[action] ?? action
 }
 
 /**
@@ -263,7 +297,28 @@ function auditTargetLabel(target: string): string {
   if (separator < 0) return target
   const kind = target.slice(0, separator)
   const label = ({ person: '人员', department: '部门', membership: '部门归属',
-    personBinding: '人员绑定', departmentBinding: '部门绑定', clientApp: '接入应用',
+    personBinding: '人员绑定', departmentBinding: '部门绑定', clientApp: '接入应用', callback: '回调',
     'person-role': '人员角色' } as Record<string, string>)[kind] ?? kind
   return `${label}：${target.slice(separator + 1)}`
+}
+
+/**
+ * 将待发项元数据转换为队列列表，不读取正文和目标地址。
+ * @param outbox 管理员有权查看的待发项摘要。
+ * @returns 页面可展示的安全行。
+ */
+export function outboxViewData(outbox: readonly AdminOutbox[]): AdminViewData {
+  return {
+    metrics: [],
+    rows: outbox.map((item, index): AdminRow => ({
+      id: `${item.eventId}:${index}`,
+      cells: {
+        eventId: item.eventId, application: item.clientAppCode,
+        kind: item.kind === 'callback' ? '回调' : item.kind,
+        status: ({ pending: '待发送', leased: '发送中', completed: '已完成' } as Record<string, string>)[item.status] ?? item.status,
+        attempts: String(item.attempts), nextAttempt: new Date(item.availableAt).toLocaleString('zh-CN'),
+        lastError: item.errorCode || '—',
+      },
+    })),
+  }
 }

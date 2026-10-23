@@ -2,7 +2,7 @@ import { ADMIN_VIEWS, adminCellText, filterAdminRows, resolveAdminView } from '.
 import type { AdminRow } from '../src/model/admin.ts'
 import { ADMIN_TABS } from '../src/model/navigation.ts'
 import { adminAdapter, AdminAdapterUnavailableError } from '../src/api/admin-adapter.ts'
-import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData } from '../src/model/admin-data.ts'
+import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData } from '../src/model/admin-data.ts'
 
 /**
  * 检查管理员页面的路径覆盖、安全列与未接入边界。
@@ -46,6 +46,11 @@ export async function runAdminChecks(check: (name: string, value: boolean) => vo
       target: 'clientApp:demo', reason: '试点接入' }]).rows[0]?.cells.reason === '试点接入'
     && auditViewData([{ occurredAt: '2026-10-23T00:00:00Z', actorId: 'p1', action: 'updated',
       target: 'clientApp:demo', reason: '试点接入' }]).rows[0]?.cells.target === '接入应用：demo')
+  check('待发列表仅映射安全元数据并保留回调事件 ID',
+    outboxViewData([{ eventId: 'e1', clientAppCode: 'demo', kind: 'callback', status: 'pending',
+      attempts: 2, availableAt: '2026-10-23T00:00:00Z', errorCode: 'TimeoutException' }]).rows[0]?.cells.kind === '回调'
+    && outboxViewData([{ eventId: 'e1', clientAppCode: 'demo', kind: 'callback', status: 'pending',
+      attempts: 2, availableAt: '2026-10-23T00:00:00Z', errorCode: 'TimeoutException' }]).rows[0]?.cells.eventId === 'e1')
   let unavailable = false
   try { await adminAdapter.loadView('system/info', new AbortController().signal) } catch (error) { unavailable = error instanceof AdminAdapterUnavailableError }
   check('未接入的管理页面明确拒绝，不返回虚构统计或密钥', unavailable)

@@ -124,6 +124,27 @@ public sealed class AdminConsoleAppService(IOrganizationRepository organization,
     }
 
     /// <summary>
+    /// 读取最近 200 条待发项元数据，永不读取发送正文。
+    /// </summary>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>待发队列摘要。</returns>
+    public async Task<IReadOnlyList<AdminOutboxResponse>> GetOutboxAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var items = await adminQueries.ListOutboxAsync(200, cancellationToken);
+        return items.Select(item => new AdminOutboxResponse
+        {
+            EventId = item.EventId,
+            ClientAppCode = item.ClientAppCode,
+            Kind = item.Kind,
+            Status = item.Status,
+            Attempts = item.Attempts,
+            AvailableAt = item.AvailableAt,
+            ErrorCode = item.ErrorCode,
+        }).ToArray();
+    }
+
+    /// <summary>
     /// 读取指定应用当前允许嵌入审批中心的网站来源。
     /// </summary>
     /// <param name="code">接入应用编码。</param>

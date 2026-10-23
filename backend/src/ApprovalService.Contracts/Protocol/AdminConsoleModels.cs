@@ -177,7 +177,7 @@ public sealed class AdminBindingResponse
 }
 
 /// <summary>
-/// 管理后台可见的组织与接入应用操作日志摘要。
+/// 管理后台可见的组织、接入应用及回调重发操作日志摘要。
 /// </summary>
 public sealed class AdminAuditResponse
 {
@@ -211,6 +211,61 @@ public sealed class AdminAuditResponse
     {
         get; set;
     }
+}
+
+/// <summary>
+/// 管理员可读取的待发项摘要，不含发送正文和地址。
+/// </summary>
+public sealed class AdminOutboxResponse
+{
+    /// <summary>
+    /// 稳定事件 ID。
+    /// </summary>
+    public string EventId { get; set; } = string.Empty;
+    /// <summary>
+    /// 所属接入应用编码。
+    /// </summary>
+    public string ClientAppCode { get; set; } = string.Empty;
+    /// <summary>
+    /// 待发项类型。
+    /// </summary>
+    public string Kind { get; set; } = string.Empty;
+    /// <summary>
+    /// 队列状态。
+    /// </summary>
+    public string Status { get; set; } = string.Empty;
+    /// <summary>
+    /// 已尝试次数。
+    /// </summary>
+    public int Attempts
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 下次可发送时间。
+    /// </summary>
+    public DateTimeOffset AvailableAt
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 最近错误类别。
+    /// </summary>
+    public string? ErrorCode
+    {
+        get; set;
+    }
+}
+
+/// <summary>
+/// 管理员手动重发回调所需的原因。
+/// </summary>
+public sealed class AdminCallbackRetryRequest
+{
+    /// <summary>
+    /// 本次重发原因。
+    /// </summary>
+    public string Reason { get; set; } = string.Empty;
 }
 
 /// <summary>

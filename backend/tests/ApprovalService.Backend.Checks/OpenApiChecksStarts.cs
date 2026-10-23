@@ -385,6 +385,7 @@ internal static partial class OpenApiChecksStarts
             await RunAwaitingTerminationAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunHooksAsync(scope.ServiceProvider, demo.ApiKey, demo.SigningSecret, check);
             await RunPatchAsync(scope.ServiceProvider, http, demo.ApiKey, other.ApiKey, check);
+            await RunPreviewAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

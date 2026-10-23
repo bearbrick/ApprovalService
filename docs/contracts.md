@@ -112,7 +112,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 | 接口 | 用途 | 任务 |
 | --- | --- | --- |
-| `POST /api/v1/flows/{code}/preview` | 预览会走哪些节点 | T-006 |
+| `POST /api/v1/flows/{code}/preview` | 按当前发布图、数据和组织预览预计路径及候选人 | T-006 |
 | `POST /api/v1/instances/batch` | 批量发起审批 | T-006 |
 | `PATCH /api/v1/instances/{id}/data` | 审批中更新发布版本显式授权的字段；协议见下文 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
@@ -120,6 +120,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 | `POST /api/v1/tasks/{id}/actions` | 审批操作 | T-006 |
 
 `PATCH /api/v1/instances/{id}/data` 需要所属接入应用的 `X-Api-Key` 与稳定 `X-Request-Id`，请求为 `{ "user": "alice", "data": { "amount": 5 } }`，`user` 必须是本应用已绑定的在职实际操作人。只接受 `running` 审批单，且仅允许修改锁定发布版本中显式设置 `businessUpdateAllowed=true` 的顶层字段或明细子字段；旧定义和未设置开关均视为禁止，计算字段及审批人填写字段不可改。顶层明细表若整体开放，可提交完整表值；仅开放子字段时，须提交与原表等长的数组，各项为该行的局部字段对象或 `null`，不能通过该形式增删行。服务在写入前校验字段类型、重算公式与可信找人映射；已到达任务不静默改派，后续节点和网关按新数据计算。数据快照、路由映射和 `businessDataUpdated` 事件在同一乐观版本事务中提交，事件 `detail.audit.dataChanges` 记录变化字段的 `before`/`after`，响应为更新后的审批单详情。同一请求 ID 重试不重复写入或追加事件；并发版本冲突返回 `CONFLICT`。
+
+`POST /api/v1/flows/{code}/preview` 需要 `X-Api-Key` 与 `X-Request-Id`，只预览当前应用获授权的已发布流程。请求为 `{ "initiator": "alice", "initiatingDepartment": "dept-one", "data": {...}, "selectedAssignees": {...} }`；部门和自选人员可省略，业务单号不必提供，可选 `businessKey` 仅供业务取人钩子识别。发起人及自选人员须按本应用现有在职绑定解析，数据沿用发起字段类型和公式校验。响应 `{flowCode, version, nodes:[{nodeId,name,type,candidateAssigneeIds,candidateAssignees:[{id,name}]}], projectedStatus, notice}`；`nodes` 按预计到达顺序排列，并行分支可交错出现，候选人是当前组织的内部人员 ID。预览在内存中假定人工操作同意、办理完成、自动动作和子流程成功；业务接口找人只在实际预计命中的节点调用，未提供业务单号时钩子收到空 `businessKey`。预览不发起审批、不占业务单号、不写事件或回调；实际到达节点时会按最新组织与业务数据重算，故路径和候选人不作最终承诺。
 | `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
 
 ## 回调和业务系统提供的接口

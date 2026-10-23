@@ -16,6 +16,11 @@ public static class OpenApiRoutes
     public const string FlowSchema = "/api/v1/flows/{code}/schema";
 
     /// <summary>
+    /// 按当前数据与组织快照预计发布流程路径，不创建审批单。
+    /// </summary>
+    public const string FlowPreview = "/api/v1/flows/{code}/preview";
+
+    /// <summary>
     /// 按流程编码与业务单号读取历史审批单。
     /// </summary>
     public const string Instances = "/api/v1/instances";

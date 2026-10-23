@@ -2,6 +2,7 @@ using System.Text.Json;
 using ApprovalService.Application.Integration;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Execution;
@@ -31,6 +32,34 @@ internal static partial class JobChecks
         const string eventId = "instance-action/request/event/1";
         await using (var db = new ApprovalDbContext(options))
         {
+            db.People.Add(new PersonEntity
+            {
+                Id = "action-admin-person",
+                EmployeeNumber = "ACTION-ADMIN",
+                Name = "动作流程管理员",
+            });
+            db.Flows.Add(new FlowEntity
+            {
+                Id = "action-flow",
+                Code = "ACTION_FLOW",
+                Name = "动作流程",
+                AdministratorId = "ACTION-ADMIN",
+            });
+            db.FlowVersions.Add(new FlowVersionEntity
+            {
+                Id = "action-flow-version",
+                FlowId = "action-flow",
+                Version = 1,
+            });
+            db.Instances.Add(new InstanceEntity
+            {
+                Id = "instance-action",
+                FlowId = "action-flow",
+                FlowVersionId = "action-flow-version",
+                FlowCode = "ACTION_FLOW",
+                BusinessKey = "ACTION-1",
+                Title = "动作审批",
+            });
             db.OutboxItems.Add(new OutboxItemEntity
             {
                 Id = eventId + ":dispatch",
@@ -72,7 +101,7 @@ internal static partial class JobChecks
         var repository = new ActionRetryRepository(factory);
         var clock = new RetryClock(tenthAt.AddMinutes(1));
         var service = new ActionRetryAppService(repository, clock);
-        await service.RetryAsync(eventId);
+        await service.RetryAsync(eventId, "action-admin-person");
         await using (var db = new ApprovalDbContext(options))
         {
             var requeued = await db.OutboxItems.AsNoTracking().SingleAsync(item => item.EventId == eventId);

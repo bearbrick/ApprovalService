@@ -15,9 +15,10 @@ public sealed class ActionRetryAppService(IActionRetryRepository repository, Tim
     /// 用原事件 ID 重排一次，不允许复制待发项或增加自动重试预算。
     /// </summary>
     /// <param name="eventId">原自动动作触发事件 ID。</param>
+    /// <param name="personId">本地登录的内部人员 ID。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>异步操作。</returns>
-    public async Task RetryAsync(string eventId, CancellationToken cancellationToken = default)
+    public async Task RetryAsync(string eventId, string personId, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(eventId))
         {
@@ -29,7 +30,13 @@ public sealed class ActionRetryAppService(IActionRetryRepository repository, Tim
             throw new UserFriendlyException(ErrorCodes.NotFound, "自动动作事件不存在。");
         }
 
-        if (!await repository.RequeueAsync(eventId, timeProvider.GetUtcNow(), cancellationToken))
+        if (string.IsNullOrWhiteSpace(personId) ||
+            !await repository.IsFlowAdministratorAsync(eventId, personId, cancellationToken))
+        {
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "当前人员不是此流程的管理员。");
+        }
+
+        if (!await repository.RequeueAsync(eventId, personId, timeProvider.GetUtcNow(), cancellationToken))
         {
             throw new UserFriendlyException(ErrorCodes.Conflict, "自动动作尚未转为待管理员处理，或正在重试中。");
         }

@@ -14,11 +14,23 @@ public interface IActionRetryRepository
     Task<bool> ExistsAsync(string eventId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 核对当前在职人员是否是原动作审批单所属流程的管理员。
+    /// </summary>
+    /// <param name="eventId">原自动动作触发事件 ID。</param>
+    /// <param name="personId">本地登录的内部人员 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>当前流程管理员可管理该事件时为真。</returns>
+    Task<bool> IsFlowAdministratorAsync(string eventId, string personId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 只将待管理员处理的原事件排入一次人工重试。
     /// </summary>
     /// <param name="eventId">自动动作触发事件 ID。</param>
+    /// <param name="personId">当前本地登录的内部人员 ID。</param>
     /// <param name="now">重新排队时间。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>成功取得待处理项并重排时为真。</returns>
-    Task<bool> RequeueAsync(string eventId, DateTimeOffset now, CancellationToken cancellationToken = default);
+    Task<bool> RequeueAsync(string eventId, string personId, DateTimeOffset now,
+        CancellationToken cancellationToken = default);
 }

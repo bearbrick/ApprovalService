@@ -112,6 +112,7 @@ app.MapIdentityEndpoints();
 app.MapNotificationSettingsEndpoints();
 app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
+app.MapAdminConsoleEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();

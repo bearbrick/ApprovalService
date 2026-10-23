@@ -1,3 +1,4 @@
+using ApprovalService.Application.Administration;
 using ApprovalService.Application.Center;
 using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
@@ -48,6 +49,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<INotificationAppService, NotificationAppService>();
         services.AddScoped<INotificationSettingsAppService, NotificationSettingsAppService>();
         services.AddScoped<IFileAppService, FileAppService>();
+        services.AddScoped<AdminConsoleAppService>();
         return services;
     }
 }

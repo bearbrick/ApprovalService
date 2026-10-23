@@ -66,6 +66,36 @@ public static class ApiRoutes
     public const string AdminActionRetry = OpenApiPrefix + "/admin/actions/retry";
 
     /// <summary>
+    /// 组织管理员本地会话核验。
+    /// </summary>
+    public const string AdminSession = OpenApiPrefix + "/admin/session";
+
+    /// <summary>
+    /// 组织管理员读取部门、人员和所属关系。
+    /// </summary>
+    public const string AdminDirectory = OpenApiPrefix + "/admin/org/directory";
+
+    /// <summary>
+    /// 组织管理员读取业务系统人员与部门绑定。
+    /// </summary>
+    public const string AdminBindings = OpenApiPrefix + "/admin/bindings";
+
+    /// <summary>
+    /// 组织管理员读取最近组织和接入应用变更的安全审计摘要。
+    /// </summary>
+    public const string AdminAudit = OpenApiPrefix + "/admin/audit";
+
+    /// <summary>
+    /// 组织管理员读取不含密钥的接入应用摘要。
+    /// </summary>
+    public const string AdminClientApps = OpenApiPrefix + "/admin/apps";
+
+    /// <summary>
+    /// 管理员读取或修改指定接入应用允许嵌入审批中心的网站来源。
+    /// </summary>
+    public const string AdminAppEmbedOrigins = AdminClientApps + "/{code}/embed-origins";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

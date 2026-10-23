@@ -1,4 +1,7 @@
+using System.Data;
+using System.Text.Json;
 using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Organization;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +13,65 @@ namespace ApprovalService.Infrastructure.Integration;
 /// <param name="factory">数据库上下文工厂。</param>
 public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> factory) : IClientAppRepository
 {
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ClientAppEntity>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await db.ClientApps.AsNoTracking().Select(item => new ClientAppEntity
+        {
+            Code = item.Code,
+            Name = item.Name,
+            AllowedFlowCodesJson = item.AllowedFlowCodesJson,
+            IsEnabled = item.IsEnabled,
+        }).ToArrayAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateAllowedEmbedOriginsAsync(string code, string expectedJson, string updatedJson,
+        string actorId, string reason, DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        if (expectedJson == updatedJson)
+        {
+            return await FindByCodeAsync(code, cancellationToken) is { } app &&
+                app.AllowedEmbedOriginsJson == expectedJson;
+        }
+
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var changed = await db.ClientApps.Where(item => item.Code == code &&
+            item.AllowedEmbedOriginsJson == expectedJson)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.AllowedEmbedOriginsJson, updatedJson),
+                cancellationToken);
+        if (changed != 1)
+        {
+            return false;
+        }
+
+        // 只记录允许来源及原因，绝不把应用实体中的密钥字段写进审计快照。
+        db.OrganizationChanges.Add(new OrganizationChangeEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            EntityKind = "clientApp",
+            EntityId = code,
+            ActorId = actorId,
+            Source = "approvalService",
+            Kind = "embedOriginsUpdated",
+            BeforeJson = JsonSerializer.Serialize(new
+            {
+                origins = JsonSerializer.Deserialize<string[]>(expectedJson) ?? [],
+            }),
+            AfterJson = JsonSerializer.Serialize(new
+            {
+                origins = JsonSerializer.Deserialize<string[]>(updatedJson) ?? [],
+                reason,
+            }),
+            OccurredAt = occurredAt,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
     /// <inheritdoc />
     public async Task<ClientAppEntity?> FindByCodeAsync(string code, CancellationToken cancellationToken = default)
     {

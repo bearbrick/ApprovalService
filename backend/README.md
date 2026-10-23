@@ -108,6 +108,14 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Files:BrowserAccessible` | `false` | 浏览器可直连时签发短时地址，否则服务转发 |
 | `Files:PresignedUrlSeconds` | `300` | 预签名地址有效秒数，只能设为 1—300 秒 |
 
+## 管理后台读取接口
+
+本地组织管理员通过 `GET /api/v1/admin/session` 核验当前身份，`GET /api/v1/admin/org/directory` 读取部门与人员摘要，`GET /api/v1/admin/apps` 读取接入应用的非敏感配置。三个接口逐项核对当前组织管理员角色和本地密码会话；应用列表仓储只投影名称、编码、授权流程和状态，数据库中的 API Key 摘要及签名密钥密文不会进入响应。组织 Excel/CSV 导入继续使用已有预检与同事务审计接口。
+
+接入应用允许嵌入来源由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/embed-origins` 配置。PUT 提交完整来源列表及变更原因；服务端限制 HTTPS 原点、本机开发 HTTP、数量和长度，并在同一数据库事务中记录操作者及不含密钥的前后快照。并发修改返回冲突，管理页须重新读取后再保存。
+
+`GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织与接入应用变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
+
 ## 工作日历基础
 
 `Domain/Notifications/Calendar` 提供纯日历规则：默认周一至周五为工作日，调用方可传入本地日期覆盖清单，将节假日设为休息日、调休周末设为工作日。`GetWorkingDateAfter` 从指定日期之后计数，不把起点算作第一个工作日；`GetLocalDate` 按指定时区将时间点换成本地日期，避免使用服务器本地时区或固定 UTC 偏移。配置清单由调用方提供，规则本身不访问数据库。

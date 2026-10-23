@@ -2,12 +2,14 @@ using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Application.Notifications;
+using ApprovalService.Domain.Administration;
 using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Files;
 using ApprovalService.Infrastructure.Identity;
@@ -46,6 +48,7 @@ public static class InfrastructureServiceCollectionExtensions
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
+        services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();

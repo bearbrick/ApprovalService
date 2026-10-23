@@ -16,8 +16,10 @@ internal static class SystemEndpoints
     public static IEndpointRouteBuilder MapSystemEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet(ApiRoutes.HealthLive, () => Results.Text("live"));
-        // 以后接上数据库后，在这里检查数据库能不能连上。
-        app.MapGet(ApiRoutes.HealthReady, () => Results.Text("ready"));
+        app.MapGet(ApiRoutes.HealthReady, async (IServiceReadinessAppService service, CancellationToken cancellationToken) =>
+            await service.IsReadyAsync(cancellationToken)
+                ? Results.Text("ready")
+                : Results.Text("not ready", statusCode: StatusCodes.Status503ServiceUnavailable));
         app.MapGet(ApiRoutes.Info, (IServiceInfoAppService service) => service.Get());
         return app;
     }

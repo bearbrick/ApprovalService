@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 
 namespace ApprovalService.Backend.Checks;
@@ -53,13 +54,14 @@ internal static class TempDataDirectory
     }
 
     /// <summary>
-    /// 删除目录。以后接上 SQLite 后，删除前要先清空连接池（Windows 上库文件被占用时删不掉）。
+    /// 清空 SQLite 连接池后删除临时数据目录，避免 Windows 锁住数据库文件。
     /// </summary>
     /// <param name="path">临时数据目录；不存在时什么也不做。</param>
     public static void Delete(string path)
     {
         if (Directory.Exists(path))
         {
+            SqliteConnection.ClearAllPools();
             Directory.Delete(path, recursive: true);
         }
     }

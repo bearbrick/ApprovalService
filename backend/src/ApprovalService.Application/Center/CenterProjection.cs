@@ -26,6 +26,7 @@ internal static class CenterProjection
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var instance = record.Instance;
         var state = Read<EngineState>(instance.StateJson);
+        var visibleSummary = VisibleData(record, personId, definition.Data.SummaryFields, definition.Data.Fields, graph);
         var currentNodeIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending)
             .Select(task => task.NodeId).Distinct(StringComparer.Ordinal).ToArray();
         var currentStep = currentNodeIds.Length switch
@@ -57,7 +58,8 @@ internal static class CenterProjection
             IsUrgent = instance.IsUrgent,
             StartedAt = instance.StartedAt,
             EndedAt = instance.EndedAt,
-            Summary = VisibleData(record, personId, definition.Data.SummaryFields, definition.Data.Fields, graph),
+            Summary = visibleSummary,
+            SummaryFieldDefinitions = DescribeFields(visibleSummary, definition.Data.Fields),
             PendingTaskIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending &&
                 (task.AssigneeId == personId || task.DelegatedForId == personId)).Select(task => task.Id).ToArray(),
             CanBulkApprove = bulkTaskIds.Length > 0,
@@ -76,10 +78,12 @@ internal static class CenterProjection
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var definition = Read<FlowDefinition>(record.FlowVersion.DefinitionJson);
         var state = Read<EngineState>(record.Instance.StateJson);
+        var visibleData = VisibleData(record, personId, definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph);
         return new CenterDetailResponse
         {
             Instance = Summary(record, personId),
-            Data = VisibleData(record, personId, definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph),
+            Data = visibleData,
+            FieldDefinitions = DescribeFields(visibleData, definition.Data.Fields),
             Tasks = record.Tasks.Select(task => new CenterTaskResponse
             {
                 Id = task.Id,
@@ -97,6 +101,55 @@ internal static class CenterProjection
             Events = record.Events.Where(item => item.Kind != "opinionDraftSaved").Select(ProjectEvent).ToArray(),
             ActiveNodeIds = state.Tokens.Select(token => token.NodeId).Distinct(StringComparer.Ordinal).ToArray(),
         };
+    }
+
+    /// <summary>
+    /// 只为已实际返回的字段创建展示定义，明细列同样按已裁剪数据求交集。
+    /// </summary>
+    /// <param name="visible">已按人员和节点权限过滤的数据。</param>
+    /// <param name="definitions">本审批单锁定发布版本的字段定义。</param>
+    /// <returns>不暴露隐藏字段名称的展示元数据。</returns>
+    private static IReadOnlyList<CenterFieldDefinitionResponse> DescribeFields(JsonElement visible,
+        IReadOnlyList<FlowFieldDefinition> definitions)
+    {
+        if (visible.ValueKind != JsonValueKind.Object)
+        {
+            return [];
+        }
+        var result = new List<CenterFieldDefinitionResponse>();
+        foreach (var definition in definitions)
+        {
+            if (!visible.TryGetProperty(definition.Key, out var value))
+            {
+                continue;
+            }
+            var children = new List<CenterFieldDefinitionResponse>();
+            if (value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var child in definition.Children)
+                {
+                    // 隐藏列已在每一行剔除；空表不虚构列的可见性。
+                    if (value.EnumerateArray().Any(row => row.ValueKind == JsonValueKind.Object &&
+                        row.TryGetProperty(child.Key, out _)))
+                    {
+                        children.Add(new CenterFieldDefinitionResponse
+                        {
+                            Key = child.Key,
+                            Name = child.Name,
+                            Type = child.Type,
+                        });
+                    }
+                }
+            }
+            result.Add(new CenterFieldDefinitionResponse
+            {
+                Key = definition.Key,
+                Name = definition.Name,
+                Type = definition.Type,
+                Children = children,
+            });
+        }
+        return result;
     }
 
     /// <summary>

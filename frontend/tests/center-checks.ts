@@ -66,7 +66,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
-    startedAt: '2026-10-19T10:00:00+08:00', summary: { amount: 200 }, pendingTaskIds: ['task-1'],
+    startedAt: '2026-10-19T10:00:00+08:00', summary: { amount: 200, lines: [{ qty: 2 }] },
+    summaryFieldDefinitions: [{ key: 'amount', name: '金额', type: 'number', children: [] },
+      { key: 'lines', name: '明细', type: 'detailTable', children: [{ key: 'qty', name: '数量', type: 'number', children: [] }] }],
+    pendingTaskIds: ['task-1'],
   }
   try {
     globalThis.fetch = async (input, init) => {
@@ -84,7 +87,9 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
           : path.endsWith('/tasks/task-1/actions')
             ? { taskId: 'task-1', instanceId: 'instance-1' }
         : path.includes('instances/instance-1')
-          ? { instance: { ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }, data: { amount: 200 }, tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
+          ? { instance: { ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] },
+            data: { amount: 200, lines: [{ qty: 2 }] }, fieldDefinitions: summary.summaryFieldDefinitions,
+            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
@@ -102,6 +107,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     check('中心适配仅使用服务端裁剪字段，缺少许可协议时不会凭待办推断可操作',
       list[0]?.summary[0]?.value === '200' && detail.fields[0]?.value === '200'
       && detail.item.allowedActions.length === 0 && !detail.item.allowsBatchApprove)
+    check('中心用锁定版本的名称展示摘要与结构化明细，不把明细渲染为原始 JSON',
+      list[0]?.summary[0]?.label === '金额' && list[0]?.summary[1]?.label === '明细'
+      && list[0]?.summary[1]?.value === '1 条明细' && detail.fields[1]?.columns?.[0]?.label === '数量'
+      && detail.fields[1]?.rows?.[0]?.[0] === '2')
     allowActions = true
     const permittedList = await centerAdapter.loadList('todo', controller.signal)
     const permittedDetail = await centerAdapter.loadDetail('instance-1', controller.signal)

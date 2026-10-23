@@ -54,6 +54,9 @@ internal static class CenterQueryChecks
                 local.Items[0].Id == "a-todo" && local.Items[0].Summary.GetProperty("amount").GetInt32() == 12 &&
                 !local.Items[0].Summary.TryGetProperty("secret", out _) &&
                 !local.Items[0].Summary.GetProperty("lines")[0].TryGetProperty("cost", out _));
+            check("列表摘要只带锁定发布版本中已授权的字段名称和明细列",
+                local.Items[0].SummaryFieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "明细"]) &&
+                local.Items[0].SummaryFieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量"]));
             check("中心列表返回真实人员、来源应用和当前环节名称",
                 local.Items[0].InitiatorName == "测试人员" && local.Items[0].SourceName == "应用一" &&
                 !string.IsNullOrWhiteSpace(local.Items[0].CurrentStep));
@@ -87,6 +90,11 @@ internal static class CenterQueryChecks
                 !detailText.Contains("private-unsent-draft", StringComparison.Ordinal) &&
                 !detailText.Contains("stateJson", StringComparison.Ordinal) &&
                 detailResponse.Headers.CacheControl?.NoStore == true);
+            check("详情字段名称和明细列按发布版本展示且不泄露隐藏定义",
+                detail is not null && detail.FieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "明细"]) &&
+                detail.FieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量"]) &&
+                !detailText.Contains("保密字段", StringComparison.Ordinal) &&
+                !detailText.Contains("成本", StringComparison.Ordinal));
             check("中心详情按认证人员和当前状态返回任务操作许可",
                 detail is not null && detail.Tasks.All(task =>
                     task.AllowedActions.Contains("approve", StringComparer.Ordinal) &&
@@ -104,7 +112,10 @@ internal static class CenterQueryChecks
             using var historical = await GetAsync(http, Path("k-history"), tokens.Local);
             using var copied = await GetAsync(http, Path("d-copy"), tokens.Local);
             var historyText = await historical.Content.ReadAsStringAsync();
-            check("历史参与者不能借未来未到达节点放宽隐藏字段", !historyText.Contains("hidden-business-secret", StringComparison.Ordinal));
+            check("历史参与者不能借未来未到达节点放宽隐藏字段与名称",
+                !historyText.Contains("hidden-business-secret", StringComparison.Ordinal) &&
+                !historyText.Contains("保密字段", StringComparison.Ordinal) &&
+                !historyText.Contains("成本", StringComparison.Ordinal));
             check("保密详情拒绝跨应用与无关管理员，但允许当前原审批人及历史处理抄送参与者",
                 foreign.StatusCode == HttpStatusCode.NotFound && administrator.StatusCode == HttpStatusCode.NotFound &&
                 delegated.StatusCode == HttpStatusCode.OK && historical.StatusCode == HttpStatusCode.OK && copied.StatusCode == HttpStatusCode.OK);

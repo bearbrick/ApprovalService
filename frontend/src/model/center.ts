@@ -150,6 +150,28 @@ export interface CenterDetailField {
    * 服务端许可展示的文本。
    */
   value: string
+  /**
+   * 明细表中按发布字段定义排序且已授权的列。
+   */
+  columns?: readonly CenterDetailColumn[]
+  /**
+   * 明细表中按列顺序展示的只读行。
+   */
+  rows?: readonly (readonly string[])[]
+}
+
+/**
+ * 一列已授权明细字段的展示名称。
+ */
+export interface CenterDetailColumn {
+  /**
+   * 子字段编码。
+   */
+  key: string
+  /**
+   * 发布版本中的子字段名称。
+   */
+  label: string
 }
 
 /**

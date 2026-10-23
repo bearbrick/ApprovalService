@@ -6,7 +6,7 @@ export type CenterSection = 'todo' | 'done' | 'cc' | 'started'
 /**
  * 审批中心可展示的操作；是否可执行由服务端逐单声明。
  */
-export type CenterAction = 'approve' | 'reject' | 'return' | 'transfer' | 'addSign' | 'removeSign' | 'consult' | 'supplement' | 'copy' | 'undoApproval' | 'comment' | 'remind'
+export type CenterAction = 'approve' | 'handle' | 'acknowledge' | 'reject' | 'return' | 'transfer' | 'addSign' | 'removeSign' | 'consult' | 'reply' | 'supplement' | 'copy' | 'undoApproval' | 'comment' | 'saveDraft' | 'remind'
 
 /**
  * 列表中的业务摘要字段，值已经由适配层转为只读文本。
@@ -95,6 +95,10 @@ export interface CenterItem {
    */
   allowsBatchApprove: boolean
   /**
+   * 当前人员经服务端确认可批量同意的任务 ID。
+   */
+  bulkTaskIds?: readonly string[]
+  /**
    * 服务端当前准许的操作。
    */
   allowedActions: readonly CenterAction[]
@@ -179,6 +183,24 @@ export interface CenterTimelineEntry {
 }
 
 /**
+ * 一项登录人员当前有权办理的任务。
+ */
+export interface CenterActionTask {
+  /**
+   * 任务 ID。
+   */
+  taskId: string
+  /**
+   * 发布节点名称。
+   */
+  nodeName: string
+  /**
+   * 服务端当前许可的操作。
+   */
+  actions: readonly CenterAction[]
+}
+
+/**
  * 审批详情，业务数据始终作为只读快照呈现。
  */
 export interface CenterDetail {
@@ -186,6 +208,10 @@ export interface CenterDetail {
    * 与列表相同的摘要。
    */
   item: CenterItem
+  /**
+   * 每项当前可办理任务及该任务的服务端许可。
+   */
+  actionTasks?: readonly CenterActionTask[]
   /**
    * 由服务端授权后返回的业务字段快照。
    */

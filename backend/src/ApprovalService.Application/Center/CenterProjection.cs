@@ -4,6 +4,7 @@ using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
 
 namespace ApprovalService.Application.Center;
@@ -24,6 +25,7 @@ internal static class CenterProjection
         var definition = Read<FlowDefinition>(record.FlowVersion.DefinitionJson);
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var instance = record.Instance;
+        var state = Read<EngineState>(instance.StateJson);
         var currentNodeIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending)
             .Select(task => task.NodeId).Distinct(StringComparer.Ordinal).ToArray();
         var currentStep = currentNodeIds.Length switch
@@ -33,6 +35,10 @@ internal static class CenterProjection
                 .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? currentNodeIds[0],
             _ => $"{currentNodeIds.Length} 个并行环节",
         };
+        var bulkTaskIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending &&
+            (task.AssigneeId == personId || task.DelegatedForId == personId)).Where(task =>
+            TaskActionAvailability.GetAllowedActions(state, graph, task.Id, personId)
+                .Contains(OperationKinds.BulkApprove, StringComparer.Ordinal)).Select(task => task.Id).ToArray();
         return new CenterInstanceResponse
         {
             Id = instance.Id,
@@ -54,6 +60,8 @@ internal static class CenterProjection
             Summary = VisibleData(record, personId, definition.Data.SummaryFields, definition.Data.Fields, graph),
             PendingTaskIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending &&
                 (task.AssigneeId == personId || task.DelegatedForId == personId)).Select(task => task.Id).ToArray(),
+            CanBulkApprove = bulkTaskIds.Length > 0,
+            BulkApprovableTaskIds = bulkTaskIds,
         };
     }
 
@@ -83,6 +91,7 @@ internal static class CenterProjection
                 Opinion = task.Opinion,
                 DueAt = task.DueAt,
                 CompletedAt = task.CompletedAt,
+                AllowedActions = TaskActionAvailability.GetAllowedActions(state, graph, task.Id, personId),
             }).ToArray(),
             // 暂存意见仍是个人草稿，不能进入其他参与者可见的时间线。
             Events = record.Events.Where(item => item.Kind != "opinionDraftSaved").Select(ProjectEvent).ToArray(),

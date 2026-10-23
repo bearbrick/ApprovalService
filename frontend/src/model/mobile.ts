@@ -34,6 +34,6 @@ export function shouldRefreshOnPull(startY: number, endY: number, scrollTop: num
  * 已声明可用但尚不能提交的审批操作标签。
  */
 export const mobileActionLabels: Readonly<Record<CenterAction, string>> = {
-  approve: '同意', reject: '拒绝', return: '退回', transfer: '转交', addSign: '加签', removeSign: '减签',
-  consult: '征询意见', supplement: '要求补充', copy: '抄送', undoApproval: '撤销同意', comment: '评论', remind: '催办',
+  approve: '同意', handle: '办理完成', acknowledge: '确认已阅', reject: '拒绝', return: '退回', transfer: '转交', addSign: '加签', removeSign: '减签',
+  consult: '征询意见', reply: '回复征询', supplement: '要求补充', copy: '抄送', undoApproval: '撤销同意', comment: '评论', saveDraft: '暂存意见', remind: '催办',
 }

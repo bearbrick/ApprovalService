@@ -44,7 +44,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     visibleCenterActions(item({ section: 'started', allowedActions: ['approve', 'remind', 'comment'] })).join(',') === 'remind,comment'
     && visibleCenterActions(item({ section: 'cc', allowedActions: ['approve', 'comment'] })).join(',') === 'comment')
   const originalFetch = globalThis.fetch
-  const requests: { path: string, authorization: string }[] = []
+  const requests: { path: string, authorization: string, method: string, body: string }[] = []
+  let allowActions = false
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
@@ -53,12 +54,17 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   try {
     globalThis.fetch = async (input, init) => {
       const path = String(input)
-      requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '' })
+      requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '',
+        method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
+        : path.endsWith('/tasks/batch-approve')
+          ? { items: [{ taskId: 'task-1', succeeded: true }] }
+          : path.endsWith('/tasks/task-1/actions')
+            ? { taskId: 'task-1', instanceId: 'instance-1' }
         : path.includes('instances/instance-1')
-          ? { instance: summary, data: { amount: 200 }, tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null }], events: [], activeNodeIds: ['approval'] }
-          : { total: 1, skip: 0, take: 100, items: [summary] }
+          ? { instance: { ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }, data: { amount: 200 }, tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
+          : { total: 1, skip: 0, take: 100, items: [{ ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     const controller = new AbortController()
@@ -75,6 +81,19 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     check('中心适配仅使用服务端裁剪字段，缺少许可协议时不会凭待办推断可操作',
       list[0]?.summary[0]?.value === '200' && detail.fields[0]?.value === '200'
       && detail.item.allowedActions.length === 0 && !detail.item.allowsBatchApprove)
+    allowActions = true
+    const permittedList = await centerAdapter.loadList('todo', controller.signal)
+    const permittedDetail = await centerAdapter.loadDetail('instance-1', controller.signal)
+    check('中心只映射服务端许可，并保留可批量同意的实际任务 ID',
+      permittedList[0]?.allowsBatchApprove === true && permittedList[0]?.bulkTaskIds?.[0] === 'task-1'
+      && permittedDetail.actionTasks?.[0]?.actions.join(',') === 'approve,supplement')
+    await centerAdapter.executeAction('task-1', { action: 'approve', opinion: '同意' })
+    const batch = await centerAdapter.batchApprove(['task-1'], '同意')
+    check('中心写请求携带当前人员 JWT 和任务 ID，批量返回逐项结果',
+      requests.slice(-2).every(request => request.authorization === 'Bearer test-token' && request.method === 'POST')
+      && requests.at(-2)?.body.includes('"action":"approve"') === true
+      && requests.at(-1)?.body.includes('"taskIds":["task-1"]') === true
+      && batch[0]?.succeeded === true)
   } finally {
     globalThis.fetch = originalFetch
     logoutCenter()

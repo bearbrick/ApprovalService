@@ -151,6 +151,19 @@ public sealed class CenterInstanceResponse
     /// </summary>
     public IReadOnlyList<string> PendingTaskIds { get; set; } = [];
 
+    /// <summary>
+    /// 当前人员是否有至少一项待办由服务端确认可批量同意。
+    /// </summary>
+    public bool CanBulkApprove
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 当前人员实际可批量同意的任务 ID，可能同一单有多个。
+    /// </summary>
+    public IReadOnlyList<string> BulkApprovableTaskIds { get; set; } = [];
+
 }
 
 /// <summary>
@@ -249,6 +262,11 @@ public sealed class CenterTaskResponse
     {
         get; set;
     }
+
+    /// <summary>
+    /// 当前登录人员在此任务上可尝试的命令；提交时引擎仍重新校验。
+    /// </summary>
+    public IReadOnlyList<string> AllowedActions { get; set; } = [];
 
 }
 

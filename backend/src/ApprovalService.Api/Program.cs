@@ -114,6 +114,7 @@ app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
+app.MapCenterActionEndpoints();
 
 if (bootstrapCommand)
 {

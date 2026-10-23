@@ -1,7 +1,7 @@
 namespace ApprovalService.Contracts.Protocol;
 
 /// <summary>
-/// 登录人员使用的审批中心只读接口，不接受接入应用密钥代替人员身份。
+/// 登录人员使用的审批中心接口，不接受接入应用密钥代替人员身份。
 /// </summary>
 public static class CenterRoutes
 {
@@ -13,6 +13,18 @@ public static class CenterRoutes
     /// 读取当前登录人员有权查看的一张审批单。
     /// </summary>
     public const string Instance = Instances + "/{id}";
+    /// <summary>
+    /// 使用当前登录人员身份办理一项人工任务。
+    /// </summary>
+    public const string TaskActions = "/api/v1/center/tasks/{taskId}/actions";
+    /// <summary>
+    /// 可接受包含斜杠的引擎任务 ID 的路由模板。
+    /// </summary>
+    public const string TaskActionCatchAll = "/api/v1/center/tasks/{**path}";
+    /// <summary>
+    /// 逐项独立办理当前登录人员的批量同意任务。
+    /// </summary>
+    public const string BatchApprove = "/api/v1/center/tasks/batch-approve";
 }
 
 /// <summary>

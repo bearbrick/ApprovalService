@@ -1,6 +1,10 @@
 import { getJson } from './http.ts'
+import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
+import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 import { centerAccessToken, centerSession } from './center-session.ts'
-import type { CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
+import type { CenterAction, CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
+
+export type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 
 /**
  * 尚未登录人员会话时的明确状态，供共用适配器的手机页辨别。
@@ -88,6 +92,14 @@ interface CenterWireItem {
    * 当前人员可处理的任务标识。
    */
   pendingTaskIds: string[]
+  /**
+   * 是否有可批量同意的任务。
+   */
+  canBulkApprove?: boolean
+  /**
+   * 服务端确认可批量同意的任务 ID。
+   */
+  bulkApprovableTaskIds?: string[]
 }
 
 /**
@@ -146,6 +158,10 @@ interface CenterWireTask {
    * 审批意见。
    */
   opinion: string | null
+  /**
+   * 当前人员在这项任务上的许可命令。
+   */
+  allowedActions?: string[]
 }
 
 /**
@@ -224,6 +240,20 @@ export interface CenterDataAdapter {
    * @returns 已授权的详情。
    */
   loadDetail(id: string, signal: AbortSignal): Promise<CenterDetail>
+  /**
+   * 使用当前 JWT 身份办理一项任务。
+   * @param taskId 服务端返回的任务 ID。
+   * @param input 任务命令。
+   * @returns 服务端完成时返回。
+   */
+  executeAction(taskId: string, input: CenterActionInput): Promise<void>
+  /**
+   * 按任务 ID 逐项批量同意。
+   * @param taskIds 服务端声明可批量同意的任务。
+   * @param opinion 共用意见。
+   * @returns 与输入顺序一致的结果。
+   */
+  batchApprove(taskIds: readonly string[], opinion: string): Promise<readonly CenterBatchResult[]>
 }
 
 /**
@@ -296,6 +326,20 @@ function fields(data: Record<string, unknown>): CenterDetailField[] {
 }
 
 /**
+ * 将引擎稳定命令映射为中心界面操作，未知命令不展示。
+ * @param code 服务端命令编码。
+ * @returns 已支持的界面操作。
+ */
+function action(code: string): CenterAction | null {
+  const aliases: Record<string, CenterAction> = {
+    approve: 'approve', handle: 'handle', acknowledge: 'acknowledge', reject: 'reject', return: 'return',
+    transfer: 'transfer', addSigner: 'addSign', removeSigner: 'removeSign', consult: 'consult', reply: 'reply',
+    requestSupplement: 'supplement', copyTo: 'copy', revokeApproval: 'undoApproval', comment: 'comment', saveDraft: 'saveDraft',
+  }
+  return aliases[code] ?? null
+}
+
+/**
  * 转换服务端摘要；尚无许可协议的操作始终禁用。
  * @param wire 已授权摘要。
  * @param section 当前列表。
@@ -306,12 +350,17 @@ function item(wire: CenterWireItem, section: CenterSection, tasks: readonly Cent
   const pending = tasks.find(task => wire.pendingTaskIds.includes(task.id))
   const latest = tasks.at(-1)
   const summary: CenterSummaryField[] = fields(wire.summary)
+  const allowed = tasks.filter(task => task.allowedActions?.length).flatMap(task => task.allowedActions ?? [])
+    .map(action).filter((code): code is CenterAction => code !== null)
+  const bulkTaskIds = wire.bulkApprovableTaskIds ?? []
+  if (wire.canBulkApprove && bulkTaskIds.length && !allowed.includes('approve')) allowed.push('approve')
   return {
     id: wire.id, section, title: wire.title, serialNo: wire.serialNo, businessKey: wire.businessKey,
     flowCode: wire.flowCode, flowName: wire.flowName, sourceName: wire.sourceName || wire.clientAppCode,
     initiatorName: wire.initiatorName || wire.initiatorId, currentStep: wire.currentStep || (pending?.nodeName ?? latest?.nodeName ?? '—'),
     status: wire.status, createdAt: wire.startedAt, updatedAt: wire.endedAt ?? wire.startedAt,
-    urgent: wire.isUrgent, unread: false, allowsBatchApprove: false, allowedActions: [], summary,
+    urgent: wire.isUrgent, unread: false, allowsBatchApprove: Boolean(wire.canBulkApprove && bulkTaskIds.length),
+    bulkTaskIds, allowedActions: [...new Set(allowed)], summary,
   }
 }
 
@@ -367,6 +416,12 @@ export const centerAdapter: CenterDataAdapter = {
       id: event.eventId, title: event.kind, actor: event.actorId ?? '系统', occurredAt: event.occurredAt,
       opinion: event.opinion ?? '', current: Boolean(event.nodeId && wire.activeNodeIds.includes(event.nodeId)),
     }))
-    return { item: item(wire.instance, section, wire.tasks), fields: fields(wire.data), timeline, attachmentNames: [] }
+    const actionTasks = wire.tasks.filter(task => task.allowedActions?.length).map(task => ({
+      taskId: task.id, nodeName: task.nodeName,
+      actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
+    }))
+    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: fields(wire.data), timeline, attachmentNames: [] }
   },
+  executeAction: executeCenterAction,
+  batchApprove: batchApproveCenter,
 }

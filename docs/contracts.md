@@ -55,7 +55,8 @@
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
 | `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
 | `GET /api/v1/info` | 无 | 服务信息 |
-| `GET /api/v1/center/instances`、`/center/instances/{id}` | 本地或嵌入 JWT | 当前人员的四类只读列表和已授权详情；不接受 API Key 代替人员登录 |
+| `GET /api/v1/center/instances`、`/center/instances/{id}` | 本地或嵌入 JWT | 当前人员的四类列表和已授权详情；不接受 API Key 代替人员登录 |
+| `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
@@ -114,7 +115,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 组织管理员以 `multipart/form-data` 的 `file` 字段调用 `POST /api/v1/admin/org/import?preview=true` 预检查，或省略 `preview` 真正导入。仅接受 UTF-8 CSV、XLSX，文件不超过 5 MB；Excel 最多 10,000 行且解压后字段总量不超过 10 MiB 字符。无效 UTF-8 返回 `VALIDATION_FAILED`。预检查不写库，响应仍为 `{applied:false, issues, departedPersonIds:[]}`。`GET /api/v1/admin/org/template?format=xlsx` 下载 Excel 模板，`format=csv` 下载同字段 CSV 模板；模板首列 `kind` 为 `department`、`person`、`membership`、`personBinding` 或 `departmentBinding`。绑定行使用 `clientAppCode`、`externalId`、`internalId` 三列，绑定方式记为 `import`；`clientAppCode` 必须是已登记的接入应用。导入会检查重复部门编码与字段列宽，正式写入在可串行化事务内按当前组织快照重验，绑定和主数据及每项来源、操作者、时间与前后快照一起提交。
 
 
-## 审批中心只读查询
+## 审批中心人员查询与任务操作
 
 中心接口使用 `Authorization: Bearer <访问令牌>`；人员 ID 和嵌入来源应用只从已验证 JWT 读取，不提供 `user`、`personId`、`scope=all` 或 `clientAppCode` 切换身份的能力。只有 API Key、未改初始密码、账号或应用代际失效的请求均返回 `UNAUTHORIZED`。响应设置 `Cache-Control: no-store`。
 
@@ -125,13 +126,17 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - `cc`：普通抄送节点实际送达或人工抄送的收件人；未到达的将来抄送不授予可见性。
 - `started`：发起人或实际代发人，只供看进度。
 
-摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, startedAt, endedAt?, summary, pendingTaskIds`。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系，不替代后续操作接口的状态、节点权限和业务校验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。
+摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, startedAt, endedAt?, summary, pendingTaskIds, canBulkApprove, bulkApprovableTaskIds`。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系；`bulkApprovableTaskIds` 只列当前人员可批量同意的实际任务 ID。全部操作提交时仍按最新状态和节点规则重验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。
 
-`GET /api/v1/center/instances/{id}` 返回 `{instance, data, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段；`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?}`；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。该切片尚未提供图布局、详情排版和读标记协议。
+`GET /api/v1/center/instances/{id}` 返回 `{instance, data, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段；`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。该切片尚未提供图布局、详情排版和读标记协议。
+
+`POST /api/v1/center/tasks/{id}/actions` 请求 `{action, opinion?, targetPersonId?, targetNodeId?, relatedId?, mode?, mentionedPersonIds?, fieldValues?}`，任务 ID 含斜杠时需将整个 ID 编码；人员参数使用审批服务内部 ID。响应 `{taskId, instanceId, detail}`，详情再次执行人员与应用授权。`action` 只允许人工任务命令，当前人、节点许可、意见及字段规则由服务端重新校验，变更经过统一引擎写入事件与任务状态。`fieldValues` 只接受当前节点显式可编辑的顶层审批人字段；人员、部门值须为现存内部 ID，必填仅在成功推进时强制；明细和附件字段目前没有安全提交协议，明确拒绝。节点同意前的业务校验钩子仍会运行，中心登录人员作为审批服务内部人员 ID 传给钩子的 `actor`。无权或失效任务不会因列表先前显示过按钮而获准。
+
+`POST /api/v1/center/tasks/batch-approve` 请求 `{taskIds:[...], opinion?}`，1～100 项且 ID 不能重复，只接受明确拥有 `bulkApprove` 许可的同意任务。每项独立调用统一引擎，响应 `{items:[{taskId, succeeded, instanceId?, code?, message?}]}` 与输入同序；业务校验失败不回滚已成功项。两种写接口都只从已验证 JWT 获取操作人和嵌入应用范围，接收 `X-Request-Id` 作为幂等 ID；批量为各项追加稳定序号。浏览器从新服务响应更新许可，不根据旧按钮状态推断权限。
 
 可见详情限发起人、实际代发人、当前本人或代理关系中的待办，以及持久化的历史实际处理人/已送达抄送人。保密流程不因管理员身份或仅有未到达、已取消任务自动开放；本切片不开放额外查看人或管理查询。嵌入会话的应用条件与人员条件共同下推到数据库查询，跨应用详情和其他不可见或不存在的单据统一返回 `NOT_FOUND`。列表与详情分别在一个一致读事务中读取计数、版本、任务和事件。
 
-没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表和只读详情，`frontend/src/api/center-adapter.ts` 是中心响应副本。字段搜索、未读、批量操作和完整审批操作仍由后续中心切片实现。本切片不供业务 SDK 调用。
+没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表、详情、任务操作与逐项批量同意，`frontend/src/api/center-adapter.ts` 是中心响应副本。字段搜索和未读仍由后续中心切片实现。本切片不供业务 SDK 调用。
 
 ## 开放接口补充与待接入项
 

@@ -1,3 +1,5 @@
+import type { FlowPrintSettings } from './flow-print.ts';
+
 /**
  * 当前自由画布格式版本。
  */
@@ -459,42 +461,9 @@ export interface FlowLayoutItem {
   showMoneyUppercase: boolean;
 }
 /**
- * 审批单的打印设置。
+ * 从独立模块转出打印设置类型，保持旧导入路径可用。
  */
-export interface FlowPrintSettings {
-  /**
-   * A4 纸张方向：portrait 或 landscape。
-   */
-  orientation: string;
-  /**
-   * 按顺序打印的审批字段 key。
-   */
-  fieldKeys: string[];
-  /**
-   * 是否打印审批意见。
-   */
-  showComments: boolean;
-  /**
-   * 是否打印审批人签名。
-   */
-  showSignatures: boolean;
-  /**
-   * 是否附票据图片页。
-   */
-  includeReceiptPages: boolean;
-  /**
-   * 是否显示单位 Logo。
-   */
-  showLogo: boolean;
-  /**
-   * 是否显示二维码。
-   */
-  showQrCode: boolean;
-  /**
-   * 是否显示打印人和打印时间水印。
-   */
-  showWatermark: boolean;
-}
+export type { FlowPrintSettings } from './flow-print.ts';
 /**
  * 从独立模块转出编译后的运行图类型，保持旧导入路径可用。
  */

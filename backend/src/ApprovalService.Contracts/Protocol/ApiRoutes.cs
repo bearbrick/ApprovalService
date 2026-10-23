@@ -101,6 +101,16 @@ public static class ApiRoutes
     public const string AdminClientApps = OpenApiPrefix + "/admin/apps";
 
     /// <summary>
+    /// 组织管理员启停接入应用。
+    /// </summary>
+    public const string AdminAppEnabled = AdminClientApps + "/{code}/enabled";
+
+    /// <summary>
+    /// 组织管理员轮换接入应用密钥。
+    /// </summary>
+    public const string AdminAppRotateSecrets = AdminClientApps + "/{code}/rotate-secrets";
+
+    /// <summary>
     /// 管理员读取或修改指定接入应用允许嵌入审批中心的网站来源。
     /// </summary>
     public const string AdminAppEmbedOrigins = AdminClientApps + "/{code}/embed-origins";

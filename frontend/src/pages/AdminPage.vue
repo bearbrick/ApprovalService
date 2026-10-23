@@ -16,6 +16,7 @@ import AdminOrganizationImport from './admin/AdminOrganizationImport.vue'
 import AdminEmbedOriginsEditor from './admin/AdminEmbedOriginsEditor.vue'
 import AdminBindingEditor from './admin/AdminBindingEditor.vue'
 import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
+import AdminClientAppEditor from './admin/AdminClientAppEditor.vue'
 import '../styles/admin.css'
 
 /**
@@ -97,6 +98,10 @@ const bindingOpen = ref(false)
  */
 const retryOpen = ref(false)
 /**
+ * 接入应用创建、轮换和启停编辑器模式。
+ */
+const appEditorMode = ref<'create' | 'rotate' | 'status' | null>(null)
+/**
  * 当前队列列表可供选择的回调事件 ID。
  */
 const callbackEventIds = computed(() => [...new Set((data.value?.rows ?? [])
@@ -105,14 +110,14 @@ const callbackEventIds = computed(() => [...new Set((data.value?.rows ?? [])
  * 从已授权应用行提取来源配置所需的选择项。
  */
 const appOptions = computed(() => (data.value?.rows ?? []).map(row => ({
-  code: row.cells.code ?? '', name: row.cells.name ?? '',
+  code: row.cells.code ?? '', name: row.cells.name ?? '', isEnabled: row.cells.status === '启用',
 })).filter(item => item.code))
 /**
  * 仅开放已有后端授权、校验和审计的导入入口。
  */
 const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['导入组织']
   : view.value?.key === 'org/people' ? ['导入人员']
-    : view.value?.key === 'apps/list' ? ['配置嵌入来源']
+    : view.value?.key === 'apps/list' ? ['新建应用', '配置嵌入来源', '轮换密钥', '启停应用']
       : view.value?.key === 'apps/bindings' ? ['新增绑定']
         : view.value?.key === 'outbound/queue' ? ['重新投递'] : [])
 
@@ -123,6 +128,9 @@ const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['
 function handleAction(name: string): void {
   if (!enabledActions.value.includes(name)) return
   if (name === '配置嵌入来源') originsOpen.value = true
+  else if (name === '新建应用') appEditorMode.value = 'create'
+  else if (name === '轮换密钥') appEditorMode.value = 'rotate'
+  else if (name === '启停应用') appEditorMode.value = 'status'
   else if (name === '新增绑定') bindingOpen.value = true
   else if (name === '重新投递') retryOpen.value = true
   else importOpen.value = true
@@ -208,7 +216,7 @@ async function load(): Promise<void> {
   }
 }
 
-watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; retryOpen.value = false; void load() }, { immediate: true })
+watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; retryOpen.value = false; appEditorMode.value = null; void load() }, { immediate: true })
 onBeforeUnmount(() => request?.abort())
 </script>
 
@@ -221,7 +229,7 @@ onBeforeUnmount(() => request?.abort())
     <nav v-if="tabs.length" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
     <template v-if="view">
       <AdminOverview v-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
-      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminTable :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
+      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminTable :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>
     <p class="workspace-note">审批服务只管理流程与审批记录；业务单据由来源业务系统维护。</p>

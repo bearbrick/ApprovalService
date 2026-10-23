@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
@@ -334,6 +335,84 @@ internal static class AdminConsoleChecks
                     !raw.Contains("beforeJson", StringComparison.OrdinalIgnoreCase) &&
                     !raw.Contains("afterJson", StringComparison.OrdinalIgnoreCase));
             }
+
+            using (var forbidden = await PostAuthorizedAsync(client, ApiRoutes.AdminClientApps,
+                new AdminClientAppCreateRequest
+                {
+                    Code = "integration",
+                    Name = "新接入系统",
+                    Reason = "试点系统接入",
+                }, viewerAfterBinding.AccessToken))
+            {
+                check("普通人员不能登记接入应用", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            AdminClientAppSecretsResponse? created;
+            using (var response = await PostAuthorizedAsync(client, ApiRoutes.AdminClientApps,
+                new AdminClientAppCreateRequest
+                {
+                    Code = "integration",
+                    Name = "新接入系统",
+                    AllowedFlowCodes = ["EXPENSE"],
+                    CallbackUrl = "https://business.example/callback",
+                    Reason = "试点系统接入",
+                }, admin.AccessToken))
+            {
+                created = await response.Content.ReadFromJsonAsync<AdminClientAppSecretsResponse>();
+                check("管理员创建应用时仅本次返回 API Key 和签名密钥",
+                    response.IsSuccessStatusCode && created?.ApiKey.Length == 64 &&
+                    created.SigningSecret.Length == 64);
+            }
+
+            var rotatePath = ApiRoutes.AdminAppRotateSecrets.Replace("{code}", "integration",
+                StringComparison.Ordinal);
+            AdminClientAppSecretsResponse? rotated;
+            using (var response = await PostAuthorizedAsync(client, rotatePath,
+                new AdminClientAppRotateRequest { Reason = "凭据定期轮换" }, admin.AccessToken))
+            {
+                rotated = await response.Content.ReadFromJsonAsync<AdminClientAppSecretsResponse>();
+                check("轮换密钥只返回新值并使旧 API Key 失效", response.IsSuccessStatusCode &&
+                    rotated?.ApiKey.Length == 64 && rotated.ApiKey != created!.ApiKey);
+            }
+
+            var enabledPath = ApiRoutes.AdminAppEnabled.Replace("{code}", "integration",
+                StringComparison.Ordinal);
+            using (var response = await PutAuthorizedAsync(client, enabledPath,
+                new AdminClientAppEnabledRequest { Enabled = false, Reason = "试点暂停" }, admin.AccessToken))
+            {
+                check("管理员可停用接入应用", response.StatusCode == HttpStatusCode.NoContent);
+            }
+
+            using (var response = await GetAuthorizedAsync(client, ApiRoutes.AdminClientApps, admin.AccessToken))
+            {
+                var apps = await response.Content.ReadFromJsonAsync<AdminClientAppResponse[]>();
+                var raw = await response.Content.ReadAsStringAsync();
+                check("应用创建和停用后安全列表更新", response.IsSuccessStatusCode &&
+                    apps?.Single(item => item.Code == "integration").IsEnabled == false);
+                check("管理列表不回显新旧 API Key 和签名密钥",
+                    !raw.Contains(created!.ApiKey, StringComparison.Ordinal) &&
+                    !raw.Contains(rotated!.ApiKey, StringComparison.Ordinal) &&
+                    !raw.Contains(rotated.SigningSecret, StringComparison.Ordinal));
+            }
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var app = await db.ClientApps.AsNoTracking().SingleAsync(item => item.Code == "integration");
+                var audit = await db.OrganizationChanges.AsNoTracking()
+                    .Where(item => item.EntityKind == "clientApp" && item.EntityId == "integration")
+                    .ToArrayAsync();
+                check("创建轮换与停用都推进应用身份代际并留管理员审计",
+                    app.AuthGeneration == 3 && audit.Length == 3 &&
+                    audit.All(item => item.ActorId == "admin"));
+                check("应用生命周期审计从不包含任何生成的密钥",
+                    audit.All(item => item.AfterJson is { } snapshot &&
+                        !snapshot.Contains(created!.ApiKey, StringComparison.Ordinal) &&
+                        !snapshot.Contains(rotated!.SigningSecret, StringComparison.Ordinal)));
+                check("旧 API Key 摘要已从应用记录中移除",
+                    app.ApiKeyHash != ClientAppAppService.HashKey(created!.ApiKey));
+            }
         }
         finally
         {
@@ -379,7 +458,7 @@ internal static class AdminConsoleChecks
     /// <param name="token">访问令牌。</param>
     /// <returns>未释放的 HTTP 响应。</returns>
     private static async Task<HttpResponseMessage> PutAuthorizedAsync(HttpClient client, string path,
-        UpdateAdminEmbedOriginsRequest body, string token)
+        object body, string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

@@ -284,7 +284,8 @@ export function auditViewData(audit: readonly AdminAudit[]): AdminViewData {
  */
 function auditActionLabel(action: string): string {
   return ({ created: '新增', create: '新增', updated: '修改', update: '修改',
-    embedOriginsUpdated: '修改允许嵌入来源', retried: '手动重发' } as Record<string, string>)[action] ?? action
+    embedOriginsUpdated: '修改允许嵌入来源', secretsRotated: '轮换密钥',
+    enabledChanged: '启停应用', retried: '手动重发' } as Record<string, string>)[action] ?? action
 }
 
 /**

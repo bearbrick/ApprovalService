@@ -134,6 +134,115 @@ export async function loadAdminBindingOptions(): Promise<{ apps: AdminClientApp[
 }
 
 /**
+ * 接入应用首次登记的资料，密钥由服务端生成。
+ */
+export interface AdminClientAppCreateInput {
+  /**
+   * 唯一应用编码。
+   */
+  code: string
+  /**
+   * 显示名称。
+   */
+  name: string
+  /**
+   * 流程授权编码。
+   */
+  allowedFlowCodes: string[]
+  /**
+   * 是否允许跨应用统计待办。
+   */
+  canViewAllTasks: boolean
+  /**
+   * 回调与四类业务钩子地址。
+   */
+  callbackUrl: string | null
+  /**
+   * 取数地址。
+   */
+  dataUrl: string | null
+  /**
+   * 校验地址。
+   */
+  validationUrl: string | null
+  /**
+   * 取人地址。
+   */
+  assigneeUrl: string | null
+  /**
+   * 自动动作地址。
+   */
+  actionUrl: string | null
+  /**
+   * 管理员填写的变更原因。
+   */
+  reason: string
+}
+
+/**
+ * 只在创建或轮换响应中展示的临时凭据。
+ */
+export interface AdminClientAppSecrets {
+  /**
+   * 应用编码。
+   */
+  code: string
+  /**
+   * 新 API Key。
+   */
+  apiKey: string
+  /**
+   * 新签名密钥。
+   */
+  signingSecret: string
+}
+
+/**
+ * 管理员登记应用并仅接收本次新生成的凭据。
+ * @param input 应用非密钥资料。
+ * @returns 本次生成的 API Key 和签名密钥。
+ */
+export async function createAdminClientApp(input: AdminClientAppCreateInput): Promise<AdminClientAppSecrets> {
+  const token = await adminAccessToken()
+  const result = await requestJson<AdminClientAppSecrets>('/api/v1/admin/apps', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: input, cache: 'no-store',
+  })
+  if (!result || result.code !== input.code || typeof result.apiKey !== 'string'
+    || typeof result.signingSecret !== 'string') throw new Error('接入应用创建响应不完整。')
+  return result
+}
+
+/**
+ * 管理员轮换已有应用密钥，旧 API Key 与嵌入会话随即失效。
+ * @param code 接入应用编码。
+ * @param reason 轮换原因。
+ * @returns 只显示一次的新凭据。
+ */
+export async function rotateAdminClientAppSecrets(code: string, reason: string): Promise<AdminClientAppSecrets> {
+  const token = await adminAccessToken()
+  const result = await requestJson<AdminClientAppSecrets>(`/api/v1/admin/apps/${encodeURIComponent(code)}/rotate-secrets`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: { reason }, cache: 'no-store',
+  })
+  if (!result || result.code !== code || typeof result.apiKey !== 'string'
+    || typeof result.signingSecret !== 'string') throw new Error('密钥轮换响应不完整。')
+  return result
+}
+
+/**
+ * 管理员带原因启用或停用接入应用。
+ * @param code 接入应用编码。
+ * @param enabled 目标启用状态。
+ * @param reason 变更原因。
+ * @returns 保存完成。
+ */
+export async function setAdminClientAppEnabled(code: string, enabled: boolean, reason: string): Promise<void> {
+  const token = await adminAccessToken()
+  await requestJson<void>(`/api/v1/admin/apps/${encodeURIComponent(code)}/enabled`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}` }, body: { enabled, reason }, cache: 'no-store',
+  })
+}
+
+/**
  * 组织导入预检逐项问题。
  */
 export interface OrganizationImportIssue {

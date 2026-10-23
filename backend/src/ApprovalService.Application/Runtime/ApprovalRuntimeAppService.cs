@@ -4,6 +4,7 @@ using ApprovalService.Application.Notifications;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Assignees;
@@ -18,9 +19,11 @@ namespace ApprovalService.Application.Runtime;
 /// <param name="repository">原子保存状态和事件的仓储。</param>
 /// <param name="businessAssignees">实际节点到达前的业务取人服务。</param>
 /// <param name="taskDeadlines">工作日历期限策略；直接构造时使用默认日历。</param>
+/// <param name="organization">用于核对通知收件人的可信组织主数据。</param>
 public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository,
     BusinessAssigneeAppService? businessAssignees = null,
-    TaskDeadlinePolicy? taskDeadlines = null) : IApprovalRuntimeAppService
+    TaskDeadlinePolicy? taskDeadlines = null,
+    IOrganizationRepository? organization = null) : IApprovalRuntimeAppService
 {
     /// <summary>
     /// 将任务启动时刻转换成发布节点的工作日历期限。
@@ -232,6 +235,15 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         // 延迟提醒与状态、任务、事件在同一事务固定；进程重启也不会漏排期。
         outbox.AddRange(new DeadlineReminderPlanner(deadlinePolicy).Plan(instance.Id, tasks,
             previousStatuses, input.Context.OccurredAt));
+        var participants = BuildParticipants(instance.Id, result.Events);
+        if (organization is not null)
+        {
+            // 权限核对、通知正文与事件在提交前固定，收件人不会因重试而漂移。
+            var audience = await RuntimeNotificationAudience.ResolveAsync(organization, snapshot, instance,
+                input.Context.Graph, result, participants, cancellationToken);
+            outbox.AddRange(new RuntimeEventNotificationPlanner().Plan(instance, input.Context.Graph, result,
+                snapshot?.Tasks ?? [], audience.EmailAddresses, audience.AuthorizedIds));
+        }
 
         // 仓储在同一个事务中更新版本、任务投影、事件链和待发项；抢输乐观锁时不重算命令。
         var saved = await repository.CommitAsync(new RuntimeCommit
@@ -241,7 +253,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             Tasks = tasks,
             Events = events,
             OutboxItems = outbox,
-            Participants = BuildParticipants(instance.Id, result.Events),
+            Participants = participants,
             FileLinks = input.FileLinks,
         }, cancellationToken);
         if (!saved)

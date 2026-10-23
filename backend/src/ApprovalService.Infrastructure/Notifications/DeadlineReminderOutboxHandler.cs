@@ -79,11 +79,15 @@ public sealed class DeadlineReminderOutboxHandler(IDbContextFactory<ApprovalDbCo
         var path = "/m/approvals/" + Uri.EscapeDataString(instance.Id);
         foreach (var recipientId in recipientIds)
         {
-            // 个人订阅接入时在这里筛选渠道，站内消息目前对所有参与者开启。
+            if (!people.TryGetValue(recipientId, out var person) || !person.IsActive)
+            {
+                // 人员已经离职或被移除时，不向无效账号继续发站内与邮件提醒。
+                continue;
+            }
+
             await QueueIfAbsentAsync(db, item, payload, recipientId, NotificationChannelCodes.InApp,
                 null, subject, body, path, cancellationToken);
-            if (people.TryGetValue(recipientId, out var person) && person.IsActive &&
-                !string.IsNullOrWhiteSpace(person.Email) && MailAddress.TryCreate(person.Email, out var address) &&
+            if (!string.IsNullOrWhiteSpace(person.Email) && MailAddress.TryCreate(person.Email, out var address) &&
                 address.Address == person.Email)
             {
                 await QueueIfAbsentAsync(db, item, payload, recipientId, NotificationChannelCodes.Email,

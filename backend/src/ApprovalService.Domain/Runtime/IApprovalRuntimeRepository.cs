@@ -115,6 +115,11 @@ public sealed class RuntimeSnapshot
     public IReadOnlyList<ApprovalTaskEntity> Tasks { get; set; } = [];
 
     /// <summary>
+    /// 已实际处理任务或收到抄送的历史参与人，供保密通知判定使用。
+    /// </summary>
+    public IReadOnlyList<InstanceParticipantEntity> Participants { get; set; } = [];
+
+    /// <summary>
     /// 最新操作记录；审批单尚无事件时为空。
     /// </summary>
     public OperationEventEntity? LastEvent

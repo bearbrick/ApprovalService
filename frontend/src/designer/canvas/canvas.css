@@ -21,33 +21,6 @@
 .flow-canvas-palette-symbol.exclusiveGateway, .flow-canvas-palette-symbol.inclusiveGateway, .flow-canvas-palette-symbol.parallelGateway { transform: rotate(45deg); }
 .flow-canvas-viewport { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #f8faff; }
 .flow-canvas-help { position: absolute; z-index: 1; top: 0; left: 0; right: 0; min-height: 33px; padding: 8px 12px; border-bottom: 1px solid #e8eef8; background: #ffffffed; color: #78869b; font-size: 11px; pointer-events: none; }
-.flow-canvas-stage { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
-.flow-canvas-stage:active { cursor: grabbing; }
-.flow-canvas-node { cursor: move; outline: none; }
-.flow-canvas-node.selected .flow-canvas-card, .flow-canvas-node.selected .flow-canvas-gateway, .flow-canvas-node.selected .flow-canvas-event { stroke: var(--blue); stroke-width: 2.5; filter: drop-shadow(0 2px 5px #1555d42b); }
-.flow-canvas-node.invalid .flow-canvas-card, .flow-canvas-node.invalid .flow-canvas-gateway, .flow-canvas-node.invalid .flow-canvas-event { stroke: #c3515a; stroke-width: 2.5; }
-.flow-canvas-node.connecting .flow-canvas-card, .flow-canvas-node.connecting .flow-canvas-gateway { stroke: #38a475; stroke-width: 3; }
-.flow-canvas-event { fill: #eaf7ef; stroke: #55a979; stroke-width: 2; }
-.flow-canvas-event-inner { fill: none; stroke: #55a979; stroke-width: 2; }
-.flow-canvas-event-text { fill: #267253; font-size: 14px; font-weight: 700; pointer-events: none; }
-.flow-canvas-gateway { fill: #fff8ed; stroke: #deb46b; stroke-width: 1.5; }
-.flow-canvas-gateway-sign { fill: #8e6b2d; font-size: 26px; font-weight: 500; pointer-events: none; }
-.flow-canvas-gateway-name { fill: #68768a; font-size: 11px; pointer-events: none; }
-.flow-canvas-card { fill: #fff; stroke: #becfe8; stroke-width: 1.4; }
-.flow-canvas-card-top { fill: #e9f1ff; stroke: none; }
-.flow-canvas-card-type { fill: #4775bd; font-size: 9px; pointer-events: none; }
-.flow-canvas-card-name { fill: #253957; font-size: 12px; font-weight: 650; pointer-events: none; }
-.flow-canvas-handle { fill: #fff; stroke: var(--blue); stroke-width: 3; cursor: crosshair; }
-.flow-canvas-edge { cursor: pointer; }
-.flow-canvas-edge-hit { fill: none; stroke: transparent; stroke-width: 16; }
-.flow-canvas-edge-path { fill: none; stroke: #7c91af; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.flow-canvas-edge-halo { fill: none; stroke: #c9dcff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.flow-canvas-edge.selected .flow-canvas-edge-path { stroke: var(--blue); stroke-width: 2.6; }
-.flow-canvas-edge.invalid .flow-canvas-edge-path { stroke: #c3515a; stroke-width: 2.5; }
-.flow-canvas-edge-label rect { fill: #fff; stroke: #d8e3f2; }
-.flow-canvas-edge-label text { fill: #62748e; font-size: 10px; pointer-events: none; }
-.flow-canvas-edge.selected .flow-canvas-edge-label rect { stroke: #94b7fb; fill: #f8fbff; }
-.flow-canvas-edge.selected .flow-canvas-edge-label text { fill: #1555d4; }
 .flow-canvas-controls { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 5px; background: #fff; box-shadow: 0 2px 8px #071f4615; color: var(--muted); }
 .flow-canvas-controls .btn { min-width: 27px; min-height: 27px; padding: 2px; }
 .flow-canvas-controls span { min-width: 34px; text-align: center; }

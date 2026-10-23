@@ -25,5 +25,21 @@ internal static class NotificationModelConfiguration
             entity.Property(item => item.TargetPath).HasMaxLength(512).IsRequired();
             entity.HasIndex(item => new { item.RecipientId, item.CreatedAt });
         });
+
+        modelBuilder.Entity<NotificationPreferenceEntity>(entity =>
+        {
+            entity.ToTable("NotificationPreferences");
+            entity.HasKey(item => new { item.PersonId, item.Category });
+            entity.Property(item => item.PersonId).HasMaxLength(128);
+            entity.Property(item => item.Category).HasMaxLength(48);
+        });
+
+        modelBuilder.Entity<DailyDigestSettingsEntity>(entity =>
+        {
+            entity.ToTable("DailyDigestSettings");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasMaxLength(16);
+            entity.Property(item => item.LocalSendTime).HasMaxLength(5);
+        });
     }
 }

@@ -65,6 +65,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton(NotificationCalendarSettings.Create(configuration));
         // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
         services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
         services.AddSingleton<SignedHttpOutboundAdapter>();
@@ -116,9 +117,14 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddOptions<SmtpNotificationOptions>()
             .Bind(configuration.GetSection(SmtpNotificationOptions.SectionName));
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<INotificationSettingsRepository, NotificationSettingsRepository>();
+        services.AddScoped<DailyDigestScheduler>();
+        services.AddScoped<IScheduledJobHandler, DailyDigestJobHandler>();
+        services.AddHostedService<DailyDigestHostedService>();
         services.AddScoped<INotificationChannel, SmtpNotificationChannel>();
         services.AddScoped<INotificationChannel, InAppNotificationChannel>();
         services.AddScoped<IOutboxHandler, NotificationOutboxHandler>();
+        services.AddScoped<IOutboxHandler, DeadlineReminderOutboxHandler>();
         return services;
     }
 }

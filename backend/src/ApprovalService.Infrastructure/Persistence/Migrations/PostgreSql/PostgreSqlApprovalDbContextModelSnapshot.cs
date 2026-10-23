@@ -344,6 +344,21 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("SerialNumberCounters", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.DailyDigestSettingsEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("LocalSendTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailyDigestSettings", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -380,6 +395,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasIndex("RecipientId", "CreatedAt");
 
                     b.ToTable("InAppNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.NotificationPreferenceEntity", b =>
+                {
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("InAppEnabled")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("PersonId", "Category");
+
+                    b.ToTable("NotificationPreferences", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>

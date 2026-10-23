@@ -148,6 +148,16 @@ public class ApprovalDbContext : DbContext
     public DbSet<InAppNotificationEntity> InAppNotifications => Set<InAppNotificationEntity>();
 
     /// <summary>
+    /// 个人提醒订阅设置。
+    /// </summary>
+    public DbSet<NotificationPreferenceEntity> NotificationPreferences => Set<NotificationPreferenceEntity>();
+
+    /// <summary>
+    /// 管理员设置的每日待办汇总时间。
+    /// </summary>
+    public DbSet<DailyDigestSettingsEntity> DailyDigestSettings => Set<DailyDigestSettingsEntity>();
+
+    /// <summary>
     /// 审批编号的持久流水号。
     /// </summary>
     public DbSet<SerialNumberCounterEntity> SerialNumberCounters => Set<SerialNumberCounterEntity>();

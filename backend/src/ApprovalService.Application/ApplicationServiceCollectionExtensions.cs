@@ -45,6 +45,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
         services.AddScoped<IIdentityAppService, IdentityAppService>();
         services.AddScoped<INotificationAppService, NotificationAppService>();
+        services.AddScoped<INotificationSettingsAppService, NotificationSettingsAppService>();
         services.AddScoped<IFileAppService, FileAppService>();
         return services;
     }

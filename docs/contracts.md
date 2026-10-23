@@ -59,6 +59,8 @@
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
+| `GET /api/v1/notifications/preferences`、`PUT /api/v1/notifications/preferences/{category}` | 人员 JWT | 读取或修改本人的邮件、站内提醒开关 |
+| `GET/PUT /api/v1/admin/notifications/daily-digest` | 本地 JWT + 当前组织管理员角色 | 读取或设置每日待办汇总的当地发送时刻 |
 | `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
@@ -69,6 +71,10 @@
 ```json
 { "name": "ApprovalService", "version": "0.1.0", "apiVersion": "v1" }
 ```
+
+个人提醒类别为 `newTask`、`urge`、`beforeDue`、`overdue`、`result`、`cc`、`mention`、`dailyDigest`。`GET /api/v1/notifications/preferences` 返回数组，每项为 `{category, emailEnabled, inAppEnabled}`；`PUT /api/v1/notifications/preferences/{category}` 请求 `{emailEnabled, inAppEnabled}`，返回更新后的同形对象。未保存的类别按默认开关显示，`dailyDigest` 仅支持邮件。人员 ID 只取已验证 JWT，不接受请求自报。
+
+`GET/PUT /api/v1/admin/notifications/daily-digest` 的响应为 `{localTime}`；PUT 请求同形，`localTime` 为严格 `HH:mm` 或 `null`（停发）。未配置时不安排每日汇总。组织管理员权限在请求时重新验证，嵌入人员会话不能修改全局时间。
 
 `GET /api/v1/flows` 和 `GET /api/v1/flows/{code}/schema` 需要 `X-Api-Key`。列表只包含当前已发布、接入应用已获授权且流程定义允许该应用使用的版本；无权限读取单个流程时返回 `FORBIDDEN`。列表项为 `{ "code": "PURCHASE", "name": "采购申请", "version": 3 }`。数据定义接口返回 `{ "flowCode": "PURCHASE", "version": 3, "data": { "fields": [], "summaryFields": [] }, "example": {} }`；`example` 按当前定义生成，不含计算字段和审批人填写字段。
 

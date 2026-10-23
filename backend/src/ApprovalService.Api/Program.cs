@@ -109,6 +109,7 @@ app.MapOpenStartEndpoints();
 app.MapOpenInstanceCommandEndpoints();
 app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
+app.MapNotificationSettingsEndpoints();
 app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapFileEndpoints();

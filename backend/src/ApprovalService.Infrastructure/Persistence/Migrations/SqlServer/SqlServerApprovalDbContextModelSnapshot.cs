@@ -344,6 +344,21 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.ToTable("SerialNumberCounters", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.DailyDigestSettingsEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("LocalSendTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailyDigestSettings", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -380,6 +395,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasIndex("RecipientId", "CreatedAt");
 
                     b.ToTable("InAppNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.NotificationPreferenceEntity", b =>
+                {
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(48)
+                        .HasColumnType("nvarchar(48)");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("InAppEnabled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("PersonId", "Category");
+
+                    b.ToTable("NotificationPreferences", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>

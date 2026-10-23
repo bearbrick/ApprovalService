@@ -55,6 +55,13 @@ internal static class Program
         AssigneeChecks.Run(Check);
         ApprovalPolicyChecks.Run(Check);
         WorkCalendarChecks.Run(Check);
+        await NotificationRulesChecks.RunAsync(Check);
+        await NotificationDeadlineSchedulerChecks.RunAsync(Check);
+        NotificationRuntimeEventChecks.Run(Check);
+        await NotificationRulesChecksIntegration.RunAsync(Check);
+        await NotificationRulesChecksSmtp.RunAsync(Check);
+        await NotificationPreferenceChecks.RunAsync(Check);
+        await NotificationRulesChecksEndpoints.RunAsync(backendRoot, Check);
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
         await EventAnchorChecks.RunAsync(Check);

@@ -36,6 +36,7 @@ internal static class Program
 
         await ClientChecks.RunAsync(Check);
         await OpenApiChecks.RunAsync(Check);
+        await AdvancedApiChecks.RunAsync(Check);
         ArchitectureChecks.Run(clientRoot, Check);
         DocumentationChecks.Run(clientRoot, Check);
         await LiveServerChecks.RunAsync(Check);

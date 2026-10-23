@@ -125,13 +125,13 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - `cc`：普通抄送节点实际送达或人工抄送的收件人；未到达的将来抄送不授予可见性。
 - `started`：发起人或实际代发人，只供看进度。
 
-摘要字段为 `id, serialNo, flowCode, flowName, businessKey, title, status, clientAppCode, initiatorId, submittedById?, isUrgent, startedAt, endedAt?, summary, pendingTaskIds`。`pendingTaskIds` 仅说明当前任务关系，不替代后续操作接口的状态、节点权限和业务校验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。
+摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, startedAt, endedAt?, summary, pendingTaskIds`。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系，不替代后续操作接口的状态、节点权限和业务校验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。
 
 `GET /api/v1/center/instances/{id}` 返回 `{instance, data, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段；`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?}`；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。该切片尚未提供图布局、详情排版和读标记协议。
 
 可见详情限发起人、实际代发人、当前本人或代理关系中的待办，以及持久化的历史实际处理人/已送达抄送人。保密流程不因管理员身份或仅有未到达、已取消任务自动开放；本切片不开放额外查看人或管理查询。嵌入会话的应用条件与人员条件共同下推到数据库查询，跨应用详情和其他不可见或不存在的单据统一返回 `NOT_FOUND`。列表与详情分别在一个一致读事务中读取计数、版本、任务和事件。
 
-没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；前端接入、字段搜索、未读、批量操作和完整审批操作仍由后续中心切片实现。本切片不供业务 SDK 调用，尚无客户端或前端协议副本。
+没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表和只读详情，`frontend/src/api/center-adapter.ts` 是中心响应副本。字段搜索、未读、批量操作和完整审批操作仍由后续中心切片实现。本切片不供业务 SDK 调用。
 
 ## 开放接口补充与待接入项
 

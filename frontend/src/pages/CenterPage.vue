@@ -2,7 +2,10 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
-import { centerAdapter, CenterAdapterUnavailableError } from '../api/center-adapter.ts'
+import { centerAdapter } from '../api/center-adapter.ts'
+import { centerSession, loginCenter, logoutCenter } from '../api/center-session.ts'
+import { requestJson } from '../api/http.ts'
+import { ApiError } from '../api/http-types.ts'
 import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import CenterList from './center/CenterList.vue'
 import CenterDetailView from './center/CenterDetailView.vue'
@@ -48,6 +51,41 @@ const items = ref<readonly CenterItem[]>([])
  */
 const detail = ref<CenterDetail | null>(null)
 /**
+ * 当前人员是否已登录。
+ */
+
+const signedIn = ref(Boolean(centerSession()))
+/**
+ * 登录工号。
+ */
+
+const employeeNumber = ref('')
+/**
+ * 登录密码，不持久化。
+ */
+
+const password = ref('')
+/**
+ * 首次登录时的新密码。
+ */
+
+const newPassword = ref('')
+/**
+ * 登录和改密提交状态。
+ */
+
+const authenticating = ref(false)
+/**
+ * 身份接口返回的中文错误。
+ */
+
+const identityError = ref('')
+/**
+ * 首次登录需要修改密码。
+ */
+
+const mustChangePassword = ref(centerSession()?.mustChangePassword ?? false)
+/**
  * 正在进行的请求，用于避免切换页面后的旧响应覆盖新页面。
  */
 let request: AbortController | null = null
@@ -61,6 +99,7 @@ async function load(): Promise<void> {
   items.value = []
   detail.value = null
   error.value = ''
+  if (!signedIn.value) { state.value = 'unavailable'; return }
   if (props.route.section === 'settings') { state.value = 'unavailable'; return }
   const current = new AbortController()
   request = current
@@ -71,9 +110,74 @@ async function load(): Promise<void> {
     if (request === current && !current.signal.aborted) state.value = 'ready'
   } catch (cause) {
     if (request !== current || current.signal.aborted) return
-    state.value = cause instanceof CenterAdapterUnavailableError ? 'unavailable' : 'error'
+    if (cause instanceof ApiError && cause.status === 401) {
+      logoutCenter()
+      signedIn.value = false
+      identityError.value = '登录已失效，请重新登录。'
+    }
+    state.value = 'error'
     error.value = cause instanceof Error ? cause.message : '审批中心暂时无法读取数据。'
   }
+}
+
+/**
+ * 通过本地工号密码登录，并立即读取已授权的中心数据。
+ * @returns 登录流程完成。
+ */
+async function signIn(): Promise<void> {
+  if (!employeeNumber.value.trim() || !password.value) { identityError.value = '请输入工号和密码。'; return }
+  authenticating.value = true
+  identityError.value = ''
+  try {
+    const tokens = await loginCenter(employeeNumber.value.trim(), password.value)
+    mustChangePassword.value = tokens.mustChangePassword
+    if (tokens.mustChangePassword) return
+    password.value = ''
+    signedIn.value = true
+    await load()
+  } catch (cause) {
+    identityError.value = cause instanceof Error ? cause.message : '登录失败，请稍后重试。'
+  } finally {
+    authenticating.value = false
+  }
+}
+
+/**
+ * 按首次登录要求改密；服务端作废旧令牌后重新登录。
+ * @returns 改密流程完成。
+ */
+async function changeInitialPassword(): Promise<void> {
+  const token = centerSession()?.accessToken
+  if (!token || !newPassword.value) { identityError.value = '请输入新密码。'; return }
+  authenticating.value = true
+  identityError.value = ''
+  try {
+    await requestJson<void>('/api/v1/identity/change-password', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` },
+      body: { currentPassword: password.value, newPassword: newPassword.value }, cache: 'no-store',
+    })
+    logoutCenter()
+    mustChangePassword.value = false
+    password.value = ''
+    newPassword.value = ''
+    identityError.value = '密码已修改，请使用新密码登录。'
+  } catch (cause) {
+    identityError.value = cause instanceof Error ? cause.message : '修改密码失败。'
+  } finally {
+    authenticating.value = false
+  }
+}
+
+/**
+ * 清除当前页面会话和已加载的审批数据。
+ */
+function signOut(): void {
+  request?.abort()
+  logoutCenter()
+  signedIn.value = false
+  items.value = []
+  detail.value = null
+  password.value = ''
 }
 
 watch(() => [props.route.section, props.route.resourceId], () => { void load() }, { immediate: true })
@@ -81,12 +185,21 @@ onBeforeUnmount(() => request?.abort())
 </script>
 
 <template>
-  <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><span class="badge">数据接口待接入</span></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
+  <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><button v-if="signedIn" class="btn" type="button" @click="signOut">退出登录</button></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
   <div class="page-body center-page-body">
+    <section v-if="!signedIn" class="center-card center-login">
+      <h2>{{ mustChangePassword ? '首次登录请修改密码' : '登录审批中心' }}</h2>
+      <p>使用已开通的工号和密码查看属于自己的审批记录。</p>
+      <form v-if="!mustChangePassword" @submit.prevent="signIn"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '登录中…' : '登录' }}</button></form>
+      <form v-else @submit.prevent="changeInitialPassword"><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '提交中…' : '修改密码' }}</button></form>
+      <p v-if="identityError" role="alert" class="center-login-error">{{ identityError }}</p>
+    </section>
+    <template v-else>
     <nav v-if="!route.resourceId" class="center-tabs" aria-label="审批列表"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined">{{ item.title }}</a><a href="#/center/settings" :aria-current="route.section === 'settings' ? 'page' : undefined">个人设置</a></nav>
     <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" @reload="load" />
     <section v-else-if="route.section === 'settings'" class="center-card center-settings-empty"><UiEmptyState title="个人设置尚未接入" description="委托、签名、常用语和提醒偏好将在账号与审批中心接口接入后开放。当前不会保存任何设置。" icon="info" /></section>
     <CenterList v-else :section="section" :items="items" :state="state" :error="error" @reload="load" />
     <p class="workspace-note">审批中心只处理审批与查看进度，不创建或修改业务单据。</p>
+    </template>
   </div>
 </template>

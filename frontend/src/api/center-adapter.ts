@@ -1,31 +1,224 @@
-import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
+import { getJson } from './http.ts'
+import { centerAccessToken, centerSession } from './center-session.ts'
+import type { CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
 
 /**
- * 审批中心接口尚未接入时的明确状态，不假装空列表。
+ * 尚未登录人员会话时的明确状态，供共用适配器的手机页辨别。
  */
 export class CenterAdapterUnavailableError extends Error {
   /**
-   * 构造界面可辨认的未接入错误。
+   * 构造未登录状态。
    */
   constructor() {
-    super('审批中心接口尚未接入。')
+    super('请先登录审批中心。')
     this.name = 'CenterAdapterUnavailableError'
   }
 }
 
 /**
- * 审批中心页面需要的只读数据入口；正式接口实现由后续任务提供。
+ * 服务端授权后的列表摘要。
+ */
+
+interface CenterWireItem {
+  /**
+   * 审批单标识。
+   */
+  id: string
+  /**
+   * 审批编号。
+   */
+  serialNo: string
+  /**
+   * 流程编码。
+   */
+  flowCode: string
+  /**
+   * 流程名称。
+   */
+  flowName: string
+  /**
+   * 来源应用显示名称。
+   */
+  sourceName?: string
+  /**
+   * 发起人显示名称。
+   */
+  initiatorName?: string
+  /**
+   * 当前人工环节。
+   */
+  currentStep?: string | null
+  /**
+   * 业务单号。
+   */
+  businessKey: string
+  /**
+   * 审批标题。
+   */
+  title: string
+  /**
+   * 审批状态。
+   */
+  status: string
+  /**
+   * 来源应用编码。
+   */
+  clientAppCode: string
+  /**
+   * 发起人员标识。
+   */
+  initiatorId: string
+  /**
+   * 是否加急。
+   */
+  isUrgent: boolean
+  /**
+   * 发起时间。
+   */
+  startedAt: string
+  /**
+   * 结束时间。
+   */
+  endedAt?: string | null
+  /**
+   * 按权限裁剪的摘要。
+   */
+  summary: Record<string, unknown>
+  /**
+   * 当前人员可处理的任务标识。
+   */
+  pendingTaskIds: string[]
+}
+
+/**
+ * 服务端分页响应。
+ */
+
+interface CenterWirePage {
+  /**
+   * 授权过滤后的总数。
+   */
+  total: number
+  /**
+   * 跳过的数量。
+   */
+  skip: number
+  /**
+   * 本页上限。
+   */
+  take: number
+  /**
+   * 本页摘要。
+   */
+  items: CenterWireItem[]
+}
+
+/**
+ * 服务端只读任务。
+ */
+
+interface CenterWireTask {
+  /**
+   * 任务标识。
+   */
+  id: string
+  /**
+   * 节点标识。
+   */
+  nodeId: string
+  /**
+   * 节点名称。
+   */
+  nodeName: string
+  /**
+   * 审批人标识。
+   */
+  assigneeId: string
+  /**
+   * 任务状态。
+   */
+  status: string
+  /**
+   * 完成时间。
+   */
+  completedAt: string | null
+  /**
+   * 审批意见。
+   */
+  opinion: string | null
+}
+
+/**
+ * 服务端安全时间线。
+ */
+
+interface CenterWireEvent {
+  /**
+   * 事件标识。
+   */
+  eventId: string
+  /**
+   * 事件类型。
+   */
+  kind: string
+  /**
+   * 节点标识。
+   */
+  nodeId: string | null
+  /**
+   * 操作人。
+   */
+  actorId: string | null
+  /**
+   * 发生时间。
+   */
+  occurredAt: string
+  /**
+   * 审批意见。
+   */
+  opinion: string | null
+}
+
+/**
+ * 服务端授权后的详情。
+ */
+
+interface CenterWireDetail {
+  /**
+   * 审批摘要。
+   */
+  instance: CenterWireItem
+  /**
+   * 按字段权限裁剪的数据。
+   */
+  data: Record<string, unknown>
+  /**
+   * 只读任务。
+   */
+  tasks: CenterWireTask[]
+  /**
+   * 安全事件。
+   */
+  events: CenterWireEvent[]
+  /**
+   * 当前执行节点。
+   */
+  activeNodeIds: string[]
+}
+
+/**
+ * 审批中心的数据入口，所有请求使用人员会话而非应用密钥。
  */
 export interface CenterDataAdapter {
   /**
-   * 读取当前登录用户有权查看的列表。
+   * 读取当前人员有权查看的整类列表。
    * @param section 列表分组。
    * @param signal 路由切换时的取消信号。
    * @returns 已授权的审批摘要。
    */
   loadList(section: CenterSection, signal: AbortSignal): Promise<readonly CenterItem[]>
   /**
-   * 读取一张审批单的只读详情。
+   * 读取一张审批单的授权详情。
    * @param id 审批单标识。
    * @param signal 路由切换时的取消信号。
    * @returns 已授权的详情。
@@ -34,15 +227,146 @@ export interface CenterDataAdapter {
 }
 
 /**
- * 未接入的数据适配器，避免向尚未确定的接口或匿名端点发请求。
+ * 判断接口响应是否为普通对象。
+ * @param value 待检查数据。
+ * @returns 是否为对象。
+ */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * 校验服务器列表响应的安全字段，异常响应不能伪装成空列表。
+ * @param value 服务器响应。
+ * @returns 是否为中心列表响应。
+ */
+function isPage(value: unknown): value is CenterWirePage {
+  return isObject(value) && Number.isSafeInteger(value.total) && Number.isSafeInteger(value.skip)
+    && Number.isSafeInteger(value.take) && Array.isArray(value.items)
+    && value.items.every(isWireItem)
+}
+
+/**
+ * 校验每条授权摘要。
+ * @param value 待检查数据。
+ * @returns 是否为摘要。
+ */
+function isWireItem(value: unknown): value is CenterWireItem {
+  return isObject(value) && ['id', 'serialNo', 'flowCode', 'flowName', 'businessKey', 'title', 'status', 'clientAppCode', 'initiatorId', 'startedAt']
+    .every(key => typeof value[key] === 'string') && typeof value.isUrgent === 'boolean'
+    && (value.endedAt === undefined || value.endedAt === null || typeof value.endedAt === 'string')
+    && isObject(value.summary) && Array.isArray(value.pendingTaskIds)
+    && value.pendingTaskIds.every(id => typeof id === 'string')
+}
+
+/**
+ * 校验详情的必要结构。
+ * @param value 服务器响应。
+ * @returns 是否为详情。
+ */
+function isDetail(value: unknown): value is CenterWireDetail {
+  return isObject(value) && isWireItem(value.instance) && isObject(value.data)
+    && Array.isArray(value.tasks) && value.tasks.every(task => isObject(task)
+      && ['id', 'nodeId', 'nodeName', 'assigneeId', 'status'].every(key => typeof task[key] === 'string'))
+    && Array.isArray(value.events) && value.events.every(event => isObject(event)
+      && typeof event.eventId === 'string' && typeof event.kind === 'string' && typeof event.occurredAt === 'string')
+    && Array.isArray(value.activeNodeIds) && value.activeNodeIds.every(id => typeof id === 'string')
+}
+
+/**
+ * 把已授权字段的 JSON 值转为易读文本。
+ * @param value 字段值。
+ * @returns 只读展示文本。
+ */
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined) return '—'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  return JSON.stringify(value)
+}
+
+/**
+ * 转换服务端已裁剪字段；未提供字段标签时使用字段编码，避免猜测定义。
+ * @param data 已授权的数据对象。
+ * @returns 展示字段。
+ */
+function fields(data: Record<string, unknown>): CenterDetailField[] {
+  return Object.entries(data).map(([key, value]) => ({ key, label: key, value: displayValue(value) }))
+}
+
+/**
+ * 转换服务端摘要；尚无许可协议的操作始终禁用。
+ * @param wire 已授权摘要。
+ * @param section 当前列表。
+ * @param tasks 详情中的只读任务。
+ * @returns 界面摘要。
+ */
+function item(wire: CenterWireItem, section: CenterSection, tasks: readonly CenterWireTask[] = []): CenterItem {
+  const pending = tasks.find(task => wire.pendingTaskIds.includes(task.id))
+  const latest = tasks.at(-1)
+  const summary: CenterSummaryField[] = fields(wire.summary)
+  return {
+    id: wire.id, section, title: wire.title, serialNo: wire.serialNo, businessKey: wire.businessKey,
+    flowCode: wire.flowCode, flowName: wire.flowName, sourceName: wire.sourceName || wire.clientAppCode,
+    initiatorName: wire.initiatorName || wire.initiatorId, currentStep: wire.currentStep || (pending?.nodeName ?? latest?.nodeName ?? '—'),
+    status: wire.status, createdAt: wire.startedAt, updatedAt: wire.endedAt ?? wire.startedAt,
+    urgent: wire.isUrgent, unread: false, allowsBatchApprove: false, allowedActions: [], summary,
+  }
+}
+
+/**
+ * 构造当前人员 JWT 请求头。
+ * @returns 授权请求头。
+ */
+async function headers(): Promise<HeadersInit> {
+  if (!centerSession()) throw new CenterAdapterUnavailableError()
+  return { Authorization: `Bearer ${await centerAccessToken()}` }
+}
+
+/**
+ * 真实中心适配器；逐页读取时每次均经过服务端身份和参与关系过滤。
  */
 export const centerAdapter: CenterDataAdapter = {
-  /** @inheritdoc */
-  async loadList(): Promise<readonly CenterItem[]> {
-    throw new CenterAdapterUnavailableError()
+  /**
+   * @inheritdoc
+   */
+
+  async loadList(section, signal) {
+    const rows: CenterItem[] = []
+    let skip = 0
+    let total = 0
+    do {
+      const query = new URLSearchParams({ section, skip: String(skip), take: '100' })
+      const page = await getJson<CenterWirePage>(`/api/v1/center/instances?${query}`, {
+        headers: await headers(), signal, cache: 'no-store',
+      })
+      if (!isPage(page) || page.skip !== skip || page.total < 0 || page.items.length > 100) {
+        throw new Error('审批列表响应不完整，请稍后重试。')
+      }
+      total = page.total
+      rows.push(...page.items.map(row => item(row, section)))
+      skip += page.items.length
+      if (page.items.length === 0 && skip < total) throw new Error('审批列表分页响应不完整，请稍后重试。')
+    } while (skip < total)
+    return rows
   },
-  /** @inheritdoc */
-  async loadDetail(): Promise<CenterDetail> {
-    throw new CenterAdapterUnavailableError()
+  /**
+   * @inheritdoc
+   */
+
+  async loadDetail(id, signal) {
+    const wire = await getJson<CenterWireDetail>(`/api/v1/center/instances/${encodeURIComponent(id)}`, {
+      headers: await headers(), signal, cache: 'no-store',
+    })
+    if (!isDetail(wire)) throw new Error('审批详情响应不完整，请稍后重试。')
+    const personId = centerSession()?.personId
+    const section: CenterSection = wire.instance.pendingTaskIds.length ? 'todo'
+      : wire.instance.initiatorId === personId ? 'started' : 'done'
+    const timeline: CenterTimelineEntry[] = wire.events.map(event => ({
+      id: event.eventId, title: event.kind, actor: event.actorId ?? '系统', occurredAt: event.occurredAt,
+      opinion: event.opinion ?? '', current: Boolean(event.nodeId && wire.activeNodeIds.includes(event.nodeId)),
+    }))
+    return { item: item(wire.instance, section, wire.tasks), fields: fields(wire.data), timeline, attachmentNames: [] }
   },
 }

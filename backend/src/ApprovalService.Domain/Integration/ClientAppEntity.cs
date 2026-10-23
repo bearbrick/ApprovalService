@@ -31,6 +31,11 @@ public sealed class ClientAppEntity
     public string AllowedFlowCodesJson { get; set; } = "[]";
 
     /// <summary>
+    /// 允许嵌入审批中心的完整网站来源 JSON 数组；默认不允许外部网站嵌入。
+    /// </summary>
+    public string AllowedEmbedOriginsJson { get; set; } = "[]";
+
+    /// <summary>
     /// 是否可以查看所有接入应用的待办数量和列表。
     /// </summary>
     public bool CanViewAllTasks

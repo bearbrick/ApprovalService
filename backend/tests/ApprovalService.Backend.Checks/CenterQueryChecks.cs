@@ -54,6 +54,9 @@ internal static class CenterQueryChecks
                 local.Items[0].Id == "a-todo" && local.Items[0].Summary.GetProperty("amount").GetInt32() == 12 &&
                 !local.Items[0].Summary.TryGetProperty("secret", out _) &&
                 !local.Items[0].Summary.GetProperty("lines")[0].TryGetProperty("cost", out _));
+            check("中心列表返回真实人员、来源应用和当前环节名称",
+                local.Items[0].InitiatorName == "测试人员" && local.Items[0].SourceName == "应用一" &&
+                !string.IsNullOrWhiteSpace(local.Items[0].CurrentStep));
             var done = await ListAsync(http, tokens.Local, "done");
             var copy = await ListAsync(http, tokens.Local, "cc");
             var started = await ListAsync(http, tokens.Local, "started");

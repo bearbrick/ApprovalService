@@ -253,6 +253,7 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.SigningSecretCiphertext).IsRequired();
             entity.Property(item => item.AuthGeneration).HasDefaultValue(1L).IsRequired();
             entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
+            entity.Property(item => item.AllowedEmbedOriginsJson).HasDefaultValue("[]").IsRequired();
             entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
             entity.Property(item => item.DataUrl).HasMaxLength(2048);
             entity.Property(item => item.ValidationUrl).HasMaxLength(2048);

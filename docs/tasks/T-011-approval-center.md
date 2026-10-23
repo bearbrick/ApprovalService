@@ -20,6 +20,10 @@
 - `backend/tests/ApprovalService.Backend.Checks/Center*.cs`：真实 SQLite/JWT/HTTP 检查
 - `backend/README.md`、`docs/contracts.md`、`docs/architecture.md`、设计书 §center/§api：实际接口行为同步
 - `frontend/src/pages/center/`：待我处理、我已处理、抄送我的、我发起的（只看进度）；详情（按排版显示业务数据，或嵌入业务系统的原单；意见栏；时间线加流程图高亮；操作按钮）
+- `frontend/src/pages/CenterPage.vue`、`frontend/src/api/center-adapter.ts`、`frontend/src/api/center-session.ts`、`frontend/src/model/center.ts`、`frontend/tests/center-checks.ts`、`frontend/src/styles/center.css`：登录会话、中心接口映射、真实列表与详情、场景检查及页面样式
+- `frontend/README.md`：记录实际可用的登录和只读中心页面
+- `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
+- `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/Migrations/`：接入应用允许嵌入来源的存储与三库迁移
 - 内嵌模式：用嵌入令牌打开，审批完用 postMessage 通知外面
 
 ## 共享文件
@@ -32,6 +36,7 @@
 - `backend/tests/ApprovalService.Backend.Checks/Program.cs`：登记中心检查
 - `backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`docs/contracts.md`：新增中心查询协议
 - `docs/architecture.md`：同步查询层安全边界
+- `docs/adr/README.md`：登记已采纳的内嵌与中心操作协议
 
 ## 验收标准
 
@@ -49,6 +54,9 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · 用户已明确确认两项后续协议，解除此前 R13 阻塞：每应用登记允许嵌入来源，服务端设置 frame-ancestors；一次性令牌放 URL # 片段、兑换后立即清除、完成消息只发登记来源；详情由服务端返回当前人可执行操作，JWT 写入口调用统一引擎，批量逐项返回结果，前端只按许可显示。新增 ADR 0016/0017 已批准的落地范围，并与 T-020 负责人约定：本任务只改 ClientAppEntity 的 AllowedEmbedOriginsJson、EF 配置与迁移和中心页面安全使用，T-020 负责管理配置 API/UI；不碰其 IClientAppRepository / ClientAppRepository。
+- 2026-10-23 · Codex · 桌面正式中心已接真实本地工号密码登录、首次改密、15 分钟访问令牌到期前轮换、JWT 四列表与详情；页面内存保存令牌，刷新页后需重新登录，不向匿名中心端点取假数据。摘要契约向后兼容新增发起人名称、来源应用名称和当前人工环节，后端在已授权记录投影中从可信主数据与发布图生成；前端协议副本、契约文档和设计书 §center 同步。测试覆盖匿名拒绝、人员令牌请求、真实显示字段与无操作许可禁用；全量 `verify.ps1` 通过：后端 729、调用端 50、前端 122 项，构建零警告。未连接真实 SQL Server/PostgreSQL，未使用真实账号或密码回放测试。剩余：读标记、真实详情排版/附件、审批动作与批量、委托/签名/常用语、嵌入兑换入口与 iframe 限制。阻塞原因（R13）：设计只说“登记过的网站能嵌入”，当前接入应用模型没有允许来源字段，也未规定令牌如何进入浏览器、发送 postMessage 的可信目标来源；写操作的逐单可用权限也未定义中心响应协议。建议先写 ADR：应用登记允许来源列表，服务端按当前应用签发 `frame-ancestors`，令牌放 URL 片段并兑换后立即清除，完成后仅向登记来源 postMessage；中心写入口从已验证 JWT 及应用范围调用统一引擎并返回逐项许可，前端不推断。请确认协议后继续，不应放宽到任意 iframe 来源或仅凭前端判断操作权限。此分支未合并 main、未推送。
+- 2026-10-23 · Codex · 继续前端接线前登记必要范围：中心页面入口、API 适配与会话、只读展示模型、场景检查和样式均属于本任务目标；本轮先接本地登录与真实 JWT 列表/详情。后端只读契约尚无每条任务的操作许可、附件元数据与字段展示标签，不会从前端猜测许可或伪造附件；审批写操作待后续稳定接口实现。此轮不需要新增依赖。
 - 2026-10-23 · Codex · 完成首个后端只读切片：新增 JWT `GET /api/v1/center/instances` 四列表和 `/{id}` 详情，人员只取认证声明，嵌入应用范围与参与关系先在 SQL 过滤，再筛选、计数、去重、排序和分页；详情不存在或不可见统一 404。待办覆盖当前代理人及原审批人，已办/抄送复用 T-043 可信参与投影，保密查询不给无关管理员或未来/取消任务自动授权。固定版本摘要和详情递归裁剪隐藏字段及明细列，不返回未定义键、运行状态、原始审计字段或私人暂存意见；历史参与者不能借 future queued 节点放宽字段权限。新增 20 项真实 SQLite/JWT/HTTP 及仓储边界检查，最终全量 `verify.ps1` 通过：后端 728、调用端 50（含真实服务端到端）、前端 120 项，构建零警告；三库模型一致性通过，未连接真实 SQL Server/PostgreSQL。同步契约、后端 README、架构及设计书 §center/§api，只描述已实现切片；没有新增依赖，初次工作树还原均用本机 NuGet/npm 缓存。下一步接前端登录/刷新/嵌入兑换与中心 adapter、读标记、字段搜索、排版/流程图、操作及批量审批、个人设置、iframe 允许来源和 postMessage；额外查看人/管理查询未在本入口开放。没有新增 SDK 或前端协议副本，因为中心客户端尚未接线；前端不持有 API Key。任务保持进行中，未合并 main、未推送。
 - 2026-10-23 · Codex · 为四列表和保密详情复用持久参与者，合入 T-043 固定已验证提交 `b3e3e8e`。唯一合并冲突为架构文档相邻段落，保留 T-044 已实现取人/自动动作说明，同时保留 T-043 参与者和附件可见性说明；不更改两者实现。当前代理原审批人依据设计书仍可查看和处理 pending 任务，已与 T-043 验证口径统一。
 - 2026-10-23 · Codex · 从 main 创建独立工作树和任务分支，认领后合入已验收 T-007 的稳定快照 `537c200`（包含 T-004、T-005），本轮先实现审批中心 JWT 只读四列表与详情。预登记范围：新增 Domain/Application/Infrastructure 的 Center 查询模块、Api/Endpoints/Center、Contracts/Protocol 的中心路由与响应、后端中心场景检查；共享登记涉及 Api/Program.cs、Application 与 Infrastructure 的 ServiceCollectionExtensions、检查 Program.cs、docs/contracts.md、docs/architecture.md；同步 backend/README.md 与设计书 §center/§api。不修改 Runtime/Persistence 实现，与 T-043 协调参与者投影，后续接入稳定版本。前端和审批写操作留待后续切片，不向前端提供 API Key。

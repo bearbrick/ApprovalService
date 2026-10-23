@@ -64,6 +64,24 @@ public sealed class CenterInstanceResponse
     public string FlowName { get; set; } = string.Empty;
 
     /// <summary>
+    /// 来源接入应用的显示名称。
+    /// </summary>
+    public string SourceName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 发起人的显示名称。
+    /// </summary>
+    public string InitiatorName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 当前人工节点名称；无人工任务时为空。
+    /// </summary>
+    public string? CurrentStep
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 来源业务单号。
     /// </summary>
     public string BusinessKey { get; set; } = string.Empty;

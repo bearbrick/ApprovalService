@@ -128,5 +128,14 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         from instance in instances
         join version in db.FlowVersions.AsNoTracking() on instance.FlowVersionId equals version.Id
         join flow in db.Flows.AsNoTracking() on version.FlowId equals flow.Id
-        select new CenterRecord { Instance = instance, FlowVersion = version, FlowName = flow.Name };
+        select new CenterRecord
+        {
+            Instance = instance,
+            FlowVersion = version,
+            FlowName = flow.Name,
+            SourceName = db.ClientApps.Where(app => app.Code == instance.ClientAppCode)
+                .Select(app => app.Name).FirstOrDefault() ?? instance.ClientAppCode,
+            InitiatorName = db.People.Where(person => person.Id == instance.InitiatorId)
+                .Select(person => person.Name).FirstOrDefault() ?? instance.InitiatorId,
+        };
 }

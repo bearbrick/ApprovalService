@@ -24,12 +24,24 @@ internal static class CenterProjection
         var definition = Read<FlowDefinition>(record.FlowVersion.DefinitionJson);
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var instance = record.Instance;
+        var currentNodeIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending)
+            .Select(task => task.NodeId).Distinct(StringComparer.Ordinal).ToArray();
+        var currentStep = currentNodeIds.Length switch
+        {
+            0 => null,
+            1 => graph.Nodes.Where(node => node.Id == currentNodeIds[0]).Select(node => node.Name)
+                .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? currentNodeIds[0],
+            _ => $"{currentNodeIds.Length} 个并行环节",
+        };
         return new CenterInstanceResponse
         {
             Id = instance.Id,
             SerialNo = instance.SerialNo,
             FlowCode = instance.FlowCode,
             FlowName = record.FlowName,
+            SourceName = record.SourceName,
+            InitiatorName = record.InitiatorName,
+            CurrentStep = currentStep,
             BusinessKey = instance.BusinessKey,
             Title = instance.Title,
             Status = instance.Status,

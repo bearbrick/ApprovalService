@@ -94,12 +94,14 @@ builder.Services.AddScoped<IAuthorizationHandler, OrganizationAdminAuthorization
 
 var app = builder.Build();
 
-// 异常处理放最外层；请求 ID 和链路 ID 紧跟其后，出错响应里也能带上。
+// 默认页面安全头包住异常处理；请求 ID 和链路 ID 紧随异常处理，出错响应也带上。
+app.UseFrontendDocumentSecurity();
 app.UseExceptionHandler(errorApp => errorApp.Run(ApiErrors.WriteUnhandledAsync));
 app.UseMiddleware<RequestTraceMiddleware>();
 app.UseStatusCodePages(context => ApiErrors.WriteStatusAsync(context.HttpContext));
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseApprovalFrontend();
 
 app.MapSystemEndpoints();
 app.MapOpenFlowEndpoints();
@@ -113,6 +115,7 @@ app.MapOrganizationEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();
+app.MapCenterEmbedEndpoints();
 
 if (bootstrapCommand)
 {

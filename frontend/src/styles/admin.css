@@ -1,6 +1,22 @@
 /* 管理后台使用和审批中心相同的深蓝、浅色分隔与紧凑表格。 */
 .admin-page-header { background: #fff; }
 .admin-page-body { min-height: calc(100dvh - 148px); padding-top: 18px; background: #f8faff; }
+.admin-login-card { width: min(420px, 100%); margin: 28px auto; padding: 28px; box-shadow: 0 14px 38px #17386212; }
+.admin-login-card h2 { color: var(--ink); font-size: 20px; }
+.admin-login-card p { margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.admin-login-card form { display: grid; gap: 16px; margin-top: 22px; }
+.admin-login-card label { display: grid; gap: 7px; color: #46556b; font-size: 13px; }
+.admin-login-card input { min-height: 39px; padding: 8px 11px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
+.admin-login-card input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+.admin-login-card .admin-login-error { margin: 0; color: #ad3030; }
+.admin-login-actions { display: flex; gap: 10px; }
+.admin-import-panel { margin-bottom: 16px; }
+.admin-import-content { display: grid; justify-items: start; gap: 14px; padding: 18px 20px; }
+.admin-import-content label { display: grid; gap: 8px; color: #46556b; font-size: 13px; }
+.admin-import-content input { max-width: 100%; }
+.admin-import-content p { color: #375c8a; font-size: 13px; }
+.admin-import-actions { display: flex; gap: 9px; }
+.admin-import-issues { margin: 0; padding-left: 18px; color: #ad3030; font-size: 13px; }
 .admin-guard-note { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid #d8e5f7; border-radius: 5px; background: #f0f6ff; color: #375c8a; }
 .admin-guard-note strong { font-weight: 600; }
 .admin-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }

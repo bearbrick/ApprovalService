@@ -5,7 +5,10 @@ using System.Text.Json;
 using ApprovalService.Application.Integration;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ApprovalService.Backend.Checks;
@@ -110,6 +113,22 @@ internal static class FrontendHostingChecks
             check("已停用接入应用不能继续提供可嵌入页面",
                 disabled.StatusCode == HttpStatusCode.NotFound && Csp(disabled) == "frame-ancestors 'none'");
 
+            await using (var production = new ProductionFrontendFactory(backendRoot,
+                Path.Combine(dataDirectory, "production-data"), dist))
+            {
+                using var published = production.CreateClient();
+                using var publishedHome = await published.GetAsync(CenterRoutes.Home);
+                using var publishedIndex = await published.GetAsync("/index.html");
+                using var publishedAsset = await published.GetAsync("/assets/app.js");
+                check("生产环境同源提供页面和资源，直访构建入口仍拒绝内嵌",
+                    publishedHome.StatusCode == HttpStatusCode.OK &&
+                    publishedIndex.StatusCode == HttpStatusCode.OK &&
+                    publishedAsset.StatusCode == HttpStatusCode.OK &&
+                    Csp(publishedHome) == "frame-ancestors 'none'" &&
+                    Csp(publishedIndex) == "frame-ancestors 'none'" &&
+                    Csp(publishedAsset) == "frame-ancestors 'none'");
+            }
+
             await VerifyMissingDistAsync(backendRoot, dataDirectory, check);
         }
         finally
@@ -168,4 +187,26 @@ internal static class FrontendHostingChecks
             check("配置缺失的发布目录时启动明确失败", error.ToString().Contains("index.html", StringComparison.Ordinal));
         }
     }
+}
+
+/// <summary>
+/// 以生产环境启动真实 API，验证已发布前端构建物的托管策略。
+/// </summary>
+/// <param name="backendRoot">后端根目录。</param>
+/// <param name="dataDirectory">独立数据目录。</param>
+/// <param name="distDirectory">前端构建目录。</param>
+internal sealed class ProductionFrontendFactory(string backendRoot, string dataDirectory, string distDirectory)
+    : WebApplicationFactory<global::Program>
+{
+    /// <inheritdoc />
+    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder
+        .UseEnvironment("Production")
+        .UseContentRoot(Path.Combine(backendRoot, "src", "ApprovalService.Api"))
+        .ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["ApprovalService:Data:Directory"] = dataDirectory,
+                ["ApprovalService:Integration:MasterKey"] = Convert.ToBase64String(new byte[32]),
+                ["ApprovalService:Frontend:DistPath"] = distDirectory,
+            }));
 }

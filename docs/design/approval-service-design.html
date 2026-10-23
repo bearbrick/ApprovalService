@@ -1151,6 +1151,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
         <p>都由审批服务的后端调用，带签名，默认 5 秒超时。都不是必须的，用到哪个功能才提供哪个。</p>
         <p>已采纳的 ADR 0010 规定各接入应用分别配置四个完整 URL，以 POST 发送小驼峰 JSON；请求与响应正文均按原始字节使用同一密钥计算 HMAC-SHA256，业务系统须回显请求 ID，审批服务验签后才解析响应。取数请求含流程编码、业务单号和请求 ID，返回 <code>data</code> 对象及可选标题、详情地址；校验请求含 <code>phase</code>、业务身份、操作人和数据快照，返回 <code>allowed</code> 以及拒绝原因。取人只接受当前应用已有的在职人员绑定，不按全局工号回退；业务动作由事务提交后待发队列调用。</p>
         <p>业务动作成功响应可带 <code>result</code>：审批服务以原动作事件 ID 独立留痕，在后续审批终态回调的可选 <code>actionResults</code> 中带出，绝不覆盖审批数据 <code>data</code>。同一动作事件的回调重发保持首次固定正文。</p>
+        <p>自动动作失败按退避间隔最多自动尝试十次；达到上限后保留原事件和等待令牌并转为待管理员处理，后台暂停自动领取。管理员对同一事件 ID 手动重试一次，仍失败则继续待处理。管理入口待流程管理员的范围权限接入后开放。</p>
         <div class="tw">
           <table>
             <thead><tr><th>接口</th><th>返回</th><th>什么时候用</th></tr></thead>

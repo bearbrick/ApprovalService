@@ -25,6 +25,14 @@ const props = defineProps<{
    * 查询失败的中文说明。
    */
   error: string
+  /**
+   * 批量提交中。
+   */
+  busy?: boolean
+  /**
+   * 最近一次批量结果说明。
+   */
+  batchMessage?: string
 }>()
 
 /**
@@ -35,6 +43,10 @@ const emit = defineEmits<{
    * 用户主动重试。
    */
   reload: []
+  /**
+   * 提交已选审批单的批量任务。
+   */
+  batch: [instanceIds: string[], opinion: string]
 }>()
 
 /**
@@ -69,6 +81,10 @@ const selectableItems = computed(() => visibleItems.value.filter(canSelectBatchA
  * 是否全选了当前可见且可批量的待办。
  */
 const allSelected = computed(() => selectableItems.value.length > 0 && selectableItems.value.every(item => selectedIds.value.includes(item.id)))
+/**
+ * 批量同意的共同意见。
+ */
+const batchOpinion = ref('')
 
 watch(() => props.section, () => { filters.value = { search: '', flowCode: '', status: '', dateFrom: '', dateTo: '' }; selectedIds.value = [] })
 watch(() => props.items, () => { selectedIds.value = [] })
@@ -129,6 +145,6 @@ function detailHash(id: string): string {
     <UiEmptyState v-else-if="state === 'unavailable'" title="审批中心尚未接入" description="列表页面已经就绪，登录与审批中心接口接入后才能读取真实待办。" icon="info" />
     <UiEmptyState v-else-if="state === 'error'" title="读取审批记录失败" :description="error" icon="alert"><template #action><button class="btn btn-primary" type="button" @click="emit('reload')">重试</button></template></UiEmptyState>
     <UiEmptyState v-else-if="visibleItems.length === 0" title="没有匹配的审批记录" description="可以调整筛选条件，或稍后刷新。" icon="search" />
-    <div v-if="state === 'ready'" class="center-list-footer"><span>显示 {{ visibleItems.length }} 条</span><div v-if="section === 'todo' && batchIds.length" class="center-batch-note">已选择 {{ batchIds.length }} 条可批量待办 <button class="btn btn-primary" type="button" disabled title="审批操作接口接入后可用">批量同意待接入</button></div></div>
+    <div v-if="state === 'ready'" class="center-list-footer"><span>显示 {{ visibleItems.length }} 条</span><div v-if="section === 'todo' && batchIds.length" class="center-batch-note">已选择 {{ batchIds.length }} 条可批量待办 <input v-model="batchOpinion" aria-label="批量审批意见" placeholder="共同审批意见"><button class="btn btn-primary" type="button" :disabled="busy" @click="emit('batch', batchIds, batchOpinion)">{{ busy ? '提交中…' : '批量同意' }}</button></div><p v-if="batchMessage" role="status">{{ batchMessage }}</p></div>
   </div>
 </template>

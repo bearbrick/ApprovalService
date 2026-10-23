@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
 import { centerAdapter } from '../api/center-adapter.ts'
+import type { CenterActionInput } from '../api/center-adapter.ts'
 import { centerSession, loginCenter, logoutCenter } from '../api/center-session.ts'
 import { requestJson } from '../api/http.ts'
 import { ApiError } from '../api/http-types.ts'
@@ -81,6 +82,18 @@ const authenticating = ref(false)
 
 const identityError = ref('')
 /**
+ * 人工操作与批量同意的提交状态。
+ */
+const actionBusy = ref(false)
+/**
+ * 当前详情操作失败说明。
+ */
+const actionError = ref('')
+/**
+ * 最近一次批量办理结果。
+ */
+const batchMessage = ref('')
+/**
  * 首次登录需要修改密码。
  */
 
@@ -117,6 +130,52 @@ async function load(): Promise<void> {
     }
     state.value = 'error'
     error.value = cause instanceof Error ? cause.message : '审批中心暂时无法读取数据。'
+  }
+}
+
+/**
+ * 提交当前任务命令，成功后重新读取服务器许可、详情与角标来源列表。
+ * @param taskId 服务端返回的当前任务 ID。
+ * @param input 已填写的命令参数。
+ * @returns 操作完成。
+ */
+async function executeAction(taskId: string, input: CenterActionInput): Promise<void> {
+  if (actionBusy.value) return
+  actionBusy.value = true
+  actionError.value = ''
+  try {
+    await centerAdapter.executeAction(taskId, input)
+    await load()
+  } catch (cause) {
+    actionError.value = cause instanceof Error ? cause.message : '审批操作失败，请刷新后重试。'
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+/**
+ * 将已选单据映射为服务端许可的任务并逐项批量提交。
+ * @param instanceIds 已选审批单 ID。
+ * @param opinion 共同审批意见。
+ * @returns 批量操作完成。
+ */
+async function executeBatch(instanceIds: string[], opinion: string): Promise<void> {
+  if (actionBusy.value) return
+  const selected = new Set(instanceIds)
+  const taskIds = items.value.filter(item => selected.has(item.id)).flatMap(item => item.bulkTaskIds ?? [])
+  if (!taskIds.length) return
+  actionBusy.value = true
+  batchMessage.value = ''
+  try {
+    const results = await centerAdapter.batchApprove(taskIds, opinion)
+    const passed = results.filter(result => result.succeeded).length
+    const failed = results.length - passed
+    await load()
+    batchMessage.value = `已同意 ${passed} 项；失败 ${failed} 项。${failed ? results.filter(result => !result.succeeded).map(result => `${result.taskId}：${result.message ?? '请刷新后重试'}`).join('；') : ''}`
+  } catch (cause) {
+    batchMessage.value = cause instanceof Error ? cause.message : '批量同意失败，请刷新后核对。'
+  } finally {
+    actionBusy.value = false
   }
 }
 
@@ -196,9 +255,9 @@ onBeforeUnmount(() => request?.abort())
     </section>
     <template v-else>
     <nav v-if="!route.resourceId" class="center-tabs" aria-label="审批列表"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined">{{ item.title }}</a><a href="#/center/settings" :aria-current="route.section === 'settings' ? 'page' : undefined">个人设置</a></nav>
-    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" @reload="load" />
+    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
     <section v-else-if="route.section === 'settings'" class="center-card center-settings-empty"><UiEmptyState title="个人设置尚未接入" description="委托、签名、常用语和提醒偏好将在账号与审批中心接口接入后开放。当前不会保存任何设置。" icon="info" /></section>
-    <CenterList v-else :section="section" :items="items" :state="state" :error="error" @reload="load" />
+    <CenterList v-else :section="section" :items="items" :state="state" :error="error" :busy="actionBusy" :batch-message="batchMessage" @reload="load" @batch="executeBatch" />
     <p class="workspace-note">审批中心只处理审批与查看进度，不创建或修改业务单据。</p>
     </template>
   </div>

@@ -70,7 +70,7 @@ internal static class CenterQueryEndpoints
     /// </summary>
     /// <param name="http">已执行 JWT 验证的请求。</param>
     /// <returns>可信人员与应用范围。</returns>
-    private static CenterScope Scope(HttpContext http)
+    internal static CenterScope Scope(HttpContext http)
     {
         http.Response.Headers.CacheControl = "no-store";
         var user = http.User;

@@ -57,6 +57,9 @@ internal static class CenterQueryChecks
             check("中心列表返回真实人员、来源应用和当前环节名称",
                 local.Items[0].InitiatorName == "测试人员" && local.Items[0].SourceName == "应用一" &&
                 !string.IsNullOrWhiteSpace(local.Items[0].CurrentStep));
+            check("中心列表仅为运行快照中的当前人员任务声明批量许可",
+                local.Items.Single(item => item.Id == "a-todo").CanBulkApprove &&
+                !local.Items.Single(item => item.Id == "b-cross").CanBulkApprove);
             var done = await ListAsync(http, tokens.Local, "done");
             var copy = await ListAsync(http, tokens.Local, "cc");
             var started = await ListAsync(http, tokens.Local, "started");
@@ -84,6 +87,10 @@ internal static class CenterQueryChecks
                 !detailText.Contains("private-unsent-draft", StringComparison.Ordinal) &&
                 !detailText.Contains("stateJson", StringComparison.Ordinal) &&
                 detailResponse.Headers.CacheControl?.NoStore == true);
+            check("中心详情按认证人员和当前状态返回任务操作许可",
+                detail is not null && detail.Tasks.All(task =>
+                    task.AllowedActions.Contains("approve", StringComparer.Ordinal) &&
+                    task.AllowedActions.Contains("bulkApprove", StringComparer.Ordinal)));
             foreach (var id in new[] { "g-forbidden", "h-queued", "i-cancelled", "missing" })
             {
                 using var denied = await GetAsync(http, Path(id), tokens.Local);
@@ -101,6 +108,28 @@ internal static class CenterQueryChecks
             check("保密详情拒绝跨应用与无关管理员，但允许当前原审批人及历史处理抄送参与者",
                 foreign.StatusCode == HttpStatusCode.NotFound && administrator.StatusCode == HttpStatusCode.NotFound &&
                 delegated.StatusCode == HttpStatusCode.OK && historical.StatusCode == HttpStatusCode.OK && copied.StatusCode == HttpStatusCode.OK);
+            using var stolenTask = await PostActionAsync(http, "a-todo-task", tokens.Stranger,
+                new CenterTaskActionRequest { Action = "approve" });
+            using var wrongAppTask = await PostActionAsync(http, "b-cross-task", tokens.Embed,
+                new CenterTaskActionRequest { Action = "approve" });
+            using var unavailableAction = await PostActionAsync(http, "a-todo-task", tokens.Local,
+                new CenterTaskActionRequest { Action = "reply" });
+            check("中心写入口必须同时通过人员、应用范围和当前任务许可",
+                stolenTask.StatusCode == HttpStatusCode.NotFound &&
+                wrongAppTask.StatusCode == HttpStatusCode.NotFound &&
+                unavailableAction.StatusCode == HttpStatusCode.Forbidden);
+            using var batchRequest = new HttpRequestMessage(HttpMethod.Post, CenterRoutes.BatchApprove);
+            batchRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Local);
+            batchRequest.Content = JsonContent.Create(new CenterBatchApproveRequest
+            {
+                TaskIds = ["missing-one", "missing-two"],
+                Opinion = "已核对",
+            });
+            using var batchResponse = await http.SendAsync(batchRequest);
+            var batch = await batchResponse.Content.ReadFromJsonAsync<CenterBatchApproveResponse>();
+            check("中心批量同意逐项返回可修正错误，不把整批作为单事务",
+                batchResponse.StatusCode == HttpStatusCode.OK && batch?.Items.Count == 2 &&
+                batch.Items.All(item => !item.Succeeded && item.Code == ErrorCodes.NotFound));
             foreach (var query in new[] { "section=unknown", "take=101", "skip=-1", "from=2026-10-24T00:00:00Z&to=2026-10-23T00:00:00Z" })
             {
                 using var invalid = await GetAsync(http, CenterRoutes.Instances + "?" + query, tokens.Local);
@@ -118,6 +147,25 @@ internal static class CenterQueryChecks
                     await db.OperationEvents.CountAsync() == 12);
             }
             await VerifyRepositoryAsync(serviceScope.ServiceProvider, check);
+            using var comment = await PostActionAsync(http, "a-todo-task", tokens.Local,
+                new CenterTaskActionRequest { Action = "comment", Opinion = "请核对金额" });
+            var commented = await comment.Content.ReadFromJsonAsync<CenterTaskActionResponse>();
+            check("中心登录人员的评论经过统一引擎提交并返回重新授权的详情",
+                comment.StatusCode == HttpStatusCode.OK && commented?.InstanceId == "a-todo" &&
+                commented.Detail.Events.Any(item => item.Opinion == "请核对金额"));
+            using var mixedBatchRequest = new HttpRequestMessage(HttpMethod.Post, CenterRoutes.BatchApprove);
+            mixedBatchRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.Local);
+            mixedBatchRequest.Content = JsonContent.Create(new CenterBatchApproveRequest
+            {
+                TaskIds = ["a-second", "missing-after-success"],
+                Opinion = "同意",
+            });
+            using var mixedBatchResponse = await http.SendAsync(mixedBatchRequest);
+            var mixedBatch = await mixedBatchResponse.Content.ReadFromJsonAsync<CenterBatchApproveResponse>();
+            check("批量同意一项成功一项失败时保留成功项并逐项返回结果",
+                mixedBatchResponse.StatusCode == HttpStatusCode.OK && mixedBatch?.Items.Count == 2 &&
+                mixedBatch.Items[0].Succeeded && mixedBatch.Items[0].InstanceId == "a-todo" &&
+                !mixedBatch.Items[1].Succeeded && mixedBatch.Items[1].Code == ErrorCodes.NotFound);
             await serviceScope.ServiceProvider.GetRequiredService<IIdentityAppService>().RevokeAllAsync("viewer");
             using var revoked = await GetAsync(http, CenterRoutes.Instances, tokens.Local);
             check("中心每次访问重新验证令牌版本，已作废令牌不能读取", revoked.StatusCode == HttpStatusCode.Unauthorized);
@@ -188,4 +236,22 @@ internal static class CenterQueryChecks
     /// <param name="id">审批单标识。</param>
     /// <returns>可请求的相对地址。</returns>
     private static string Path(string id) => CenterRoutes.Instance.Replace("{id}", Uri.EscapeDataString(id), StringComparison.Ordinal);
+
+    /// <summary>
+    /// 使用人员 JWT 向真实任务写路由提交操作。
+    /// </summary>
+    /// <param name="http">测试服务客户端。</param>
+    /// <param name="taskId">目标任务 ID。</param>
+    /// <param name="token">人员访问令牌。</param>
+    /// <param name="input">操作内容。</param>
+    /// <returns>调用方负责释放的响应。</returns>
+    private static async Task<HttpResponseMessage> PostActionAsync(HttpClient http, string taskId, string token,
+        CenterTaskActionRequest input)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            CenterRoutes.TaskActions.Replace("{taskId}", Uri.EscapeDataString(taskId), StringComparison.Ordinal));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = JsonContent.Create(input);
+        return await http.SendAsync(request);
+    }
 }

@@ -30,6 +30,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CallbackDeliveryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
         services.AddScoped<CenterQueryAppService>();
+        services.AddScoped<CenterActionAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
         services.AddScoped<BusinessHookAppService>();
         services.AddScoped<BusinessAssigneeAppService>();

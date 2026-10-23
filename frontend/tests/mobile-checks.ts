@@ -14,5 +14,7 @@ export function runMobileChecks(check: (name: string, value: boolean) => void): 
     shouldRefreshOnPull(10, 82, 0, false) && !shouldRefreshOnPull(10, 81, 0, false)
     && !shouldRefreshOnPull(10, 120, 2, false) && !shouldRefreshOnPull(10, 120, 0, true))
   check('手机审批操作名称齐全且不暗含可写接口',
-    mobileActionLabels.approve === '同意' && mobileActionLabels.undoApproval === '撤销同意' && mobileActionLabels.supplement === '要求补充')
+    mobileActionLabels.approve === '同意' && mobileActionLabels.undoApproval === '撤销同意' && mobileActionLabels.supplement === '要求补充' &&
+    mobileActionLabels.handle === '办理完成' && mobileActionLabels.acknowledge === '确认已阅' &&
+    mobileActionLabels.reply === '回复征询' && mobileActionLabels.saveDraft === '暂存意见')
 }

@@ -91,6 +91,24 @@ internal static class CenterChecksFixture
             db.ApprovalTasks.Local.Single(item => item.InstanceId == "k-history").NodeId = graph.Nodes.Last(item => item.Type == FlowNodeTypes.Approval).Id;
             // 同一审批单多个本人待办不能导致列表重复或总数膨胀。
             db.ApprovalTasks.Add(new ApprovalTaskEntity { Id = "a-second", InstanceId = "a-todo", NodeId = node.Id, AssigneeId = "viewer", Status = EngineTaskStatuses.Pending });
+            // 这张待办的运行快照与任务投影保持一致，供中心操作许可场景验证。
+            var writable = db.Instances.Local.Single(item => item.Id == "a-todo");
+            writable.LastEventSequence = 2;
+            writable.StateJson = JsonSerializer.Serialize(new EngineState
+            {
+                InstanceId = "a-todo",
+                Status = EngineInstanceStatuses.Running,
+                Tokens = [new EngineToken { Id = "a-todo-token", NodeId = node.Id, WaitingFor = "task" }],
+                Tasks =
+                [
+                    new EngineTask { Id = "a-todo-task", TokenId = "a-todo-token", NodeId = node.Id,
+                        AssigneeId = "viewer", Status = EngineTaskStatuses.Pending,
+                        CompletionKind = EngineCommandKinds.Approve, CanReject = true },
+                    new EngineTask { Id = "a-second", TokenId = "a-todo-token", NodeId = node.Id,
+                        AssigneeId = "viewer", Status = EngineTaskStatuses.Pending,
+                        CompletionKind = EngineCommandKinds.Approve, CanReject = true },
+                ],
+            }, ApprovalJson.Options);
             foreach (var (id, kind) in new[] { ("c-done", InstanceParticipantKinds.TaskActor), ("d-copy", InstanceParticipantKinds.CopyRecipient), ("k-history", InstanceParticipantKinds.TaskActor) })
             {
                 db.InstanceParticipants.Add(new InstanceParticipantEntity { InstanceId = id, PersonId = "viewer", Kind = kind, EventId = id + "-event", GrantedAt = DateTimeOffset.UtcNow });

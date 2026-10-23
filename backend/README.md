@@ -34,6 +34,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /health/ready` | 数据库可连接时返回 `ready`；不可连接时返回 503 |
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤 |
+| `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 登录人员对当前任务提交引擎命令，批量同意逐项独立处理 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
 | `POST /api/v1/instances` | 传审批数据快照发起；已在途同号返回原审批单，需 API Key |
@@ -56,6 +57,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 ## 审批中心查询
 
 `CenterQueryAppService` 提供当前人员的待办、已办、抄送和发起/代发列表及只读详情，分页与总数基于同一授权查询。只接受 JWT，本地会话跨应用按参与关系读取，嵌入会话再限定所属应用；API Key 不能替代登录。当前原审批人与代理人均可查看 pending 任务；历史实际处理和已送达抄送复用持久参与者投影。无关管理员、未来/取消任务不能直接取得保密详情，不可见与不存在统一 404。
+
+详情任务的 `allowedActions` 由纯引擎从当前运行状态和锁定发布图按登录人员计算，列表另给可批量同意的实际任务 ID。`CenterActionAppService` 在写入前再次检查查询授权、状态、节点许可、组织目标和审批人字段；同意前照常调用所属应用的校验钩子，最终走 `IApprovalRuntimeAppService` 的统一命令入口。批量同意逐项返回成功或业务错误，已成功任务不因另一项失败而回滚；中心不修改业务数据快照。
 
 列表支持流程、状态、发起时间和标题/审批编号/业务单号搜索，加急优先。摘要与详情递归过滤隐藏字段及明细列；详情不暴露运行状态、原始事件载荷和暂存意见。桌面前端已通过本地工号密码和短期 JWT 接入此只读接口，令牌只在页面内存保存并在到期前轮换；首次登录先改密。中心查询已返回真实人员和来源名称及当前人工环节，仍不返回字段展示标签、附件元数据、已读标记或逐单操作许可，因此前端不会猜测操作权限。读标记、字段内容搜索、详情排版、审批动作和 iframe 限制仍未接入，任务保持进行中。完整参数与返回结构见契约文档。
 

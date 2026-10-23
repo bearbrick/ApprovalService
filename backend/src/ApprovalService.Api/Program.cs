@@ -112,6 +112,7 @@ app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
+app.MapCenterActionEndpoints();
 
 if (bootstrapCommand)
 {

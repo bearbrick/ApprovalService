@@ -40,11 +40,14 @@
 .flow-canvas-handle { fill: #fff; stroke: var(--blue); stroke-width: 3; cursor: crosshair; }
 .flow-canvas-edge { cursor: pointer; }
 .flow-canvas-edge-hit { fill: none; stroke: transparent; stroke-width: 16; }
-.flow-canvas-edge-path { fill: none; stroke: #8ba0bb; stroke-width: 1.6; pointer-events: none; }
-.flow-canvas-edge.selected .flow-canvas-edge-path { stroke: var(--blue); stroke-width: 2.5; }
+.flow-canvas-edge-path { fill: none; stroke: #7c91af; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.flow-canvas-edge-halo { fill: none; stroke: #c9dcff; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.flow-canvas-edge.selected .flow-canvas-edge-path { stroke: var(--blue); stroke-width: 2.6; }
 .flow-canvas-edge.invalid .flow-canvas-edge-path { stroke: #c3515a; stroke-width: 2.5; }
 .flow-canvas-edge-label rect { fill: #fff; stroke: #d8e3f2; }
 .flow-canvas-edge-label text { fill: #62748e; font-size: 10px; pointer-events: none; }
+.flow-canvas-edge.selected .flow-canvas-edge-label rect { stroke: #94b7fb; fill: #f8fbff; }
+.flow-canvas-edge.selected .flow-canvas-edge-label text { fill: #1555d4; }
 .flow-canvas-controls { position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; padding: 4px; border: 1px solid var(--line); border-radius: 5px; background: #fff; box-shadow: 0 2px 8px #071f4615; color: var(--muted); }
 .flow-canvas-controls .btn { min-width: 27px; min-height: 27px; padding: 2px; }
 .flow-canvas-controls span { min-width: 34px; text-align: center; }

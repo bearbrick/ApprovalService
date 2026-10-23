@@ -47,6 +47,37 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
   check('新增连线 ID 稳定且允许非相邻节点连接', connectCanvasNodes(added, 'handling', 'end').edgeId === 'edge_3' && nextCanvasId('edge', ['edge_1', 'edge_3']) === 'edge_2')
   const loop = connectCanvasNodes(added, 'handling', 'manager')
   check('回路连线可创建并绘出上方绕行路径', loop.canvas.edges.some(edge => edge.targetId === 'manager') && edgeGeometry(loop.canvas.edges.at(-1)!, newNode, simpleFlow.canvas.nodes[1]!).path.includes('V'))
+  const start = createCanvasNode(flowNodeTypes.Start, 'circle', 80, 160)
+  const gateway = createCanvasNode(flowNodeTypes.ExclusiveGateway, 'gateway', 260, 160)
+  const upper = createCanvasNode(flowNodeTypes.Approval, 'upper', 520, 48)
+  const lower = createCanvasNode(flowNodeTypes.Approval, 'lower', 520, 272)
+  const straight = { id: 'shape', sourceId: start.id, targetId: gateway.id, priority: 0, isDefault: false }
+  const shaped = edgeGeometry(straight, start, gateway)
+  check('圆形和菱形连线端点贴合真实轮廓', shaped.points[0]?.x === start.x + 25 && shaped.points.at(-1)?.x === gateway.x - 42)
+  const branches = [
+    { id: 'upper-edge', sourceId: gateway.id, targetId: upper.id, priority: 0, isDefault: false, condition: '${amount} > 10' },
+    { id: 'lower-edge', sourceId: gateway.id, targetId: lower.id, priority: 1, isDefault: true },
+  ]
+  const firstBranch = edgeGeometry(branches[0]!, gateway, upper, [gateway, upper, lower], branches)
+  const secondBranch = edgeGeometry(branches[1]!, gateway, lower, [gateway, upper, lower], branches)
+  check('网关多分支在不同端口出线，箭头分别贴合目标节点', firstBranch.points[0]!.y < secondBranch.points[0]!.y && firstBranch.points.at(-1)?.x === upper.x - 76 && secondBranch.points.at(-1)?.x === lower.x - 76)
+  const join = createCanvasNode(flowNodeTypes.ParallelGateway, 'join', 800, 160)
+  const incoming = [
+    { id: 'join-upper', sourceId: upper.id, targetId: join.id, priority: 0, isDefault: false },
+    { id: 'join-lower', sourceId: lower.id, targetId: join.id, priority: 0, isDefault: false },
+  ]
+  const joinedUpper = edgeGeometry(incoming[0]!, upper, join, [upper, lower, join], incoming)
+  const joinedLower = edgeGeometry(incoming[1]!, lower, join, [upper, lower, join], incoming)
+  check('多分支汇合从不同高度进入网关', joinedUpper.points.at(-1)!.y < joinedLower.points.at(-1)!.y)
+  const obstacle = createCanvasNode(flowNodeTypes.Approval, 'obstacle', 300, 160)
+  const bypass = edgeGeometry({ id: 'bypass', sourceId: 'start', targetId: 'end', priority: 0, isDefault: false, condition: '${amount} > 10' }, simpleFlow.canvas.nodes[0]!, simpleFlow.canvas.nodes[2]!, [simpleFlow.canvas.nodes[0]!, obstacle, simpleFlow.canvas.nodes[2]!])
+  const avoidsObstacle = bypass.points.slice(1).every((point, index) => {
+    const previous = bypass.points[index]!
+    return previous.y === point.y
+      ? previous.y < 119 || previous.y > 201 || Math.max(previous.x, point.x) <= 212 || Math.min(previous.x, point.x) >= 388
+      : previous.x < 212 || previous.x > 388 || Math.max(previous.y, point.y) <= 119 || Math.min(previous.y, point.y) >= 201
+  })
+  check('跨越中间节点的连线和条件标签绕开节点', avoidsObstacle && (bypass.labelX + 53 < 224 || bypass.labelX - 53 > 376 || bypass.labelY + 13 < 131 || bypass.labelY - 13 > 189))
   check('不能直接自连或连接不存在的节点', ['handling', 'missing'].every(target => { try { connectCanvasNodes(added, 'handling', target); return false } catch { return true } }))
   const conditioned = updateCanvasEdge(simpleFlow.canvas, 'edge_1', '${amount} > 50000', false, 2)
   check('连线条件和优先级可修改，发布校验定位不存在字段', conditioned.edges[0]?.priority === 2 && validateCanvasDefinition({ ...simpleFlow, canvas: conditioned }).some(issue => issue.elementId === 'edge_1' && issue.message.includes('amount')))

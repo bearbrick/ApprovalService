@@ -143,7 +143,7 @@ const visibleIssues = computed(() => props.issues ?? checkedIssues.value ?? [])
 const renderedEdges = computed(() => edges.value.flatMap(edge => {
   const source = nodes.value.find(node => node.id === edge.sourceId)
   const target = nodes.value.find(node => node.id === edge.targetId)
-  return source && target ? [{ edge, geometry: edgeGeometry(edge, source, target) }] : []
+  return source && target ? [{ edge, geometry: edgeGeometry(edge, source, target, nodes.value, edges.value) }] : []
 }))
 /**
  * 画布平移与缩放变换。
@@ -455,21 +455,24 @@ onMounted(fit)
         <svg ref="stage" class="flow-canvas-stage" tabindex="0" role="img" aria-label="审批流程自由画布" @dragover.prevent @drop="onDrop" @pointerdown="onStageDown" @pointermove="onPointerMove" @pointerup="onPointerUp" @pointercancel="onPointerUp" @wheel="onWheel">
           <defs>
             <pattern id="approval-canvas-grid" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="#cbd8eb" /></pattern>
-            <marker id="approval-canvas-arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M 0 0 L 9 4.5 L 0 9 z" fill="#8ba0bb" /></marker>
+            <marker id="approval-canvas-arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7c91af" /></marker>
+            <marker id="approval-canvas-arrow-selected" markerWidth="11" markerHeight="11" refX="10" refY="5.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 11 5.5 L 0 11 z" fill="#1555d4" /></marker>
+            <marker id="approval-canvas-arrow-invalid" markerWidth="11" markerHeight="11" refX="10" refY="5.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 11 5.5 L 0 11 z" fill="#c3515a" /></marker>
           </defs>
           <rect width="100%" height="100%" fill="#f8faff" />
           <g :transform="sceneTransform">
             <rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#approval-canvas-grid)" />
             <g v-for="item in renderedEdges" :key="item.edge.id" class="flow-canvas-edge" :class="{ selected: selected?.id === item.edge.id, invalid: hasIssue(item.edge.id) }" @pointerdown.stop="choose('edge', item.edge.id)">
               <path :d="item.geometry.path" class="flow-canvas-edge-hit" />
-              <path :d="item.geometry.path" class="flow-canvas-edge-path" marker-end="url(#approval-canvas-arrow)" />
+              <path v-if="selected?.id === item.edge.id" :d="item.geometry.path" class="flow-canvas-edge-halo" />
+              <path :d="item.geometry.path" class="flow-canvas-edge-path" :marker-end="hasIssue(item.edge.id) ? 'url(#approval-canvas-arrow-invalid)' : selected?.id === item.edge.id ? 'url(#approval-canvas-arrow-selected)' : 'url(#approval-canvas-arrow)'" />
               <g v-if="item.edge.condition || item.edge.isDefault" :transform="`translate(${item.geometry.labelX} ${item.geometry.labelY})`" class="flow-canvas-edge-label"><title>{{ item.edge.isDefault ? '其他情况' : item.edge.condition }}</title><rect x="-53" y="-13" width="106" height="22" rx="4" /><text text-anchor="middle" y="2">{{ item.edge.isDefault ? '其他情况' : (item.edge.condition?.length ?? 0) > 16 ? item.edge.condition?.slice(0, 16) + '…' : item.edge.condition }}</text></g>
             </g>
             <g v-for="node in nodes" :key="node.id" class="flow-canvas-node" :class="{ selected: selected?.id === node.id, invalid: hasIssue(node.id), connecting: connectFrom === node.id }" :transform="`translate(${node.x} ${node.y})`" role="button" tabindex="0" :aria-label="`${node.name}，${typeLabel(node.type)}`" @pointerdown="onNodeDown($event, node)" @keydown.enter.stop="choose('node', node.id)">
               <template v-if="node.type === 'start' || node.type === 'end'"><circle r="25" class="flow-canvas-event" /><circle v-if="node.type === 'end'" r="19" class="flow-canvas-event-inner" /><text class="flow-canvas-event-text" text-anchor="middle" y="5">{{ node.type === 'start' ? '始' : '终' }}</text></template>
               <template v-else-if="node.type.endsWith('Gateway')"><path d="M 0 -35 L 42 0 L 0 35 L -42 0 Z" class="flow-canvas-gateway" /><text class="flow-canvas-gateway-sign" text-anchor="middle" y="7">{{ node.type === 'exclusiveGateway' ? '×' : node.type === 'parallelGateway' ? '+' : '○' }}</text><text class="flow-canvas-gateway-name" text-anchor="middle" y="56">{{ node.name }}</text></template>
               <template v-else><rect x="-76" y="-29" width="152" height="58" rx="7" class="flow-canvas-card" /><rect x="-76" y="-29" width="152" height="17" rx="7" class="flow-canvas-card-top" /><text x="-64" y="-17" class="flow-canvas-card-type">{{ typeLabel(node.type) }}</text><text x="-64" y="10" class="flow-canvas-card-name">{{ node.name.length > 11 ? node.name.slice(0, 11) + '…' : node.name }}</text></template>
-              <circle v-if="selected?.id === node.id && !readonly" cx="76" cy="0" r="8" class="flow-canvas-handle" @pointerdown.stop="connectFrom = node.id" />
+              <circle v-if="selected?.id === node.id && !readonly" :cx="node.type === 'start' || node.type === 'end' ? 25 : node.type.endsWith('Gateway') ? 42 : 76" cy="0" r="8" class="flow-canvas-handle" @pointerdown.stop="connectFrom = node.id" />
             </g>
           </g>
         </svg>

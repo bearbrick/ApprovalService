@@ -34,6 +34,11 @@ public static class ErrorCodes
     public const string ValidationFailed = "VALIDATION_FAILED";
 
     /// <summary>
+    /// 业务系统钩子超时、不可用或响应验签与格式错误（400）。
+    /// </summary>
+    public const string BusinessHookFailed = "BUSINESS_HOOK_FAILED";
+
+    /// <summary>
     /// 和当前状态冲突，如审批单已经结束、别人刚处理过（409）。
     /// </summary>
     public const string Conflict = "CONFLICT";

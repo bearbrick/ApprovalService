@@ -49,6 +49,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
+        services.AddScoped<IActionRetryRepository, ActionRetryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
         services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();

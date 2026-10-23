@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using ApprovalService.Application.Integration;
-using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
@@ -130,6 +128,21 @@ internal static partial class OpenApiChecksStarts
                 item.Contains("awaitingInitiator", StringComparison.Ordinal)));
         }
 
+        using (var wrongSubmit = ResubmitRequest(limited.Id, "secretary", apiKey, "limited-wrong-submit"))
+        using (var wrongResponse = await http.SendAsync(wrongSubmit))
+        {
+            check("只有本应用绑定的原发起人能补充审批数据", wrongResponse.StatusCode == HttpStatusCode.Forbidden);
+        }
+
+        using (var supplementSubmit = ResubmitRequest(limited.Id, "alice", apiKey, "limited-submit"))
+        using (var supplementResponse = await http.SendAsync(supplementSubmit))
+        {
+            var restored = await supplementResponse.Content.ReadFromJsonAsync<OpenInstanceResponse>(ApprovalJson.Options);
+            check("补充数据通过开放接口恢复原审批任务", supplementResponse.StatusCode == HttpStatusCode.OK &&
+                restored is { Status: EngineInstanceStatuses.Running } &&
+                restored.Tasks.Any(task => task.Id == supplementTask.Id && task.Status == EngineTaskStatuses.Pending));
+        }
+
         var legacyInstance = await StartPolicyFlowAsync(http, apiKey, "LEGACY", check);
         using (var approveRequest = ActionRequest(legacyInstance.Tasks.Single().Id, new OpenTaskActionRequest
         {
@@ -189,25 +202,11 @@ internal static partial class OpenApiChecksStarts
                 item.Contains("instance.returnedToInitiator", StringComparison.Ordinal) &&
                 item.Contains("awaitingInitiator", StringComparison.Ordinal)));
         }
-        var contexts = services.GetRequiredService<OpenStartContextBuilder>();
-        var lockedGraph = JsonSerializer.Deserialize<FlowExecutionGraph>(returned.FlowVersion.GraphJson,
-            ApprovalJson.Options)!;
-        var lockedDefinition = JsonSerializer.Deserialize<FlowDefinition>(returned.FlowVersion.DefinitionJson,
-            ApprovalJson.Options)!;
-        var continuation = await contexts.BuildContinuationAsync(returned.Instance, lockedDefinition,
-            lockedGraph, DateTimeOffset.UtcNow);
-        var runtime = services.GetRequiredService<IApprovalRuntimeAppService>();
-        await runtime.ExecuteAsync(new RuntimeCommandInput
+        using (var resubmitRequest = ResubmitRequest(returnInstance.Id, "alice", apiKey, "return-node-resubmit"))
+        using (var resubmitResponse = await http.SendAsync(resubmitRequest))
         {
-            Command = new EngineCommand
-            {
-                Kind = OperationKinds.Resubmit,
-                InstanceId = returnInstance.Id,
-                RequestId = "return-node-resubmit",
-                Operation = new OperationInput { ActorId = "requester" },
-            },
-            Context = continuation,
-        });
+            check("退回给发起人后可经开放接口重新提交", resubmitResponse.StatusCode == HttpStatusCode.OK);
+        }
         var resumed = await repository.LoadAsync(returnInstance.Id)
             ?? throw new InvalidOperationException("重提状态未保存。");
         var resumedState = JsonSerializer.Deserialize<EngineState>(resumed.Instance.StateJson, ApprovalJson.Options)!;
@@ -215,6 +214,32 @@ internal static partial class OpenApiChecksStarts
             resumedState.Status == EngineInstanceStatuses.Running &&
             resumedState.Tasks.Any(task => task.NodeId == "n2" && task.Status == EngineTaskStatuses.Pending) &&
             resumedState.Tasks.Count(task => task.NodeId == "n1") == 1);
+    }
+
+    /// <summary>
+    /// 以完整新数据发起退回重提或补充请求。
+    /// </summary>
+    /// <param name="instanceId">所属审批单 ID。</param>
+    /// <param name="user">当前应用绑定的人员标识。</param>
+    /// <param name="apiKey">接入应用密钥。</param>
+    /// <param name="requestId">稳定请求 ID。</param>
+    /// <param name="data">完整新业务数据；空值使用空对象。</param>
+    /// <returns>带 JSON 请求体的 HTTP 消息。</returns>
+    private static HttpRequestMessage ResubmitRequest(string instanceId, string user, string apiKey, string requestId,
+        object? data = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post,
+            OpenApiRoutes.InstanceResubmit.Replace("{id}", instanceId))
+        {
+            Content = JsonContent.Create(new OpenResubmitRequest
+            {
+                User = user,
+                Data = JsonSerializer.SerializeToElement(data ?? new { }),
+            }, options: ApprovalJson.Options),
+        };
+        request.Headers.Add(HeaderNames.ApiKey, apiKey);
+        request.Headers.Add(HeaderNames.RequestId, requestId);
+        return request;
     }
 
     /// <summary>

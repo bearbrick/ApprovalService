@@ -5,6 +5,7 @@ using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Execution;
 
 namespace ApprovalService.Application.Integration;
 
@@ -177,6 +178,8 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
     private static OpenInstanceResponse ProjectInstance(InstanceEntity instance, OpenInstanceDetails? details)
     {
         using var data = JsonDocument.Parse(instance.ApprovalDataJson);
+        var state = JsonSerializer.Deserialize<EngineState>(instance.StateJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("审批单引擎状态为空。");
         return new OpenInstanceResponse
         {
             Id = instance.Id,
@@ -190,6 +193,8 @@ public sealed class OpenApprovalQueryAppService(IApprovalOpenQueryRepository rep
             ClientAppCode = instance.ClientAppCode,
             Status = instance.Status,
             Data = data.RootElement.Clone(),
+            ApproverFieldValues = JsonSerializer.SerializeToElement(
+                state.Operations.CurrentApproverFieldValues, ApprovalJson.Options),
             StartedAt = instance.StartedAt,
             EndedAt = instance.EndedAt,
             Tasks = details?.Tasks.Select(task => new OpenInstanceTaskResponse

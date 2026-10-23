@@ -182,5 +182,19 @@ internal static partial class OpenApiChecksStarts
             handler.Requests.Count(item => item.Path == "/action") == requestsBeforeReplay &&
             handler.Requests.Any(item => item.Path == "/action" && item.IsSigned &&
                 item.Body.Contains("\"eventId\":\"" + queued.EventId + "\"", StringComparison.Ordinal)));
+        await using (var db = await factory.CreateDbContextAsync())
+        {
+            var completion = await db.OperationEvents.AsNoTracking().SingleAsync(item => item.InstanceId == pending.Id &&
+                item.Kind == "actionCompleted");
+            var callback = await db.OutboxItems.AsNoTracking().SingleAsync(item => item.InstanceId == pending.Id &&
+                item.Kind == "callback" && item.PayloadJson.Contains("instance.approved"));
+            using var completionJson = JsonDocument.Parse(completion.PayloadJson);
+            using var callbackJson = JsonDocument.Parse(callback.PayloadJson);
+            check("自动动作结果独立进入审计和后续结果回调，不覆盖业务数据",
+                completionJson.RootElement.GetProperty("actionResult").GetProperty("reservationId").GetString() == "R-1" &&
+                callbackJson.RootElement.GetProperty("actionResults").GetProperty(queued.EventId)
+                    .GetProperty("reservationId").GetString() == "R-1" &&
+                !callbackJson.RootElement.GetProperty("data").TryGetProperty("reservationId", out _));
+        }
     }
 }

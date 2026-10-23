@@ -124,6 +124,10 @@ public static class EngineRuntime
 
             var undo = command.Kind == EngineCommandKinds.Approve && command.Operation is not null
                 ? OperationUndo.Capture(state, command) : null;
+            if (command.Kind != EngineCommandKinds.Reject)
+            {
+                OperationCurrentValues.Merge(state.Operations, command.Operation?.FieldValues);
+            }
             work.CompleteTask(task, token, node, command.Kind);
             if (undo is not null && state.Status == EngineInstanceStatuses.Running)
             {
@@ -154,6 +158,11 @@ public static class EngineRuntime
             else
             {
                 work.Emit(expected == "action" ? "actionCompleted" : "subprocessCompleted", token.NodeId, token.Id);
+                if (expected == "action" && command.ActionResult is { } actionResult)
+                {
+                    state.Operations.ActionResults[command.RequestId] = actionResult.Clone();
+                    work.Events[^1].ActionResult = actionResult.Clone();
+                }
                 token.WaitingFor = null;
                 work.MoveSingle(token);
                 work.Advance();

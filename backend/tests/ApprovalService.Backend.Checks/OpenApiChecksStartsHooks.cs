@@ -183,7 +183,7 @@ internal static partial class OpenApiChecksStarts
                 "/assignee" when Mode == "unbound-assignee" => "{\"userIds\":[\"E002\"]}",
                 "/assignee" => "{\"userIds\":[\"bob\"]}",
                 "/action" when Mode == "reject-action" => "{\"success\":false}",
-                "/action" => "{\"success\":true}",
+                "/action" => "{\"success\":true,\"result\":{\"reservationId\":\"R-1\"}}",
                 _ when Mode == "reject" => "{\"allowed\":false,\"reason\":\"预算不足\"}",
                 _ => "{\"allowed\":true}",
             };

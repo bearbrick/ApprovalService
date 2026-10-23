@@ -395,6 +395,10 @@ export interface FlowFieldDefinition {
    */
   approverInput: boolean;
   /**
+   * 业务系统是否可在审批中更新；旧定义缺省为禁止。
+   */
+  businessUpdateAllowed?: boolean;
+  /**
    * 明细表的子字段。
    */
   children: FlowFieldDefinition[];

@@ -9,7 +9,7 @@ using ApprovalService.Engine.Expressions;
 namespace ApprovalService.Application.Integration;
 
 /// <summary>
-/// 发起前校验业务快照并在服务端计算公式，避免业务系统篡改审批分支依据。
+/// 发起前校验业务快照并在服务端计算公式，同时收集待原子关联的附件。
 /// </summary>
 public static class OpenApprovalDataPreparer
 {
@@ -146,7 +146,7 @@ public static class OpenApprovalDataPreparer
     }
 
     /// <summary>
-    /// 在附件归属/关联事务接通前拒绝任何提交的附件 ID。
+    /// 非发起用例没有附件关联事务，拒绝其提交附件 ID。
     /// </summary>
     /// <param name="fields">当前层的字段定义。</param>
     /// <param name="container">当前层的业务数据。</param>

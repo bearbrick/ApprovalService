@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Engine.Abstractions;
 using ApprovalService.Engine.Assignees;
@@ -166,6 +167,14 @@ public sealed class EngineCommand
     /// 动作或子流程结果是否成功。
     /// </summary>
     public bool Success { get; set; } = true;
+
+    /// <summary>
+    /// 业务自动动作成功时返回的可选结果，与审批数据分开保存。
+    /// </summary>
+    public JsonElement? ActionResult
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 本次操作的身份、意见和目标参数；旧自动命令可为空。

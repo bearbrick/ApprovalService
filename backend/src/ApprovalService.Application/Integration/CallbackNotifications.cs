@@ -62,8 +62,24 @@ public static class CallbackNotifications
             FieldValues = item.Kind is "taskCompleted" or "instanceApproved" or "instanceRejected" or
                 "returnedToInitiator" or "supplementRequested"
                 ? item.Audit?.FieldValues?.Clone() : null,
+            ActionResults = item.Kind is "instanceApproved" or "instanceRejected" or "instanceWithdraw" or
+                "instanceWithdrawn" or "instanceTerminate" or "instanceTerminated" or "instanceCancelled"
+                ? ReadActionResults(instance.StateJson) : null,
             OccurredAt = item.OccurredAt,
         };
+    }
+
+    /// <summary>
+    /// 从已提交的运行投影读取动作结果，空集合省略可选回调字段。
+    /// </summary>
+    /// <param name="stateJson">本次提交后的引擎状态。</param>
+    /// <returns>按动作事件 ID 索引的业务结果。</returns>
+    private static JsonElement? ReadActionResults(string stateJson)
+    {
+        var state = JsonSerializer.Deserialize<EngineState>(stateJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("审批单引擎状态为空。");
+        return state.Operations.ActionResults.Count == 0 ? null :
+            JsonSerializer.SerializeToElement(state.Operations.ActionResults, ApprovalJson.Options);
     }
 
     /// <summary>

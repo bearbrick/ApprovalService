@@ -1,6 +1,6 @@
 # T-006 开放接口、接入应用、回调和钩子
 
-状态：进行中
+状态：待验收
 负责人：Codex 2026-10-20
 里程碑：M4
 依赖：T-004、T-005
@@ -23,6 +23,16 @@
 - `backend/src/ApprovalService.Infrastructure/Integration/`：出站适配层（HMAC 签名、5 秒超时、按 1 分钟 / 5 分钟 / 30 分钟 / 2 小时重试、发送日志）、钩子调用（取数、校验、取人、业务动作）
 - `backend/src/ApprovalService.Engine/Execution/EngineWork.cs`、`EngineRuntime.cs`、`EngineResults.cs` 与 `backend/src/ApprovalService.Engine/Assignees/BusinessApiAssigneeResolver.cs`、`AssigneeModels.cs`：仅为业务接口找人增加纯计算的“实际命中节点待预取”结果，发现缺失时不提交状态，补齐可信快照后以同一命令重算；不在引擎做网络访问
 - `backend/src/ApprovalService.Application/Runtime/ApprovalRuntimeAppService.cs`、`backend/src/ApprovalService.Application/Integration/OpenStartContextBuilder.cs`、`OpenRoutingInputs.cs`、`BusinessHookAppService.cs`、`BusinessAssigneeAppService.cs` 与 `backend/src/ApprovalService.Infrastructure/Integration/EngineEventOutboxHandler.cs`：事务前按实际节点取人、在路由快照保存发起时本应用外部人员 ID、提交后持久业务动作及同一事件 ID 的结果回写
+- `backend/src/ApprovalService.Contracts/Flows/FlowPresentation.cs`、`frontend/src/model/flow.ts`、`backend/src/ApprovalService.Contracts/Protocol/OpenApiRoutes.cs` 与新增开放请求/响应模型：字段级审批中业务更新开关（默认关闭）、PATCH、外部重新提交及预览的兼容契约；前端只同步流程定义镜像，不增加业务界面
+- `backend/src/ApprovalService.Engine/Commands/OperationModels.cs`、`OperationGuard.cs`、`OperationDispatcher.cs`、`backend/src/ApprovalService.Engine/Execution/EngineResults.cs`、`EngineRuntime.cs`：审批中数据更新走统一命令和只追加事件，记录改前改后，不让外部请求直接改引擎状态；退回重提/补充字段当前值策略按已确认语义处理
+- `backend/src/ApprovalService.Engine/Commands/OperationUndoFrame.cs`：PATCH 增加命令/审计字段后按文件规模限制拆出既有撤销同意状态载体，不改变其行为
+- `backend/src/ApprovalService.Engine/Commands/OperationStateCopy.cs`、新增审批人当前填写值投影辅助文件：重提清空、补充保留，历史审计不变
+- `backend/src/ApprovalService.Engine/Execution/EngineModels.cs`、`EngineResults.cs`、`backend/src/ApprovalService.Application/Integration/CallbackNotifications.cs`：自动动作可选 result 在纯命令、事件与运行投影中独立留痕，并在后续结果回调中携带
+- `backend/src/ApprovalService.Infrastructure/Jobs/OutboxQueue.cs`、`JobStatuses.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ActionRetryRepository.cs`、`backend/src/ApprovalService.Domain/Integration/IActionRetryRepository.cs`、`backend/src/ApprovalService.Application/Integration/ActionRetryAppService.cs`、`backend/tests/ApprovalService.Backend.Checks/JobChecks*.cs`：自动动作第十次失败停自动重试，管理员用例可用同 eventId 触发一次人工重试；暂不新增权限边界未定的管理 HTTP 路由
+- `backend/src/ApprovalService.Infrastructure/Jobs/ActionOutboxPayload.cs`：按持久事件的规范 JSON 判别自动动作，避免其他待发类型误用十次上限
+- `backend/src/ApprovalService.Domain/Integration/IActionRetryRepository.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ActionRetryRepository.cs`、`backend/src/ApprovalService.Application/Integration/ActionRetryAppService.cs`、新增管理路由和 `backend/tests/ApprovalService.Backend.Checks/ActionRetryEndpointChecks.cs`：按审批单所属流程的现有流程管理员配置核对当前本地登录人员，再允许原事件人工重排
+- `backend/src/ApprovalService.Application/Integration/OpenApprovalDataPreparer.cs`、`OpenStartContextBuilder.cs`、`OpenRoutingInputs.cs`、新增数据更新/重新提交/预览应用服务、`backend/src/ApprovalService.Application/Runtime/ApprovalRuntimeAppService.cs`：锁定发布版本校验字段授权与数据，重算公式和后续路由，在原子运行提交中保存；预览只做纯计算，不落审批单
+- `backend/src/ApprovalService.Api/Endpoints/OpenApi/`、`backend/tests/ApprovalService.Backend.Checks/OpenApiChecks*.cs`、`EngineScenarioChecks*.cs`：开放路由及跨应用、未授权字段、并发、审计、重提和预览场景
 - `backend/tests/ApprovalService.Backend.Checks/EngineScenarioChecks*.cs`、`AssigneeChecks.cs` 与 `OpenApiChecks*.cs`：分支实际到达取人、严格绑定、动作重试和结果恢复场景
 - `backend/src/ApprovalService.Domain/Integration/`：接入应用、流程授权、加密密文与出站发送记录实体和仓储接口
 - `backend/src/ApprovalService.Domain/Runtime/IApprovalRuntimeRepository.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalRuntimeRepository.cs`：审批单和任务查询、在途唯一性与数据更新所需仓储能力
@@ -56,12 +66,17 @@
 - `docs/architecture.md`：接入应用持久化和出站可靠发送说明
 - `docs/adr/README.md`：登记 T-006 钩子协议提议 ADR
 - `backend/src/ApprovalService.Contracts/Flows/FlowDefinition.cs`、`FlowExecutionGraph.cs`、`FlowKinds.cs`、`backend/tests/ApprovalService.Backend.Checks/ContractChecks.cs`、`frontend/src/model/flow.ts`：合入 T-034 已验收契约与检查
+- `backend/src/ApprovalService.Contracts/Flows/FlowPresentation.cs`、`backend/src/ApprovalService.Contracts/Protocol/OpenApiRoutes.cs`、`frontend/src/model/flow.ts`、`backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`、`docs/contracts.md`、`docs/architecture.md`：本轮 PATCH、重提、预览兼容契约与登记；先完成独立 PATCH 切片并逐项同步
+- `backend/src/ApprovalService.Contracts/Protocol/OpenQueryModels.cs`、新增重新提交请求、`OpenApiRoutes.cs`、应用服务与 API/检查登记、`docs/contracts.md`：本轮重提/补充独立切片增加可选当前审批人值投影和外部提交路由，保持既有字段兼容
+- `backend/src/ApprovalService.Contracts/Protocol/CallbackNotification.cs`、`BusinessHookModels.cs`、`docs/contracts.md`：业务动作可选 result 的回调副本与现有动作响应契约同步，仅增加可选字段
+- `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`docs/contracts.md`、`docs/architecture.md`：动作待处理重排服务登记和队列语义同步
+- `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs` 与新增管理请求模型、`backend/src/ApprovalService.Api/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`、`docs/contracts.md`、`docs/architecture.md`：按流程管理员授权的动作人工重试管理接口及场景登记
 
 ## 验收标准
 
-- [ ] 设计书第 13 节的审批服务接口全部可用（嵌入令牌、附件、打印除外）
+- [x] 设计书第 13 节的审批服务接口全部可用（嵌入令牌、附件、打印除外）
 - [x] “流程编码 + 业务单号”在进行中的审批里唯一，重复发起拿到已有的那张
-- [ ] 只传单号发起时调取数接口；校验钩子不通过时挡住并返回原因；钩子超时有明确的错误
+- [x] 只传单号发起时调取数接口；校验钩子不通过时挡住并返回原因；钩子超时有明确的错误
 - [x] 回调带签名、失败按规则重试、可以手动重发；同一事件重发时 `eventId` 不变
 - [x] `tasks/count` 能只算本接入应用的流程，也能算全部（按接入应用设置）
 - [x] 性能初定：发起、审批 P95 ≤ 300 ms（不含钩子），待办数量 P95 ≤ 50 ms，写进交接记录
@@ -79,6 +94,18 @@
 
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
 
+- 2026-10-23 · Codex：合入已通过验证的 T-044 稳定快照，其中已包含 T-013 的接入应用附件归属与发起事务内原子关联，以及 T-041 的应用身份代际。合并时同时保留流程管理员动作重试和附件/API/检查登记，设计书 §api 修正旧的开放终止与工号说明；真实 HTTP/SQLite 检查覆盖 API Key 上传、跨应用拒绝、部分关联回滚、重复引用和并发争用，身份场景覆盖停用再启用及轮换密钥后旧嵌入令牌永久失效。完整 `verify.ps1` 通过：后端 737、前端 119 项及客户端检查，构建零警告。T-006 验收项全部满足，状态转待验收；真实 MinIO 环境检查仍由 T-013 在提供环境后执行。本分支未合并 main、未推送。
+
+- 2026-10-23 · Codex：继续剩余附件原子关联与接入应用身份代际时，先核对稳定 T-044 集成提交 `38449ac` 已包含 T-013 附件归属 `b8ecec6` 和 T-041 身份代际 `ed91b32`。计划合入该稳定快照，逐项保留双方变更；随后在本任务范围内接入 API Key 上传和发起事务内附件关联。涉及共享的 Contracts、API/检查入口、运行仓储与文档先在本条登记；合并冲突若语义不明确按 R13 停下。
+
+- 2026-10-23 · Codex：按用户确认完成流程管理员人工重试入口 `POST /api/v1/admin/actions/retry`，正文 `{eventId}` 可承载含斜杠的原事件 ID，成功返回 204。复用已持久的 `FlowEntity.AdministratorId` 流程管理员工号，仅当前在职、本地登录且工号与原事件审批单 `FlowId` 对应流程一致者可重排；组织管理员角色不自动跨流程获权。应用层校验后，数据库条件更新再次核对当时管理范围与 `needsAttention` 状态，避免权限或队列状态变化后误重排。真实 HTTP/SQLite 场景覆盖匿名、跨流程、仅有组织管理员角色、允许的管理员及重复请求；完整 `verify.ps1` 通过：后端 625、调用端 33、前端 65 项，零构建警告。Contracts、契约、设计书 §integration、架构与后端 README 已同步；上一轮授权阻塞解除，任务恢复进行中。T-006 仍余附件原子关联及需与身份任务协调的 `AuthGeneration`，不可标完成。
+- 2026-10-23 · Codex：完成自动动作失败上限的内部切片：第十次失败后只将原 `actionPending` 待发项标为待管理员处理，暂停自动领取；其他回调待发项仍沿用原重试策略。内部管理用例仅在该状态下以原 `eventId` 重排同一待发项，每次人工操作只给一次发送机会，失败后再回待管理员处理，不生成新事件或修改业务数据。SQLite 队列场景覆盖第九/十次、停止自动领取及人工再失败；完整 `verify.ps1` 通过：后端 619、调用端 33、前端 65 项，零构建警告。本轮第一次全量验证仅本机性能基线的发起 P95 偶发为 335.3 ms，重跑后全量通过且发起/审批/计数分别为 176.9/20.2/6.0 ms。管理 HTTP 路由暂缓：现有 `OrganizationAdmin` 只代表本地组织管理员，设计中的流程管理员按范围授权尚无可复用权限点；建议定义可管理该实例所属流程的专用权限后再开放路由。按 R13 将任务标为阻塞，未把 T-006 标完成。另剩余附件原子关联及与身份任务联动的 `AuthGeneration`，交由主任务协调。
+- 2026-10-23 · Codex：完成自动动作可选 `result` 独立切片：验签成功后以原动作 `eventId` 幂等回写，引擎的 `actionCompleted.actionResult` 事件和运行投影按该事件 ID 独立留痕；后续审批终态回调可选携带 `actionResults`，业务 `data` 不变。真实 SQLite/假签名业务端场景覆盖结果审计、固定回调与重领不重复出站，纯引擎场景覆盖状态不可原地改写。Contracts、契约、设计书、架构与后端 README 已同步；全量 `verify.ps1` 通过：后端 610、调用端 33、前端 65 项，零构建警告；5289 已释放。任务保持进行中，下一切片为动作 10 次自动失败转管理员待处理和管理员同 `eventId` 手动重试。
+- 2026-10-23 · Codex：完成重提/补充独立切片：登记 `OperationStateCopy.cs`、当前值辅助文件及共享 Contracts 请求/响应/路径、DI/API/检查入口与契约文档；新增 `POST /api/v1/instances/{id}/resubmit`。只接受所属应用已绑定的原发起人和完整新数据；按锁定定义、公式、当前组织的可信路由映射预校验，再由引擎和运行仓储以同一乐观版本事务保存。成功推进时合并独立 `approverFieldValues` 当前值；退回重提清空、补充保留，历史事件不改。重提还清除上一轮“已同意/相邻同意”找人跟踪，防止默认相邻只审一次跳过新轮次首节点。HTTP/SQLite 场景覆盖权限、无效数据、公式和网关重算、幂等与原任务恢复；纯引擎场景覆盖当前值和历史留存。全量 `verify.ps1` 通过：后端 608、调用端 33、前端 65 项，零构建警告；5289 已释放。Contracts、契约、设计书 §api、架构和后端 README 已同步。T-006 继续进行中，剩余附件原子关联、动作可选 result/回调与 10 次失败转管理员处理及同 eventId 手动重试；接入应用 AuthGeneration 需与身份任务合拢，不能标完成。
+- 2026-10-23 · Codex：完成流程预览 `POST /api/v1/flows/{code}/preview`：沿用发布流程授权、严格本应用发起人与自选人员绑定、字段类型和公式校验及当前组织快照，以纯引擎在内存里按同意/办理完成/外部动作成功路径逐步推进；只在预计实际命中业务接口找人节点时调用签名钩子。返回按到达顺序排列的节点及候选内部人员 ID/当前姓名、预计状态和到节点重算提示；业务单号可省略，此时取人钩子收到空值。不持久化实例、在途键、事件或待发项。真实 HTTP/SQLite 场景覆盖高低金额分支、姓名、未绑定发起人及零持久化；全量 `verify.ps1` 通过：后端 595、调用端 33、前端 65 项，零构建警告；5289 已释放。Contracts、契约、设计书 §api、架构及后端 README 已同步。T-006 保持进行中，其余未完成项见下一条 PATCH 交接。
+- 2026-10-23 · Codex：完成审批中数据 PATCH 的可独立交付切片：锁定发布字段的 `businessUpdateAllowed` 默认关闭，所属应用和本应用在职绑定操作人双重校验，顶层/逐行明细子字段白名单、类型检查、公式与可信路由重算；统一引擎 `updateData` 命令在同一乐观版本提交中保存快照、映射与改前改后审计，同请求 ID 重试不重复落事件，已到达任务不静默改派。真实 HTTP/SQLite 场景覆盖跨应用、未绑定工号、禁用字段/公式/明细子字段、错误类型、公式和审计、后续排他网关按新金额选路。Contracts、前端镜像、契约、设计书 §form/#api、架构及后端 README 已同步；按规模限制拆出既有 `OperationUndoFrame`，行为未变。完整 `verify.ps1` 通过：后端 591、调用端 33、前端 65 项，零构建警告；5289 已释放。状态仍为进行中：开放重提/补充、流程预览、附件原子关联、自动动作可选 `result` 独立审计及结果回调、失败 10 次转管理员待处理并以原 `eventId` 手动重试尚未完成；重提所需审批人填写当前值投影尚缺，不能从历史事件推断。T-041/T-043 并行认领文件本次未触碰。
+- 2026-10-22 · Codex：按用户要求在合适节点暂停，额度留给其他项目；本轮不再启动重提和预览。独立工作树 `C:\Users\dukun\.codex\worktrees\open-api\ApprovalService` 的稳定 HEAD 仍为 `0568558`，PATCH 草稿尚未提交：已加字段 `businessUpdateAllowed`（后端和前端定义，缺省 false）、`PATCH /api/v1/instances/{id}/data` 请求与路由、`OpenDataPatchAppService` 的本应用归属/已绑定操作人/顶层字段和逐行明细子字段授权、字段类型与公式重算、可信找人映射刷新、改前改后审计，以及引擎 `updateData` 命令、运行时原子保存和 HTTP 场景草稿。当前 `dotnet build backend/ApprovalService.Backend.slnx --no-restore` 为 0 警告 0 错误；尚未运行检查程序、格式或全量 `verify.ps1`，新源码尚需登记到 Git 索引，契约/设计/README 尚未同步，不能视为已完成或合入。下一位先看 `git status` 与上述草稿，运行新场景并修缺陷，再同步 `docs/contracts.md`、设计书 §form/#integration/#api、架构与后端 README、跑全量验证后小步提交；不要触碰 T-041 ClientApp/Identity、T-043 文件可见性认领文件。现有审批人填写值只在事件审计中，没有当前值投影；重提/补充不能靠反读历史猜当前值，应先设计并实现明确的当前值载体，再按已确认的“退回清空、补充保留”接线。预览尚未开始。用户另确认：自动动作可选 `result` 应独立留痕并进入后续结果回调，绝不覆盖审批数据；动作失败按既定间隔最多自动重试 10 次，随后转待管理员处理并暂停自动重试，管理员手动重试使用原 `eventId`。这两项仅登记决定，本轮未修改已提交的动作实现。
+- 2026-10-22 · Codex：按已确认规则继续审批中 PATCH、退回/补充后重新提交和流程预览；先登记上列 Contracts/前端镜像/引擎命令/Runtime/API/检查及共享文件。PATCH 先做独立完整切片：发布字段显式开关默认关闭，仅已授权字段可更新，校验并重算公式和可信路由，原子保存数据与改前改后审计。严格核对接入应用归属和本应用已绑定实际操作人；不接触 T-041 的 ClientApp/Identity 或 T-043 文件可见性文件。重提当前审批人填写值与预览的具体载体待核对现有运行状态后继续，不猜测不兼容契约。
 - 2026-10-22 · Codex：ADR 0010 取人与自动动作的最小完整切片已实现。纯引擎仅在实际命中 BusinessApi 节点且可信快照缺结果时报告该节点，无待提交事件；运行应用服务按原状态、请求 ID、固定时间与图有界重算，业务人员只经当前应用既有在职绑定解析，取人拒绝时无部分审批状态。发起路由快照保存本应用外部发起人 ID。自动节点继续使用原子写入的 `actionPending` 待发项，后台事务外双向验签发送，以 `eventId` 让业务系统去重；成功后同 ID 幂等提交 `ActionSucceeded`，远端失败/非成功响应保留队列重试，确认待发项失败后重领不重复出站。纯引擎分支场景与真实 SQLite/假签名业务端覆盖严格绑定、失败隔离、动作失败重试及回写；完整 `verify.ps1` 通过：后端 583、调用端 33、前端 65 项，零构建警告，5289 已释放。Contracts、契约、架构、设计书与后端 README 已同步。状态保持进行中：动作响应的可选 `result` 如何进入回调或审批数据、无限重试后的管理员处理边界，设计仍不明确，本轮只回写成功结论，不猜测业务结果持久语义；开放 PATCH、重新提交、预览、附件原子关联、`AuthGeneration` 仍未完成。
 - 2026-10-22 · Codex：继续 ADR 0010 后两类钩子前已复核：T-002 状态已完成，当前无并行认领；`EngineWork.Advance` 会在一个纯命令里跨过多个实际分支并创建任务，应用层无法从整图安全预取取人结果。按主任务同意，本轮精确扩范围到上列 Engine/Runtime/出站与场景文件：引擎遇缺少的业务节点取人输入返回实际命中节点请求、无任何持久提交，应用层用同一命令和固定时间重新计算；自动动作使用已有 `actionPending` 待发事件及 `ActionSucceeded/Failed` 恢复命令。先完成纯引擎最小切片，随后补严格本应用绑定和持久动作；状态保持进行中。
 - 2026-10-22 · Codex：已采纳 ADR 0010，接入应用四个完整 URL 保持默认 HTTPS、可信内网显式开启 HTTP。提交 `be8f839` 接通未传 `data` 时的发起前取数、发起前与任务同意前的业务校验；统一出站层对原始响应字节做 HMAC-SHA256 恒定时间核对，校验回显的请求 ID 后才解析 JSON，网络/超时/HTTP/签名/格式错误统一为 `BUSINESS_HOOK_FAILED`。真实数据库和假业务端场景证明签名错误或校验拒绝不保存部分审批，拒绝同意后任务仍待办；Contracts、SDK 错误码、DI 和契约/架构/设计/README 已同步。完整 `verify.ps1` 通过：后端 572、调用端 33、前端 65 项，零构建警告；5289 已释放。状态保持进行中：业务取人必须仅在即将进入目标节点前预取，并严格按当前应用已有人员绑定解析，不能全图预取未走分支；自动动作须从持久引擎待发事件在提交后发送，并以同一 `eventId` 幂等地把执行结果送回引擎，不能在写事务中等待网络。PATCH、外部重提、预览、附件原子关联仍待接线。T-007 已记录的停用再启用可能复活旧嵌入访问/刷新/未兑换令牌问题，需要接入应用启停/密钥轮换路径与身份令牌联合引入单调 `AuthGeneration`，本次未单方修改，不得把 T-006 标完成。

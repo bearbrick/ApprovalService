@@ -72,6 +72,14 @@ public sealed class OpenInstanceResponse
     }
 
     /// <summary>
+    /// 已成功推进的审批人填写字段当前值；退回重提后清空，历史仍在事件中。
+    /// </summary>
+    public JsonElement ApproverFieldValues
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 发起时间。
     /// </summary>
     public DateTimeOffset StartedAt

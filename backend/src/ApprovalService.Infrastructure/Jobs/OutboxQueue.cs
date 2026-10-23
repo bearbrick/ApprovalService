@@ -118,13 +118,14 @@ public sealed class OutboxQueue
         ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var nextAttempt = now.Add(JobRetrySchedule.AfterFailure(claim.Attempts));
+        var needsAttention = ActionOutboxPayload.IsPendingAction(claim) && claim.Attempts >= 10;
         var safeErrorCode = errorCode.Length > 200 ? errorCode[..200] : errorCode;
         var updated = await context.OutboxItems.Where(item => item.Id == claim.Id &&
                 item.Status == JobStatuses.Leased && item.LeaseOwner == claim.LeaseOwner &&
                 item.LeaseUntil > now && item.Version == claim.Version)
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(item => item.Status, JobStatuses.Pending)
-                .SetProperty(item => item.AvailableAt, nextAttempt)
+                .SetProperty(item => item.Status, needsAttention ? JobStatuses.NeedsAttention : JobStatuses.Pending)
+                .SetProperty(item => item.AvailableAt, needsAttention ? now : nextAttempt)
                 .SetProperty(item => item.LastError, safeErrorCode)
                 .SetProperty(item => item.LeaseOwner, (string?)null)
                 .SetProperty(item => item.LeaseUntil, (DateTimeOffset?)null)

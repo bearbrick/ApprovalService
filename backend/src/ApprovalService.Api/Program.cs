@@ -110,6 +110,7 @@ app.MapOpenInstanceCommandEndpoints();
 app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+app.MapActionRetryEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 

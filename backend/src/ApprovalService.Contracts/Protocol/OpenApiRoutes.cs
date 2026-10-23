@@ -16,6 +16,11 @@ public static class OpenApiRoutes
     public const string FlowSchema = "/api/v1/flows/{code}/schema";
 
     /// <summary>
+    /// 按当前数据与组织快照预计发布流程路径，不创建审批单。
+    /// </summary>
+    public const string FlowPreview = "/api/v1/flows/{code}/preview";
+
+    /// <summary>
     /// 按流程编码与业务单号读取历史审批单。
     /// </summary>
     public const string Instances = "/api/v1/instances";
@@ -31,9 +36,19 @@ public static class OpenApiRoutes
     public const string Instance = "/api/v1/instances/{id}";
 
     /// <summary>
+    /// 审批中由所属业务系统更新已授权的审批数据字段。
+    /// </summary>
+    public const string InstanceData = "/api/v1/instances/{id}/data";
+
+    /// <summary>
     /// 发起人撤回在途审批。
     /// </summary>
     public const string InstanceWithdraw = "/api/v1/instances/{id}/withdraw";
+
+    /// <summary>
+    /// 发起人提交退回后的新数据，或补充当前审批数据。
+    /// </summary>
+    public const string InstanceResubmit = "/api/v1/instances/{id}/resubmit";
 
     /// <summary>
     /// 所属接入应用以已绑定实际操作人终止在途审批。

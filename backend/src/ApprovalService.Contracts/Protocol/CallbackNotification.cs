@@ -67,6 +67,14 @@ public sealed class CallbackNotification
     }
 
     /// <summary>
+    /// 已成功完成的自动动作结果，按原动作事件 ID 区分；不覆盖 data。
+    /// </summary>
+    public JsonElement? ActionResults
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 事件发生时间。
     /// </summary>
     public DateTimeOffset OccurredAt

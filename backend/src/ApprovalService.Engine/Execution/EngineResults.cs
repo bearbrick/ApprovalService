@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace ApprovalService.Engine.Execution;
 
 /// <summary>
@@ -45,6 +47,13 @@ public sealed class EngineEvent
     /// 子流程编码或自动动作编码。
     /// </summary>
     public string? TargetCode
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 自动动作完成时的可选业务结果；审批数据快照不包含此值。
+    /// </summary>
+    public JsonElement? ActionResult
     {
         get; set;
     }

@@ -27,6 +27,14 @@ public static class OpenFlowEndpoints
             var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
             return Results.Ok(await flows.GetSchemaAsync(client, code, cancellationToken));
         });
+        app.MapPost(OpenApiRoutes.FlowPreview, async (string code, OpenFlowPreviewRequest request,
+            HttpContext http, ClientAppAppService clients, OpenFlowPreviewAppService previews,
+            CancellationToken cancellationToken) =>
+        {
+            var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
+            return Results.Ok(await previews.PreviewAsync(client, code, request,
+                http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
+        });
         return app;
     }
 }

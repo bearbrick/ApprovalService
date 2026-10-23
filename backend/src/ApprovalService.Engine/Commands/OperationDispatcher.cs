@@ -21,6 +21,10 @@ internal static class OperationDispatcher
         var input = command.Operation ?? throw new EngineException(ErrorCodes.ValidationFailed, "操作参数不能为空。");
         switch (command.Kind)
         {
+            case OperationKinds.UpdateData:
+                RequireRunning(state);
+                work.Emit("businessDataUpdated");
+                break;
             case OperationKinds.RequestCancellation:
                 if (state.Status != EngineInstanceStatuses.Approved)
                 {
@@ -254,6 +258,7 @@ internal static class OperationDispatcher
 
         state.Status = EngineInstanceStatuses.Running;
         state.Operations.Pause = null;
+        // 补充只替换业务数据，已完成审批节点的当前填写值继续有效。
         work.Emit("supplementSubmitted", pause.NodeId, pause.TokenId);
     }
 
@@ -353,6 +358,12 @@ internal static class OperationDispatcher
 
         state.Status = EngineInstanceStatuses.Running;
         state.Operations.Pause = null;
+        // 退回后重新走审批时移除当前值，原填写仍留在事件审计中。
+        state.Operations.CurrentApproverFieldValues.Clear();
+        // 新一轮审批必须重新计算重复审批人规则，不能让上一轮的同意自动跳过目标节点。
+        state.ApprovedAssigneeIds.Clear();
+        state.LastApprovedAssigneeId = null;
+        state.Operations.LastApprovalUndo = null;
         if (pause.Mode == "restart")
         {
             foreach (var task in state.Tasks.Where(item => item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued))

@@ -114,10 +114,11 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         if (input.UpdatedApprovalDataJson is not null || input.UpdatedRoutingInputsJson is not null)
         {
             if (command.Kind is not (ApprovalService.Engine.Commands.OperationKinds.Resubmit or
-                    ApprovalService.Engine.Commands.OperationKinds.Supplement) ||
+                    ApprovalService.Engine.Commands.OperationKinds.Supplement or
+                    ApprovalService.Engine.Commands.OperationKinds.UpdateData) ||
                 input.UpdatedApprovalDataJson is null || input.UpdatedRoutingInputsJson is null)
             {
-                throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批数据与找人映射必须在重新提交时一起更新。");
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed, "审批数据与找人映射必须随允许的数据更新命令一起提交。");
             }
 
             // 数据只在引擎命令成功后随同状态、事件和回调快照进入同一事务。

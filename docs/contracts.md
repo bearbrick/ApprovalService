@@ -114,10 +114,12 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 | --- | --- | --- |
 | `POST /api/v1/flows/{code}/preview` | 预览会走哪些节点 | T-006 |
 | `POST /api/v1/instances/batch` | 批量发起审批 | T-006 |
-| `PATCH /api/v1/instances/{id}/data` | 审批中更新允许更新的字段 | T-006 |
+| `PATCH /api/v1/instances/{id}/data` | 审批中更新发布版本显式授权的字段；协议见下文 | T-006 |
 | `POST /api/v1/instances/{id}/withdraw`、`/resubmit`、`/remind`、`/terminate` | 撤回、重新提交、催办、业务单据作废时终止 | T-006 |
 | `GET /api/v1/instances/{id}/print` | 审批单 PDF | T-015 |
 | `POST /api/v1/tasks/{id}/actions` | 审批操作 | T-006 |
+
+`PATCH /api/v1/instances/{id}/data` 需要所属接入应用的 `X-Api-Key` 与稳定 `X-Request-Id`，请求为 `{ "user": "alice", "data": { "amount": 5 } }`，`user` 必须是本应用已绑定的在职实际操作人。只接受 `running` 审批单，且仅允许修改锁定发布版本中显式设置 `businessUpdateAllowed=true` 的顶层字段或明细子字段；旧定义和未设置开关均视为禁止，计算字段及审批人填写字段不可改。顶层明细表若整体开放，可提交完整表值；仅开放子字段时，须提交与原表等长的数组，各项为该行的局部字段对象或 `null`，不能通过该形式增删行。服务在写入前校验字段类型、重算公式与可信找人映射；已到达任务不静默改派，后续节点和网关按新数据计算。数据快照、路由映射和 `businessDataUpdated` 事件在同一乐观版本事务中提交，事件 `detail.audit.dataChanges` 记录变化字段的 `before`/`after`，响应为更新后的审批单详情。同一请求 ID 重试不重复写入或追加事件；并发版本冲突返回 `CONFLICT`。
 | `POST /api/v1/files`、`GET /api/v1/files/{id}` | 上传、下载附件 | T-013 |
 
 ## 回调和业务系统提供的接口
@@ -175,7 +177,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 发起时数据快照是 JSON 对象；必传字段和明细子字段按类型检查，必传文本不能只含空白，明细错误路径带零起始行号，例如 `data.items[0].qty`。计算字段和审批人填写字段无需业务系统在发起时提交。`number` 和 `money` 必须是 JSON 数字，日期必须是 `yyyy-MM-dd`，人员和部门是字符串 ID，附件为一个文件 ID 字符串或文件 ID 字符串数组；数组内每个文件 ID 必须为非空白字符串。必传明细表至少一行，单表最多 1000 行。`flows/{code}/schema` 可按同一字段定义生成 JSON 样例，样例不包含计算字段和审批人填写字段。审批编号由服务分配序号后按 `前缀-日期-流水号` 格式生成；日期格式支持 `yyyy`、`yyyyMM`、`yyyyMMdd`，流水号按配置位数补零，发号的并发唯一性由持久化层保证。
 
-`data.fields[]` 的字段包含 `key`、`name`、`type`、`required`、可选 `formula`、`approverInput` 与 `children`。`type` 可为 `text`、`number`、`money`、`date`、`person`、`department`、`attachment`、`detailTable`；明细表的子字段放在 `children`。计算字段仅供审批判断与展示，不回写业务单据；`approverInput` 表示由获授权节点的审批人填写。`summaryFields` 存字段 key，通常选三至五个。节点 `fieldPermissions[]` 的每项包含 `fieldKey` 和 `access`（`hidden`、`readOnly`、`editable`）；明细子字段 key 写成 `tableKey.childKey`。
+`data.fields[]` 的字段包含 `key`、`name`、`type`、`required`、可选 `formula`、`approverInput`、`businessUpdateAllowed` 与 `children`。`businessUpdateAllowed` 缺省为 `false`，仅显式开启的字段允许业务系统在审批进行中更新。`type` 可为 `text`、`number`、`money`、`date`、`person`、`department`、`attachment`、`detailTable`；明细表的子字段放在 `children`。计算字段仅供审批判断与展示，不回写业务单据；`approverInput` 表示由获授权节点的审批人填写。`summaryFields` 存字段 key，通常选三至五个。节点 `fieldPermissions[]` 的每项包含 `fieldKey` 和 `access`（`hidden`、`readOnly`、`editable`）；明细子字段 key 写成 `tableKey.childKey`。
 
 人工节点的 `assignee` 至少有 `source`；可选 `value`、`fieldKey`、`level` 分别存成员/角色/矩阵/接口等编码、数据字段和上级层级。来源编码为 `member`、`role`、`position`、`grade`、`manager`、`managerChain`、`departmentHead`、`dataDepartmentHead`、`divisionLeader`、`dataPerson`、`matrix`、`businessApi`、`previousSelection`、`initiatorSelection`、`initiator`；岗位和职级在设计书同一类中。可选的 `limitToInitiatingDepartment` 限定角色只在发起部门内找人，`stopAtGrade` 是连续多级上级的截止职级。`approval` 存多人方式（`sequential`、`all`、`any`、`vote`）、票签门槛与权重；会签拒绝处理为 `immediate` 或 `waitAll`，无处理人为 `block`、`approve`、`administrator` 或 `specified`，选 `specified` 时由 `missingAssigneeUserId` 保存目标人员 ID；本人审批为 `skip`、`self` 或 `manager`，重复审批人为 `adjacentOnce`、`once` 或 `everyTime`，离职人员为 `manager` 或 `administrator`。其余还有允许的操作、意见及已阅要求、时限；新增可选字段不改变既有流程定义的默认行为。`subprocess` 存目标 `flowCode`、`waitForCompletion` 与 `dataMappings`；`automation` 存由出站适配层执行的 `actionCode` 和失败后交管理员的设置。
 

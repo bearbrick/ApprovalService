@@ -610,7 +610,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           </table>
         </div>
         <ul>
-          <li>发起时保存一份业务数据<b>快照</b>，审批人看到的是提交时的数据。业务系统确实要在审批中改数据时走接口，改动留痕并标给审批人看（第 12 节）。</li>
+          <li>发起时保存一份业务数据<b>快照</b>，审批人看到的是提交时的数据。业务系统确实要在审批中改数据时走接口，改动留痕并标给审批人看（第 12 节）；只允许修改发布版本显式开启“审批中业务更新”的字段（缺省关闭），服务重算公式和后续路由，已到达任务不静默改派。</li>
           <li>计算字段用自己写的表达式解析，只支持四则运算、比较、常用函数（SUM、AVG、MAX、MIN、IF、日期差等），不执行任意代码。</li>
           <li>这份设计里的“审批单”指一次审批的记录（流程实例），不是业务单据。</li>
         </ul>
@@ -1122,7 +1122,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>GET /api/v1/instances/{id}</code></td><td>状态、当前节点、审批记录；也可以按流程编码和业务单号查</td></tr>
               <tr><td><code>GET /api/v1/instances?flowCode=&amp;businessKey=</code></td><td>按流程编码和业务单号查本接入应用发起的历史审批单，最新的排在前面</td></tr>
               <tr><td><code>GET /api/v1/instances/{id}/print</code></td><td>审批单 PDF</td></tr>
-              <tr><td><code>PATCH /api/v1/instances/{id}/data</code></td><td>审批中更新允许更新的字段（留痕）</td></tr>
+              <tr><td><code>PATCH /api/v1/instances/{id}/data</code></td><td>所属应用提交已绑定实际操作人和局部数据；仅发布版本显式授权字段可改，字段校验、公式与后续路由重算后原子留痕</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/withdraw</code></td><td>撤回</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/resubmit</code></td><td>被退回或被要求补充后重新提交（带新数据）</td></tr>
               <tr><td><code>POST /api/v1/instances/{id}/remind</code></td><td>催办</td></tr>

@@ -44,7 +44,7 @@ internal static partial class OpenApiChecksStarts
             {
                 Code = "demo",
                 Name = "示例",
-                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY", "REVOKE", "HOOK_ASSIGN", "HOOK_ACTION"],
+                AllowedFlowCodes = ["PURCHASE", "MULTI", "SCOPE", "SELECTED", "DYNAMIC", "INPUT", "LIMITED", "RETURN_NODE", "LEGACY", "REVOKE", "HOOK_ASSIGN", "HOOK_ACTION", "PATCH"],
             });
             var other = await clients.CreateAsync(new CreateClientAppInput
             {
@@ -384,6 +384,7 @@ internal static partial class OpenApiChecksStarts
             await RunBatchAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunAwaitingTerminationAsync(scope.ServiceProvider, http, demo.ApiKey, check);
             await RunHooksAsync(scope.ServiceProvider, demo.ApiKey, demo.SigningSecret, check);
+            await RunPatchAsync(scope.ServiceProvider, http, demo.ApiKey, other.ApiKey, check);
             await RunPerformanceAsync(http, demo.ApiKey, check);
         }
         finally

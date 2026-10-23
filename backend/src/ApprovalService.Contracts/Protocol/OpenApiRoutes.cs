@@ -31,6 +31,11 @@ public static class OpenApiRoutes
     public const string Instance = "/api/v1/instances/{id}";
 
     /// <summary>
+    /// 审批中由所属业务系统更新已授权的审批数据字段。
+    /// </summary>
+    public const string InstanceData = "/api/v1/instances/{id}/data";
+
+    /// <summary>
     /// 发起人撤回在途审批。
     /// </summary>
     public const string InstanceWithdraw = "/api/v1/instances/{id}/withdraw";

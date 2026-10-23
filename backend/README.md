@@ -64,6 +64,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 `src/ApprovalService.Engine/Expressions/` 提供纯逻辑的表达式解析、审批快照逐字段校验、JSON 样例生成和人民币大写。条件与计算字段用 `${fieldKey}` 引用快照，例如 `SUM(${items.amount}) >= 1000 AND ${initiator.level} >= 3`；明细列聚合、`IF`、`ANY` 和 `DATEDIFF` 的边界见契约文档。发起时可调用 `ApprovalDataValidator.Validate(definition, data)` 获得 `data.items[0].qty` 这样的错误路径，调用 `CreateExampleJson(definition)` 为 schema 接口生成示例。审批编号格式规则在领域层 `ApprovalSerialNumber.Format`，调用方必须先分配唯一流水号并传入时间；纯规则本身不抢号、不访问数据库。
 
+审批中的业务数据 PATCH 只接受审批单所属应用和本应用已绑定的操作人。锁定发布定义中的字段需显式开启 `businessUpdateAllowed`（默认关闭）；服务按字段授权合并并校验类型、重算公式和后续路由，已到达任务不改派。新快照与 `businessDataUpdated` 的改前改后审计、路由映射在同一乐观版本事务中提交，同一请求 ID 可安全重试。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：

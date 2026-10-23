@@ -61,6 +61,14 @@ public sealed class FlowFieldDefinition
     }
 
     /// <summary>
+    /// 业务系统是否可以在审批进行中更新该字段；旧定义缺省为禁止。
+    /// </summary>
+    public bool BusinessUpdateAllowed
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 明细表的子字段；普通字段保持空集合。
     /// </summary>
     public List<FlowFieldDefinition> Children { get; set; } = [];

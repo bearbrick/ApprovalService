@@ -119,6 +119,19 @@ internal static class OperationGuard
             }
         }
 
+        if (command.Kind == OperationKinds.UpdateData)
+        {
+            if (!input.IsOwningClientApp)
+            {
+                throw new EngineException(ErrorCodes.Forbidden, "只有审批单所属接入应用可以更新审批数据。");
+            }
+
+            if (input.DataChanges?.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "审批数据更新缺少改前改后审计值。");
+            }
+        }
+
         if (command.Kind is OperationKinds.Reassign or OperationKinds.Jump or
             OperationKinds.Handover or OperationKinds.Resend)
         {
@@ -179,6 +192,7 @@ internal static class OperationGuard
                 TargetUserId = input.TargetUserId,
                 MentionedUserIds = [.. input.MentionedUserIds],
                 FieldValues = input.FieldValues?.Clone(),
+                DataChanges = input.DataChanges?.Clone(),
             };
         }
     }

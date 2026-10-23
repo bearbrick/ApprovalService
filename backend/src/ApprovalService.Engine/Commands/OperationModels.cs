@@ -41,6 +41,10 @@ public static class OperationKinds
     /// </summary>
     public const string Resubmit = "resubmit";
     /// <summary>
+    /// 所属业务系统更新审批中的可变数据字段。
+    /// </summary>
+    public const string UpdateData = "updateData";
+    /// <summary>
     /// 转交。
     /// </summary>
     public const string Transfer = "transfer";
@@ -157,6 +161,13 @@ public sealed class OperationInput
         get; set;
     }
     /// <summary>
+    /// 审批数据更新的字段级改前改后值，仅由服务端计算。
+    /// </summary>
+    public JsonElement? DataChanges
+    {
+        get; set;
+    }
+    /// <summary>
     /// 本次是否由应用层确认管理员权限。
     /// </summary>
     public bool IsAdministrator
@@ -164,7 +175,7 @@ public sealed class OperationInput
         get; set;
     }
     /// <summary>
-    /// 应用层已核对本接入应用拥有审批单且实际操作人已绑定，仅可用于终止。
+    /// 应用层已核对本接入应用拥有审批单且实际操作人已绑定，可用于终止和数据更新。
     /// </summary>
     public bool IsOwningClientApp
     {
@@ -294,6 +305,13 @@ public sealed class OperationAudit
     /// 本次操作中审批人提交的顶层字段值。
     /// </summary>
     public JsonElement? FieldValues
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 审批数据更新的字段级改前改后值。
+    /// </summary>
+    public JsonElement? DataChanges
     {
         get; set;
     }
@@ -450,37 +468,4 @@ public sealed class OperationVisit
     /// 进入时的分叉路径。
     /// </summary>
     public List<EngineForkFrame> Forks { get; set; } = [];
-}
-
-/// <summary>
-/// 撤销同意的固定前态及同意者身份。
-/// </summary>
-public sealed class OperationUndoFrame
-{
-    /// <summary>
-    /// 同意命令之前的状态快照，不携带更早的撤销帧。
-    /// </summary>
-    public EngineState Snapshot { get; set; } = new();
-    /// <summary>
-    /// 允许收回同意的实际操作人。
-    /// </summary>
-    public string ActorId { get; set; } = string.Empty;
-    /// <summary>
-    /// 本次同意任务 ID。
-    /// </summary>
-    public string TaskId { get; set; } = string.Empty;
-    /// <summary>
-    /// 同意后的累计人工作业次数。
-    /// </summary>
-    public int DecisionCountAfter
-    {
-        get; set;
-    }
-    /// <summary>
-    /// 同意命令完成后的已处理请求数，防止撤销时抹掉后续已留痕操作。
-    /// </summary>
-    public int ProcessedRequestCountAfter
-    {
-        get; set;
-    }
 }

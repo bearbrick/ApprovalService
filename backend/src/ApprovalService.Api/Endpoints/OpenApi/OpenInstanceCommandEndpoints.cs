@@ -15,6 +15,14 @@ public static class OpenInstanceCommandEndpoints
     /// <returns>原应用。</returns>
     public static WebApplication MapOpenInstanceCommandEndpoints(this WebApplication app)
     {
+        app.MapMethods(OpenApiRoutes.InstanceData, ["PATCH"], async (string id, OpenDataPatchRequest request,
+            HttpContext http, ClientAppAppService clients, OpenDataPatchAppService patches,
+            CancellationToken cancellationToken) =>
+        {
+            var client = await clients.AuthenticateAsync(http.Request.Headers[HeaderNames.ApiKey].ToString(), cancellationToken);
+            return Results.Ok(await patches.PatchAsync(client, id, request,
+                http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken));
+        });
         app.MapPost(OpenApiRoutes.InstanceWithdraw, async (string id, OpenInstanceCommandRequest request,
             HttpContext http, ClientAppAppService clients, OpenInstanceCommandAppService commands,
             CancellationToken cancellationToken) =>

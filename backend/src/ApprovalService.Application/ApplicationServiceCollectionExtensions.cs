@@ -30,6 +30,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<BusinessHookAppService>();
         services.AddScoped<BusinessAssigneeAppService>();
         services.AddScoped<OpenInstanceCommandAppService>();
+        services.AddScoped<OpenDataPatchAppService>();
         services.AddScoped<OpenTaskActionAppService>();
         services.AddScoped<OpenStartContextBuilder>();
         services.AddSingleton<IMatrixMatchProvider, UnconfiguredMatrixMatchProvider>();

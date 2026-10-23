@@ -1,7 +1,4 @@
 /**
- * 后端流程定义 JSON 的前端镜像；权威定义在 Contracts/Flows。
- */
-/**
  * 当前自由画布格式版本。
  */
 export const flowSchemaVersion = 1 as const;
@@ -393,6 +390,10 @@ export interface FlowFieldDefinition {
    * 是否由审批人在获授权的节点填写。
    */
   approverInput: boolean;
+  /**
+   * 业务系统是否可在审批中更新；旧定义缺省为禁止。
+   */
+  businessUpdateAllowed?: boolean;
   /**
    * 明细表的子字段。
    */

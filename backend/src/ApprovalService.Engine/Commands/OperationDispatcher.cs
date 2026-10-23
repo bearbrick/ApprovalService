@@ -21,6 +21,10 @@ internal static class OperationDispatcher
         var input = command.Operation ?? throw new EngineException(ErrorCodes.ValidationFailed, "操作参数不能为空。");
         switch (command.Kind)
         {
+            case OperationKinds.UpdateData:
+                RequireRunning(state);
+                work.Emit("businessDataUpdated");
+                break;
             case OperationKinds.RequestCancellation:
                 if (state.Status != EngineInstanceStatuses.Approved)
                 {

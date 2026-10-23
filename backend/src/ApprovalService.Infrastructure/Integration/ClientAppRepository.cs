@@ -97,6 +97,24 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
     }
 
     /// <inheritdoc />
+    public async Task CreateWithAuditAsync(ClientAppEntity app, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
+        db.ClientApps.Add(app);
+        RecordAdminChange(db, app.Code, actorId, "created", occurredAt, null,
+            JsonSerializer.Serialize(new
+            {
+                app.Name,
+                reason
+            }));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> UpdateSecretsAsync(ClientAppEntity app, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
@@ -110,6 +128,34 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
     }
 
     /// <inheritdoc />
+    public async Task<bool> UpdateSecretsWithAuditAsync(ClientAppEntity app, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
+        var changed = await db.ClientApps.Where(item => item.Code == app.Code &&
+            item.AuthGeneration < long.MaxValue).ExecuteUpdateAsync(setters => setters
+            .SetProperty(item => item.ApiKeyHash, app.ApiKeyHash)
+            .SetProperty(item => item.SigningSecretCiphertext, app.SigningSecretCiphertext)
+            .SetProperty(item => item.AuthGeneration, item => item.AuthGeneration + 1), cancellationToken);
+        if (changed != 1)
+        {
+            return false;
+        }
+
+        // 操作日志只记录轮换发生，不保存摘要、密文或本次生成的明文。
+        RecordAdminChange(db, app.Code, actorId, "secretsRotated", occurredAt, null,
+            JsonSerializer.Serialize(new
+            {
+                reason
+            }));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
@@ -119,5 +165,71 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
                 .SetProperty(item => item.IsEnabled, enabled)
                 .SetProperty(item => item.AuthGeneration, item => item.AuthGeneration + 1), cancellationToken);
         return changed == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetEnabledWithAuditAsync(string code, bool enabled, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
+        var current = await db.ClientApps.AsNoTracking().SingleOrDefaultAsync(item => item.Code == code,
+            cancellationToken);
+        if (current is null || current.IsEnabled == enabled)
+        {
+            return false;
+        }
+
+        var changed = await db.ClientApps.Where(item => item.Code == code &&
+            item.IsEnabled == current.IsEnabled && item.AuthGeneration == current.AuthGeneration &&
+            item.AuthGeneration < long.MaxValue).ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.IsEnabled, enabled)
+                .SetProperty(item => item.AuthGeneration, item => item.AuthGeneration + 1), cancellationToken);
+        if (changed != 1)
+        {
+            return false;
+        }
+
+        RecordAdminChange(db, code, actorId, "enabledChanged", occurredAt,
+            JsonSerializer.Serialize(new
+            {
+                enabled = current.IsEnabled
+            }),
+            JsonSerializer.Serialize(new
+            {
+                enabled,
+                reason
+            }));
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// 将脱敏应用变更摘要加入当前事务；严禁传入密钥或出站地址。
+    /// </summary>
+    /// <param name="db">当前数据库事务上下文。</param>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="kind">变更类别。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="beforeJson">脱敏前值。</param>
+    /// <param name="afterJson">脱敏后值。</param>
+    private static void RecordAdminChange(ApprovalDbContext db, string code, string actorId, string kind,
+        DateTimeOffset occurredAt, string? beforeJson, string afterJson)
+    {
+        db.OrganizationChanges.Add(new OrganizationChangeEntity
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            EntityKind = "clientApp",
+            EntityId = code,
+            ActorId = actorId,
+            Source = "approvalService",
+            Kind = kind,
+            BeforeJson = beforeJson,
+            AfterJson = afterJson,
+            OccurredAt = occurredAt,
+        });
     }
 }

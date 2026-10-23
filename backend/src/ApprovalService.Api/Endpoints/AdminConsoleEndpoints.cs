@@ -45,6 +45,40 @@ internal static class AdminConsoleEndpoints
         app.MapGet(ApiRoutes.AdminClientApps, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetClientAppsAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPost(ApiRoutes.AdminClientApps, async (HttpContext http,
+            AdminClientAppCreateRequest request, ClientAppAppService service,
+            CancellationToken cancellationToken) =>
+        {
+            var secrets = await service.CreateAdminAsync(new CreateClientAppInput
+            {
+                Code = request.Code,
+                Name = request.Name,
+                AllowedFlowCodes = request.AllowedFlowCodes,
+                CanViewAllTasks = request.CanViewAllTasks,
+                CallbackUrl = request.CallbackUrl,
+                DataUrl = request.DataUrl,
+                ValidationUrl = request.ValidationUrl,
+                AssigneeUrl = request.AssigneeUrl,
+                ActionUrl = request.ActionUrl,
+            }, PersonId(http), request.Reason, DateTimeOffset.UtcNow, cancellationToken);
+            return ToSecretsResponse(secrets);
+        }).RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPut(ApiRoutes.AdminAppEnabled, async (HttpContext http, string code,
+            AdminClientAppEnabledRequest request, ClientAppAppService service,
+            CancellationToken cancellationToken) =>
+        {
+            await service.SetEnabledAdminAsync(code, request.Enabled, PersonId(http), request.Reason,
+                DateTimeOffset.UtcNow, cancellationToken);
+            return Results.NoContent();
+        }).RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPost(ApiRoutes.AdminAppRotateSecrets, async (HttpContext http, string code,
+            AdminClientAppRotateRequest request, ClientAppAppService service,
+            CancellationToken cancellationToken) =>
+        {
+            var secrets = await service.RotateSecretsAdminAsync(code, PersonId(http), request.Reason,
+                DateTimeOffset.UtcNow, cancellationToken);
+            return ToSecretsResponse(secrets);
+        }).RequireAuthorization(OrganizationAdminRequirement.PolicyName);
         app.MapGet(ApiRoutes.AdminAppEmbedOrigins, (string code, AdminConsoleAppService service,
             CancellationToken cancellationToken) => service.GetEmbedOriginsAsync(code, cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
@@ -64,4 +98,16 @@ internal static class AdminConsoleEndpoints
     private static string PersonId(HttpContext http) =>
         http.User.FindFirstValue(ClaimTypes.NameIdentifier) ??
         throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录。");
+
+    /// <summary>
+    /// 只在当前创建或轮换响应中映射一次性密钥。
+    /// </summary>
+    /// <param name="secrets">应用服务生成的密钥。</param>
+    /// <returns>管理端密钥响应。</returns>
+    private static AdminClientAppSecretsResponse ToSecretsResponse(ClientAppSecretsDto secrets) => new()
+    {
+        Code = secrets.Code,
+        ApiKey = secrets.ApiKey,
+        SigningSecret = secrets.SigningSecret,
+    };
 }

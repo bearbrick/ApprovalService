@@ -62,6 +62,7 @@
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
+| `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
@@ -75,6 +76,8 @@
 管理后台三个 GET 接口都要求本地密码会话和当前有效的 `organization-admin` 角色；匿名请求返回 401，普通人员或嵌入会话返回 403。`/admin/session` 返回 `{personId}`；`/admin/org/directory` 返回 `{departments, people}`，部门含 `id, code, name, parentName, managerName, source`，人员含 `id, employeeNumber, name, departments, position, isActive`，不包含联系方式和账号凭据；`/admin/apps` 返回应用数组，每项只含 `code, name, allowedFlowCodes, isEnabled`，不返回 API Key 摘要、签名密钥密文或出站地址。管理页使用访问令牌请求这些接口；组织 CSV/XLSX 导入继续使用既有 `/admin/org/import`，预检通过后正式导入时服务端再次校验并留变更记录。
 
 `GET /admin/apps/{code}/embed-origins` 返回 `{code, origins}`；`PUT` 接受 `{origins, reason}` 并返回相同结构。`origins` 是完整来源列表，最多 20 项、每项不超过 256 字符，去重后保存；仅允许 HTTPS 网站来源，开发时 HTTP 只允许 `localhost` 或 `127.0.0.1`，不得包含路径、查询、片段、用户信息或通配符。`reason` 须为 2 至 200 字符。保存使用旧值条件更新防止覆盖并发修改，在同一事务记录管理员、原因和不含密钥的前后来源快照。
+
+`POST /admin/apps` 接受 `{code, name, allowedFlowCodes, canViewAllTasks, callbackUrl?, dataUrl?, validationUrl?, assigneeUrl?, actionUrl?, reason}`。应用编码只含 ASCII 字母、数字、`-`、`_`，最长 128 字符；名称最长 256 字符，出站地址必须满足部署的 HTTPS/显式内网 HTTP 策略。`PUT /admin/apps/{code}/enabled` 接受 `{enabled, reason}` 并返回 204；`POST /admin/apps/{code}/rotate-secrets` 接受 `{reason}`。三种管理操作的原因均须为 2 至 200 字符，实际变更与不含凭据的管理员审计在同一事务提交。创建和轮换只在本次响应返回 `{code, apiKey, signingSecret}`；后续列表和日志均不能再次读取明文。轮换或实际启停使旧嵌入会话永久失效，停用时旧 API Key 不可调用；重新启用不会恢复旧嵌入会话。
 
 `GET /admin/bindings` 返回绑定数组，每项只含 `clientAppCode, kind, externalId, internalId, targetName, method`；目标名称来自当前可信组织主数据，不含电话、邮箱。管理员写入继续使用 `POST /admin/org/bindings`：传 `kind, externalId, internalId, clientAppCode`，人员绑定可由管理员指定内部人员，服务端记录操作者并在换绑时作废旧身份令牌。`GET /admin/audit` 返回最近 200 条组织、接入应用及回调重发变更摘要，字段为 `occurredAt, actorId, action, target, reason`；不返回完整前后快照、联系方式或密钥。其他管理日志待相应写入功能接线。
 

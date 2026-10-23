@@ -22,8 +22,37 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     /// <param name="input">管理端校验过的登记资料。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>只显示一次的 API Key 与签名密钥。</returns>
-    public async Task<ClientAppSecretsDto> CreateAsync(CreateClientAppInput input,
-        CancellationToken cancellationToken = default)
+    public Task<ClientAppSecretsDto> CreateAsync(CreateClientAppInput input,
+        CancellationToken cancellationToken = default) =>
+        CreateCoreAsync(input, null, null, default, cancellationToken);
+
+    /// <summary>
+    /// 本地管理员登记接入应用，并在同一事务记录脱敏操作摘要。
+    /// </summary>
+    /// <param name="input">应用登记资料。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">登记原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>只显示一次的新密钥。</returns>
+    public Task<ClientAppSecretsDto> CreateAdminAsync(CreateClientAppInput input, string actorId,
+        string reason, DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        ValidateAdminChange(actorId, reason);
+        return CreateCoreAsync(input, actorId, reason.Trim(), occurredAt, cancellationToken);
+    }
+
+    /// <summary>
+    /// 复用相同输入规则生成密钥，仅管理入口额外持久审计。
+    /// </summary>
+    /// <param name="input">应用登记资料。</param>
+    /// <param name="actorId">可空的管理员人员 ID。</param>
+    /// <param name="reason">可空的登记原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>只显示一次的新密钥。</returns>
+    private async Task<ClientAppSecretsDto> CreateCoreAsync(CreateClientAppInput input, string? actorId,
+        string? reason, DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
         Validate(input);
@@ -34,7 +63,7 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
 
         var apiKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         var signingSecret = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
-        await repository.CreateAsync(new ClientAppEntity
+        var entity = new ClientAppEntity
         {
             Code = input.Code,
             Name = input.Name,
@@ -47,7 +76,15 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
             ValidationUrl = input.ValidationUrl,
             AssigneeUrl = input.AssigneeUrl,
             ActionUrl = input.ActionUrl,
-        }, cancellationToken);
+        };
+        if (actorId is null)
+        {
+            await repository.CreateAsync(entity, cancellationToken);
+        }
+        else
+        {
+            await repository.CreateWithAuditAsync(entity, actorId, reason!, occurredAt, cancellationToken);
+        }
         return new ClientAppSecretsDto { Code = input.Code, ApiKey = apiKey, SigningSecret = signingSecret };
     }
 
@@ -75,7 +112,38 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     /// <param name="enabled">目标启用状态。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>异步操作。</returns>
-    public async Task SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default)
+    public Task SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default) =>
+        SetEnabledCoreAsync(code, enabled, null, null, default, cancellationToken);
+
+    /// <summary>
+    /// 本地管理员启停应用并记录原因与操作人员。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="enabled">目标启用状态。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">变更原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>异步操作。</returns>
+    public Task SetEnabledAdminAsync(string code, bool enabled, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        ValidateAdminChange(actorId, reason);
+        return SetEnabledCoreAsync(code, enabled, actorId, reason.Trim(), occurredAt, cancellationToken);
+    }
+
+    /// <summary>
+    /// 复用启停规则，只在管理员入口追加事务内审计。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="enabled">目标启用状态。</param>
+    /// <param name="actorId">可空的管理员人员 ID。</param>
+    /// <param name="reason">可空的变更原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>异步操作。</returns>
+    private async Task SetEnabledCoreAsync(string code, bool enabled, string? actorId, string? reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -89,7 +157,11 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
             return;
         }
 
-        if (!await repository.SetEnabledAsync(code, enabled, cancellationToken))
+        var changed = actorId is null
+            ? await repository.SetEnabledAsync(code, enabled, cancellationToken)
+            : await repository.SetEnabledWithAuditAsync(code, enabled, actorId, reason!, occurredAt,
+                cancellationToken);
+        if (!changed)
         {
             throw new UserFriendlyException(ErrorCodes.Conflict, "接入应用状态已变化，请刷新后重试。");
         }
@@ -101,8 +173,37 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     /// <param name="code">接入应用编码。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>只显示一次的新密钥。</returns>
-    public async Task<ClientAppSecretsDto> RotateSecretsAsync(string code,
-        CancellationToken cancellationToken = default)
+    public Task<ClientAppSecretsDto> RotateSecretsAsync(string code,
+        CancellationToken cancellationToken = default) =>
+        RotateSecretsCoreAsync(code, null, null, default, cancellationToken);
+
+    /// <summary>
+    /// 本地管理员轮换接入应用密钥，并在同一事务记录脱敏审计摘要。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">轮换原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>只显示一次的新密钥。</returns>
+    public Task<ClientAppSecretsDto> RotateSecretsAdminAsync(string code, string actorId,
+        string reason, DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        ValidateAdminChange(actorId, reason);
+        return RotateSecretsCoreAsync(code, actorId, reason.Trim(), occurredAt, cancellationToken);
+    }
+
+    /// <summary>
+    /// 复用同一密钥轮换逻辑，只在管理员入口追加事务内审计。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="actorId">可空的管理员人员 ID。</param>
+    /// <param name="reason">可空的轮换原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>只显示一次的新密钥。</returns>
+    private async Task<ClientAppSecretsDto> RotateSecretsCoreAsync(string code, string? actorId,
+        string? reason, DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -116,18 +217,40 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
 
         var apiKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         var signingSecret = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
-        var changed = await repository.UpdateSecretsAsync(new ClientAppEntity
+        var entity = new ClientAppEntity
         {
             Code = code,
             ApiKeyHash = HashKey(apiKey),
             SigningSecretCiphertext = protector.Protect(signingSecret),
-        }, cancellationToken);
+        };
+        var changed = actorId is null
+            ? await repository.UpdateSecretsAsync(entity, cancellationToken)
+            : await repository.UpdateSecretsWithAuditAsync(entity, actorId, reason!, occurredAt,
+                cancellationToken);
         if (!changed)
         {
             throw new UserFriendlyException(ErrorCodes.Conflict, "接入应用状态已变化，请刷新后重试。");
         }
 
         return new ClientAppSecretsDto { Code = code, ApiKey = apiKey, SigningSecret = signingSecret };
+    }
+
+    /// <summary>
+    /// 管理员应用变更必须具有可信操作者及可审阅的原因。
+    /// </summary>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">操作原因。</param>
+    private static void ValidateAdminChange(string actorId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(actorId))
+        {
+            throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录。");
+        }
+
+        if ((reason?.Trim().Length ?? 0) is < 2 or > 200)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "请填写 2 到 200 个字符的变更原因。");
+        }
     }
 
     /// <summary>

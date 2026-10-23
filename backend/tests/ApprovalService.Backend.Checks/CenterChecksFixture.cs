@@ -75,6 +75,18 @@ internal static class CenterChecksFixture
                 DefinitionJson = JsonSerializer.Serialize(definition, ApprovalJson.Options),
                 GraphJson = JsonSerializer.Serialize(graph, ApprovalJson.Options),
             });
+            // 最新发布版本更名不应改写既有审批单已锁定版本的字段名称。
+            definition.Data.Fields[0].Name = "新版金额";
+            db.FlowVersions.Add(new FlowVersionEntity
+            {
+                Id = "version-new",
+                FlowId = "flow",
+                Version = 2,
+                SchemaVersion = 1,
+                DefinitionJson = JsonSerializer.Serialize(definition, ApprovalJson.Options),
+                GraphJson = JsonSerializer.Serialize(graph, ApprovalJson.Options),
+            });
+            db.Flows.Local.Single(item => item.Id == "flow").PublishedVersionId = "version-new";
             AddInstance(db, "a-todo", "one", node.Id, "other", "viewer", EngineTaskStatuses.Pending, true);
             AddInstance(db, "b-cross", "two", node.Id, "other", "viewer", EngineTaskStatuses.Pending);
             AddInstance(db, "c-done", "one", node.Id, "other", "other", EngineTaskStatuses.Approved);

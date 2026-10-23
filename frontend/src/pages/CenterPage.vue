@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
 import { centerAdapter } from '../api/center-adapter.ts'
 import type { CenterActionInput } from '../api/center-adapter.ts'
-import { centerSession, loginCenter, logoutCenter } from '../api/center-session.ts'
+import { centerSession, exchangeCenterEmbed, loginCenter, logoutCenter } from '../api/center-session.ts'
+import { loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, takeEmbedTokenFromHash } from '../api/center-embed.ts'
+import type { CenterEmbedContext } from '../api/center-embed.ts'
 import { requestJson } from '../api/http.ts'
 import { ApiError } from '../api/http-types.ts'
 import UiEmptyState from '../components/ui/UiEmptyState.vue'
@@ -82,6 +84,21 @@ const authenticating = ref(false)
 
 const identityError = ref('')
 /**
+ * 初始片段令牌须在网络请求之前从浏览器历史中同步删除。
+ */
+let pendingEmbedToken: { token: string, cleanHash: string } | null = null
+try { pendingEmbedToken = takeEmbedTokenFromHash() } catch (cause) {
+  identityError.value = cause instanceof Error ? cause.message : '内嵌登录地址无效，请从业务系统重新打开。'
+}
+/**
+ * 一次性令牌正在兑换时暂缓普通登录与列表读取。
+ */
+const embedding = ref(Boolean(pendingEmbedToken))
+/**
+ * 仅嵌入 JWT 成功读取的服务端来源列表。
+ */
+let embedContext: CenterEmbedContext | null = null
+/**
  * 人工操作与批量同意的提交状态。
  */
 const actionBusy = ref(false)
@@ -112,7 +129,7 @@ async function load(): Promise<void> {
   items.value = []
   detail.value = null
   error.value = ''
-  if (!signedIn.value) { state.value = 'unavailable'; return }
+  if (!signedIn.value || embedding.value) { state.value = 'unavailable'; return }
   if (props.route.section === 'settings') { state.value = 'unavailable'; return }
   const current = new AbortController()
   request = current
@@ -125,11 +142,50 @@ async function load(): Promise<void> {
     if (request !== current || current.signal.aborted) return
     if (cause instanceof ApiError && cause.status === 401) {
       logoutCenter()
+      embedContext = null
       signedIn.value = false
       identityError.value = '登录已失效，请重新登录。'
     }
     state.value = 'error'
     error.value = cause instanceof Error ? cause.message : '审批中心暂时无法读取数据。'
+  }
+}
+
+/**
+ * 仅在有可信嵌入上下文和实际父窗口时发送完成提示。
+ * @param instanceId 服务端返回的审批单 ID。
+ * @param taskId 服务端返回的任务 ID。
+ */
+function notifyChanged(instanceId: string, taskId: string): void {
+  if (embedContext) postCenterChange(embedContext, document.referrer,
+    window.parent === window ? null : window.parent, instanceId, taskId)
+}
+
+/**
+ * 兑换一次性令牌并验证服务端声明的目标路由和嵌入来源。
+ * @returns 初始身份流程完成。
+ */
+async function establishEmbedSession(): Promise<void> {
+  const pending = pendingEmbedToken
+  if (!pending) return
+  pendingEmbedToken = null
+  logoutCenter()
+  signedIn.value = false
+  authenticating.value = true
+  try {
+    const tokens = await exchangeCenterEmbed(pending.token)
+    if (tokens.mustChangePassword) throw new Error('请先在审批中心完成首次改密，再从业务系统打开。')
+    if (!matchesEmbedTarget(tokens.targetPath, pending.cleanHash)) throw new Error('内嵌登录目标页面不匹配，请从业务系统重新打开。')
+    embedContext = await loadCenterEmbedContext()
+    signedIn.value = true
+  } catch (cause) {
+    logoutCenter()
+    embedContext = null
+    identityError.value = cause instanceof Error ? cause.message : '内嵌登录失败，请从业务系统重新打开。'
+  } finally {
+    authenticating.value = false
+    embedding.value = false
+    await load()
   }
 }
 
@@ -144,7 +200,8 @@ async function executeAction(taskId: string, input: CenterActionInput): Promise<
   actionBusy.value = true
   actionError.value = ''
   try {
-    await centerAdapter.executeAction(taskId, input)
+    const result = await centerAdapter.executeAction(taskId, input)
+    notifyChanged(result.instanceId, result.taskId)
     await load()
   } catch (cause) {
     actionError.value = cause instanceof Error ? cause.message : '审批操作失败，请刷新后重试。'
@@ -170,6 +227,9 @@ async function executeBatch(instanceIds: string[], opinion: string): Promise<voi
     const results = await centerAdapter.batchApprove(taskIds, opinion)
     const passed = results.filter(result => result.succeeded).length
     const failed = results.length - passed
+    for (const result of results) {
+      if (result.succeeded && result.instanceId) notifyChanged(result.instanceId, result.taskId)
+    }
     await load()
     batchMessage.value = `已同意 ${passed} 项；失败 ${failed} 项。${failed ? results.filter(result => !result.succeeded).map(result => `${result.taskId}：${result.message ?? '请刷新后重试'}`).join('；') : ''}`
   } catch (cause) {
@@ -188,6 +248,7 @@ async function signIn(): Promise<void> {
   authenticating.value = true
   identityError.value = ''
   try {
+    embedContext = null
     const tokens = await loginCenter(employeeNumber.value.trim(), password.value)
     mustChangePassword.value = tokens.mustChangePassword
     if (tokens.mustChangePassword) return
@@ -233,6 +294,7 @@ async function changeInitialPassword(): Promise<void> {
 function signOut(): void {
   request?.abort()
   logoutCenter()
+  embedContext = null
   signedIn.value = false
   items.value = []
   detail.value = null
@@ -240,6 +302,7 @@ function signOut(): void {
 }
 
 watch(() => [props.route.section, props.route.resourceId], () => { void load() }, { immediate: true })
+onMounted(() => { void establishEmbedSession() })
 onBeforeUnmount(() => request?.abort())
 </script>
 
@@ -247,10 +310,10 @@ onBeforeUnmount(() => request?.abort())
   <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><button v-if="signedIn" class="btn" type="button" @click="signOut">退出登录</button></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
   <div class="page-body center-page-body">
     <section v-if="!signedIn" class="center-card center-login">
-      <h2>{{ mustChangePassword ? '首次登录请修改密码' : '登录审批中心' }}</h2>
-      <p>使用已开通的工号和密码查看属于自己的审批记录。</p>
-      <form v-if="!mustChangePassword" @submit.prevent="signIn"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '登录中…' : '登录' }}</button></form>
-      <form v-else @submit.prevent="changeInitialPassword"><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '提交中…' : '修改密码' }}</button></form>
+      <h2>{{ embedding ? '正在验证内嵌身份' : mustChangePassword ? '首次登录请修改密码' : '登录审批中心' }}</h2>
+      <p>{{ embedding ? '正在确认一次性令牌及应用来源…' : '使用已开通的工号和密码查看属于自己的审批记录。' }}</p>
+      <form v-if="!embedding && !mustChangePassword" @submit.prevent="signIn"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '登录中…' : '登录' }}</button></form>
+      <form v-else-if="!embedding" @submit.prevent="changeInitialPassword"><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '提交中…' : '修改密码' }}</button></form>
       <p v-if="identityError" role="alert" class="center-login-error">{{ identityError }}</p>
     </section>
     <template v-else>

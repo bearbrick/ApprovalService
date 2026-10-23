@@ -22,6 +22,7 @@
 - `frontend/src/pages/center/`：待我处理、我已处理、抄送我的、我发起的（只看进度）；详情（按排版显示业务数据，或嵌入业务系统的原单；意见栏；时间线加流程图高亮；操作按钮）
 - `frontend/src/pages/CenterPage.vue`、`frontend/src/api/center-adapter.ts`、`frontend/src/api/center-session.ts`、`frontend/src/model/center.ts`、`frontend/tests/center-checks.ts`、`frontend/src/styles/center.css`：登录会话、中心接口映射、真实列表与详情、场景检查及页面样式
 - `frontend/src/api/center-actions.ts`：拆出中心 JWT 写请求，保持适配器单文件低于 500 行
+- `frontend/src/api/center-embed.ts`：内嵌令牌片段消费、登记来源读取及最小完成通知
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
@@ -57,6 +58,10 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · 完成已授权字段展示切片：中心列表新增 `summaryFieldDefinitions`、详情新增 `fieldDefinitions`，只从审批单锁定的发布版本及当前人员已裁剪的数据生成名称、种类和明细子列；即使流程新版本更名、当前查看者为历史参与人，隐藏字段名称不泄露。前端摘要显示发布名称，详情将明细数据绘成只读表格，不把明细对象直接渲染为 JSON；缺失展示定义时仍安全回退到已有可见字段编码。真实 SQLite/JWT 检查验证锁定版本、顶层及明细列隐藏，前端检查验证映射与表格数据。contracts、设计书 §center、前后端 README 同步。全量 `verify.ps1` 通过：后端 737、调用端 50、前端 130 项，构建零警告。完整自定义详情排版、附件、已读和个人设置仍未接入；没有新增依赖。
+- 2026-10-23 · Codex · 下一段共享文件登记：为发布版本中的已授权字段增加安全展示元数据，向后兼容地扩展 Contracts/Protocol/CenterResponses.cs，投影由 CenterProjection.cs 生成；同步 docs/contracts.md、设计书 §center/§api，前端 model/center.ts、center-adapter.ts 与 CenterDetailView.vue 接入字段名称及结构化明细，并在 CenterQueryChecks.cs/center-checks.ts 验证隐藏字段名称不泄露。T-052 的内嵌共享文档修改与本段按不同小节集成，暂不改其 HTML/CSP 文件。
+- 2026-10-23 · Codex · 完成 T-011 前端内嵌会话切片：合法中心地址中的 `embedToken` 在网络请求前从当前地址及历史条目同步清除，重复或无效令牌也先清除；兑换结果必须绑定清理后的目标路由，随后用嵌入 JWT 读取 `/api/v1/center/embed-context`。任务操作和逐项批量成功后，用服务端返回的审批单与任务 ID，仅向 referrer 精确匹配当前接入应用登记来源的父窗口发送 `{instanceId,taskId,status:"changed"}`，不传业务数据或令牌；普通登录、无 referrer 与未登记来源不发送。对应前端场景检查及 README 已同步；全量 `verify.ps1` 通过：后端 735、调用端 50、前端 129 项，前端类型检查与打包成功。T-052 独立分支负责后端 HTML 入口、CSP、同源托管与上述 embed-context 接口，本分支未实现或验收最终 iframe；字段标签、附件、已读、设置仍待续做。无新依赖、未用真实账号或密钥测试。
+- 2026-10-23 · Codex · 本轮追加范围登记：新增 frontend/src/api/center-embed.ts，改 CenterPage.vue/center-actions.ts/center-adapter.ts 和 center-checks.ts，完成 URL 片段中的一次性令牌即时清除、兑换、嵌入上下文来源核对、成功办理后的最小 postMessage；T-052 独立负责服务端 HTML 入口、CSP 与同源托管，双方约定 GET /api/v1/center/embed-context 仅嵌入 JWT 可读。无新增依赖。
 - 2026-10-23 · Codex · 本轮共享文件登记补充：Api/Program.cs 登记中心写路由、ApplicationServiceCollectionExtensions.cs 登记写用例、Contracts 的 Center 路由及响应添加向后兼容字段/模型，docs/contracts.md 与设计书 §center/§api 同步；前端 App.vue 不再改，CenterPage.vue 连接真实写适配。中心人员任务操作先按认证 JWT、嵌入应用、任务当前许可三重核对，再查可信组织及当前节点可编辑字段、执行同意前业务钩子，最终调用统一引擎；批量按任务独立返回结果。真实 SQLite/JWT/HTTP 检查覆盖评论成功、批量一成一败、无关人员/跨应用/未许可动作拒绝，前端检查覆盖只映射服务端许可和 JWT 写请求。当前仍未实现安全 iframe 最终 HTML 响应、嵌入令牌片段兑换、附件与字段标签/排版、读标记及个人设置；其中 iframe 的最终文档由独立 Vite 静态前端而非后端提供，仅 API 响应设置 CSP 无效，必须明确生产静态托管与开发服务如何对最终 HTML 施加每应用动态 frame-ancestors，不能假称仅靠 API CSP 已满足。新命令没有新增第三方依赖。
 - 2026-10-23 · Codex · 中心写接口使用的操作类型扩至办理完成、确认已阅、回复征询和暂存意见；T-012 尚待认领，已与总任务负责人确认可在此仅最小更新手机共享标签和对应检查，避免跨端类型检查失败，不扩展手机 UI。
 - 2026-10-23 · Codex · 用户已明确确认两项后续协议，解除此前 R13 阻塞：每应用登记允许嵌入来源，服务端设置 frame-ancestors；一次性令牌放 URL # 片段、兑换后立即清除、完成消息只发登记来源；详情由服务端返回当前人可执行操作，JWT 写入口调用统一引擎，批量逐项返回结果，前端只按许可显示。新增 ADR 0016/0017 已批准的落地范围，并与 T-020 负责人约定：本任务只改 ClientAppEntity 的 AllowedEmbedOriginsJson、EF 配置与迁移和中心页面安全使用，T-020 负责管理配置 API/UI；不碰其 IClientAppRepository / ClientAppRepository。

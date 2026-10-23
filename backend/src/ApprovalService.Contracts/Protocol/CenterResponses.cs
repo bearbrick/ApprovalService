@@ -147,6 +147,11 @@ public sealed class CenterInstanceResponse
     }
 
     /// <summary>
+    /// 与已裁剪摘要一一对应的发布版本字段名称和明细列，不含隐藏字段。
+    /// </summary>
+    public IReadOnlyList<CenterFieldDefinitionResponse> SummaryFieldDefinitions { get; set; } = [];
+
+    /// <summary>
     /// 当前登录人员可处理的待办 ID，仅表达当前任务关系。
     /// </summary>
     public IReadOnlyList<string> PendingTaskIds { get; set; } = [];
@@ -185,6 +190,11 @@ public sealed class CenterDetailResponse
     }
 
     /// <summary>
+    /// 与已裁剪详情数据一一对应的发布版本字段名称和明细列。
+    /// </summary>
+    public IReadOnlyList<CenterFieldDefinitionResponse> FieldDefinitions { get; set; } = [];
+
+    /// <summary>
     /// 当前与历史人工任务的只读展示。
     /// </summary>
     public IReadOnlyList<CenterTaskResponse> Tasks { get; set; } = [];
@@ -199,6 +209,32 @@ public sealed class CenterDetailResponse
     /// </summary>
     public IReadOnlyList<string> ActiveNodeIds { get; set; } = [];
 
+}
+
+/// <summary>
+/// 按可见数据键裁剪后的展示定义，名称取自本审批单锁定的发布版本。
+/// </summary>
+public sealed class CenterFieldDefinitionResponse
+{
+    /// <summary>
+    /// 本层字段编码。
+    /// </summary>
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 审批人可见的发布字段名称。
+    /// </summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 发布版本中的字段种类。
+    /// </summary>
+    public string Type { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 仅含已返回明细列的子定义。
+    /// </summary>
+    public IReadOnlyList<CenterFieldDefinitionResponse> Children { get; set; } = [];
 }
 
 /// <summary>

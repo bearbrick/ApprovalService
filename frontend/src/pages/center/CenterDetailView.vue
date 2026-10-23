@@ -155,7 +155,21 @@ watch(() => props.requestedId, () => { tab.value = 'data' })
       <div class="center-detail-grid">
         <div class="center-detail-primary">
           <nav class="center-detail-tabs" aria-label="审批详情页签"><button type="button" :aria-current="tab === 'data' ? 'page' : undefined" @click="tab = 'data'">审批数据</button><button type="button" :aria-current="tab === 'progress' ? 'page' : undefined" @click="tab = 'progress'">流程进度</button></nav>
-          <section v-if="tab === 'data'" class="center-card"><h3>业务数据快照</h3><dl v-if="detail.fields.length" class="center-data-grid"><div v-for="field in detail.fields" :key="field.key"><dt>{{ field.label }}</dt><dd>{{ field.value }}</dd></div></dl><p v-else class="center-blank">这张审批单没有可展示的业务字段。</p></section>
+          <section v-if="tab === 'data'" class="center-card">
+            <h3>业务数据快照</h3>
+            <dl v-if="detail.fields.length" class="center-data-grid">
+              <div v-for="field in detail.fields" :key="field.key" :class="{ 'center-data-table-field': field.rows }">
+                <dt>{{ field.label }}</dt>
+                <dd v-if="field.rows && field.columns?.length" class="center-data-table-scroll">
+                  <table class="center-data-table"><thead><tr><th v-for="column in field.columns" :key="column.key">{{ column.label }}</th></tr></thead>
+                    <tbody><tr v-for="(row, rowIndex) in field.rows" :key="rowIndex"><td v-for="(cell, columnIndex) in row" :key="columnIndex">{{ cell }}</td></tr></tbody>
+                  </table>
+                </dd>
+                <dd v-else>{{ field.value }}</dd>
+              </div>
+            </dl>
+            <p v-else class="center-blank">这张审批单没有可展示的业务字段。</p>
+          </section>
           <section v-if="tab === 'progress'" class="center-card"><h3>审批经过</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }} <span v-if="entry.occurredAt">· {{ entry.occurredAt }}</span></p><blockquote v-if="entry.opinion">{{ entry.opinion }}</blockquote></li></ol><p v-else class="center-blank">暂无可展示的流程记录。</p></section>
           <section class="center-card"><h3>附件</h3><ul v-if="detail.attachmentNames.length" class="center-attachment-list"><li v-for="name in detail.attachmentNames" :key="name">{{ name }} <span>下载与预览待权限接口接入</span></li></ul><p v-else class="center-blank">当前详情接口尚未返回附件信息。</p></section>
         </div>

@@ -1,5 +1,6 @@
 import { getJson } from './http.ts'
 import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
+import type { CenterActionResult } from './center-actions.ts'
 import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 import { centerAccessToken, centerSession } from './center-session.ts'
 import type { CenterAction, CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
@@ -89,6 +90,10 @@ interface CenterWireItem {
    */
   summary: Record<string, unknown>
   /**
+   * 仅包含摘要中已授权字段的发布定义。
+   */
+  summaryFieldDefinitions?: CenterWireFieldDefinition[]
+  /**
    * 当前人员可处理的任务标识。
    */
   pendingTaskIds: string[]
@@ -100,6 +105,28 @@ interface CenterWireItem {
    * 服务端确认可批量同意的任务 ID。
    */
   bulkApprovableTaskIds?: string[]
+}
+
+/**
+ * 服务端只为实际返回的数据键提供的发布字段元数据。
+ */
+interface CenterWireFieldDefinition {
+  /**
+   * 当前层字段编码。
+   */
+  key: string
+  /**
+   * 发布时的字段名称。
+   */
+  name: string
+  /**
+   * 发布时的字段种类。
+   */
+  type: string
+  /**
+   * 已授权的明细子字段。
+   */
+  children: CenterWireFieldDefinition[]
 }
 
 /**
@@ -209,6 +236,10 @@ interface CenterWireDetail {
    */
   data: Record<string, unknown>
   /**
+   * 仅包含详情数据已授权字段的发布定义。
+   */
+  fieldDefinitions?: CenterWireFieldDefinition[]
+  /**
    * 只读任务。
    */
   tasks: CenterWireTask[]
@@ -244,9 +275,9 @@ export interface CenterDataAdapter {
    * 使用当前 JWT 身份办理一项任务。
    * @param taskId 服务端返回的任务 ID。
    * @param input 任务命令。
-   * @returns 服务端完成时返回。
+   * @returns 服务端确认的任务和审批单 ID。
    */
-  executeAction(taskId: string, input: CenterActionInput): Promise<void>
+  executeAction(taskId: string, input: CenterActionInput): Promise<CenterActionResult>
   /**
    * 按任务 ID 逐项批量同意。
    * @param taskIds 服务端声明可批量同意的任务。
@@ -285,8 +316,22 @@ function isWireItem(value: unknown): value is CenterWireItem {
   return isObject(value) && ['id', 'serialNo', 'flowCode', 'flowName', 'businessKey', 'title', 'status', 'clientAppCode', 'initiatorId', 'startedAt']
     .every(key => typeof value[key] === 'string') && typeof value.isUrgent === 'boolean'
     && (value.endedAt === undefined || value.endedAt === null || typeof value.endedAt === 'string')
-    && isObject(value.summary) && Array.isArray(value.pendingTaskIds)
+    && isObject(value.summary)
+    && (value.summaryFieldDefinitions === undefined || isFieldDefinitions(value.summaryFieldDefinitions))
+    && Array.isArray(value.pendingTaskIds)
     && value.pendingTaskIds.every(id => typeof id === 'string')
+}
+
+/**
+ * 校验可选的发布字段元数据，不能让损坏结构进入展示层。
+ * @param value 服务响应中的字段定义。
+ * @returns 是否为完整字段定义数组。
+ */
+function isFieldDefinitions(value: unknown): value is CenterWireFieldDefinition[] {
+  return Array.isArray(value) && value.every(field => isObject(field) &&
+    typeof field.key === 'string' && typeof field.name === 'string' && typeof field.type === 'string' &&
+    Array.isArray(field.children) && field.children.every(child => isObject(child) &&
+      typeof child.key === 'string' && typeof child.name === 'string' && typeof child.type === 'string'))
 }
 
 /**
@@ -296,6 +341,7 @@ function isWireItem(value: unknown): value is CenterWireItem {
  */
 function isDetail(value: unknown): value is CenterWireDetail {
   return isObject(value) && isWireItem(value.instance) && isObject(value.data)
+    && (value.fieldDefinitions === undefined || isFieldDefinitions(value.fieldDefinitions))
     && Array.isArray(value.tasks) && value.tasks.every(task => isObject(task)
       && ['id', 'nodeId', 'nodeName', 'assigneeId', 'status'].every(key => typeof task[key] === 'string'))
     && Array.isArray(value.events) && value.events.every(event => isObject(event)
@@ -313,16 +359,29 @@ function displayValue(value: unknown): string {
   if (typeof value === 'string') return value
   if (typeof value === 'number') return String(value)
   if (typeof value === 'boolean') return value ? '是' : '否'
+  if (Array.isArray(value)) return `${value.length} 项`
   return JSON.stringify(value)
 }
 
 /**
- * 转换服务端已裁剪字段；未提供字段标签时使用字段编码，避免猜测定义。
+ * 按服务端已裁剪字段和发布名称构造只读文字或明细表。
  * @param data 已授权的数据对象。
+ * @param definitions 服务端返回的已授权字段元数据。
  * @returns 展示字段。
  */
-function fields(data: Record<string, unknown>): CenterDetailField[] {
-  return Object.entries(data).map(([key, value]) => ({ key, label: key, value: displayValue(value) }))
+function fields(data: Record<string, unknown>, definitions: readonly CenterWireFieldDefinition[] = []): CenterDetailField[] {
+  const byKey = new Map(definitions.map(definition => [definition.key, definition]))
+  return Object.entries(data).map(([key, value]) => {
+    const definition = byKey.get(key)
+    const result: CenterDetailField = { key, label: definition?.name || key,
+      value: Array.isArray(value) && definition?.type === 'detailTable' ? `${value.length} 条明细` : displayValue(value) }
+    if (Array.isArray(value) && definition?.type === 'detailTable' && definition.children.length) {
+      const columns = definition.children.map(child => ({ key: child.key, label: child.name || child.key }))
+      result.columns = columns
+      result.rows = value.filter(isObject).map(row => columns.map(column => displayValue(row[column.key])))
+    }
+    return result
+  })
 }
 
 /**
@@ -349,7 +408,7 @@ function action(code: string): CenterAction | null {
 function item(wire: CenterWireItem, section: CenterSection, tasks: readonly CenterWireTask[] = []): CenterItem {
   const pending = tasks.find(task => wire.pendingTaskIds.includes(task.id))
   const latest = tasks.at(-1)
-  const summary: CenterSummaryField[] = fields(wire.summary)
+  const summary: CenterSummaryField[] = fields(wire.summary, wire.summaryFieldDefinitions)
   const allowed = tasks.filter(task => task.allowedActions?.length).flatMap(task => task.allowedActions ?? [])
     .map(action).filter((code): code is CenterAction => code !== null)
   const bulkTaskIds = wire.bulkApprovableTaskIds ?? []
@@ -420,7 +479,7 @@ export const centerAdapter: CenterDataAdapter = {
       taskId: task.id, nodeName: task.nodeName,
       actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
     }))
-    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: fields(wire.data), timeline, attachmentNames: [] }
+    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: fields(wire.data, wire.fieldDefinitions), timeline, attachmentNames: [] }
   },
   executeAction: executeCenterAction,
   batchApprove: batchApproveCenter,

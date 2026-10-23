@@ -51,6 +51,11 @@
 .center-data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 20px; margin: 0; padding: 20px; }
 .center-data-grid dt, .center-meta dt { color: #8390a1; font-size: 12px; }
 .center-data-grid dd, .center-meta dd { margin: 5px 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.center-data-table-field { grid-column: 1 / -1; min-width: 0; }
+.center-data-table-scroll { max-width: 100%; overflow-x: auto; }
+.center-data-table { width: 100%; min-width: 360px; border-collapse: collapse; font-size: 13px; }
+.center-data-table th, .center-data-table td { padding: 10px 12px; border: 1px solid var(--line); text-align: left; }
+.center-data-table th { background: #f7f9fc; color: var(--muted); font-weight: 600; }
 .center-blank { padding: 24px 20px; color: var(--muted); }
 .center-meta { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 15px 8px; margin: 0; padding: 18px; }
 .center-meta dd { margin: 0; }

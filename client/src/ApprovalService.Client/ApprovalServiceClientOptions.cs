@@ -1,7 +1,7 @@
 namespace ApprovalService.Client;
 
 /// <summary>
-/// 客户端设置。
+/// 客户端设置。创建客户端时读取一次，之后修改设置不会影响已有客户端。
 /// </summary>
 public sealed class ApprovalServiceClientOptions
 {
@@ -22,7 +22,7 @@ public sealed class ApprovalServiceClientOptions
     }
 
     /// <summary>
-    /// 等待响应的超时，默认 30 秒。
+    /// 等待响应的超时，默认 30 秒；必须大于零，或使用无限超时。
     /// </summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 }

@@ -128,6 +128,8 @@ public sealed class DeadlineReminderOutboxHandler(IDbContextFactory<ApprovalDbCo
             Body = body,
             TargetPath = path,
             CreatedAt = payload.ScheduledAt,
+            Category = payload.ReminderKind == DeadlineReminderPlanner.BeforeDue
+                ? NotificationCategories.BeforeDue : NotificationCategories.Overdue,
         }, cancellationToken);
     }
 

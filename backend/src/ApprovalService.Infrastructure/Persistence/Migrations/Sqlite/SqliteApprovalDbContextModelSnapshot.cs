@@ -339,6 +339,21 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("SerialNumberCounters", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.DailyDigestSettingsEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LocalSendTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailyDigestSettings", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -375,6 +390,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasIndex("RecipientId", "CreatedAt");
 
                     b.ToTable("InAppNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.NotificationPreferenceEntity", b =>
+                {
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(48)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("InAppEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("PersonId", "Category");
+
+                    b.ToTable("NotificationPreferences", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>

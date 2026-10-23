@@ -32,6 +32,14 @@ public sealed class NotificationMessage
     public string ChannelCode { get; set; } = string.Empty;
 
     /// <summary>
+    /// 可选的订阅类别；为空的系统消息不按个人订阅过滤。
+    /// </summary>
+    public string? Category
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 内部收件人员 ID。
     /// </summary>
     public string RecipientId { get; set; } = string.Empty;

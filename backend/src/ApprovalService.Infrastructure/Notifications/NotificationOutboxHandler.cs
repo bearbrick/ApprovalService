@@ -10,7 +10,9 @@ namespace ApprovalService.Infrastructure.Notifications;
 /// 从持久待发项恢复通知内容，交给已登记的唯一渠道实现。
 /// </summary>
 /// <param name="channels">所有通知渠道。</param>
-public sealed class NotificationOutboxHandler(IEnumerable<INotificationChannel> channels) : IOutboxHandler
+/// <param name="settings">可选的个人订阅仓储。</param>
+public sealed class NotificationOutboxHandler(IEnumerable<INotificationChannel> channels,
+    INotificationSettingsRepository? settings = null) : IOutboxHandler
 {
     /// <inheritdoc />
     public string Kind => NotificationChannelCodes.Outbox;
@@ -23,6 +25,14 @@ public sealed class NotificationOutboxHandler(IEnumerable<INotificationChannel> 
         if (message.Id != item.Id)
         {
             throw new InvalidOperationException("待发通知 ID 与消息内容不一致。");
+        }
+
+        if (settings is not null && message.Category is not null &&
+            !await settings.IsEnabledAsync(message.RecipientId, message.Category, message.ChannelCode,
+                cancellationToken))
+        {
+            // 个人在排队后关闭提醒时，投递前最后一次按最新订阅判断。
+            return;
         }
 
         var matches = channels.Where(channel => channel.Code == message.ChannelCode).ToArray();

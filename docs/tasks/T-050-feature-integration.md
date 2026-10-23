@@ -3,7 +3,7 @@
 状态：进行中
 负责人：Codex 2026-10-23
 里程碑：M5
-依赖：T-006、T-014、T-046
+依赖：—（整合各任务已提交、待验收的稳定快照）
 设计书：§arch、§designer、§center、§integration、§stats
 
 ## 目标

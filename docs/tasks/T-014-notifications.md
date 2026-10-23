@@ -18,12 +18,19 @@
 - 提醒规则：新待办、被催办、快到期、超时、审批结果、被抄送、被 @；个人订阅设置
 - 将节点时限配置、实际任务起始时间与 T-029 工作日历接通；工作日历规则本身由 T-029 交付
 - 邮件库如果要新增依赖，按 R8 处理
+- `Application/Runtime/ApprovalRuntimeAppService.cs`、`Domain/Runtime/IApprovalRuntimeRepository.cs` 与 `Infrastructure/Persistence/ApprovalRuntimeRepository.cs`：在审批事务中依据实际任务和事件固定通知待发项与节点期限，避免提交后补扫丢失。
+- `Application/Notifications/`、`Infrastructure/Notifications/`、`Infrastructure/Jobs/`：通知规则、个人订阅、期限提醒和每日待办汇总；复用 T-030 渠道及持久队列，不新增邮件包。
+- `backend/tests/ApprovalService.Backend.Checks/NotificationRulesChecks*.cs`：真实 SQLite、假 SMTP 和工作日历场景。
+- `backend/README.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`：仅同步实际完成的通知行为。
 
 ## 共享文件
 
 改这些文件前先在交接记录里写明改什么；改动尽量小，单独成一个提交：
 
 - 登记文件
+- `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`：新服务或接口登记。
+- `backend/tests/ApprovalService.Backend.Checks/Program.cs`：登记通知规则检查。
+- `backend/src/ApprovalService.Contracts/**`、`docs/contracts.md`、`docs/architecture.md`：个人订阅和收件箱对外契约若变化时同步权威模型与文档。
 
 ## 验收标准
 
@@ -41,6 +48,7 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · T-007 已在 `537c200` 独立验收，T-029/T-030 已完成；本轮从 main 认领并合入固定已验证集成提交，登记上列运行提交、通知规则及共享文件。先做定义明确的新待办、催办、结果、抄送和 @ 通知；提前多久提醒及“每天早上”的默认时间设计未写明，不擅自猜测，留待具体实现前按 R13 处理。
 - 2026-10-22 · Codex · T-029 已增加按默认 09:00–18:00 或自定义工作时段累计 `DueMinutes` 的纯计算；本任务仍需提供日历/时区配置、在任务创建时写入 `DueAt`，并实现到期前与超时提醒。
 - 2026-10-20 · Codex · 工作日历与可复用日期规则拆到 T-029，本任务保留身份相关通知、渠道以及节点期限接线。
 

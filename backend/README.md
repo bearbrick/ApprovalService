@@ -96,6 +96,8 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 `GetDueAt` 从任务开始的实际时间点累计节点 `DueMinutes`，只计入工作日每天的工作时段，默认 09:00–18:00，也可以传 `WorkCalendarWorkingHours` 指定当天的起止时间。提前开始从当日开工起算；下班后、周末和节假日顺延到下个工作时段；恰好在下班时到期则保留该时刻。夏令时缺口中的时段边界顺延到第一个有效本地分钟，重复的开始边界取较早一次、结束边界取较晚一次，累计的是实际经过的分钟。通知任务负责提供日历配置、把结果写入任务期限并安排提醒。
 
+审批任务实际进入待办时，服务根据该审批单锁定的发布节点时限计算并保存 `DueAt`；依次审批中尚在排队的任务到激活时才开始计时，既有待办的期限不会因后续操作重新计算。部署配置 `ApprovalService:Notifications:Calendar` 可指定 `TimeZoneId`（默认 `Asia/Shanghai`）、`WorkingStart`/`WorkingEnd`（默认 `09:00`/`18:00`），以及 `Overrides` 中形如 `2026-10-01: false`、`2026-10-11: true` 的节假日和调休日期。无效时区、时间或日期会在启动时拒绝。到期前和超时提醒仍由后续持久定时通知规则接入。
+
 ## 持久化与后台任务
 
 流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。

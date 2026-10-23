@@ -389,6 +389,10 @@ public sealed class OperationState
     /// </summary>
     public Dictionary<string, JsonElement> CurrentApproverFieldValues { get; set; } = new(StringComparer.Ordinal);
     /// <summary>
+    /// 已成功完成的自动动作结果，按触发事件 ID 保存供最终结果回调使用。
+    /// </summary>
+    public Dictionary<string, JsonElement> ActionResults { get; set; } = new(StringComparer.Ordinal);
+    /// <summary>
     /// 管理员对尚未到达节点设置的审批人覆盖值。
     /// </summary>
     public Dictionary<string, string> AssigneeOverrides { get; set; } = new(StringComparer.Ordinal);

@@ -102,6 +102,8 @@ internal static class OpenApiChecksCallbacks
                 BusinessKey = "PO-2",
                 Status = EngineInstanceStatuses.Approved,
                 ApprovalDataJson = "{\"amount\":1}",
+                StateJson = JsonSerializer.Serialize(new EngineState { InstanceId = "source-instance" },
+                    ApprovalJson.Options),
             };
             var mappedEvents = new Dictionary<string, string>(StringComparer.Ordinal)
             {

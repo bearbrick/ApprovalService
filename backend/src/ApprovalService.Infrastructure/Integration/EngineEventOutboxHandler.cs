@@ -122,6 +122,7 @@ public sealed class EngineEventOutboxHandler(IApprovalRuntimeRepository reposito
                 InstanceId = item.InstanceId,
                 TokenId = source.TokenId,
                 RequestId = source.Id,
+                ActionResult = result.Result?.Clone(),
             },
             Context = context,
         }, cancellationToken);

@@ -141,6 +141,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 四类钩子按已采纳的 [ADR 0010](adr/0010-outbound-hook-protocol.md) 使用各应用分别登记的完整 URL、POST 小驼峰 JSON，默认 5 秒超时；可选校验地址未配置时跳过，必需的取数、取人和动作地址未配置时返回可纠正错误或保留待发项。审批服务用 `X-Approval-Signature` 对原始 UTF-8 请求体签名，业务系统须以同一密钥对原始响应字节签名并原样回显 `X-Request-Id`；审批服务在解析 JSON 前恒定时间验签并核对请求 ID。非 2xx、超时、网络故障、无效签名、请求 ID 或 JSON 均返回 `BUSINESS_HOOK_FAILED`；钩子明确拒绝返回 `VALIDATION_FAILED` 和业务原因。取数请求 `{flowCode,businessKey,requestId}`，响应 `{data:{…},title?,detailUrl?}` 且 `data` 必须为对象；校验请求 `{phase:"start"/"approve",flowCode,businessKey,instanceId?,taskId?,actor,data}`，响应 `{allowed,reason?}`，拒绝时 `reason` 必填。取人请求 `{flowCode,businessKey,nodeId,sourceValue?,initiator,data}`、响应 `{userIds:[…]}`；动作请求 `{eventId,actionCode,instanceId,flowCode,businessKey,data}`、响应 `{success,message?,result?}`。取数和校验在审批写事务前同步调用；取人于目标节点前取得；业务动作经提交后持久待发队列执行。取人只在纯引擎实际到达目标节点时调用，返回人员仅按当前接入应用已有绑定解析；失败不落部分审批状态。自动节点在事务内固定 `actionPending` 待发项，提交后由后台调用；业务响应 `success:false` 或网络故障保留事件并退避重试，`success:true` 后用原 `eventId` 幂等提交引擎结果，业务端也须据此去重。
 
+动作响应的可选 `result` 不改审批数据。成功时 `actionCompleted` 事件独立保存 `actionResult`，引擎状态按原动作 `eventId` 保存结果；后续审批终态回调在可选 `actionResults` 对象中按该 `eventId` 带出结果，`data` 仍是业务审批数据快照。无结果时省略 `actionResults`，重发回调使用首次入队时固定的正文。
+
 ## 流程定义 JSON
 
 流程顶层新增两个可省略的流程级审批操作策略，`schemaVersion` 仍为 `1`，旧定义与旧执行图不需要迁移：

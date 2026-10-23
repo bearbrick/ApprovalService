@@ -155,12 +155,21 @@ internal static class EngineScenarioChecks
         var pending = EngineRuntime.Execute(null, Command(EngineCommandKinds.Start, "action"), Context(action));
         check("自动节点产生待执行动作事件而不直接执行", pending.State.Tokens.Single().WaitingFor == "action" &&
             pending.Events.Any(item => item.Kind == "actionPending" && item.TargetCode == "make-order"));
-        var success = EngineRuntime.Execute(pending.State,
-            Command(EngineCommandKinds.ActionSucceeded, "action-ok", tokenId: pending.State.Tokens.Single().Id), Context(action));
+        var resultCommand = Command(EngineCommandKinds.ActionSucceeded, "action-ok",
+            tokenId: pending.State.Tokens.Single().Id);
+        resultCommand.ActionResult = System.Text.Json.JsonSerializer.SerializeToElement(new
+        {
+            orderNo = "PO-1"
+        });
+        var success = EngineRuntime.Execute(pending.State, resultCommand, Context(action));
         var failure = EngineRuntime.Execute(pending.State,
             Command(EngineCommandKinds.ActionFailed, "action-fail", tokenId: pending.State.Tokens.Single().Id), Context(action));
         check("动作结果命令分别推进或标记异常", success.State.Status == EngineInstanceStatuses.Approved &&
             failure.State.Status == EngineInstanceStatuses.Faulted);
+        check("自动动作结果独立进入事件和运行投影而不改原状态",
+            success.Events.Single(item => item.Kind == "actionCompleted").ActionResult?.GetProperty("orderNo").GetString() == "PO-1" &&
+            success.State.Operations.ActionResults["action-ok"].GetProperty("orderNo").GetString() == "PO-1" &&
+            pending.State.Operations.ActionResults.Count == 0);
 
         var child = Chain(FlowNodeTypes.Subprocess);
         child.Nodes.Single(item => item.Id == "n1").Subprocess = new FlowSubprocessSettings { FlowCode = "CHILD", WaitForCompletion = true };

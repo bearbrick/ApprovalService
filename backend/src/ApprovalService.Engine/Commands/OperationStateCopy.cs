@@ -41,6 +41,8 @@ internal static class OperationStateCopy
         DraftOpinions = new Dictionary<string, string>(source.DraftOpinions, StringComparer.Ordinal),
         CurrentApproverFieldValues = source.CurrentApproverFieldValues.ToDictionary(
             item => item.Key, item => item.Value.Clone(), StringComparer.Ordinal),
+        ActionResults = source.ActionResults.ToDictionary(item => item.Key, item => item.Value.Clone(),
+            StringComparer.Ordinal),
         AssigneeOverrides = new Dictionary<string, string>(source.AssigneeOverrides, StringComparer.Ordinal),
         CopyRecipients = new HashSet<string>(source.CopyRecipients, StringComparer.Ordinal),
         Consultations = source.Consultations.Select(item => new OperationConsultation

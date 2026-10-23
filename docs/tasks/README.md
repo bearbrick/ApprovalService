@@ -63,6 +63,8 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-043](T-043-confidential-visibility.md) | 保密流程与抄送收件人附件可见性 | 后端 + 契约镜像 | M3 | T-013、T-041、T-042 | Runtime、Files、Contracts/Flows、frontend/src/model |
 | [T-045](T-045-canvas-polish.md) | 自由画布走线与评审预览 | 前端 | M1 | T-009、T-011 | src/designer/canvas |
 | [T-046](T-046-bpmn-modeler.md) | 使用标准 BPMN 建模器替换自绘画布 | 前端 | M1 | T-009、T-045 | src/designer/canvas |
+| [T-049](T-049-reporting-foundation.md) | 报表真实事实读取基础 | 后端 | M5 | T-005、T-007 | Domain/Reporting、Infrastructure/Reporting |
+| [T-050](T-050-feature-integration.md) | 功能分支整合与统一验收 | 全部 | M5 | 已提交稳定快照 | backend、frontend、client、docs |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Administration;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Shared;
@@ -11,7 +12,9 @@ namespace ApprovalService.Application.Administration;
 /// </summary>
 /// <param name="organization">组织主数据仓储。</param>
 /// <param name="clientApps">接入应用仓储。</param>
-public sealed class AdminConsoleAppService(IOrganizationRepository organization, IClientAppRepository clientApps)
+/// <param name="adminQueries">管理端安全摘要仓储。</param>
+public sealed class AdminConsoleAppService(IOrganizationRepository organization, IClientAppRepository clientApps,
+    IAdminConsoleRepository adminQueries)
 {
     /// <summary>
     /// 读取部门、人员及所属关系并仅映射管理列表需要的字段。
@@ -73,6 +76,51 @@ public sealed class AdminConsoleAppService(IOrganizationRepository organization,
                 AllowedFlowCodes = JsonSerializer.Deserialize<string[]>(item.AllowedFlowCodesJson) ?? [],
                 IsEnabled = item.IsEnabled,
             }).ToArray();
+    }
+
+    /// <summary>
+    /// 读取业务系统人员及部门绑定，并将内部目标 ID 映射为当前组织名称。
+    /// </summary>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>安全绑定摘要。</returns>
+    public async Task<IReadOnlyList<AdminBindingResponse>> GetBindingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var bindings = await adminQueries.ListBindingsAsync(cancellationToken);
+        var master = await organization.LoadMasterDataAsync(cancellationToken);
+        var people = master.People.ToDictionary(item => item.Id, item => item.Name, StringComparer.Ordinal);
+        var departments = master.Departments.ToDictionary(item => item.Id, item => item.Name,
+            StringComparer.Ordinal);
+        return bindings.Select(item => new AdminBindingResponse
+        {
+            ClientAppCode = item.ClientAppCode,
+            Kind = item.Kind,
+            ExternalId = item.ExternalId,
+            InternalId = item.InternalId,
+            TargetName = item.Kind == "person" && people.TryGetValue(item.InternalId, out var person)
+                ? person : item.Kind == "department" && departments.TryGetValue(item.InternalId, out var department)
+                    ? department : "已删除对象",
+            Method = item.Method,
+        }).ToArray();
+    }
+
+    /// <summary>
+    /// 只读取最近 200 条组织及接入应用变更元数据，不暴露前后快照。
+    /// </summary>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>操作日志摘要。</returns>
+    public async Task<IReadOnlyList<AdminAuditResponse>> GetAuditAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var changes = await adminQueries.ListAuditAsync(200, cancellationToken);
+        return changes.Select(item => new AdminAuditResponse
+        {
+            OccurredAt = item.OccurredAt,
+            ActorId = item.ActorId,
+            Action = item.Kind,
+            Target = item.EntityKind + ":" + item.EntityId,
+            Reason = item.Reason,
+        }).ToArray();
     }
 
     /// <summary>

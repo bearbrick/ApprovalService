@@ -1,6 +1,6 @@
 import type { AdminViewData } from '../model/admin.ts'
-import { clientAppsViewData, directoryViewData } from '../model/admin-data.ts'
-import type { AdminClientApp, AdminDirectory } from '../model/admin-data.ts'
+import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData } from '../model/admin-data.ts'
+import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory } from '../model/admin-data.ts'
 import { ApiError, getJson, requestJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
 
@@ -38,7 +38,7 @@ export const adminAdapter: AdminDataAdapter = {
    * @inheritdoc
    */
   async loadView(viewKey: string, signal: AbortSignal): Promise<AdminViewData> {
-    if (!['overview', 'org/departments', 'org/people', 'apps/list'].includes(viewKey)) {
+    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs'].includes(viewKey)) {
       throw new AdminAdapterUnavailableError()
     }
     const token = await adminAccessToken()
@@ -54,12 +54,61 @@ export const adminAdapter: AdminDataAdapter = {
         || typeof item.isEnabled !== 'boolean')) throw new Error('接入应用列表响应不完整。')
       return clientAppsViewData(apps)
     }
+    if (viewKey === 'apps/bindings') {
+      const bindings = await getJson<AdminBinding[]>('/api/v1/admin/bindings', options)
+      if (!Array.isArray(bindings) || bindings.some(item => !item || typeof item.clientAppCode !== 'string'
+        || typeof item.kind !== 'string' || typeof item.externalId !== 'string'
+        || typeof item.internalId !== 'string' || typeof item.targetName !== 'string')) {
+        throw new Error('业务系统绑定响应不完整。')
+      }
+      return bindingsViewData(bindings)
+    }
+    if (viewKey === 'system/logs') {
+      const audit = await getJson<AdminAudit[]>('/api/v1/admin/audit', options)
+      if (!Array.isArray(audit) || audit.some(item => !item || typeof item.occurredAt !== 'string'
+        || typeof item.actorId !== 'string' || typeof item.action !== 'string'
+        || typeof item.target !== 'string')) throw new Error('操作日志响应不完整。')
+      return auditViewData(audit)
+    }
     const directory = await getJson<AdminDirectory>('/api/v1/admin/org/directory', options)
     if (!directory || !Array.isArray(directory.departments) || !Array.isArray(directory.people)) {
       throw new Error('组织目录响应不完整。')
     }
     return directoryViewData(viewKey, directory)
   },
+}
+
+/**
+ * 在已授权的管理页面中手工建立业务系统外部标识绑定。
+ * @param clientAppCode 接入应用编码。
+ * @param kind 人员或部门。
+ * @param externalId 业务系统外部标识。
+ * @param internalId 审批服务内部标识。
+ * @returns 保存完成。
+ */
+export async function saveAdminBinding(clientAppCode: string, kind: 'person' | 'department',
+  externalId: string, internalId: string): Promise<void> {
+  const token = await adminAccessToken()
+  await requestJson<unknown>('/api/v1/admin/org/bindings', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    body: { kind, externalId, internalId, employeeNumber: null, phone: null, method: 'manual', clientAppCode },
+  })
+}
+
+/**
+ * 加载绑定编辑器的应用与内部目标选项，两个查询都由管理员权限保护。
+ * @returns 可选择的应用和组织目录。
+ */
+export async function loadAdminBindingOptions(): Promise<{ apps: AdminClientApp[]; directory: AdminDirectory }> {
+  const token = await adminAccessToken()
+  const options = { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' as RequestCache }
+  const [apps, directory] = await Promise.all([
+    getJson<AdminClientApp[]>('/api/v1/admin/apps', options),
+    getJson<AdminDirectory>('/api/v1/admin/org/directory', options),
+  ])
+  if (!Array.isArray(apps) || !directory || !Array.isArray(directory.people)
+    || !Array.isArray(directory.departments)) throw new Error('绑定选项响应不完整。')
+  return { apps, directory }
 }
 
 /**

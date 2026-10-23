@@ -23,6 +23,11 @@
 .admin-origins-content select, .admin-origins-content textarea, .admin-origins-content input { width: 100%; min-height: 39px; padding: 8px 11px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
 .admin-origins-content textarea { resize: vertical; font-family: inherit; }
 .admin-origins-hint { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.admin-binding-panel { margin-bottom: 16px; }
+.admin-binding-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; padding: 18px 20px; }
+.admin-binding-content label { display: grid; gap: 7px; color: #46556b; font-size: 13px; }
+.admin-binding-content select, .admin-binding-content input { width: 100%; min-height: 39px; padding: 8px 11px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
+.admin-binding-content .admin-import-actions, .admin-binding-content p { grid-column: 1 / -1; }
 .admin-guard-note { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 16px; padding: 12px 16px; border: 1px solid #d8e5f7; border-radius: 5px; background: #f0f6ff; color: #375c8a; }
 .admin-guard-note strong { font-weight: 600; }
 .admin-tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -67,4 +72,4 @@
 .admin-intervention-grid textarea { resize: vertical; }
 .admin-intervention-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 20px; border-top: 1px solid var(--line); color: var(--muted); }
 @media (max-width: 1100px) { .admin-overview-grid { grid-template-columns: minmax(0, 1fr); } .admin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 650px) { .admin-page-body { padding-inline: 12px; } .admin-metrics, .admin-intervention-grid { grid-template-columns: minmax(0, 1fr); } .admin-panel-head { align-items: stretch; } .admin-panel-tools { justify-content: flex-start; } }
+@media (max-width: 650px) { .admin-page-body { padding-inline: 12px; } .admin-metrics, .admin-intervention-grid, .admin-binding-content { grid-template-columns: minmax(0, 1fr); } .admin-panel-head { align-items: stretch; } .admin-panel-tools { justify-content: flex-start; } }

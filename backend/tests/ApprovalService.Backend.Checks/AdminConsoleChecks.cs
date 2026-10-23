@@ -201,6 +201,54 @@ internal static class AdminConsoleChecks
                     !auditJson.Contains("sensitive-ciphertext", StringComparison.Ordinal) &&
                     !auditJson.Contains(new string('a', 64), StringComparison.Ordinal));
             }
+
+            using (var forbidden = await GetAuthorizedAsync(client, ApiRoutes.AdminBindings, viewer.AccessToken))
+            {
+                check("普通人员不能读取业务系统绑定", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var bound = await PostAuthorizedAsync(client, ApiRoutes.AdminOrgBindings,
+                new OrganizationBindingRequest("person", "erp-user-1", "viewer", null, null,
+                    "manual", "sample"), admin.AccessToken))
+            {
+                check("管理员可经现有绑定接口建立人员映射", bound.IsSuccessStatusCode);
+            }
+
+            using (var response = await GetAuthorizedAsync(client, ApiRoutes.AdminBindings, admin.AccessToken))
+            {
+                var bindings = await response.Content.ReadFromJsonAsync<AdminBindingResponse[]>();
+                var raw = await response.Content.ReadAsStringAsync();
+                check("管理员可读取带当前内部名称的业务系统绑定", response.IsSuccessStatusCode &&
+                    bindings?.Single().ClientAppCode == "sample" &&
+                    bindings.Single().ExternalId == "erp-user-1" &&
+                    bindings.Single().TargetName == "普通人员");
+                check("绑定列表不泄露人员联系方式和应用密钥",
+                    !raw.Contains("13900000000", StringComparison.Ordinal) &&
+                    !raw.Contains("sensitive-ciphertext", StringComparison.Ordinal));
+            }
+
+            // 人员重新绑定会推进令牌代际；再次登录后仍须由当前角色拒绝审计读取。
+            var viewerAfterBinding = await LoginAsync(client, "V001", "normal-viewer-password");
+            using (var forbidden = await GetAuthorizedAsync(client, ApiRoutes.AdminAudit,
+                viewerAfterBinding.AccessToken))
+            {
+                check("普通人员不能读取管理员操作日志", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var response = await GetAuthorizedAsync(client, ApiRoutes.AdminAudit, admin.AccessToken))
+            {
+                var audit = await response.Content.ReadFromJsonAsync<AdminAuditResponse[]>();
+                var raw = await response.Content.ReadAsStringAsync();
+                check("管理员操作日志只列出最近的组织及应用变更元数据和显式原因",
+                    response.IsSuccessStatusCode && audit?.Any(item => item.Action == "embedOriginsUpdated" &&
+                        item.ActorId == "admin" && item.Reason == "试点系统嵌入审批中心") == true &&
+                    audit.Any(item => item.Target == "personBinding:sample:erp-user-1"));
+                check("操作日志不返回人员联系方式、完整快照与应用密钥",
+                    !raw.Contains("13900000000", StringComparison.Ordinal) &&
+                    !raw.Contains("sensitive-ciphertext", StringComparison.Ordinal) &&
+                    !raw.Contains("beforeJson", StringComparison.OrdinalIgnoreCase) &&
+                    !raw.Contains("afterJson", StringComparison.OrdinalIgnoreCase));
+            }
         }
         finally
         {
@@ -249,6 +297,23 @@ internal static class AdminConsoleChecks
         UpdateAdminEmbedOriginsRequest body, string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = JsonContent.Create(body);
+        return await client.SendAsync(request);
+    }
+
+    /// <summary>
+    /// 使用管理员访问令牌建立业务系统绑定。
+    /// </summary>
+    /// <param name="client">进程内 HTTP 客户端。</param>
+    /// <param name="path">绑定接口地址。</param>
+    /// <param name="body">绑定请求。</param>
+    /// <param name="token">访问令牌。</param>
+    /// <returns>未释放的 HTTP 响应。</returns>
+    private static async Task<HttpResponseMessage> PostAuthorizedAsync(HttpClient client, string path,
+        OrganizationBindingRequest body, string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         request.Content = JsonContent.Create(body);
         return await client.SendAsync(request);

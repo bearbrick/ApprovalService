@@ -71,6 +71,16 @@ public static class ApiRoutes
     public const string AdminDirectory = OpenApiPrefix + "/admin/org/directory";
 
     /// <summary>
+    /// 组织管理员读取业务系统人员与部门绑定。
+    /// </summary>
+    public const string AdminBindings = OpenApiPrefix + "/admin/bindings";
+
+    /// <summary>
+    /// 组织管理员读取最近组织和接入应用变更的安全审计摘要。
+    /// </summary>
+    public const string AdminAudit = OpenApiPrefix + "/admin/audit";
+
+    /// <summary>
     /// 组织管理员读取不含密钥的接入应用摘要。
     /// </summary>
     public const string AdminClientApps = OpenApiPrefix + "/admin/apps";

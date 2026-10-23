@@ -141,6 +141,79 @@ public sealed class AdminClientAppResponse
 }
 
 /// <summary>
+/// 管理后台可见的业务系统外部 ID 绑定。
+/// </summary>
+public sealed class AdminBindingResponse
+{
+    /// <summary>
+    /// 接入应用编码。
+    /// </summary>
+    public string ClientAppCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// person 或 department。
+    /// </summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 业务系统外部 ID。
+    /// </summary>
+    public string ExternalId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 审批服务内部人员或部门 ID。
+    /// </summary>
+    public string InternalId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 当前内部目标名称，不含联系方式。
+    /// </summary>
+    public string TargetName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 绑定来源。
+    /// </summary>
+    public string Method { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// 管理后台可见的组织与接入应用操作日志摘要。
+/// </summary>
+public sealed class AdminAuditResponse
+{
+    /// <summary>
+    /// 操作时间。
+    /// </summary>
+    public DateTimeOffset OccurredAt
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 操作者 ID。
+    /// </summary>
+    public string ActorId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 操作类别。
+    /// </summary>
+    public string Action { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 对象类型及 ID。
+    /// </summary>
+    public string Target { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 明确填写的操作原因；其他变更为空。
+    /// </summary>
+    public string? Reason
+    {
+        get; set;
+    }
+}
+
+/// <summary>
 /// 接入应用的可信嵌入来源设置。
 /// </summary>
 public sealed class AdminEmbedOriginsResponse

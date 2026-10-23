@@ -25,6 +25,12 @@ internal static class AdminConsoleEndpoints
         app.MapGet(ApiRoutes.AdminDirectory, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetDirectoryAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapGet(ApiRoutes.AdminBindings, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
+            service.GetBindingsAsync(cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapGet(ApiRoutes.AdminAudit, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
+            service.GetAuditAsync(cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
         app.MapGet(ApiRoutes.AdminClientApps, (AdminConsoleAppService service, CancellationToken cancellationToken) =>
             service.GetClientAppsAsync(cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);

@@ -124,7 +124,7 @@ export const ADMIN_VIEWS: readonly AdminView[] = [
   { key: 'system/notifications', section: 'system', tab: 'notifications', title: '消息配置', description: '查看邮件与站内消息的渠道状态和提醒规则。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '发送测试邮件'] },
   { key: 'system/storage', section: 'system', tab: 'storage', title: '附件与字体', description: '查看附件存储和已授权字体配置，不回显连接密钥。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '上传字体'] },
   { key: 'system/security', section: 'system', tab: 'security', title: '安全设置', description: '查看登录方式、令牌与可信嵌入来源。', kind: 'settings', columns: [{ key: 'name', title: '设置项' }, { key: 'status', title: '状态' }], actions: ['保存安全设置'] },
-  { key: 'system/logs', section: 'system', tab: 'logs', title: '操作日志', description: '只读查看管理员操作与原因，记录由服务端追加和审计。', kind: 'audit', columns: [{ key: 'time', title: '时间' }, { key: 'actor', title: '操作人' }, { key: 'action', title: '操作' }, { key: 'target', title: '对象' }, { key: 'reason', title: '原因' }, { key: 'traceId', title: '链路编号' }], actions: [] },
+  { key: 'system/logs', section: 'system', tab: 'logs', title: '操作日志', description: '只读查看最近的组织及接入应用变更，记录由服务端追加和审计。', kind: 'audit', columns: [{ key: 'time', title: '时间' }, { key: 'actor', title: '操作人' }, { key: 'action', title: '操作' }, { key: 'target', title: '对象' }, { key: 'reason', title: '原因' }], actions: [] },
 ]
 
 /**

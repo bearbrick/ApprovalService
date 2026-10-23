@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "bpmn-js": "18.16.0",
     "vue": "3.5.43"
   },
   "devDependencies": {

@@ -1,0 +1,11 @@
+/* 保留 bpmn.io 许可标识，并用标签服务色系包裹标准建模器。 */
+.bpmn-stage { width: 100%; height: 100%; background: #f8faff; }
+.bpmn-stage.is-readonly .djs-container { pointer-events: none; }
+.bpmn-stage .djs-palette, .bpmn-stage .djs-context-pad { display: none; }
+.bpmn-stage .djs-container { background-image: radial-gradient(#dce5f3 0.75px, transparent 0.75px); background-size: 16px 16px; }
+.bpmn-stage .djs-visual text, .bpmn-stage .djs-label { font-family: 'Microsoft YaHei UI', 'PingFang SC', sans-serif; font-size: 12px; fill: #263b58; }
+.bpmn-stage .djs-element.approval-invalid .djs-visual > :first-child { stroke: #c3515a !important; stroke-width: 3px !important; }
+.bpmn-stage .djs-element.selected .djs-visual > :first-child { stroke: #1555d4 !important; stroke-width: 2.5px !important; }
+.bpmn-stage .bjs-powered-by { display: block !important; visibility: visible !important; opacity: 1 !important; z-index: 3; }
+.bpmn-editor .flow-canvas-help { z-index: 2; }
+.bpmn-editor .flow-canvas-controls { right: auto; left: 12px; z-index: 2; }

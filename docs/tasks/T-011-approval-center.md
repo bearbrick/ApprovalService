@@ -1,7 +1,7 @@
 # T-011 审批中心（电脑网页）
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-23
 里程碑：M3
 依赖：T-004、T-005、T-007
 设计书：§center、§rules
@@ -41,4 +41,4 @@
 
 ## 交接记录
 
-<!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
+- 2026-10-23 · Codex · 从 main 创建独立工作树和任务分支，认领后合入已验收 T-007 的稳定快照 `537c200`（包含 T-004、T-005），本轮先实现审批中心 JWT 只读四列表与详情。预登记范围：新增 Domain/Application/Infrastructure 的 Center 查询模块、Api/Endpoints/Center、Contracts/Protocol 的中心路由与响应、后端中心场景检查；共享登记涉及 Api/Program.cs、Application 与 Infrastructure 的 ServiceCollectionExtensions、检查 Program.cs、docs/contracts.md、docs/architecture.md；同步 backend/README.md 与设计书 §center/§api。不修改 Runtime/Persistence 实现，与 T-043 协调参与者投影，后续接入稳定版本。前端和审批写操作留待后续切片，不向前端提供 API Key。

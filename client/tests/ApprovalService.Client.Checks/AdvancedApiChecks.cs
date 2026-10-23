@@ -151,7 +151,7 @@ internal static class AdvancedApiChecks
         using var file = new MemoryStream(new byte[] { 1, 2, 3 });
         var uploaded = await client.UploadFileAsync("票据.png", file);
         check("附件上传发送原始字节和已编码文件名", path == "/prefix/api/v1/files?fileName=%E7%A5%A8%E6%8D%AE.png"
-            && apiKey == "app-key" && uploaded.Size == 3 && uploaded.Id == "f1");
+            && apiKey == "app-key" && uploaded.Size == 3 && uploaded.Id == "f1" && file.CanRead);
 
         var unlinked = await client.DownloadUnlinkedFileAsync("f1");
         check("对象存储跳转下载不转发应用密钥", unlinked.Content.SequenceEqual(new byte[] { 1, 2, 3 })

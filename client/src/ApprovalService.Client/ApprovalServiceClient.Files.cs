@@ -29,7 +29,7 @@ public sealed partial class ApprovalServiceClient
 
         var path = Relative(AuxiliaryPaths.Files) + "?fileName=" + Encode(fileName, nameof(fileName));
         using var request = new HttpRequestMessage(HttpMethod.Post, path);
-        request.Content = new StreamContent(content);
+        request.Content = new StreamContent(new NonClosingReadStream(content));
         request.Headers.TryAddWithoutValidation(Protocol.ApiKey, Required(apiKey ?? string.Empty, nameof(apiKey)));
         request.Headers.TryAddWithoutValidation(Protocol.RequestId, ValidRequestId(null));
         using var response = await SendFileRequestAsync(request, cancellationToken).ConfigureAwait(false);

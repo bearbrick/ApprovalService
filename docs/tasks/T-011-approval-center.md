@@ -41,4 +41,5 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · 为四列表和保密详情复用持久参与者，合入 T-043 固定已验证提交 `b3e3e8e`。唯一合并冲突为架构文档相邻段落，保留 T-044 已实现取人/自动动作说明，同时保留 T-043 参与者和附件可见性说明；不更改两者实现。当前代理原审批人依据设计书仍可查看和处理 pending 任务，已与 T-043 验证口径统一。
 - 2026-10-23 · Codex · 从 main 创建独立工作树和任务分支，认领后合入已验收 T-007 的稳定快照 `537c200`（包含 T-004、T-005），本轮先实现审批中心 JWT 只读四列表与详情。预登记范围：新增 Domain/Application/Infrastructure 的 Center 查询模块、Api/Endpoints/Center、Contracts/Protocol 的中心路由与响应、后端中心场景检查；共享登记涉及 Api/Program.cs、Application 与 Infrastructure 的 ServiceCollectionExtensions、检查 Program.cs、docs/contracts.md、docs/architecture.md；同步 backend/README.md 与设计书 §center/§api。不修改 Runtime/Persistence 实现，与 T-043 协调参与者投影，后续接入稳定版本。前端和审批写操作留待后续切片，不向前端提供 API Key。

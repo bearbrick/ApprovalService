@@ -1,4 +1,8 @@
+using System.Text.Json;
+using ApprovalService.Contracts;
+using ApprovalService.Contracts.Flows;
 using ApprovalService.Domain.Files;
+using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,21 +56,41 @@ public sealed class StoredFileRepository(IDbContextFactory<ApprovalDbContext> fa
         string? clientAppCode = null, CancellationToken cancellationToken = default)
     {
         await using var context = await factory.CreateDbContextAsync(cancellationToken);
-        if (clientAppCode is not null && !await context.Instances.AsNoTracking().AnyAsync(item =>
-                item.Id == instanceId && item.ClientAppCode == clientAppCode, cancellationToken))
+        var record = await (from instance in context.Instances.AsNoTracking()
+                            join version in context.FlowVersions.AsNoTracking()
+                                on instance.FlowVersionId equals version.Id
+                            where instance.Id == instanceId
+                            select new
+                            {
+                                instance.ClientAppCode,
+                                instance.InitiatorId,
+                                instance.SubmittedById,
+                                version.GraphJson,
+                            }).SingleOrDefaultAsync(cancellationToken);
+        if (record is null || clientAppCode is not null && record.ClientAppCode != clientAppCode)
         {
             return false;
         }
 
-        var isInitiator = await context.Instances.AsNoTracking().AnyAsync(item => item.Id == instanceId &&
-            (item.InitiatorId == userId || item.SubmittedById == userId), cancellationToken);
-        if (isInitiator)
+        if (record.InitiatorId == userId || record.SubmittedById == userId)
         {
             return true;
         }
 
+        if (await context.InstanceParticipants.AsNoTracking().AnyAsync(item =>
+                item.InstanceId == instanceId && item.PersonId == userId, cancellationToken))
+        {
+            return true;
+        }
+
+        var graph = JsonSerializer.Deserialize<FlowExecutionGraph>(record.GraphJson, ApprovalJson.Options)
+            ?? throw new InvalidOperationException("已发布流程版本缺少执行图。");
+        // 保密版本只允许当前待办人；历史实际处理人已由事件投影授权。
         return await context.ApprovalTasks.AsNoTracking().AnyAsync(item => item.InstanceId == instanceId &&
-            item.AssigneeId == userId, cancellationToken);
+            (!graph.IsConfidential && item.AssigneeId == userId ||
+                graph.IsConfidential && item.Status == EngineTaskStatuses.Pending &&
+                (item.AssigneeId == userId || item.DelegatedForId == userId)),
+            cancellationToken);
     }
 
     /// <inheritdoc />

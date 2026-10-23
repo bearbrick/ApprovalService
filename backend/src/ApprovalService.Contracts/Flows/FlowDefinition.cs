@@ -56,6 +56,14 @@ public sealed class FlowDefinition
     public List<string> AllowedInitiatorRoles { get; set; } = [];
 
     /// <summary>
+    /// 是否为仅参与人可见的保密流程；旧定义缺省为非保密。
+    /// </summary>
+    public bool IsConfidential
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 是否仅在首位人工处理人操作前允许发起人撤回；省略时审批结束前均可撤回。
     /// </summary>
     public bool WithdrawBeforeFirstDecision

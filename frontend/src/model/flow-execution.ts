@@ -17,6 +17,10 @@ export interface FlowExecutionGraph {
    */
   returnMode?: FlowReturnMode;
   /**
+   * 发布时固定的保密标记；旧图省略时为非保密。
+   */
+  isConfidential?: boolean;
+  /**
    * 运行节点。
    */
   nodes: FlowExecutionNode[];

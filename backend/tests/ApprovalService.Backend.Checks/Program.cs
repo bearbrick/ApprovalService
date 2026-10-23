@@ -79,6 +79,7 @@ internal static class Program
         await IdentityAppServiceChecks.RunAsync(Check);
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
+        await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);
         await FileChecks.RunAsync(backendRoot, Check);
         await ServerChecks.RunAsync(backendRoot, Check);

@@ -11,6 +11,19 @@ namespace ApprovalService.Infrastructure.Integration;
 public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> factory) : IClientAppRepository
 {
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ClientAppEntity>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await db.ClientApps.AsNoTracking().Select(item => new ClientAppEntity
+        {
+            Code = item.Code,
+            Name = item.Name,
+            AllowedFlowCodesJson = item.AllowedFlowCodesJson,
+            IsEnabled = item.IsEnabled,
+        }).ToArrayAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<ClientAppEntity?> FindByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);

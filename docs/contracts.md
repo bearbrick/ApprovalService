@@ -61,12 +61,15 @@
 | `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
+| `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
 
 `GET /api/v1/info` 的响应：
 
 ```json
 { "name": "ApprovalService", "version": "0.1.0", "apiVersion": "v1" }
 ```
+
+管理后台三个 GET 接口都要求本地密码会话和当前有效的 `organization-admin` 角色；匿名请求返回 401，普通人员或嵌入会话返回 403。`/admin/session` 返回 `{personId}`；`/admin/org/directory` 返回 `{departments, people}`，部门含 `id, code, name, parentName, managerName, source`，人员含 `id, employeeNumber, name, departments, position, isActive`，不包含联系方式和账号凭据；`/admin/apps` 返回应用数组，每项只含 `code, name, allowedFlowCodes, isEnabled`，不返回 API Key 摘要、签名密钥密文或出站地址。管理页使用访问令牌请求这些接口；组织 CSV/XLSX 导入继续使用既有 `/admin/org/import`，预检通过后正式导入时服务端再次校验并留变更记录。
 
 `GET /api/v1/flows` 和 `GET /api/v1/flows/{code}/schema` 需要 `X-Api-Key`。列表只包含当前已发布、接入应用已获授权且流程定义允许该应用使用的版本；无权限读取单个流程时返回 `FORBIDDEN`。列表项为 `{ "code": "PURCHASE", "name": "采购申请", "version": 3 }`。数据定义接口返回 `{ "flowCode": "PURCHASE", "version": 3, "data": { "fields": [], "summaryFields": [] }, "example": {} }`；`example` 按当前定义生成，不含计算字段和审批人填写字段。
 

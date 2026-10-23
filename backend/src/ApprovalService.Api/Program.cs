@@ -109,6 +109,7 @@ app.MapOpenInstanceCommandEndpoints();
 app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
+app.MapAdminConsoleEndpoints();
 app.MapFileEndpoints();
 
 if (bootstrapCommand)

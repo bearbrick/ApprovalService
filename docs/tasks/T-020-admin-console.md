@@ -42,4 +42,6 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · 认领后从 main 合入已验收的 T-007 基线，先接入管理员登录、权限校验、部门/人员与接入应用安全列表。拟修改共享文件：`backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs` 增加管理读取路由；`backend/src/ApprovalService.Api/Program.cs` 登记管理端点；`backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs` 登记管理用例；`backend/tests/ApprovalService.Backend.Checks/Program.cs` 登记场景检查；`docs/contracts.md` 与 `docs/architecture.md` 同步新管理读取接口。共享文件改动单独提交。正式页面的其它写入功能尚需逐项实现。
+
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

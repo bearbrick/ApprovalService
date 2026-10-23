@@ -6,6 +6,13 @@ namespace ApprovalService.Domain.Integration;
 public interface IClientAppRepository
 {
     /// <summary>
+    /// 读取管理列表需要的应用摘要；实现不得装载密钥列。
+    /// </summary>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>不含密钥的接入应用。</returns>
+    Task<IReadOnlyList<ClientAppEntity>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 按编码读取接入应用。
     /// </summary>
     /// <param name="code">应用编码。</param>

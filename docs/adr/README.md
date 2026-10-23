@@ -51,3 +51,5 @@
 | [0012](0012-miniexcel-organization-import.md) | 组织 Excel 导入导出使用 MiniExcel | 已采纳 |
 | [0013](0013-bound-user-id-for-open-api.md) | 开放接口只接受接入应用已绑定的人员 ID | 已采纳 |
 | [0014](0014-confidential-participant-visibility.md) | 保密流程按发布版本和实际参与记录控制附件可见性 | 已采纳 |
+| [0015](0015-embed-origin-and-token-handshake.md) | 按接入应用限制审批中心内嵌来源与一次性令牌交换 | 已采纳 |
+| [0016](0016-center-jwt-actions.md) | 审批中心使用人员 JWT 执行任务命令并返回逐项许可 | 已采纳 |

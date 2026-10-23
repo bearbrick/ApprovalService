@@ -1,6 +1,6 @@
 import type { AdminViewData } from '../model/admin.ts'
-import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData } from '../model/admin-data.ts'
-import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory } from '../model/admin-data.ts'
+import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData } from '../model/admin-data.ts'
+import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory, AdminOutbox } from '../model/admin-data.ts'
 import { ApiError, getJson, requestJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
 
@@ -38,7 +38,7 @@ export const adminAdapter: AdminDataAdapter = {
    * @inheritdoc
    */
   async loadView(viewKey: string, signal: AbortSignal): Promise<AdminViewData> {
-    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs'].includes(viewKey)) {
+    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'outbound/queue'].includes(viewKey)) {
       throw new AdminAdapterUnavailableError()
     }
     const token = await adminAccessToken()
@@ -70,12 +70,34 @@ export const adminAdapter: AdminDataAdapter = {
         || typeof item.target !== 'string')) throw new Error('操作日志响应不完整。')
       return auditViewData(audit)
     }
+    if (viewKey === 'outbound/queue') {
+      const outbox = await getJson<AdminOutbox[]>('/api/v1/admin/outbox', options)
+      if (!Array.isArray(outbox) || outbox.some(item => !item || typeof item.eventId !== 'string'
+        || typeof item.clientAppCode !== 'string' || typeof item.kind !== 'string'
+        || typeof item.status !== 'string' || typeof item.attempts !== 'number'
+        || typeof item.availableAt !== 'string')) throw new Error('待发队列响应不完整。')
+      return outboxViewData(outbox)
+    }
     const directory = await getJson<AdminDirectory>('/api/v1/admin/org/directory', options)
     if (!directory || !Array.isArray(directory.departments) || !Array.isArray(directory.people)) {
       throw new Error('组织目录响应不完整。')
     }
     return directoryViewData(viewKey, directory)
   },
+}
+
+/**
+ * 以原始事件 ID 手动重发回调并提交管理员填写的原因。
+ * @param eventId 原始回调事件 ID。
+ * @param reason 本次重发原因。
+ * @returns 重排完成。
+ */
+export async function retryAdminCallback(eventId: string, reason: string): Promise<void> {
+  const token = await adminAccessToken()
+  await requestJson<void>(`/api/v1/admin/callbacks/${encodeURIComponent(eventId)}/retry`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: { reason }, cache: 'no-store',
+  })
 }
 
 /**

@@ -86,6 +86,16 @@ public static class ApiRoutes
     public const string AdminAudit = OpenApiPrefix + "/admin/audit";
 
     /// <summary>
+    /// 组织管理员读取待发队列的安全摘要。
+    /// </summary>
+    public const string AdminOutbox = OpenApiPrefix + "/admin/outbox";
+
+    /// <summary>
+    /// 组织管理员按原事件 ID 手动重发回调。
+    /// </summary>
+    public const string AdminCallbackRetry = OpenApiPrefix + "/admin/callbacks/{eventId}/retry";
+
+    /// <summary>
     /// 组织管理员读取不含密钥的接入应用摘要。
     /// </summary>
     public const string AdminClientApps = OpenApiPrefix + "/admin/apps";

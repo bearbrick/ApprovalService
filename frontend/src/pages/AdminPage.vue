@@ -15,6 +15,7 @@ import AdminIntervention from './admin/AdminIntervention.vue'
 import AdminOrganizationImport from './admin/AdminOrganizationImport.vue'
 import AdminEmbedOriginsEditor from './admin/AdminEmbedOriginsEditor.vue'
 import AdminBindingEditor from './admin/AdminBindingEditor.vue'
+import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
 import '../styles/admin.css'
 
 /**
@@ -92,6 +93,15 @@ const originsOpen = ref(false)
  */
 const bindingOpen = ref(false)
 /**
+ * 回调手动重发面板的展开状态。
+ */
+const retryOpen = ref(false)
+/**
+ * 当前队列列表可供选择的回调事件 ID。
+ */
+const callbackEventIds = computed(() => [...new Set((data.value?.rows ?? [])
+  .filter(row => row.cells.kind === '回调').map(row => row.cells.eventId ?? '').filter(Boolean))])
+/**
  * 从已授权应用行提取来源配置所需的选择项。
  */
 const appOptions = computed(() => (data.value?.rows ?? []).map(row => ({
@@ -103,7 +113,8 @@ const appOptions = computed(() => (data.value?.rows ?? []).map(row => ({
 const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['导入组织']
   : view.value?.key === 'org/people' ? ['导入人员']
     : view.value?.key === 'apps/list' ? ['配置嵌入来源']
-      : view.value?.key === 'apps/bindings' ? ['新增绑定'] : [])
+      : view.value?.key === 'apps/bindings' ? ['新增绑定']
+        : view.value?.key === 'outbound/queue' ? ['重新投递'] : [])
 
 /**
  * 处理已接通的页面操作。
@@ -113,6 +124,7 @@ function handleAction(name: string): void {
   if (!enabledActions.value.includes(name)) return
   if (name === '配置嵌入来源') originsOpen.value = true
   else if (name === '新增绑定') bindingOpen.value = true
+  else if (name === '重新投递') retryOpen.value = true
   else importOpen.value = true
 }
 
@@ -196,7 +208,7 @@ async function load(): Promise<void> {
   }
 }
 
-watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; void load() }, { immediate: true })
+watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; retryOpen.value = false; void load() }, { immediate: true })
 onBeforeUnmount(() => request?.abort())
 </script>
 
@@ -209,7 +221,7 @@ onBeforeUnmount(() => request?.abort())
     <nav v-if="tabs.length" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
     <template v-if="view">
       <AdminOverview v-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
-      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminTable :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
+      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminTable :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>
     <p class="workspace-note">审批服务只管理流程与审批记录；业务单据由来源业务系统维护。</p>

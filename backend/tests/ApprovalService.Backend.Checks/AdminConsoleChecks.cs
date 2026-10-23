@@ -6,6 +6,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -81,6 +82,48 @@ internal static class AdminConsoleChecks
                         SigningSecretCiphertext = "sensitive-ciphertext",
                         AllowedFlowCodesJson = "[\"EXPENSE\"]",
                     });
+                    db.Flows.Add(new FlowEntity
+                    {
+                        Id = "flow",
+                        Code = "EXPENSE",
+                        Name = "费用",
+                        PublishedVersionId = "version",
+                    });
+                    db.FlowVersions.Add(new FlowVersionEntity
+                    {
+                        Id = "version",
+                        FlowId = "flow",
+                        Version = 1,
+                        SchemaVersion = 1,
+                        DefinitionJson = "{}",
+                        GraphJson = "{}",
+                    });
+                    db.Instances.Add(new InstanceEntity
+                    {
+                        Id = "instance",
+                        SerialNo = "EXP-1",
+                        FlowId = "flow",
+                        FlowVersionId = "version",
+                        FlowCode = "EXPENSE",
+                        BusinessKey = "B-1",
+                        Title = "费用申请",
+                        InitiatorId = "admin",
+                        ClientAppCode = "sample",
+                        Status = "approved",
+                        StateJson = "{}",
+                    });
+                    db.OutboxItems.Add(new OutboxItemEntity
+                    {
+                        Id = "outbox",
+                        InstanceId = "instance",
+                        EventId = "callback-event",
+                        Kind = "callback",
+                        PayloadJson = "{\"private\":\"business-payload\"}",
+                        Status = "completed",
+                        Attempts = 3,
+                        LastError = "TimeoutException",
+                        AvailableAt = DateTimeOffset.UtcNow.AddHours(-1),
+                    });
                     await db.SaveChangesAsync();
                 }
 
@@ -129,6 +172,48 @@ internal static class AdminConsoleChecks
                 check("接入应用列表不泄露 API Key 摘要和签名密钥密文",
                     !raw.Contains(new string('a', 64), StringComparison.Ordinal) &&
                     !raw.Contains("sensitive-ciphertext", StringComparison.Ordinal));
+            }
+
+            using (var forbidden = await GetAuthorizedAsync(client, ApiRoutes.AdminOutbox, viewer.AccessToken))
+            {
+                check("普通人员不能读取待发队列", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var response = await GetAuthorizedAsync(client, ApiRoutes.AdminOutbox, admin.AccessToken))
+            {
+                var queue = await response.Content.ReadFromJsonAsync<AdminOutboxResponse[]>();
+                var raw = await response.Content.ReadAsStringAsync();
+                check("管理员可读取所属应用、事件状态和错误类别", response.IsSuccessStatusCode &&
+                    queue?.Single().EventId == "callback-event" &&
+                    queue.Single().ClientAppCode == "sample" && queue.Single().Attempts == 3 &&
+                    queue.Single().ErrorCode == "TimeoutException");
+                check("队列摘要不泄露业务正文", !raw.Contains("business-payload", StringComparison.Ordinal));
+            }
+
+            var retryPath = ApiRoutes.AdminCallbackRetry.Replace("{eventId}", "callback-event",
+                StringComparison.Ordinal);
+            using (var invalid = await PostAuthorizedAsync(client, retryPath,
+                new AdminCallbackRetryRequest { Reason = "" }, admin.AccessToken))
+            {
+                check("回调手动重发必须填写原因", invalid.StatusCode == HttpStatusCode.BadRequest);
+            }
+
+            using (var retried = await PostAuthorizedAsync(client, retryPath,
+                new AdminCallbackRetryRequest { Reason = "试点故障后重新投递" }, admin.AccessToken))
+            {
+                check("管理员可用原事件 ID 重排回调", retried.StatusCode == HttpStatusCode.NoContent);
+            }
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var retryAudit = await db.OrganizationChanges.AsNoTracking()
+                    .SingleAsync(item => item.EntityKind == "callback" && item.EntityId == "callback-event");
+                check("回调重发以原事件 ID 记录管理员和原因且不含正文",
+                    retryAudit.ActorId == "admin" && retryAudit.Kind == "retried" &&
+                    retryAudit.AfterJson is { } json && json.Contains("reason", StringComparison.Ordinal) &&
+                    !json.Contains("business-payload", StringComparison.Ordinal));
             }
 
             var originsPath = ApiRoutes.AdminAppEmbedOrigins.Replace("{code}", "sample", StringComparison.Ordinal);
@@ -311,7 +396,7 @@ internal static class AdminConsoleChecks
     /// <param name="token">访问令牌。</param>
     /// <returns>未释放的 HTTP 响应。</returns>
     private static async Task<HttpResponseMessage> PostAuthorizedAsync(HttpClient client, string path,
-        OrganizationBindingRequest body, string token)
+        object body, string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);

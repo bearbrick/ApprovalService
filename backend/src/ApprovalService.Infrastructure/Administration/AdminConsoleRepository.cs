@@ -12,6 +12,26 @@ namespace ApprovalService.Infrastructure.Administration;
 public sealed class AdminConsoleRepository(IDbContextFactory<ApprovalDbContext> factory) : IAdminConsoleRepository
 {
     /// <inheritdoc />
+    public async Task<IReadOnlyList<AdminOutboxRecord>> ListOutboxAsync(int limit,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        return await (from item in db.OutboxItems.AsNoTracking()
+                      join instance in db.Instances.AsNoTracking() on item.InstanceId equals instance.Id
+                      orderby item.AvailableAt descending, item.Id descending
+                      select new AdminOutboxRecord
+                      {
+                          EventId = item.EventId,
+                          ClientAppCode = instance.ClientAppCode,
+                          Kind = item.Kind,
+                          Status = item.Status,
+                          Attempts = item.Attempts,
+                          AvailableAt = item.AvailableAt,
+                          ErrorCode = item.LastError,
+                      }).Take(limit).ToArrayAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<AdminBindingRecord>> ListBindingsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -60,12 +80,12 @@ public sealed class AdminConsoleRepository(IDbContextFactory<ApprovalDbContext> 
             EntityKind = item.EntityKind,
             EntityId = item.EntityId,
             Kind = item.Kind,
-            Reason = item.EntityKind == "clientApp" ? ReadReason(item.AfterJson) : null,
+            Reason = item.EntityKind is "clientApp" or "callback" ? ReadReason(item.AfterJson) : null,
         }).ToArray();
     }
 
     /// <summary>
-    /// 仅从本服务生成的接入应用审计数据中提取原因，其他快照内容不传出仓储。
+    /// 仅从本服务生成的接入应用或回调审计数据中提取原因，其他快照内容不传出仓储。
     /// </summary>
     /// <param name="json">审计数据快照。</param>
     /// <returns>显式填写的变更原因。</returns>

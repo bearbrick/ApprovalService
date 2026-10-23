@@ -34,4 +34,38 @@ public sealed class CallbackDeliveryAppService(ICallbackDeliveryRepository repos
             throw new UserFriendlyException(ErrorCodes.Conflict, "回调正在发送，请稍后重试。");
         }
     }
+
+    /// <summary>
+    /// 管理员带原因手动重发原事件回调，操作与原因在同一事务持久留痕。
+    /// </summary>
+    /// <param name="eventId">原始回调事件 ID。</param>
+    /// <param name="actorId">本地组织管理员人员 ID。</param>
+    /// <param name="reason">本次重发原因。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>异步操作。</returns>
+    public async Task ResendAdminAsync(string eventId, string actorId, string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(eventId) || string.IsNullOrWhiteSpace(actorId))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "回调事件和管理员身份不能为空。");
+        }
+
+        reason = reason?.Trim() ?? string.Empty;
+        if (reason.Length is < 2 or > 200)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "请填写 2 到 200 个字符的重发原因。");
+        }
+
+        if (!await repository.ExistsAsync(eventId, cancellationToken))
+        {
+            throw new UserFriendlyException(ErrorCodes.NotFound, "回调事件不存在。");
+        }
+
+        if (!await repository.RequeueWithAuditAsync(eventId, timeProvider.GetUtcNow(), actorId, reason,
+            cancellationToken))
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "回调正在发送，请稍后重试。");
+        }
+    }
 }

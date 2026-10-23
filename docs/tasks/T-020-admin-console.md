@@ -42,6 +42,10 @@
 
 ## 交接记录
 
+- 2026-10-23 · Codex · 第三切片接通 `GET /admin/outbox` 和 `POST /admin/callbacks/{eventId}/retry`：队列列表只投影最近 200 条待发项的安全元数据，管理员带 2–200 字原因原地重发回调；仍处于有效租约的回调拒绝重排，原事件 ID 和正文保持不变，重排与管理员审计在同一数据库事务内完成。新增真实 HTTP/SQLite 权限、正文隔离、原因和审计检查；待发页面可输入/选择事件 ID 重投，其它待发类型不能被该接口重发。全量 `verify.ps1` 通过，独立临时服务与外置 Chrome 已复核待发队列列表和重投面板，临时服务已停止。当前统计、系统配置、流程管理及应用密钥生命周期等页面仍待接线。
+
+- 2026-10-23 · Codex · 下一切片接通待发队列安全列表与已批准的回调原事件重发。拟改共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`docs/contracts.md`；列表只投影状态、次数、错误类别和所属应用，绝不返回正文，手动重发保留 eventId、要求原因并在同一事务记管理员审计。
+
 - 2026-10-23 · Codex · 第二切片已接通 `GET /admin/bindings` 和 `GET /admin/audit` 两个仅本地组织管理员可读的安全摘要；绑定页可选择应用、人员/部门和外部 ID 调用原有受保护手工绑定接口，操作日志页展示最近 200 条组织/应用变更且不发送原始前后快照。后端用真实 HTTP/SQLite 验证权限、换绑令牌代际及不泄露联系方式和密钥；前端安全列和类型检查通过。用独立临时 SQLite 服务及外置 Google Chrome 复核了登录、绑定编辑器和操作日志页面，布局与导航正常；临时服务已停止。共享路由、DI 注册及契约文档已同步。系统日志目前只覆盖组织和应用变更，其它模块须在各自写入接线时补审计。
 
 - 2026-10-23 · Codex · 下一切片补管理端业务系统绑定列表与手工绑定页面、组织及接入应用操作日志安全摘要。拟改共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`docs/contracts.md`，仅添加路由、只读仓储注册和契约说明；已有绑定写入接口沿用原权限及事务审计。

@@ -69,6 +69,68 @@ public sealed class ClientAppAppService(IClientAppRepository repository, IIntegr
     }
 
     /// <summary>
+    /// 供已授权管理用例启用或停用应用，实际状态切换使旧嵌入会话永久失效。
+    /// </summary>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="enabled">目标启用状态。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>异步操作。</returns>
+    public async Task SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用编码不能为空。");
+        }
+
+        var app = await repository.FindByCodeAsync(code, cancellationToken) ??
+            throw new UserFriendlyException(ErrorCodes.NotFound, "接入应用不存在。");
+        if (app.IsEnabled == enabled)
+        {
+            return;
+        }
+
+        if (!await repository.SetEnabledAsync(code, enabled, cancellationToken))
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "接入应用状态已变化，请刷新后重试。");
+        }
+    }
+
+    /// <summary>
+    /// 供已授权管理用例轮换应用密钥，同时作废既有嵌入会话。
+    /// </summary>
+    /// <param name="code">接入应用编码。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>只显示一次的新密钥。</returns>
+    public async Task<ClientAppSecretsDto> RotateSecretsAsync(string code,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "接入应用编码不能为空。");
+        }
+
+        if (await repository.FindByCodeAsync(code, cancellationToken) is null)
+        {
+            throw new UserFriendlyException(ErrorCodes.NotFound, "接入应用不存在。");
+        }
+
+        var apiKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        var signingSecret = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+        var changed = await repository.UpdateSecretsAsync(new ClientAppEntity
+        {
+            Code = code,
+            ApiKeyHash = HashKey(apiKey),
+            SigningSecretCiphertext = protector.Protect(signingSecret),
+        }, cancellationToken);
+        if (!changed)
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "接入应用状态已变化，请刷新后重试。");
+        }
+
+        return new ClientAppSecretsDto { Code = code, ApiKey = apiKey, SigningSecret = signingSecret };
+    }
+
+    /// <summary>
     /// 将 API Key 转为只可比较的摘要。
     /// </summary>
     /// <param name="apiKey">原始密钥。</param>
@@ -174,7 +236,7 @@ public sealed class CreateClientAppInput
 }
 
 /// <summary>
-/// 密钥只在创建时返回，后续不能从数据库反查 API Key。
+/// 密钥只在创建或轮换时返回，后续不能从数据库反查 API Key。
 /// </summary>
 public sealed class ClientAppSecretsDto
 {

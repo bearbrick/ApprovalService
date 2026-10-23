@@ -1,5 +1,7 @@
+using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
 using ApprovalService.Application.Organization;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
@@ -40,6 +42,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IOrganizationAppService, OrganizationAppService>();
         services.AddScoped<IOrganizationLookupAppService, OrganizationLookupAppService>();
         services.AddScoped<IIdentityAppService, IdentityAppService>();
+        services.AddScoped<INotificationAppService, NotificationAppService>();
+        services.AddScoped<IFileAppService, FileAppService>();
         return services;
     }
 }

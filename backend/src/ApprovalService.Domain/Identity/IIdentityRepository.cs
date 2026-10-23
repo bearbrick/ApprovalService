@@ -26,14 +26,14 @@ public interface IIdentityRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 核对嵌入会话的应用仍启用且外部人员绑定仍指向签发时的人员。
+    /// 读取仍启用且外部人员绑定未变的应用身份代际。
     /// </summary>
     /// <param name="clientAppCode">接入应用编码。</param>
     /// <param name="externalUserId">外部人员 ID。</param>
     /// <param name="personId">令牌绑定的内部人员 ID。</param>
     /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>应用和绑定均有效为真。</returns>
-    Task<bool> IsEmbedSubjectActiveAsync(string clientAppCode, string externalUserId, string personId,
+    /// <returns>当前应用身份代际；停用或绑定失效时为空。</returns>
+    Task<long?> FindActiveEmbedSubjectGenerationAsync(string clientAppCode, string externalUserId, string personId,
         CancellationToken cancellationToken = default);
 
     /// <summary>

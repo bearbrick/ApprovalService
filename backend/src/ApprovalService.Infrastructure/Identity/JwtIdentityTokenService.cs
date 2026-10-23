@@ -45,6 +45,11 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
     public const string ExternalUserIdClaim = "externalUserId";
 
     /// <summary>
+    /// 嵌入会话签发时的应用身份代际声明名称。
+    /// </summary>
+    public const string AuthGenerationClaim = "authGeneration";
+
+    /// <summary>
     /// 本地密码会话的声明值。
     /// </summary>
     public const string LocalSessionKind = "local";
@@ -89,7 +94,7 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
 
     /// <inheritdoc />
     public string Issue(string personId, long tokenVersion, bool mustChangePassword, string? clientAppCode,
-        string? externalUserId,
+        string? externalUserId, long? authGeneration,
         DateTimeOffset issuedAt, DateTimeOffset expiresAt)
     {
         var claims = new List<Claim>
@@ -102,9 +107,19 @@ public sealed class JwtIdentityTokenService : IIdentityAccessTokenService
         };
         if (clientAppCode is not null)
         {
+            if (authGeneration is not > 0)
+            {
+                throw new InvalidOperationException("嵌入会话缺少应用身份代际。");
+            }
+
             claims.Add(new Claim(ClientAppCodeClaim, clientAppCode));
             claims.Add(new Claim(ExternalUserIdClaim, externalUserId ?? throw new InvalidOperationException(
                 "嵌入会话缺少外部人员 ID。")));
+            claims.Add(new Claim(AuthGenerationClaim, authGeneration.Value.ToString(CultureInfo.InvariantCulture)));
+        }
+        else if (authGeneration is not null)
+        {
+            throw new InvalidOperationException("本地会话不能携带应用身份代际。");
         }
 
         return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor

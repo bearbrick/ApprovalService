@@ -133,7 +133,7 @@ internal static class OperationGuard
         }
 
         if (command.Kind is OperationKinds.Reassign or OperationKinds.Jump or
-            OperationKinds.Handover or OperationKinds.Resend)
+            OperationKinds.Handover or OperationKinds.ReassignInactive or OperationKinds.Resend)
         {
             if (!input.IsAdministrator)
             {
@@ -189,7 +189,8 @@ internal static class OperationGuard
                 OnBehalfOfId = input.ActorId == task?.AssigneeId ? task.DelegatorId : null,
                 Opinion = input.Opinion,
                 Reason = input.Reason,
-                TargetUserId = input.TargetUserId,
+                TargetUserId = input.TargetUserId ??
+                    (command.Kind == OperationKinds.ReassignInactive ? item.TargetCode : null),
                 MentionedUserIds = [.. input.MentionedUserIds],
                 FieldValues = input.FieldValues?.Clone(),
                 DataChanges = input.DataChanges?.Clone(),

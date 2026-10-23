@@ -44,6 +44,11 @@ public sealed class ClientAppEntity
     public bool IsEnabled { get; set; } = true;
 
     /// <summary>
+    /// 每次启停或轮换密钥时单调递增的嵌入身份代际。
+    /// </summary>
+    public long AuthGeneration { get; set; } = 1;
+
+    /// <summary>
     /// 审批结果回调地址。
     /// </summary>
     public string? CallbackUrl

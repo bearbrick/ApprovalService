@@ -1,8 +1,11 @@
+using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
+using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Organization;
 using Microsoft.EntityFrameworkCore;
 
@@ -135,6 +138,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<ClientAppEntity> ClientApps => Set<ClientAppEntity>();
 
     /// <summary>
+    /// 已投递的站内消息。
+    /// </summary>
+    public DbSet<InAppNotificationEntity> InAppNotifications => Set<InAppNotificationEntity>();
+
+    /// <summary>
     /// 审批编号的持久流水号。
     /// </summary>
     public DbSet<SerialNumberCounterEntity> SerialNumberCounters => Set<SerialNumberCounterEntity>();
@@ -143,6 +151,11 @@ public class ApprovalDbContext : DbContext
     /// 每次回调发送的结果日志。
     /// </summary>
     public DbSet<OutboundSendLogEntity> OutboundSendLogs => Set<OutboundSendLogEntity>();
+
+    /// <summary>
+    /// 数据库中的附件元数据，不含文件字节。
+    /// </summary>
+    public DbSet<StoredFileEntity> StoredFiles => Set<StoredFileEntity>();
 
     /// <inheritdoc />
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -222,6 +235,7 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired();
             entity.Property(item => item.ApiKeyHash).HasMaxLength(64).IsRequired();
             entity.Property(item => item.SigningSecretCiphertext).IsRequired();
+            entity.Property(item => item.AuthGeneration).HasDefaultValue(1L).IsRequired();
             entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
             entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
             entity.Property(item => item.DataUrl).HasMaxLength(2048);
@@ -337,8 +351,31 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Kind).HasMaxLength(64).IsRequired();
             entity.Property(item => item.Status).HasMaxLength(48).IsRequired();
             entity.Property(item => item.LeaseOwner).HasMaxLength(128);
+            entity.Property(item => item.LastError).HasMaxLength(200);
             entity.Property(item => item.Version).IsConcurrencyToken();
             entity.HasIndex(item => new { item.Status, item.DueAt, item.LeaseUntil });
+        });
+        NotificationModelConfiguration.Configure(modelBuilder);
+
+        modelBuilder.Entity<StoredFileEntity>(entity =>
+        {
+            entity.ToTable("StoredFiles");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasMaxLength(64);
+            entity.Property(item => item.FileName).HasMaxLength(255).IsRequired();
+            entity.Property(item => item.ContentType).HasMaxLength(100).IsRequired();
+            entity.Property(item => item.Sha256).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.StorageKind).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.StorageKey).HasMaxLength(512).IsRequired();
+            entity.Property(item => item.InstanceId).HasMaxLength(64);
+            entity.Property(item => item.UploadedById).HasMaxLength(128);
+            entity.Property(item => item.UploadedByClientAppCode).HasMaxLength(128);
+            entity.Property(item => item.CleanupOwner).HasMaxLength(64);
+            entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => new { item.StorageKind, item.StorageKey }).IsUnique();
+            entity.HasIndex(item => item.InstanceId);
+            entity.HasIndex(item => new { item.UploadedAt, item.CleanupLeaseUntil });
         });
     }
 }

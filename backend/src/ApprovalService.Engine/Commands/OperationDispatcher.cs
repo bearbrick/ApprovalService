@@ -140,6 +140,9 @@ internal static class OperationDispatcher
             case OperationKinds.Handover:
                 Handover(state, command, work);
                 break;
+            case OperationKinds.ReassignInactive:
+                InactiveAssigneeOperation.Reassign(state, command, context, work);
+                break;
             case OperationKinds.Jump:
                 Jump(state, command, context, work);
                 break;

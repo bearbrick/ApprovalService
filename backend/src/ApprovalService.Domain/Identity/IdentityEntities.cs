@@ -78,6 +78,13 @@ public sealed class RefreshTokenEntity
         get; set;
     }
     /// <summary>
+    /// 嵌入签发时的应用身份代际；本地会话和迁移前旧令牌为空。
+    /// </summary>
+    public long? AuthGeneration
+    {
+        get; set;
+    }
+    /// <summary>
     /// 签发时的令牌版本。
     /// </summary>
     public long TokenVersion
@@ -121,6 +128,20 @@ public sealed class EmbedTokenEntity
     /// 绑定的人员 ID。
     /// </summary>
     public string PersonId { get; set; } = string.Empty;
+    /// <summary>
+    /// 签发时账号的单调令牌版本，离职、复职或改绑后不允许兑换旧令牌。
+    /// </summary>
+    public long TokenVersion
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 签发时的应用身份代际；迁移前旧令牌为空且不可兑换。
+    /// </summary>
+    public long? AuthGeneration
+    {
+        get; set;
+    }
     /// <summary>
     /// 目标相对页面路径。
     /// </summary>

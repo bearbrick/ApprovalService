@@ -137,7 +137,7 @@ public static class AssigneeRuleEngine
     /// <param name="settings">节点规则。</param>
     /// <param name="snapshot">组织快照。</param>
     /// <returns>可用人员 ID，找不到时为空。</returns>
-    private static string ResolveInactive(string id, FlowApprovalSettings settings, AssigneeSnapshot snapshot)
+    internal static string ResolveInactive(string id, FlowApprovalSettings settings, AssigneeSnapshot snapshot)
     {
         var person = snapshot.People.SingleOrDefault(item => item.Id == id);
         if (person is null)

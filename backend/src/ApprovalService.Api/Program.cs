@@ -1,9 +1,11 @@
 using System.Globalization;
 using System.Security.Claims;
 using ApprovalService.Api.Endpoints;
+using ApprovalService.Api.Endpoints.Files;
 using ApprovalService.Api.Endpoints.OpenApi;
 using ApprovalService.Api.Hosting;
 using ApprovalService.Application;
+using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
@@ -13,7 +15,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 
-var builder = WebApplication.CreateBuilder(args);
+var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
+var migrateFiles = args.Contains("--migrate-files", StringComparer.Ordinal);
+var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args.Where(arg => arg != "--migrate-files").ToArray());
+if (bootstrapCommand)
+{
+    // 首次迁移会执行大量 SQL，控制台只保留告警，避免冲掉交互提示。
+    builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+}
 
 // 三层各一个注册入口（docs/architecture.md）；接口的 JSON 写法和 Contracts 的约定保持一致。
 builder.Services.AddApprovalApplication();
@@ -34,11 +43,25 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
                 var sessionKind = context.Principal?.FindFirstValue(JwtIdentityTokenService.SessionKindClaim);
                 var clientAppCode = context.Principal?.FindFirstValue(JwtIdentityTokenService.ClientAppCodeClaim);
                 var externalUserId = context.Principal?.FindFirstValue(JwtIdentityTokenService.ExternalUserIdClaim);
+                var generationText = context.Principal?.FindFirstValue(JwtIdentityTokenService.AuthGenerationClaim);
+                long? authGeneration = null;
+                if (generationText is not null)
+                {
+                    if (!long.TryParse(generationText, NumberStyles.None, CultureInfo.InvariantCulture,
+                        out var parsedGeneration))
+                    {
+                        context.Fail("访问令牌中的应用身份代际无效。");
+                        return;
+                    }
+
+                    authGeneration = parsedGeneration;
+                }
+
                 if (string.IsNullOrWhiteSpace(personId) ||
                     !long.TryParse(versionText, NumberStyles.None, CultureInfo.InvariantCulture, out var version) ||
                     !await context.HttpContext.RequestServices.GetRequiredService<IIdentityAppService>()
                         .ValidateAccessPrincipalAsync(personId, version, sessionKind, clientAppCode,
-                            externalUserId, context.HttpContext.RequestAborted))
+                            externalUserId, authGeneration, context.HttpContext.RequestAborted))
                 {
                     context.Fail("访问令牌已作废或人员已停用。");
                     return;
@@ -87,7 +110,29 @@ app.MapOpenTaskActionEndpoints();
 app.MapIdentityEndpoints();
 app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
+app.MapFileEndpoints();
 
+if (bootstrapCommand)
+{
+    if (args.Length != 1)
+    {
+        Console.Error.WriteLine("用法：dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    Environment.ExitCode = await BootstrapAdminCommand.RunAsync(app.Services);
+    return;
+}
+
+if (migrateFiles)
+{
+    // 命令模式不启动 HTTP 监听；先使目标数据库处于当前迁移版本，再搬运内容。
+    await using var scope = app.Services.CreateAsyncScope();
+    var moved = await scope.ServiceProvider.GetRequiredService<IFileMigrationService>().MigrateAsync();
+    Console.WriteLine($"已迁移 {moved} 个附件。");
+    return;
+}
 
 app.Run();
 

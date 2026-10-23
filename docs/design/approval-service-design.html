@@ -957,13 +957,14 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
         </ul>
         <p>初版接口提供 CSV、XLSX 模板与导入前预检查；同一模板可导入部门、人员、所属关系和每个接入应用的外部人员、部门 ID 绑定。文件上传上限 5 MB，Excel 最多 10,000 行。接入应用的 API Key 只能推送和绑定本应用来源的数据；跨来源绑定须由本地组织管理员确认。正式导入与推送在可串行化事务中按当前数据重新校验，每项改动在同一事务留下操作者、来源和前后快照，离职时生成交接提醒。</p>
         <h3>账号</h3>
+        <p>空库的首位组织管理员由部署人员在服务器本机控制台运行一次性命令开通：输入人员 ID、工号、姓名和临时密码，也可选用已导入的在职人员 ID。人员、需首次改密的账号及组织管理员角色在同一串行化事务中写入；已有管理员角色时命令拒绝再次执行，不开放匿名 HTTP 初始化接口。</p>
         <ul>
           <li>现在独立：人员开通账号后用工号和密码登录审批中心，首次登录要改密码；登录、改密码、权限沿用标签服务的做法。</li>
           <li>从业务系统进来不用再登录：业务系统后端用 SDK 签发嵌入令牌（几分钟有效，绑定用户和接入应用），打开待办、审批页面就是这个人。</li>
           <li>手机网页和以后的 App 用同一套登录令牌：短期访问令牌加刷新令牌，可以记住登录；手机丢了，管理员可以在后台把这个人的令牌全部作废。</li>
           <li>为统一登录预留：登录这一层按标准协议（OIDC）设计，公司统一登录上线后，审批服务和标签服务作为它的客户端接进去，账号按工号对上；到时候可以关掉本地密码登录。</li>
         </ul>
-        <p>初版访问令牌有效 15 分钟，刷新令牌有效 30 天并逐次轮换；连续 5 次密码错误暂时锁定 15 分钟。首次登录令牌只能用于改密。嵌入令牌由有效 API Key 为本应用已绑定的业务人员签发，5 分钟内只能交换一次，不按全局工号回退；嵌入会话及其刷新令牌保留应用和业务人员来源，应用停用或改绑即失效，不能获得组织管理权限。组织管理员权限以本地登录会话和当前组织角色共同核对。</p>
+        <p>初版访问令牌有效 15 分钟，刷新令牌有效 30 天并逐次轮换；连续 5 次密码错误暂时锁定 15 分钟。首次登录令牌只能用于改密。嵌入令牌由有效 API Key 为本应用已绑定且已开通本地账号的业务人员签发，5 分钟内只能交换一次，不按全局工号回退；嵌入会话及其刷新令牌保留应用和业务人员来源，应用停用或改绑即失效，不能获得组织管理权限。接入应用启停或轮换密钥时应用身份代际单调递增，旧嵌入访问、刷新和未兑换令牌在重新启用后仍无效，本地登录不受影响。可信人员离职、复职及外部人员绑定换人时，旧账号令牌代际不可恢复，尚未兑换的嵌入令牌也按签发代际核验。组织管理员权限以本地登录会话和当前组织角色共同核对。</p>
       </section>
 
       <!-- 12 -->
@@ -1053,28 +1054,33 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
           <li>待办列表接口带摘要字段和免登录打开地址。</li>
         </ul>
 
-        <h3>SDK 用法（示意，具体写法开发时定）</h3>
-<pre><code>var approval = new ApprovalClient(new ApprovalClientOptions
+        <h3>SDK 用法（首批开放接口）</h3>
+<pre><code>using var approval = new ApprovalServiceClient(new ApprovalServiceClientOptions
 {
     BaseAddress = new Uri("http://approval.example.com/"),
     ApiKey = Environment.GetEnvironmentVariable("APPROVAL_API_KEY"),
 });
 
-// 提交审批：只传单号，单据数据由审批服务回业务系统的取数接口取
-var instance = await approval.StartAsync(new StartRequest("PURCHASE_REQUEST", order.No) { Initiator = currentUser.Code });
+// 当前发起接口需传审批数据快照；只传单号取数待钩子协议确认。
+var instance = await approval.StartAsync(new StartApprovalRequest
+{
+    FlowCode = "PURCHASE_REQUEST", BusinessKey = order.No,
+    Title = order.Title, Initiator = currentUser.Code,
+    Data = new Dictionary&lt;string, object?&gt; { ["amount"] = order.Amount },
+});
 order.ApprovalId = instance.Id;
 
 // 登录后：当前用户的待办数，角标自己画
 var count = await approval.GetTaskCountAsync(currentUser.Code);
 todoBadge.Text = count.Pending.ToString();
 
-// 点开待办：拿免登录地址，用浏览器或 WebView2 打开审批中心的页面
-webView.Source = await approval.CreateOpenUrlAsync(taskId, currentUser.Code);
-
-// 回调（业务系统后端）：先验签，再改单据状态
-if (!ApprovalCallback.Verify(body, signatureHeader, callbackSecret)) return Results.Unauthorized();
-var e = ApprovalCallback.Parse(body);
-await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
+// 自画待办时读取列表；任务 ID 即使包含斜杠，SDK 也会正确编码。
+var tasks = await approval.GetTasksAsync(currentUser.Code);
+await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
+{
+    User = currentUser.Code, Action = "approve", Opinion = "同意",
+});</code></pre>
+        <p>已实现的 SDK 方法另含流程列表与数据定义、审批单按 ID 或业务单号查询、撤回和催办；免登录地址、回调验签及未确认协议由后续任务补齐。各操作仍由服务端核对人员绑定与权限。</p>
 
         <h3>审批人看得快</h3>
         <ul>
@@ -1108,7 +1114,7 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
       <!-- 13 -->
       <section id="api">
         <h2><span class="n">13</span>接口清单</h2>
-        <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。人员用工号，或者业务系统自己的用户 ID（绑定过的）。</p>
+        <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。代表人员调用的开放接口只接受当前接入应用已绑定的业务用户 ID；工号用于本地登录或管理员确认绑定。</p>
         <h3>审批服务提供的接口</h3>
         <div class="tw">
           <table>
@@ -1130,8 +1136,8 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
               <tr><td><code>GET /api/v1/tasks/count?user=</code></td><td>待办数量：待处理、加急、超时（业务系统登录时调）</td></tr>
               <tr><td><code>GET /api/v1/tasks?user=</code></td><td>待办列表，带摘要字段和打开地址</td></tr>
               <tr><td><code>POST /api/v1/tasks/{id}/actions</code></td><td>同意、拒绝、退回、转交、加签等（带意见和可编辑字段的值）</td></tr>
-              <tr><td><code>POST /api/v1/files</code></td><td>上传附件，返回文件 ID</td></tr>
-              <tr><td><code>GET /api/v1/files/{id}</code></td><td>下载附件（要权限）</td></tr>
+              <tr><td><code>POST /api/v1/files?fileName=…</code></td><td>接入应用 API Key 或可信人员会话上传原始文件字节；校验大小和真实类型后返回文件 ID、名称、大小、类型和 SHA-256</td></tr>
+              <tr><td><code>GET /api/v1/files/{id}</code></td><td>同应用可读取自己上传的未关联附件；已关联附件按人员权限验权下载，浏览器能访问对象存储时短时跳转，否则由服务转发</td></tr>
               <tr><td><code>POST /api/v1/embed-tokens</code></td><td>签发嵌入令牌，换成免登录打开地址（跳转、内嵌审批中心页面用）</td></tr>
               <tr><td><code>POST /api/v1/embed-tokens/exchange</code></td><td>一次性嵌入令牌换短期访问令牌和刷新令牌</td></tr>
               <tr><td><code>POST /api/v1/org/changes</code></td><td>推送人员、部门变更（新增、修改、调岗、离职）</td></tr>
@@ -1141,8 +1147,8 @@ await purchases.UpdateApprovalStatusAsync(e.BusinessKey, e.Status);</code></pre>
           <p>流程目录只返回当前已发布、接入应用获授权且流程定义允许该应用使用的版本；每项给出编码、名称、版本号。数据定义接口返回当前版本的字段定义与按同一字段生成的 JSON 样例，样例不含计算字段和审批人填写字段。</p>
           <p>审批单查询按 API Key 对应的接入应用隔离：按 ID 读取详情时返回状态、审批数据快照、任务和操作记录；按流程编码与业务单号读取时返回该应用的历史审批单列表，不透出其他接入应用的记录。</p>
           <p>待办数量和列表要求 <code>user</code> 是当前接入应用已绑定的在职业务人员 ID，不按全局工号回退。默认仅统计本应用的待办；接入应用获跨应用待办授权后可显式传 <code>scope=all</code>。列表按 <code>skip</code>、<code>take</code> 分页，每页最多一百条，摘要只包含流程版本指定且当前节点未显式隐藏的字段；重复字段权限在发布时拒绝。</p>
-          <p>当前发起接口要求已授权流程和本应用已绑定的在职发起人；可直接传审批数据快照，未传时由本应用登记的取数钩子取得。服务端按发布版本校验、重算公式与条件，调用已配置的发起校验钩子，再交统一引擎入口原子保存审批单和在途唯一键；业务钩子拒绝或故障时不写部分审批。同一应用的在途同号返回原审批单，其他应用占用同号只返回冲突。编号目前用可配置的部署级前缀、日期格式和流水号位数，数据库分配时保证不重号；流程级编号配置待管理后台接入。取人仅在引擎实际到达业务取人节点时调用，业务人员只按当前应用已有绑定解析，失败不写部分审批状态；自动动作先固定待发事件，审批事务提交后由后台调用，并以同一事件 ID 幂等回写结果。未配置的矩阵流程会给出可纠正错误。</p>
-          <p>当前已接通撤回、催办和人工任务操作：业务系统 Key 只能操作本应用审批单，实际操作人必须是本应用已绑定人员；撤回/催办只能由发起人发出。任务 ID 可能包含斜杠，放入 URL 时需编码。引擎继续核对节点权限、任务处理人及意见要求。发起自选人员和业务数据找人 ID 保存为固定快照；后续节点到达按最新组织与矩阵重新找人。开放终止的管理员权限语义仍待确认，暂未开放该路径。</p>
+          <p>当前发起接口要求已授权流程和本应用已绑定的在职发起人；可直接传审批数据快照，未传时由本应用登记的取数钩子取得。服务端按发布版本校验、重算公式与条件，调用已配置的发起校验钩子，再交统一引擎入口原子保存审批单和在途唯一键；业务钩子拒绝或故障时不写部分审批。顶层和明细附件须由该应用预先上传；发起时去重，并在同一数据库事务内按应用归属与未关联状态有条件地关联到新审批单。任一附件不存在、属于其他应用或已被占用，整笔发起回滚。同一应用的在途同号返回原审批单，其他应用占用同号只返回冲突。编号目前用可配置的部署级前缀、日期格式和流水号位数，数据库分配时保证不重号；流程级编号配置待管理后台接入。取人仅在引擎实际到达业务取人节点时调用，业务人员只按当前应用已有绑定解析，失败不写部分审批状态；自动动作先固定待发事件，审批事务提交后由后台调用，并以同一事件 ID 幂等回写结果。未配置的矩阵流程会给出可纠正错误。</p>
+          <p>撤回、催办、终止和人工任务操作已接通：业务系统 Key 只能操作本应用审批单，实际操作人必须是本应用已绑定人员；撤回/催办只能由发起人发出，终止必须提供原因。任务 ID 可能包含斜杠，放入 URL 时需编码。引擎继续核对节点权限、任务处理人及意见要求。发起自选人员和业务数据找人 ID 保存为固定快照；后续节点到达按最新组织与矩阵重新找人。</p>
           <p>人工任务操作可选传 <code>fieldValues</code> 对象填写顶层审批人字段；字段须在锁定流程定义中标为 <code>approverInput</code>，且当前节点明确授予 <code>editable</code> 权限。字段类型和本应用人员、部门绑定在服务端核对；明细子字段缺少行索引协议、附件缺少归属校验时明确拒绝。已核准值进入操作记录和相关回调的独立 <code>fieldValues</code>，不覆盖原业务数据 <code>data</code>，由业务系统决定回写。当前节点显式可写且标记必填的顶层审批人字段，只在同意、办理完成、确认已阅等成功推进时强制填写；拒绝、评论、暂存与协作操作不强制填写，提交的值仍须通过类型与授权校验。</p>
           <p>征询回复须引用原发问任务与征询 ID，受询人只能提交意见，不能借其他任务的字段权限填写审批人字段；原发问任务完成后即使其他节点仍在运行，也不能补交征询回复。退回发起人和要求补充分别发 <code>instance.returnedToInitiator</code>、<code>instance.supplementRequested</code> 回调，均保存当时的 <code>awaitingInitiator</code> 状态和独立的审批人填写值；待发正文固定，重试保持原事件 ID 与正文。</p>
           <p>所属业务系统以已绑定原发起人提交完整新数据时，审批服务按锁定版本重新校验字段和公式、刷新可信找人映射，再原子恢复审批。退回重提按发起时固定的策略从头或原节点继续，并清空审批人填写字段的当前值；要求补充恢复原任务且保留当前值。历史操作记录始终保留。审批单详情把当前审批人填写值放在独立的 <code>approverFieldValues</code>，不覆盖业务 <code>data</code>。</p>

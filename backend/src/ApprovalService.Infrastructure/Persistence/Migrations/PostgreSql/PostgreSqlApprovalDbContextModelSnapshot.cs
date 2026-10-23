@@ -22,11 +22,85 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("CleanupLeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CleanupOwner")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("LinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("StorageKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("UploadedById")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstanceId");
+
+                    b.HasIndex("StorageKind", "StorageKey")
+                        .IsUnique();
+
+                    b.HasIndex("UploadedAt", "CleanupLeaseUntil");
+
+                    b.ToTable("StoredFiles", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Identity.EmbedTokenEntity", b =>
                 {
                     b.Property<string>("TokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("bigint");
 
                     b.Property<string>("ClientAppCode")
                         .IsRequired()
@@ -53,6 +127,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .IsRequired()
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<long>("TokenVersion")
+                        .HasColumnType("bigint");
 
                     b.HasKey("TokenHash");
 
@@ -106,6 +183,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("ClientAppCode")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -157,6 +237,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.Property<string>("AssigneeUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
+
+                    b.Property<long>("AuthGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(1L);
 
                     b.Property<string>("CallbackUrl")
                         .HasMaxLength(2048)
@@ -257,6 +342,44 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasKey("Prefix", "DateBucket");
 
                     b.ToTable("SerialNumberCounters", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecipientId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("TargetPath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientId", "CreatedAt");
+
+                    b.ToTable("InAppNotifications", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
@@ -935,6 +1058,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
@@ -960,6 +1087,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasIndex("Status", "DueAt", "LeaseUntil");
 
                     b.ToTable("ScheduledJobs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>

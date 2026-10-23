@@ -35,13 +35,27 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
     }
 
     /// <inheritdoc />
-    public async Task UpdateSecretsAsync(ClientAppEntity app, CancellationToken cancellationToken = default)
+    public async Task<bool> UpdateSecretsAsync(ClientAppEntity app, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        var existing = await db.ClientApps.SingleOrDefaultAsync(item => item.Code == app.Code, cancellationToken)
-            ?? throw new InvalidOperationException("接入应用不存在，不能轮换密钥。");
-        existing.ApiKeyHash = app.ApiKeyHash;
-        existing.SigningSecretCiphertext = app.SigningSecretCiphertext;
-        await db.SaveChangesAsync(cancellationToken);
+        // 密钥与代际须在同一条 SQL 中更新，避免并发启停或轮换丢失版本。
+        var changed = await db.ClientApps.Where(item => item.Code == app.Code &&
+            item.AuthGeneration < long.MaxValue).ExecuteUpdateAsync(setters => setters
+            .SetProperty(item => item.ApiKeyHash, app.ApiKeyHash)
+            .SetProperty(item => item.SigningSecretCiphertext, app.SigningSecretCiphertext)
+            .SetProperty(item => item.AuthGeneration, item => item.AuthGeneration + 1), cancellationToken);
+        return changed == 1;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        var changed = await db.ClientApps.Where(item => item.Code == code &&
+            item.IsEnabled != enabled && item.AuthGeneration < long.MaxValue)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(item => item.IsEnabled, enabled)
+                .SetProperty(item => item.AuthGeneration, item => item.AuthGeneration + 1), cancellationToken);
+        return changed == 1;
     }
 }

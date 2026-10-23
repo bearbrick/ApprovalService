@@ -97,7 +97,6 @@ internal static class FlowDefinitionChecks
         check("BPMN 往返保留流程级撤回和重提策略",
             imported.WithdrawBeforeFirstDecision && imported.ReturnMode == FlowReturnModes.ReturnNode
             && FlowCompiler.Compile(imported).Graph is { WithdrawBeforeFirstDecision: true, ReturnMode: FlowReturnModes.ReturnNode });
-
         var duplicatePermissions = Copy(flows[0]);
         var permissionNode = duplicatePermissions.Canvas.Nodes.First(node => node.FieldPermissions.Count > 0);
         var permission = permissionNode.FieldPermissions.First();

@@ -81,9 +81,10 @@ public interface IIdentityAppService
     /// <param name="sessionKind">签名令牌的会话来源。</param>
     /// <param name="clientAppCode">嵌入会话绑定的接入应用；本地登录为空。</param>
     /// <param name="externalUserId">嵌入会话绑定的业务人员；本地登录为空。</param>
+    /// <param name="authGeneration">嵌入签发时的应用身份代际；本地登录为空。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>令牌仍有效为真。</returns>
     Task<bool> ValidateAccessPrincipalAsync(string personId, long tokenVersion, string? sessionKind,
-        string? clientAppCode, string? externalUserId,
+        string? clientAppCode, string? externalUserId, long? authGeneration = null,
         CancellationToken cancellationToken = default);
 }

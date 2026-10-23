@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     [DbContext(typeof(SqlServerApprovalDbContext))]
-    [Migration("20261020105226_AddOrganizationIdentity")]
-    partial class AddOrganizationIdentity
+    [Migration("20261022041309_AddFileClientAppOwnership")]
+    partial class AddFileClientAppOwnership
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,522 +25,75 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("ApprovalService.Domain.Identity.EmbedTokenEntity", b =>
-                {
-                    b.Property<string>("TokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("ClientAppCode")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ExternalUserId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("PersonId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("TargetPath")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)");
-
-                    b.HasKey("TokenHash");
-
-                    b.HasIndex("PersonId", "ExpiresAt");
-
-                    b.ToTable("EmbedTokens", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Identity.LocalAccountEntity", b =>
-                {
-                    b.Property<string>("PersonId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("FailedLogins")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LockedUntil")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("MustChangePassword")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("PasswordSalt")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<long>("TokenVersion")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("PersonId");
-
-                    b.HasIndex("LockedUntil");
-
-                    b.ToTable("LocalAccounts", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Identity.RefreshTokenEntity", b =>
-                {
-                    b.Property<string>("TokenHash")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("ClientAppCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<DateTime?>("ConsumedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ExternalUserId")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("PersonId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<long>("TokenVersion")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("TokenHash");
-
-                    b.HasIndex("PersonId", "ExpiresAt");
-
-                    b.ToTable("RefreshTokens", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Integration.ClientAppEntity", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("ActionUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.Property<string>("AllowedFlowCodesJson")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ApiKeyHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("AssigneeUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.Property<string>("CallbackUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.Property<bool>("CanViewAllTasks")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("DataUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.Property<bool>("IsEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("SigningSecretCiphertext")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("ValidationUrl")
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.HasKey("Code");
-
-                    b.HasIndex("ApiKeyHash")
-                        .IsUnique();
-
-                    b.ToTable("ClientApps", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Integration.OutboundSendLogEntity", b =>
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<int>("Attempt")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ClientAppCode")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("ErrorCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("EventId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<int?>("HttpStatus")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("SentAt")
+                    b.Property<DateTime?>("CleanupLeaseUntil")
                         .HasColumnType("datetime2");
 
-                    b.Property<bool>("Succeeded")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("TargetUrl")
-                        .IsRequired()
-                        .HasMaxLength(2048)
-                        .HasColumnType("nvarchar(2048)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventId", "Attempt");
-
-                    b.ToTable("OutboundSendLogs", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
-                {
-                    b.Property<string>("Id")
+                    b.Property<string>("CleanupOwner")
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.Property<string>("Code")
+                    b.Property<string>("ContentType")
                         .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
-                    b.Property<string>("DivisionLeaderIdsJson")
+                    b.Property<string>("FileName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("HeadPersonId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("ParentId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("TrustedSource")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Code")
-                        .IsUnique();
-
-                    b.ToTable("Departments", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.DepartureNoticeEntity", b =>
-                {
-                    b.Property<string>("PersonId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTime?>("AcknowledgedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("PendingTaskCount")
-                        .HasColumnType("int");
-
-                    b.HasKey("PersonId");
-
-                    b.ToTable("DepartureNotices", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.ExternalDepartmentBindingEntity", b =>
-                {
-                    b.Property<string>("ClientAppCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("ExternalDepartmentId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("DepartmentId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("Method")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("ClientAppCode", "ExternalDepartmentId");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.ToTable("ExternalDepartmentBindings", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.ExternalPersonBindingEntity", b =>
-                {
-                    b.Property<string>("ClientAppCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("ExternalUserId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("Method")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<string>("PersonId")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.HasKey("ClientAppCode", "ExternalUserId");
-
-                    b.HasIndex("PersonId");
-
-                    b.ToTable("ExternalPersonBindings", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.OrganizationChangeEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("ActorId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("AfterJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("BeforeJson")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("EntityId")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("EntityKind")
-                        .IsRequired()
-                        .HasMaxLength(48)
-                        .HasColumnType("nvarchar(48)");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(48)
-                        .HasColumnType("nvarchar(48)");
-
-                    b.Property<DateTime>("OccurredAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EntityKind", "EntityId", "OccurredAt");
-
-                    b.ToTable("OrganizationChanges", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.OrganizationRoleEntity", b =>
-                {
-                    b.Property<string>("Code")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.HasKey("Code");
-
-                    b.ToTable("OrganizationRoles", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.PersonDepartmentEntity", b =>
-                {
-                    b.Property<string>("PersonId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("DepartmentId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<bool>("IsPrimary")
-                        .HasColumnType("bit");
-
-                    b.HasKey("PersonId", "DepartmentId");
-
-                    b.HasIndex("DepartmentId");
-
-                    b.ToTable("PersonDepartments", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.PersonEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("EmployeeNumber")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("Grade")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<int>("GradeRank")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("ManagerId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("Position")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("TrustedSource")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<long>("Version")
-                        .IsConcurrencyToken()
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmployeeNumber")
-                        .IsUnique();
-
-                    b.HasIndex("Phone");
-
-                    b.ToTable("People", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Organization.PersonRoleEntity", b =>
-                {
-                    b.Property<string>("PersonId")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<string>("RoleCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.HasKey("PersonId", "RoleCode");
-
-                    b.HasIndex("RoleCode");
-
-                    b.ToTable("PersonRoles", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Runtime.ActiveInstanceKeyEntity", b =>
-                {
-                    b.Property<string>("FlowCode")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<string>("BusinessKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
 
                     b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("LinkedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Sha256")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
 
-                    b.HasKey("FlowCode", "BusinessKey");
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
 
-                    b.HasIndex("InstanceId")
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("StorageKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("UploadedById")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstanceId");
+
+                    b.HasIndex("StorageKind", "StorageKey")
                         .IsUnique();
 
-                    b.ToTable("ActiveInstanceKeys", (string)null);
+                    b.HasIndex("UploadedAt", "CleanupLeaseUntil");
+
+                    b.ToTable("StoredFiles", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>
@@ -772,7 +325,8 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasIndex("SerialNo")
                         .IsUnique();
 
-                    b.HasIndex("FlowCode", "BusinessKey");
+                    b.HasIndex("FlowCode", "BusinessKey")
+                        .IsUnique();
 
                     b.HasIndex("Status", "StartedAt");
 
@@ -937,6 +491,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasIndex("Status", "DueAt", "LeaseUntil");
 
                     b.ToTable("ScheduledJobs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>

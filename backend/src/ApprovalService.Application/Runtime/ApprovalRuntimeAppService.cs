@@ -5,6 +5,8 @@ using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Assignees;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
 
 namespace ApprovalService.Application.Runtime;
@@ -18,6 +20,40 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
     BusinessAssigneeAppService? businessAssignees = null) : IApprovalRuntimeAppService
 {
     /// <inheritdoc />
+    public Task<IReadOnlyList<DepartureTaskRef>> ListDepartureTasksAsync(string departedPersonId,
+        CancellationToken cancellationToken = default) =>
+        repository.ListDepartureTasksAsync(departedPersonId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<EngineResult> ReassignDepartedTaskAsync(DepartureTaskRef task, string departedPersonId,
+        AssigneeSnapshot snapshot, DateTimeOffset occurredAt, string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(departedPersonId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        return ExecuteAsync(new RuntimeCommandInput
+        {
+            Command = new EngineCommand
+            {
+                Kind = OperationKinds.ReassignInactive,
+                InstanceId = task.InstanceId,
+                TaskId = task.TaskId,
+                RequestId = requestId,
+                Operation = new OperationInput
+                {
+                    ActorId = "system:organization",
+                    RelatedId = departedPersonId,
+                    Reason = "人员离职或停用，按节点规则交接。",
+                    IsAdministrator = true,
+                },
+            },
+            Context = new EngineContext { OccurredAt = occurredAt, AssigneeSnapshot = snapshot },
+        }, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<EngineResult> ExecuteAsync(RuntimeCommandInput input, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -25,6 +61,13 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         ArgumentNullException.ThrowIfNull(input.Context);
 
         var command = input.Command;
+        if (input.FileLinks.Count > 0 &&
+            (command.Kind != EngineCommandKinds.Start || input.StartInstance is null ||
+                input.FileLinks.Any(link => link.ClientAppCode != input.StartInstance.ClientAppCode)))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "附件只能由所属接入应用在发起审批时关联。");
+        }
+
         RuntimeSnapshot? snapshot = null;
         FlowVersionEntity flowVersion;
         InstanceEntity instance;
@@ -185,6 +228,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             Tasks = tasks,
             Events = events,
             OutboxItems = outbox,
+            FileLinks = input.FileLinks,
         }, cancellationToken);
         if (!saved)
         {

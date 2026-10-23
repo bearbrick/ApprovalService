@@ -85,7 +85,8 @@ public sealed class OpenApprovalStartAppService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var data = OpenApprovalDataPreparer.Prepare(definition.Data, request.Data!.Value);
+        var prepared = OpenApprovalDataPreparer.PrepareWithAttachments(definition.Data, request.Data!.Value);
+        var data = prepared.Data;
         var context = await contextBuilder.BuildAsync(app.Code, definition, graph, request, initiatorId,
             data, now, cancellationToken);
         await hooks.ValidateAsync(app, new ValidationHookRequest
@@ -114,6 +115,12 @@ public sealed class OpenApprovalStartAppService(
                     Operation = new() { ActorId = submittedById ?? initiatorId },
                 },
                 Context = context,
+                FileLinks = prepared.AttachmentIds.Select(id => new RuntimeFileLink
+                {
+                    FileId = id,
+                    ClientAppCode = app.Code,
+                    LinkedAt = now,
+                }).ToArray(),
                 StartInstance = new InstanceEntity
                 {
                     Id = instanceId,

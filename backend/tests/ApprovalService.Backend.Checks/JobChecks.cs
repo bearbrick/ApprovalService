@@ -134,11 +134,18 @@ internal static partial class JobChecks
         var recovered = await afterRestart.ClaimNextAsync(now.AddMinutes(3), TimeSpan.FromMinutes(2));
         check("服务重启后过期的定时任务能继续执行", recovered is not null &&
             recovered.LeaseOwner != claim!.LeaseOwner);
-        check("定时任务失败后按退避重新排期", await afterRestart.FailAsync(recovered!, now.AddMinutes(3)) &&
+        check("定时任务失败后按退避重新排期", await afterRestart.FailAsync(recovered!, now.AddMinutes(3),
+                new string('E', 210)) &&
             await afterRestart.ClaimNextAsync(now.AddMinutes(7).AddSeconds(30), TimeSpan.FromMinutes(2)) is null);
         var retry = await beforeRestart.ClaimNextAsync(now.AddMinutes(8), TimeSpan.FromMinutes(2));
+        check("定时任务仅持久保留有界失败码", retry is not null && retry.LastError?.Length == 200);
         check("定时任务重试后可完成", retry is not null &&
             await beforeRestart.CompleteAsync(retry, now.AddMinutes(8)));
+        await using (var context = new ApprovalDbContext(options))
+        {
+            check("定时任务完成时清除过期失败码", await context.ScheduledJobs.AnyAsync(item =>
+                item.Id == "scheduled-one" && item.Status == JobStatuses.Completed && item.LastError == null));
+        }
     }
 
     /// <summary>

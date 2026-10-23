@@ -1,11 +1,14 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using ApprovalService.Application.Identity;
+using ApprovalService.Application.Integration;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Shared;
 using ApprovalService.Infrastructure.Identity;
+using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
@@ -61,7 +64,7 @@ internal static class IdentityAppServiceChecks
                 {
                     Code = "demo",
                     Name = "演示系统",
-                    ApiKeyHash = "test-key-hash",
+                    ApiKeyHash = ClientAppAppService.HashKey("initial-key"),
                     SigningSecretCiphertext = "test-ciphertext",
                 });
                 db.ExternalPersonBindings.Add(new ExternalPersonBindingEntity
@@ -139,11 +142,12 @@ internal static class IdentityAppServiceChecks
                 exchanged.PersonId == "person-1" && exchanged.TargetPath == "#/m/tasks" &&
                 await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(embed.Token), ErrorCodes.Unauthorized));
             var embedJwt = new JsonWebTokenHandler().ReadJsonWebToken(exchanged.AccessToken);
+            var initialGeneration = ReadAuthGeneration(embedJwt);
             var embedRefreshed = await service.RefreshAsync(exchanged.RefreshToken);
             var refreshedEmbedJwt = new JsonWebTokenHandler().ReadJsonWebToken(embedRefreshed.AccessToken);
             check("嵌入会话及刷新令牌始终绑定原接入应用，不能升级成本地管理员会话",
                 IsEmbedJwt(embedJwt, "demo", "external-1") &&
-                IsEmbedJwt(refreshedEmbedJwt, "demo", "external-1"));
+                IsEmbedJwt(refreshedEmbedJwt, "demo", "external-1") && initialGeneration == 1);
             var expiring = await service.CreateEmbedTokenAsync("demo", "external-1", "person-1", "#/m/tasks");
             clock.Advance(TimeSpan.FromMinutes(6));
             check("嵌入令牌过期后不能交换",
@@ -158,7 +162,7 @@ internal static class IdentityAppServiceChecks
 
             check("外部人员改绑后旧嵌入访问与刷新令牌均失效",
                 !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
-                    "demo", "external-1") &&
+                    "demo", "external-1", initialGeneration) &&
                 await FailsWithCodeAsync(() => service.RefreshAsync(embedRefreshed.RefreshToken),
                     ErrorCodes.Unauthorized));
             await using (var db = await factory.CreateDbContextAsync())
@@ -168,20 +172,62 @@ internal static class IdentityAppServiceChecks
                 await db.SaveChangesAsync();
             }
 
+            var pendingBeforeDisable = await service.CreateEmbedTokenAsync(
+                "demo", "external-1", "person-1", "#/m/tasks");
             var beforeDisable = await service.ExchangeEmbedTokenAsync((await service.CreateEmbedTokenAsync(
                 "demo", "external-1", "person-1", "#/m/tasks")).Token);
-            await using (var db = await factory.CreateDbContextAsync())
-            {
-                var app = await db.ClientApps.SingleAsync();
-                app.IsEnabled = false;
-                await db.SaveChangesAsync();
-            }
+            var localBeforeDisable = await service.LoginAsync("EMP-001", "new-password-123");
+            var apps = new ClientAppAppService(new ClientAppRepository(factory), new CheckSecretProtector());
+            await apps.SetEnabledAsync("demo", false);
 
             check("接入应用停用后旧嵌入访问与刷新令牌均失效",
                 !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
-                    "demo", "external-1") &&
+                    "demo", "external-1", initialGeneration) &&
+                await FailsWithCodeAsync(() => service.CreateEmbedTokenAsync(
+                    "demo", "external-1", "person-1", "#/m/tasks"), ErrorCodes.Forbidden));
+            await apps.SetEnabledAsync("demo", true);
+            check("接入应用停用再启用后旧访问、刷新和未兑换嵌入令牌永久失效",
+                await ReadGenerationAsync(factory) == 3 &&
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1", initialGeneration) &&
                 await FailsWithCodeAsync(() => service.RefreshAsync(beforeDisable.RefreshToken),
+                    ErrorCodes.Unauthorized) &&
+                await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(pendingBeforeDisable.Token),
                     ErrorCodes.Unauthorized));
+            check("应用启停不作废同一人员的本地登录与刷新",
+                await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Local, null, null) &&
+                (await service.RefreshAsync(localBeforeDisable.RefreshToken)).PersonId == "person-1");
+
+            var pendingBeforeRotation = await service.CreateEmbedTokenAsync(
+                "demo", "external-1", "person-1", "#/m/tasks");
+            var beforeRotation = await service.ExchangeEmbedTokenAsync((await service.CreateEmbedTokenAsync(
+                "demo", "external-1", "person-1", "#/m/tasks")).Token);
+            var currentGeneration = ReadAuthGeneration(new JsonWebTokenHandler().ReadJsonWebToken(
+                beforeRotation.AccessToken));
+            check("新嵌入会话包含新代际且缺失代际声明不能访问",
+                currentGeneration == 3 &&
+                await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1", currentGeneration) &&
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1"));
+            var rotated = await apps.RotateSecretsAsync("demo");
+            check("密钥轮换原子递增代际并作废旧 Key 与旧嵌入令牌",
+                await ReadGenerationAsync(factory) == 4 &&
+                await FailsWithCodeAsync(() => apps.AuthenticateAsync("initial-key"), ErrorCodes.Unauthorized) &&
+                (await apps.AuthenticateAsync(rotated.ApiKey)).Code == "demo" &&
+                !await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1", currentGeneration) &&
+                await FailsWithCodeAsync(() => service.RefreshAsync(beforeRotation.RefreshToken),
+                    ErrorCodes.Unauthorized) &&
+                await FailsWithCodeAsync(() => service.ExchangeEmbedTokenAsync(pendingBeforeRotation.Token),
+                    ErrorCodes.Unauthorized));
+            var afterRotation = await service.ExchangeEmbedTokenAsync((await service.CreateEmbedTokenAsync(
+                "demo", "external-1", "person-1", "#/m/tasks")).Token);
+            check("密钥轮换后的新嵌入访问和刷新仍可用",
+                ReadAuthGeneration(new JsonWebTokenHandler().ReadJsonWebToken(afterRotation.AccessToken)) == 4 &&
+                await service.ValidateAccessPrincipalAsync("person-1", 1, IdentitySessionKinds.Embed,
+                    "demo", "external-1", 4) &&
+                (await service.RefreshAsync(afterRotation.RefreshToken)).PersonId == "person-1");
 
             await service.RevokeAllAsync("person-1");
             check("管理员作废令牌版本后旧访问令牌无效",
@@ -205,6 +251,8 @@ internal static class IdentityAppServiceChecks
                     await db.LocalAccounts.AnyAsync(item => item.PersonId == "person-1" &&
                         item.FailedLogins == 0 && item.LockedUntil == null));
             }
+
+            await IdentityLifecycleChecks.RunAsync(check);
         }
         finally
         {
@@ -245,7 +293,28 @@ internal static class IdentityAppServiceChecks
         token.TryGetPayloadValue(JwtIdentityTokenService.ClientAppCodeClaim, out string? code) &&
         code == clientAppCode &&
         token.TryGetPayloadValue(JwtIdentityTokenService.ExternalUserIdClaim, out string? userId) &&
-        userId == externalUserId;
+        userId == externalUserId && ReadAuthGeneration(token) > 0;
+
+    /// <summary>
+    /// 从真实签发的访问令牌读取应用身份代际。
+    /// </summary>
+    /// <param name="token">已读取的 JWT。</param>
+    /// <returns>有效代际；缺失或格式错误时为零。</returns>
+    private static long ReadAuthGeneration(JsonWebToken token) =>
+        token.TryGetPayloadValue(JwtIdentityTokenService.AuthGenerationClaim, out string? value) &&
+        long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var generation)
+            ? generation : 0;
+
+    /// <summary>
+    /// 读取数据库中的应用身份代际。
+    /// </summary>
+    /// <param name="factory">检查专用数据库工厂。</param>
+    /// <returns>当前代际。</returns>
+    private static async Task<long> ReadGenerationAsync(IdentityContextFactory factory)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.ClientApps.Select(item => item.AuthGeneration).SingleAsync();
+    }
 
     /// <summary>
     /// 为检查程序创建独立数据库上下文。
@@ -275,6 +344,18 @@ internal static class IdentityAppServiceChecks
 
         /// <inheritdoc />
         public bool VerifyMissing(string password) => false;
+    }
+
+    /// <summary>
+    /// 检查专用的可逆加密替身，避免依赖部署主密钥。
+    /// </summary>
+    private sealed class CheckSecretProtector : IIntegrationSecretProtector
+    {
+        /// <inheritdoc />
+        public string Protect(string secret) => "check:" + secret;
+
+        /// <inheritdoc />
+        public string Unprotect(string ciphertext) => ciphertext[6..];
     }
 
     /// <summary>

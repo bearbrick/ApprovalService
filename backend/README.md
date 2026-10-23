@@ -24,6 +24,8 @@ dotnet run --project backend/tests/ApprovalService.Backend.Checks -- docs    # �
 dotnet run --project backend/src/ApprovalService.Api                         # http://localhost:5280
 ```
 
+统一验证会在随机回环端口启动真实服务。后端检查程序的 `seed-sdk-e2e` 命令只供 `verify.ps1` 使用：在全新临时 SQLite 库中创建测试应用、发布流程和人员绑定，并将本次随机生成的 API Key 写进同目录的临时文件。它不注册生产 HTTP 路由；脚本完成后会停服并清理整个临时目录。
+
 ## 现在有的接口
 
 | 接口 | 说明 |
@@ -43,15 +45,19 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `POST /api/v1/org/changes`、`/org/bindings` | 接入应用推送本应用来源的组织数据并绑定自身人员、部门 ID |
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地组织管理员预检查、导入 CSV/XLSX、手工绑定、下载模板 |
 | `POST /api/v1/admin/actions/retry` | 本地登录的所属流程管理员以原事件 ID 人工重试自动动作 |
-
+| `POST /api/v1/files?fileName=...` | 原始字节上传附件；支持接入应用 API Key 或可信人员会话 |
+| `GET /api/v1/files/{id}` | 按应用归属或人员权限验权下载；必要时短时跳转 |
 
 所有响应都带 `X-Request-Id`、`X-Trace-Id`；出错统一返回 `{code, message, errors, traceId}`（见 [docs/contracts.md](../docs/contracts.md)）。
 
-身份访问令牌为 15 分钟 JWT，刷新令牌可轮换且有效 30 天；首次开通账号后只能先改密码。嵌入令牌 5 分钟内只能交换一次，必须先通过接入应用 API Key 验证并找到本应用绑定。嵌入会话不能使用管理接口，刷新后仍保留应用来源。组织主数据存部门、人员、角色、外部 ID 绑定与每次变更的前后快照；CSV/XLSX 模板可同时导入主数据及外部绑定，预览一次返回可定位的组织问题，正式保存会在事务中按最新主数据重验。组织管理接口要求本地登录 JWT 及当前 `organization-admin` 角色；动作人工重试按所属流程单独授权。首次管理员引导方式仍待确认，当前不开放匿名管理入口。
+可信组织导入或推送把人员停用时，同一事务写入管理员交接提醒和持久离职任务；后台工作者在重启或失败退避后可继续扫描该人员的在途待办，逐项提交引擎离职命令。命令按任务所在发布节点的配置选择在职直属上级或流程管理员；任务投影、操作事件和待发项在单审批单事务中保存，若无有效接手人则保留原任务与待处理交接提醒，补齐组织数据后自动重试。人员在任务执行前复职时保留本人待办，并取消过期的离职交接提醒。
+身份访问令牌为 15 分钟 JWT，刷新令牌可轮换且有效 30 天；首次开通账号后只能先改密码。嵌入令牌 5 分钟内只能交换一次，必须先通过接入应用 API Key 验证并找到本应用绑定。可信人员离职、复职或外部人员绑定换人时，在组织事务内单调递增旧、新账号的令牌版本；一次性嵌入令牌也保存签发版本，旧访问、刷新和未兑换令牌不会因状态恢复而复活。接入应用的已授权管理用例调用 `ClientAppAppService.SetEnabledAsync` 或 `RotateSecretsAsync` 时原子递增应用身份代际；签发、兑换、刷新和访问嵌入令牌均核对代际，停用再启用或轮换密钥后旧令牌永久失效，本地会话不受影响。当前尚无接入应用管理 HTTP 路由，后续须经受保护的管理接口调用，不能直接修改数据库启用标记。嵌入会话不能使用组织管理接口，刷新后仍保留应用来源。组织主数据存部门、人员、角色、外部 ID 绑定与每次变更的前后快照；CSV/XLSX 模板可同时导入主数据及外部绑定，预览一次返回可定位的组织问题，正式保存会在事务中按最新主数据重验。组织管理接口要求本地登录 JWT 及当前 `organization-admin` 角色；动作人工重试按审批单所属流程单独授权。首位管理员须在服务器本机交互式运行 `dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin`：输入内部人员 ID、工号、姓名及两次临时密码；已有在职人员可将工号和姓名留空。命令先应用数据库迁移，再在串行化事务中开通账号和角色；一旦已有管理员角色即拒绝重复执行，不提供匿名 HTTP 初始化入口。
 
 ## 流程定义
 
 正式流程定义模型位于 `src/ApprovalService.Contracts/Flows/`，只接受统一自由画布的 JSON；`schemaVersion` 标识格式版本。`src/ApprovalService.Engine/Definitions/` 负责在发布前检查设计内容并生成不含画布坐标的执行图。可导入的 BPMN 文件必须由本服务导出且携带本服务扩展信息。开发样例放在 `samples/flows/`，完整字段约定见 [docs/contracts.md](../docs/contracts.md)。
+
+流程级 `withdrawBeforeFirstDecision` 和 `returnMode` 是可省略的发布策略：旧定义分别按“审批结束前可撤回”和“退回后从头重提”处理。业务系统发起时把编译图中的值固定到审批单操作状态，不接受每次操作临时更改。
 
 `src/ApprovalService.Engine/Execution/EngineRuntime` 是运行时的统一命令入口：输入已发布执行图、当前状态、命令和固定时间、连线条件结果、到节点时的组织快照，返回新状态与只追加事件。入口不修改传入状态；审批单 ID 与请求 ID 一起用于幂等及确定性生成令牌、任务、事件 ID。自动动作和子流程只产生待发事件，外部执行结果再以命令送回。包容网关按本次分叉实际选中的边汇合，回路累计推进超过 200 步后标记异常。撤销只接受已通过的审批单；审批中可撤回或终止。
 
@@ -84,13 +90,26 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `Integration:SerialPrefix`、`SerialDatePattern`、`SerialDigits` | `SP`、`yyyyMM`、`6` | 部署级审批编号默认格式；流程级配置由管理后台后续接入 |
 | `Identity:SigningKey` | 数据目录内随机密钥文件 | 可选的 Base64 JWT 签名密钥；多实例部署须配置同一密钥 |
 | `Integration:MasterKey` | — | 接入应用签名密钥加密所需的 32 字节 Base64 主密钥；不要提交仓库 |
+| `Files:Provider` | `Local` | 新上传附件的存储：`Local` 或 `Minio`；历史文件按元数据读取 |
+| `Files:MaxUploadBytes` | `20971520` | 单文件大小限制，默认 20 MB |
+| `Files:Endpoint`、`Files:Bucket` | — | 使用 MinIO 时的绝对服务地址和私有桶名 |
+| `Files:AccessKey`、`Files:SecretKey` | — | 仅从部署环境提供的对象存储凭据，不要写入仓库 |
+| `Files:BrowserAccessible` | `false` | 浏览器可直连时签发短时地址，否则服务转发 |
+| `Files:PresignedUrlSeconds` | `300` | 预签名地址有效秒数，只能设为 1—300 秒 |
 
+## 工作日历基础
+
+`Domain/Notifications/Calendar` 提供纯日历规则：默认周一至周五为工作日，调用方可传入本地日期覆盖清单，将节假日设为休息日、调休周末设为工作日。`GetWorkingDateAfter` 从指定日期之后计数，不把起点算作第一个工作日；`GetLocalDate` 按指定时区将时间点换成本地日期，避免使用服务器本地时区或固定 UTC 偏移。配置清单由调用方提供，规则本身不访问数据库。
+
+`GetDueAt` 从任务开始的实际时间点累计节点 `DueMinutes`，只计入工作日每天的工作时段，默认 09:00–18:00，也可以传 `WorkCalendarWorkingHours` 指定当天的起止时间。提前开始从当日开工起算；下班后、周末和节假日顺延到下个工作时段；恰好在下班时到期则保留该时刻。夏令时缺口中的时段边界顺延到第一个有效本地分钟，重复的开始边界取较早一次、结束边界取较晚一次，累计的是实际经过的分钟。通知任务负责提供日历配置、把结果写入任务期限并安排提醒。
 
 ## 持久化与后台任务
 
 流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。
 
-审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试。接入应用的 API Key 只存 SHA-256 摘要，回调签名密钥使用部署主密钥加密。回调正文在审批事务中固定，后台发送器用 HMAC-SHA256 签名、5 秒超时；每次发送留不含正文的结果日志，管理用例可重排原事件且不改变 `eventId`。四类业务钩子按已采纳的 ADR 0010 使用 POST JSON、双向 HMAC、请求 ID 回显与 5 秒超时；目前发起前取数、发起前和同意前校验已接通。
+审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试并只保存有界错误码，成功后清除旧错误码。接入应用的 API Key 只存 SHA-256 摘要，回调签名密钥使用部署主密钥加密。回调正文在审批事务中固定，后台发送器用 HMAC-SHA256 签名、5 秒超时；每次发送留不含正文的结果日志，管理用例可重排原事件且不改变 `eventId`。四类业务钩子按已采纳的 ADR 0010 使用 POST JSON、双向 HMAC、请求 ID 回显与 5 秒超时；目前发起前取数、发起前和同意前校验已接通，取人与自动动作待后续接线。
+
+通知传输基础在 `Notifications/`：`INotificationAppService.QueueAsync` 把稳定 ID、渠道编码、收件人和站内路径写入待发队列；后台处理器在事务外选择 `INotificationChannel`，发送 SMTP 邮件或写入站内收件箱。站内消息按 ID 幂等，按人员读取和标记已读。邮件在 SMTP 接收后、待发确认前故障时可能重发，邮件带稳定的 `X-Approval-Notification-Id` 供下游去重。当前没有业务事件自动产生通知；后续接入审批事件时，应在审批事务的 `RuntimeCommit.OutboxItems` 中一并写入通知待发项，避免提交后进程退出漏发。
 
 在途业务单号按全局 `(flowCode, businessKey)` 唯一，接入应用不能把其他应用占用的单据当作幂等结果。审批详情在同一数据库快照读取状态、任务和事件。出站地址默认要求 HTTPS，回调应用停用时保留待发项并记录原因；HTTP 重定向不会把签名正文转发到其他地址。
 
@@ -109,5 +128,9 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 业务自动动作第十次失败转 `needsAttention`，停止后台自动领取，保留原令牌和待发正文。本地登录的流程管理员以当前工号匹配事件审批单所属流程的 `AdministratorId` 后，可向管理路由提交 `{eventId}`，按原事件排入一次人工重试；再次失败仍待管理员处理。组织管理员角色不自动拥有其他流程权限。
 
 新增或修改实体配置后，用 `backend/tools/add-migration.ps1` 分别为 SQLite、SQL Server、PostgreSQL 生成迁移；不要手改生成的迁移或模型快照。
+
+附件的文件字节不入数据库，`StoredFiles` 只保存名称、大小、内容类型、SHA-256、存储位置、上传人员或接入应用归属、所属审批单和清理租约。本地内容在数据目录的 `files/年/月/` 下，上传临时文件同目录原子转正。每小时扫描一次，清理上传超过 24 小时仍未关联的内容；多实例通过数据库条件更新抢租约。切换到 MinIO 时，先配置 `ApprovalService__Files__Provider=Minio` 和对象存储凭据，再运行 `powershell -NoProfile -ExecutionPolicy Bypass -File backend/tools/migrate-files.ps1` 搬运旧本地文件；中断后重跑会继续。真实对象存储检查需要设置 `APPROVAL_TEST_MINIO`（服务 URL）、`APPROVAL_TEST_MINIO_BUCKET`、`APPROVAL_TEST_MINIO_ACCESS_KEY`、`APPROVAL_TEST_MINIO_SECRET_KEY`，桶需事先存在。
+
+上传白名单是 PDF、PNG、JPEG、GIF、WebP、DOCX、XLSX、PPTX；Office 文件须具有有效包清单、入口关系和主部件 XML，只下载查看，不做在线预览。嵌入会话只可下载同一接入应用审批单的已关联附件；人员上传的未关联文件仅本人本地会话可读，应用上传的仅同一已认证应用可读。接入应用可用 API Key 上传并读取本应用尚未关联的附件；发起审批时只接受该应用上传且未被占用的文件，附件与审批单在同一数据库事务中关联。普通抄送人可见性尚缺持久化收件人投影，不能仅凭人员 ID 放开。OFD 和旧版 Office 文件的下载范围尚待单独确认。
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。`/health/ready` 会检查数据库连通性；数据库不可连接时返回 503。

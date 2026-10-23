@@ -153,6 +153,10 @@ internal static class EventChainConsistencyChecks
             inner.LoadVersionAsync(versionId, cancellationToken);
 
         /// <inheritdoc />
+        public Task<IReadOnlyList<DepartureTaskRef>> ListDepartureTasksAsync(string assigneeId,
+            CancellationToken cancellationToken = default) => inner.ListDepartureTasksAsync(assigneeId, cancellationToken);
+
+        /// <inheritdoc />
         public Task<bool> CommitAsync(RuntimeCommit commit, CancellationToken cancellationToken = default) =>
             inner.CommitAsync(commit, cancellationToken);
 

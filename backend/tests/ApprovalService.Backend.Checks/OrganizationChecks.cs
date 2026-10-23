@@ -157,6 +157,10 @@ internal static class OrganizationChecks
             check("工号自动绑定后业务人员和部门 ID 可解析", personId == "p1" &&
                 await lookup.ResolvePersonAsync("demo", "external-1") == "p1" &&
                 await lookup.ResolveDepartmentAsync("demo", "external-d1") == "d1");
+            check("开放人员解析仅接受本应用绑定，不接受全局工号或其他应用绑定",
+                await lookup.ResolvePersonAsync("demo", "E1") is null &&
+                await lookup.ResolvePersonAsync("other", "external-1") is null &&
+                await lookup.ResolveBoundPersonAsync("demo", "E1") is null);
             check("严格部门解析仅接受本应用绑定，不回退全局部门 ID 或编码",
                 await lookup.ResolveBoundDepartmentAsync("demo", "external-d1") == "d1" &&
                 await lookup.ResolveBoundDepartmentAsync("other", "external-d1") is null &&

@@ -79,7 +79,7 @@
 
 待办摘要还必须按锁定发布图中该待办的当前节点权限过滤：`fieldPermissions` 显式为 `hidden` 的字段不返回；未配置节点权限的字段沿用默认可见语义。同一节点重复配置同一字段权限时拒绝发布，查询旧异常图也拒绝投影，避免权限冲突导致泄露。
 
-`POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data?, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 是审批数据对象；未传时要求当前应用配置取数地址，并在审批事务前调用取数钩子。服务端按已发布定义校验并重算公式、分支条件，再调用已配置的发起校验钩子；拒绝时返回业务原因且不创建审批单。审批人填写值不接受业务系统自造；附件 ID 在同应用归属与原子关联接通前拒绝。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
+`POST /api/v1/instances` 需要 `X-Api-Key`，请求为 `{flowCode, businessKey, title, initiator, initiatingDepartment?, submittedBy?, data?, detailUrl?, isUrgent?, selectedAssignees?}`。`initiator`、`submittedBy` 及 `selectedAssignees` 中的人员 ID 必须已在当前应用绑定且在职；`initiatingDepartment` 必须是本应用已绑定部门且发起人属于该部门，不传时使用可信组织主数据中的主部门。流程同时检查应用授权、发起角色与选定发起部门范围；流程允许部门配置只按组织主数据的内部 ID 或编码解析，不接受应用外部部门绑定覆盖。`selectedAssignees` 按允许发起人自选的节点 ID 传人员列表，可用于自选审批人和抄送人。`data` 可直接提供审批数据对象；未传时要求当前应用配置取数地址，并在审批事务前调用取数钩子。服务端按已发布定义校验、重算公式与分支条件，再在写事务前调用已配置的发起校验钩子；拒绝时返回业务原因且不创建审批单。审批人填写值不接受业务系统自造；顶层及明细附件 ID 只能引用本应用上传且尚未关联的文件，文件归属与实例状态在同一事务内确认和保存，任何一项失败都回滚整笔发起。成功返回 200 和该审批单详情，已在途的本应用同号请求返回同一张，跨应用同号只返回 `CONFLICT`。取人与自动动作仍待按 ADR 0010 的节点到达和提交后持久队列接线。审批矩阵命中只从服务端可信提供者读取，未配置时返回可纠正错误。编号默认 `SP-yyyyMM-六位流水号`，部署可配置前缀、日期格式和位数；数据库分配号码后若发起失败允许留空号，流程级编号配置由管理后台接入。
 
 `POST /api/v1/instances/batch` 需要同一 `X-Api-Key`，请求为 `{ "items": [单张发起请求, …] }`，每批 1 至 100 项。服务端按列表顺序逐张独立验证和提交，返回 `{ "results": [{ "index": 0, "instance": 审批单详情或 null, "error": { "code", "message" } 或 null }, …] }`；`index` 从 0 开始。单项业务校验失败只写该项 `error`，其他已成功的单据不回滚；无效的批次外形整体返回 400。每项使用由批次 `X-Request-Id` 和下标确定的独立请求 ID，重复批次中仍在途的同应用单据返回原审批单。程序缺陷不会被当作单项业务错误吞掉。
 
@@ -94,7 +94,7 @@
 `POST /api/v1/embed-tokens/exchange` 接受 `{ "token": "..." }`。三者成功后都返回
 `{personId, accessToken, accessExpiresAt, refreshToken, refreshExpiresAt, mustChangePassword, targetPath}`，普通登录的 `targetPath` 为 null 并按通用约定省略。访问令牌有效 15 分钟，刷新令牌有效 30 天、每次使用后立即轮换；数据库只存刷新令牌摘要。登录失败连续 5 次暂时锁定 15 分钟。管理员开通账号时通过 `POST /api/v1/identity/provision` 传 `{personId, temporaryPassword}`，首次登录必须改密码；`POST /api/v1/identity/change-password` 传 `{currentPassword, newPassword}`；管理员作废人员全部令牌时向 `/identity/revoke-all` 传 `{personId}`。改密和作废会使旧访问及刷新令牌失效。
 
-JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核对账号、在职状态和令牌版本。首次登录尚未改密码的访问令牌只能调用 `/identity/change-password`。JWT 内部 `sessionKind` 为 `local` 或 `embed`；嵌入交换和后续刷新保持 `embed` 来源、`clientAppCode` 及 `externalUserId`，只用于审批中心。每次交换、刷新和访问都重新核对接入应用仍启用且原绑定仍指向同一人员；改绑或停用应用立即使旧令牌失效。组织管理授权要求 `sessionKind=local` 且人员当前具有 `organization-admin` 角色；业务系统的外部用户绑定不能提升为管理员。首位管理员由本机部署引导流程开通，具体运维入口待确认，不提供匿名管理 HTTP 路由。
+JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核对账号、在职状态和令牌版本。首次登录尚未改密码的访问令牌只能调用 `/identity/change-password`。JWT 内部 `sessionKind` 为 `local` 或 `embed`；嵌入交换和后续刷新保持 `embed` 来源、`clientAppCode` 及 `externalUserId`，只用于审批中心。每次交换、刷新和访问都重新核对接入应用仍启用且原绑定仍指向同一人员；改绑或停用应用立即使旧令牌失效。组织管理授权要求 `sessionKind=local` 且人员当前具有 `organization-admin` 角色；业务系统的外部用户绑定不能提升为管理员。首位管理员在服务器本机交互式运行 `dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin` 开通；命令在串行化事务内创建或选用在职人员、开通需首次改密的账号并授予组织管理员角色，已有管理员时拒绝再次运行，不提供匿名管理 HTTP 路由。
 
 `POST /api/v1/embed-tokens` 由接入应用后端带 `X-Api-Key` 调用，请求为 `{userId, targetPath}`；`userId` 必须已在该应用自己的绑定表对应在职内部人员，嵌入签发不按全局工号回退，也不能使用别的应用的绑定。`targetPath` 只能是本站相对路由。响应为 `{token, expiresAt, targetPath}`；令牌绑定已认证接入应用和人员，5 分钟有效，只能原子交换一次，数据库只存摘要。嵌入令牌无效或已消费时返回 `UNAUTHORIZED`。
 
@@ -109,7 +109,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 ## 开放接口补充与待接入项
 
-下表汇集近期开放接口及尚未接入的附件、打印接口；已接入接口的细节以相邻正文为准：
+下表汇集近期开放接口；已接入接口的细节以相邻正文为准，打印接口仍由独立任务实现：
 
 | 接口 | 用途 | 任务 |
 | --- | --- | --- |
@@ -126,6 +126,12 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 `POST /api/v1/instances/{id}/resubmit` 需要所属应用的 `X-Api-Key` 和稳定 `X-Request-Id`，请求为 `{ "user": "alice", "data": { ...完整新业务数据 } }`。`user` 必须是本应用已绑定且在职的原发起人；只接受退回发起人或要求补充后的 `awaitingInitiator` 审批单。服务按锁定发布定义重新校验完整业务数据、计算公式，并按当前可信组织重新解析数据找人映射；审批数据、映射、任务和事件通过同一引擎命令及乐观版本事务保存。退回重提按发起时锁定的 `returnMode` 从头或原节点恢复，清空审批人填写字段的当前值但保留历史事件；补充恢复原任务，保留当前值。审批单详情新增 `approverFieldValues` 对象承载成功推进后的顶层审批人填写值，与业务 `data` 分开；同一请求 ID 重试不追加事件。
 
 `POST /api/v1/flows/{code}/preview` 需要 `X-Api-Key` 与 `X-Request-Id`，只预览当前应用获授权的已发布流程。请求为 `{ "initiator": "alice", "initiatingDepartment": "dept-one", "data": {...}, "selectedAssignees": {...} }`；部门和自选人员可省略，业务单号不必提供，可选 `businessKey` 仅供业务取人钩子识别。发起人及自选人员须按本应用现有在职绑定解析，数据沿用发起字段类型和公式校验。响应 `{flowCode, version, nodes:[{nodeId,name,type,candidateAssigneeIds,candidateAssignees:[{id,name}]}], projectedStatus, notice}`；`nodes` 按预计到达顺序排列，并行分支可交错出现，候选人是当前组织的内部人员 ID。预览在内存中假定人工操作同意、办理完成、自动动作和子流程成功；业务接口找人只在实际预计命中的节点调用，未提供业务单号时钩子收到空 `businessKey`。预览不发起审批、不占业务单号、不写事件或回调；实际到达节点时会按最新组织与业务数据重算，故路径和候选人不作最终承诺。
+
+## 附件接口
+
+`POST /api/v1/files?fileName=票据.png` 的请求体是文件原始字节，不是 JSON 或 multipart；返回 JSON：`{ "id": "...", "fileName": "票据.png", "size": 123, "contentType": "image/png", "sha256": "..." }`。服务按内容签名核对扩展名，默认单文件上限 20 MB。当前接受 PDF、PNG、JPEG、GIF、WebP，以及具有有效包清单、入口关系和主部件 XML 的 DOCX、XLSX、PPTX；Office 文件只提供下载，不在线预览。其他类型返回 `VALIDATION_FAILED`。上传支持接入应用 API Key 或可信人员会话；应用上传的文件 ID 可在发起审批的顶层或明细附件字段中引用。同一文件在请求内去重，仅当前应用上传、尚未关联且未被清理占用的文件可以关联；审批单和所有附件在同一事务提交，任一文件不符则整笔失败。审批意见中的附件字段暂不接受。
+
+`GET /api/v1/files/{id}` 先校验可信身份及审批单可见性。本地会话按人员权限访问；嵌入会话还必须带已验证的接入应用编码，且只能下载同一应用审批单的已关联附件。未关联附件在元数据中记录上传主体：人员上传的仅本人本地会话可读，应用上传的仅同一 API Key 已认证应用可读；嵌入人员会话不能读取未关联附件。已关联附件不能仅凭 API Key 下载。上传 24 小时后若仍未关联则自动清理。本地文件与浏览器不可直连的 MinIO 由服务转发，浏览器可直连的 MinIO 返回最长五分钟有效的预签名地址的 302 跳转。应用编码从已验证 API Key 得出，不接受请求自报；客户端参数中的 `userId` 从不用于授权。
 
 ## 回调和业务系统提供的接口
 

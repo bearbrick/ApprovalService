@@ -17,11 +17,85 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CleanupLeaseUntil")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CleanupOwner")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LinkedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StorageKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UploadedByClientAppCode")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("UploadedById")
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstanceId");
+
+                    b.HasIndex("StorageKind", "StorageKey")
+                        .IsUnique();
+
+                    b.HasIndex("UploadedAt", "CleanupLeaseUntil");
+
+                    b.ToTable("StoredFiles", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Identity.EmbedTokenEntity", b =>
                 {
                     b.Property<string>("TokenHash")
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
+
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ClientAppCode")
                         .IsRequired()
@@ -48,6 +122,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .IsRequired()
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("TokenVersion")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("TokenHash");
 
@@ -101,6 +178,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<long?>("AuthGeneration")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ClientAppCode")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
@@ -152,6 +232,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.Property<string>("AssigneeUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("AuthGeneration")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1L);
 
                     b.Property<string>("CallbackUrl")
                         .HasMaxLength(2048)
@@ -252,6 +337,44 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasKey("Prefix", "DateBucket");
 
                     b.ToTable("SerialNumberCounters", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("RecipientId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TargetPath")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientId", "CreatedAt");
+
+                    b.ToTable("InAppNotifications", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
@@ -930,6 +1053,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("LastError")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LeaseOwner")
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
@@ -955,6 +1082,14 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasIndex("Status", "DueAt", "LeaseUntil");
 
                     b.ToTable("ScheduledJobs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.ApprovalTaskEntity", b =>

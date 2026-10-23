@@ -34,6 +34,15 @@ public interface IClientAppRepository
     /// </summary>
     /// <param name="app">已登记应用的新密钥状态。</param>
     /// <param name="cancellationToken">取消信号。</param>
-    /// <returns>异步操作。</returns>
-    Task UpdateSecretsAsync(ClientAppEntity app, CancellationToken cancellationToken = default);
+    /// <returns>应用存在且完成轮换为真。</returns>
+    Task<bool> UpdateSecretsAsync(ClientAppEntity app, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 仅在启用状态实际改变时，原子更新状态并递增身份代际。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="enabled">目标启用状态。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>状态确实改变为真。</returns>
+    Task<bool> SetEnabledAsync(string code, bool enabled, CancellationToken cancellationToken = default);
 }

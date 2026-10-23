@@ -95,6 +95,7 @@ public sealed class ScheduledJobQueue
                 job.LeaseUntil > now && job.Version == claim.Version)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(job => job.Status, JobStatuses.Completed)
+                .SetProperty(job => job.LastError, (string?)null)
                 .SetProperty(job => job.LeaseOwner, (string?)null)
                 .SetProperty(job => job.LeaseUntil, (DateTimeOffset?)null)
                 .SetProperty(job => job.Version, job => job.Version + 1), cancellationToken);
@@ -106,20 +107,24 @@ public sealed class ScheduledJobQueue
     /// </summary>
     /// <param name="claim">已领取任务。</param>
     /// <param name="now">失败时间。</param>
+    /// <param name="errorCode">不含敏感信息的稳定错误码。</param>
     /// <param name="cancellationToken">取消信号。</param>
     /// <returns>是否成功重新排队。</returns>
-    public async Task<bool> FailAsync(ScheduledJobEntity claim, DateTimeOffset now,
+    public async Task<bool> FailAsync(ScheduledJobEntity claim, DateTimeOffset now, string errorCode,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(claim);
+        ArgumentException.ThrowIfNullOrWhiteSpace(errorCode);
         await using var context = await contextFactory.CreateDbContextAsync(cancellationToken);
         var dueAt = now.Add(JobRetrySchedule.AfterFailure(claim.Attempts));
+        var safeErrorCode = errorCode.Length > 200 ? errorCode[..200] : errorCode;
         var updated = await context.ScheduledJobs.Where(job => job.Id == claim.Id &&
                 job.Status == JobStatuses.Leased && job.LeaseOwner == claim.LeaseOwner &&
                 job.LeaseUntil > now && job.Version == claim.Version)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(job => job.Status, JobStatuses.Pending)
                 .SetProperty(job => job.DueAt, dueAt)
+                .SetProperty(job => job.LastError, safeErrorCode)
                 .SetProperty(job => job.LeaseOwner, (string?)null)
                 .SetProperty(job => job.LeaseUntil, (DateTimeOffset?)null)
                 .SetProperty(job => job.Version, job => job.Version + 1), cancellationToken);

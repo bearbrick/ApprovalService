@@ -79,9 +79,13 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             {
                 var wasActive = existing.IsActive;
                 db.Entry(existing).CurrentValues.SetValues(person);
+                if (wasActive != person.IsActive)
+                {
+                    await OrganizationIdentityGeneration.AdvanceAsync(db, [person.Id], cancellationToken);
+                }
                 if (wasActive && !person.IsActive)
                 {
-                    await AddDepartureNoticeAsync(db, person.Id, occurredAt, cancellationToken);
+                    await DepartureScheduleWriter.AddAsync(db, person.Id, occurredAt, cancellationToken);
                 }
             }
 
@@ -115,6 +119,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 item.ClientAppCode == binding.ClientAppCode && item.ExternalUserId == binding.ExternalUserId,
                 cancellationToken);
             var before = existing is null ? null : JsonSerializer.Serialize(existing);
+            var previousPersonId = existing?.PersonId;
             if (existing is null)
             {
                 db.ExternalPersonBindings.Add(binding);
@@ -122,6 +127,12 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             else
             {
                 db.Entry(existing).CurrentValues.SetValues(binding);
+            }
+
+            if (previousPersonId != binding.PersonId)
+            {
+                await OrganizationIdentityGeneration.AdvanceAsync(db,
+                    [previousPersonId, binding.PersonId], cancellationToken);
             }
 
             Record(db, "personBinding", binding.ClientAppCode + ":" + binding.ExternalUserId,
@@ -205,12 +216,16 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
                 person.TrustedSource = clientAppCode;
                 person.Version = existing.Version + 1;
                 db.Entry(existing).CurrentValues.SetValues(person);
+                if (wasActive != person.IsActive)
+                {
+                    await OrganizationIdentityGeneration.AdvanceAsync(db, [person.Id], cancellationToken);
+                }
                 Record(db, "person", person.Id, actorId, clientAppCode, before,
                     JsonSerializer.Serialize(person), occurredAt);
                 if (wasActive && !person.IsActive)
                 {
                     departed.Add(person.Id);
-                    await AddDepartureNoticeAsync(db, person.Id, occurredAt, cancellationToken);
+                    await DepartureScheduleWriter.AddAsync(db, person.Id, occurredAt, cancellationToken);
                 }
             }
             // 其他来源只能维护绑定，不能覆盖可信主数据。
@@ -282,6 +297,8 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
         DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
         if (!await db.People.AnyAsync(item => item.Id == binding.PersonId, cancellationToken))
         {
             throw new UserFriendlyException(ErrorCodes.NotFound, "绑定的人员不存在。");
@@ -291,6 +308,7 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             item.ClientAppCode == binding.ClientAppCode && item.ExternalUserId == binding.ExternalUserId,
             cancellationToken);
         var before = existing is null ? null : JsonSerializer.Serialize(existing);
+        var previousPersonId = existing?.PersonId;
         if (existing is null)
         {
             db.ExternalPersonBindings.Add(binding);
@@ -300,9 +318,16 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             db.Entry(existing).CurrentValues.SetValues(binding);
         }
 
+        if (previousPersonId != binding.PersonId)
+        {
+            await OrganizationIdentityGeneration.AdvanceAsync(db,
+                [previousPersonId, binding.PersonId], cancellationToken);
+        }
+
         Record(db, "personBinding", binding.ClientAppCode + ":" + binding.ExternalUserId,
             actorId, binding.ClientAppCode, before, JsonSerializer.Serialize(binding), occurredAt);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -459,35 +484,4 @@ public sealed class OrganizationRepository(IDbContextFactory<ApprovalDbContext> 
             OccurredAt = occurredAt,
         });
 
-    /// <summary>
-    /// 留下离职提醒和当前未办任务数；具体改派遵循节点离职规则，由运行用例接续。
-    /// </summary>
-    /// <param name="db">同一事务的上下文。</param>
-    /// <param name="personId">离职人员 ID。</param>
-    /// <param name="occurredAt">发生时间。</param>
-    /// <param name="cancellationToken">取消标记。</param>
-    /// <returns>异步操作。</returns>
-    private static async Task AddDepartureNoticeAsync(ApprovalDbContext db, string personId,
-        DateTimeOffset occurredAt, CancellationToken cancellationToken)
-    {
-        var pending = await db.ApprovalTasks.CountAsync(item => item.AssigneeId == personId &&
-            item.Status == "pending", cancellationToken);
-        var notice = await db.DepartureNotices.SingleOrDefaultAsync(item => item.PersonId == personId,
-            cancellationToken);
-        if (notice is null)
-        {
-            db.DepartureNotices.Add(new DepartureNoticeEntity
-            {
-                PersonId = personId,
-                CreatedAt = occurredAt,
-                PendingTaskCount = pending,
-            });
-        }
-        else
-        {
-            notice.CreatedAt = occurredAt;
-            notice.PendingTaskCount = pending;
-            notice.AcknowledgedAt = null;
-        }
-    }
 }

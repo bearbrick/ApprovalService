@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ApprovalService.Application.Integration;
+using ApprovalService.Application.Notifications;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
@@ -16,9 +17,16 @@ namespace ApprovalService.Application.Runtime;
 /// </summary>
 /// <param name="repository">原子保存状态和事件的仓储。</param>
 /// <param name="businessAssignees">实际节点到达前的业务取人服务。</param>
+/// <param name="taskDeadlines">工作日历期限策略；直接构造时使用默认日历。</param>
 public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository,
-    BusinessAssigneeAppService? businessAssignees = null) : IApprovalRuntimeAppService
+    BusinessAssigneeAppService? businessAssignees = null,
+    TaskDeadlinePolicy? taskDeadlines = null) : IApprovalRuntimeAppService
 {
+    /// <summary>
+    /// 将任务启动时刻转换成发布节点的工作日历期限。
+    /// </summary>
+    private readonly TaskDeadlinePolicy deadlinePolicy = taskDeadlines ?? TaskDeadlinePolicy.CreateDefault();
+
     /// <inheritdoc />
     public Task<IReadOnlyList<DepartureTaskRef>> ListDepartureTasksAsync(string departedPersonId,
         CancellationToken cancellationToken = default) =>
@@ -181,6 +189,8 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
 
         var previousStatuses = current?.Tasks.ToDictionary(task => task.Id, task => task.Status) ??
             new Dictionary<string, string>(StringComparer.Ordinal);
+        var previousTasks = snapshot?.Tasks.ToDictionary(task => task.Id) ??
+            new Dictionary<string, ApprovalTaskEntity>(StringComparer.Ordinal);
         var tasks = result.State.Tasks.Select(task => new ApprovalTaskEntity
         {
             Id = task.Id,
@@ -195,6 +205,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
                 (!previousStatuses.TryGetValue(task.Id, out var previousStatus) || previousStatus == EngineTaskStatuses.Pending)
                     ? input.Context.OccurredAt
                     : null,
+            DueAt = GetDueAt(task, input.Context.Graph, input.Context.OccurredAt, previousStatuses, previousTasks),
         }).ToArray();
         var events = BuildEvents(instance.Id, command.RequestId, result.Events, snapshot?.LastEvent);
         var outbox = result.Events.Select(item =>
@@ -248,6 +259,31 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         }
 
         return OperationHash.Verify(snapshot.Events, snapshot.LastEventSequence, snapshot.LastEventHash);
+    }
+
+    /// <summary>
+    /// 新待办或排队转待办从实际激活时刻起算，原待办的期限保持不变。
+    /// </summary>
+    /// <param name="task">引擎任务。</param>
+    /// <param name="graph">发起时锁定的发布执行图。</param>
+    /// <param name="occurredAt">本次命令时间。</param>
+    /// <param name="previousStatuses">命令前的任务状态。</param>
+    /// <param name="previousTasks">已持久化的任务投影。</param>
+    /// <returns>到期时刻或空值。</returns>
+    private DateTimeOffset? GetDueAt(EngineTask task, FlowExecutionGraph graph, DateTimeOffset occurredAt,
+        IReadOnlyDictionary<string, string> previousStatuses,
+        IReadOnlyDictionary<string, ApprovalTaskEntity> previousTasks)
+    {
+        var prior = previousTasks.TryGetValue(task.Id, out var persisted) ? persisted.DueAt : null;
+        if (task.Status != EngineTaskStatuses.Pending ||
+            previousStatuses.TryGetValue(task.Id, out var previousStatus) &&
+            previousStatus == EngineTaskStatuses.Pending)
+        {
+            return prior;
+        }
+
+        // 依次审批中排队任务尚未开始；只有实际成为待办才计算时限。
+        return deadlinePolicy.Calculate(graph, task, occurredAt);
     }
 
     /// <summary>

@@ -110,6 +110,11 @@ public sealed class RuntimeSnapshot
     public FlowVersionEntity FlowVersion { get; set; } = new();
 
     /// <summary>
+    /// 已保存的任务投影，供下一命令保留期限并识别刚进入待办的任务。
+    /// </summary>
+    public IReadOnlyList<ApprovalTaskEntity> Tasks { get; set; } = [];
+
+    /// <summary>
     /// 最新操作记录；审批单尚无事件时为空。
     /// </summary>
     public OperationEventEntity? LastEvent

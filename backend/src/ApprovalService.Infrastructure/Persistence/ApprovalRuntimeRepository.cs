@@ -23,9 +23,11 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             return null;
         }
         var version = await db.FlowVersions.AsNoTracking().SingleAsync(item => item.Id == instance.FlowVersionId, cancellationToken);
+        var tasks = await db.ApprovalTasks.AsNoTracking().Where(item => item.InstanceId == instanceId)
+            .OrderBy(item => item.Id).ToListAsync(cancellationToken);
         var lastEvent = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderByDescending(item => item.Sequence).FirstOrDefaultAsync(cancellationToken);
-        return new RuntimeSnapshot { Instance = instance, FlowVersion = version, LastEvent = lastEvent };
+        return new RuntimeSnapshot { Instance = instance, FlowVersion = version, Tasks = tasks, LastEvent = lastEvent };
     }
 
     /// <inheritdoc />

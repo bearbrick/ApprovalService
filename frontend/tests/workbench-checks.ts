@@ -5,6 +5,7 @@ import type { ConditionGroup } from '../src/designer/workbench/condition-model.t
 import { checkPublication } from '../src/designer/workbench/publication-check.ts'
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../src/designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
+import { simpleFlowTemplates } from '../src/designer/workbench/simple-templates.ts'
 import { actionsForNodeType, defaultActionsForNodeType } from '../src/designer/workbench/rule-options.ts'
 
 /**
@@ -32,7 +33,12 @@ export function runWorkbenchChecks(check: (name: string, value: boolean) => void
   invalidConfidential.isConfidential = 'yes' as unknown as boolean
   check('非布尔保密标记被前端发布预检拒绝', checkPublication(invalidConfidential).some(issue => issue.message.includes('保密流程标记')))
   check('空白自由画布具有唯一开始和结束且能通过结构预检', blank.canvas.nodes.length === 2 && checkPublication(blank).length === 0)
-  check('三个正式示例模板覆盖采购、费用与质量异常且均能通过发布预检', flowTemplates.length === 3 && flowTemplates.every(template => checkPublication(template.definition).length === 0))
+  check('十类正式模板覆盖常见审批且均能通过发布预检', flowTemplates.length === 10 &&
+    new Set(flowTemplates.map(template => template.code)).size === 10 &&
+    flowTemplates.every(template => checkPublication(template.definition).length === 0))
+  check('七类新增通用模板只定义审批图与业务字段，不带业务单据或外部动作', simpleFlowTemplates.length === 7 && simpleFlowTemplates.every(template =>
+    template.definition.data.fields.length > 0 && template.definition.canvas.nodes.length > 0 &&
+    template.definition.canvas.nodes.every(node => node.type !== 'automatic')))
   check('正式示例可展开明细字段并显示节点字段权限', flowTemplates.every(template => fieldReferences(template.definition.data).length >= template.definition.data.fields.length))
   check('办理节点默认只能提交且不能配置同意或拒绝', defaultActionsForNodeType('handling').join(',') === 'submit' && !actionsForNodeType('handling').includes('approve') && !actionsForNodeType('handling').includes('reject'))
   check('抄送节点不提供审批操作', defaultActionsForNodeType('cc').length === 0 && actionsForNodeType('cc').length === 0)

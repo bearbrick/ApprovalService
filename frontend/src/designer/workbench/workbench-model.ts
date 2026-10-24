@@ -3,6 +3,7 @@ import type { FlowApprovalSettings, FlowDefinition, FlowEdge, FlowNode } from '.
 import purchase from './samples/purchase-request.json' with { type: 'json' }
 import expense from './samples/expense.json' with { type: 'json' }
 import quality from './samples/quality-exception.json' with { type: 'json' }
+import { simpleFlowTemplates } from './simple-templates.ts'
 
 /**
  * 可定位到节点、连线或字段的一条设计问题。
@@ -120,6 +121,7 @@ export const flowTemplates: readonly FlowTemplate[] = [
   { code: 'PURCHASE_REQUEST', name: '采购申请', description: '部门审批、金额分支与采购执行', definition: normalizeSample(purchase as unknown as FlowDefinition) },
   { code: 'EXPENSE', name: '费用报销', description: '金额条件、会签与财务办理', definition: normalizeSample(expense as unknown as FlowDefinition) },
   { code: 'QUALITY_EXCEPTION', name: '质量异常', description: '返工回路与并行会审', definition: normalizeSample(quality as unknown as FlowDefinition) },
+  ...simpleFlowTemplates,
 ]
 
 /**

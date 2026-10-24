@@ -46,8 +46,12 @@ public static class ReportingMetricsCalculator
         var activatedAt = facts.TaskActivatedEvents
             .GroupBy(item => item.TaskId, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.Min(item => item.OccurredAt), StringComparer.Ordinal);
-        var durations = completed.ToDictionary(item => item.Id,
-            item => DurationMinutes(item, createdAt, activatedAt), StringComparer.Ordinal);
+        var durations = completed.ToDictionary(item => item.Id, item =>
+        {
+            DateTimeOffset? created = createdAt.TryGetValue(item.Id, out var createdValue) ? createdValue : null;
+            DateTimeOffset? activated = activatedAt.TryGetValue(item.Id, out var activatedValue) ? activatedValue : null;
+            return ReportingTaskMetricRules.TaskMinutes(item.CompletedAt, created, activated);
+        }, StringComparer.Ordinal);
 
         var flows = started.Select(item => item.FlowCode).Concat(ended.Select(item => item.FlowCode))
             .Distinct(StringComparer.Ordinal).OrderBy(item => item, StringComparer.Ordinal)
@@ -122,7 +126,7 @@ public static class ReportingMetricsCalculator
             CompletedCount = finished.Length,
             AverageDurationMinutes = Mean(finished.Select(item => durations[item.Id]).Where(item => item.HasValue).Select(item => item!.Value)),
             DueCount = expired.Length,
-            OverdueCount = expired.Count(item => IsOverdue(item, asOfUtc)),
+            OverdueCount = expired.Count(item => ReportingTaskMetricRules.IsOverdue(item, asOfUtc)),
         };
     }
 
@@ -147,42 +151,9 @@ public static class ReportingMetricsCalculator
             PendingCount = pending.Count(item => item.AssigneeId == assigneeId),
             CompletedCount = finished.Length,
             AverageDurationMinutes = Mean(finished.Select(item => durations[item.Id]).Where(item => item.HasValue).Select(item => item!.Value)),
-            OverdueCount = due.Count(item => item.AssigneeId == assigneeId && IsOverdue(item, asOfUtc)),
+            OverdueCount = due.Count(item => item.AssigneeId == assigneeId && ReportingTaskMetricRules.IsOverdue(item, asOfUtc)),
         };
     }
-
-    /// <summary>
-    /// 读取任务真实处理起点并计算有效历时。
-    /// </summary>
-    /// <param name="task">已完成任务。</param>
-    /// <param name="createdAt">任务创建事件。</param>
-    /// <param name="activatedAt">任务激活事件。</param>
-    /// <returns>历时分钟数；缺少有效事件时为空。</returns>
-    private static double? DurationMinutes(ReportingTaskFact task,
-        IReadOnlyDictionary<string, DateTimeOffset> createdAt, IReadOnlyDictionary<string, DateTimeOffset> activatedAt)
-    {
-        if (task.CompletedAt is null)
-        {
-            return null;
-        }
-
-        if (!activatedAt.TryGetValue(task.Id, out var start) && !createdAt.TryGetValue(task.Id, out start))
-        {
-            return null;
-        }
-
-        return task.CompletedAt < start ? null : (task.CompletedAt.Value - start).TotalMinutes;
-    }
-
-    /// <summary>
-    /// 识别已到期任务的逾期情况。
-    /// </summary>
-    /// <param name="task">已到期任务。</param>
-    /// <param name="asOfUtc">观察时间。</param>
-    /// <returns>逾期完成或仍待办时为真。</returns>
-    private static bool IsOverdue(ReportingTaskFact task, DateTimeOffset asOfUtc) =>
-        task.CompletedAt > task.DueAt ||
-        (task.Status == EngineTaskStatuses.Pending && task.CompletedAt is null && task.DueAt <= asOfUtc);
 
     /// <summary>
     /// 计算非空样本的平均值。

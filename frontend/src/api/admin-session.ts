@@ -42,6 +42,10 @@ export interface AdminSession {
    * 身份接口签发的令牌。
    */
   tokens: AdminTokens
+  /**
+   * 本次登录获准进入的管理范围；报表登录不能进入其他管理页面。
+   */
+  scope: 'admin' | 'reports'
 }
 
 /**
@@ -63,19 +67,21 @@ function isTokens(value: unknown): value is AdminTokens {
 }
 
 /**
- * 使用工号和密码建立本地会话，并核对当前组织管理员角色。
+ * 使用工号和密码建立本地会话；管理范围登录核对组织管理员角色。
  * @param employeeNumber 本地工号。
  * @param password 本地密码。
+ * @param scope 本次会话的页面范围。
  * @returns 登录结果；首次登录须先改密。
  */
-export async function loginAdmin(employeeNumber: string, password: string): Promise<AdminSession> {
+export async function loginAdmin(employeeNumber: string, password: string,
+  scope: 'admin' | 'reports' = 'admin'): Promise<AdminSession> {
   const tokens = await requestJson<unknown>('/api/v1/identity/login', {
     method: 'POST', body: { employeeNumber, password }, cache: 'no-store',
   })
   if (!isTokens(tokens)) throw new Error('登录响应不完整，请稍后重试。')
-  current = { employeeNumber, tokens }
+  current = { employeeNumber, tokens, scope }
   try {
-    if (!tokens.mustChangePassword) await verifyAdminSession()
+    if (!tokens.mustChangePassword && scope === 'admin') await verifyAdminSession()
     return current
   } catch (error) {
     current = null
@@ -87,9 +93,11 @@ export async function loginAdmin(employeeNumber: string, password: string): Prom
  * 首次登录修改密码后重新签发令牌并再次核对管理角色。
  * @param currentPassword 当前密码。
  * @param newPassword 新密码。
+ * @param scope 改密后的页面范围。
  * @returns 新会话。
  */
-export async function changeAdminPassword(currentPassword: string, newPassword: string): Promise<AdminSession> {
+export async function changeAdminPassword(currentPassword: string, newPassword: string,
+  scope: 'admin' | 'reports' = 'admin'): Promise<AdminSession> {
   if (!current) throw new Error('请先登录。')
   const employeeNumber = current.employeeNumber
   await requestJson<void>('/api/v1/identity/change-password', {
@@ -97,7 +105,17 @@ export async function changeAdminPassword(currentPassword: string, newPassword: 
     headers: { Authorization: `Bearer ${current.tokens.accessToken}` }, cache: 'no-store',
   })
   current = null
-  return loginAdmin(employeeNumber, newPassword)
+  return loginAdmin(employeeNumber, newPassword, scope)
+}
+
+/**
+ * 页面范围守卫；报表登录只能停留在统计页。
+ * @param session 当前本地会话。
+ * @param section 管理后台一级模块。
+ * @returns 是否允许进入该模块。
+ */
+export function canReadAdminSection(session: AdminSession | null, section: string): boolean {
+  return !!session && (session.scope === 'admin' || section === 'reports')
 }
 
 /**
@@ -112,11 +130,13 @@ export function adminSession(): AdminSession | null { return current }
 export function logoutAdmin(): void { current = null }
 
 /**
- * 必要时轮换短期令牌，再向管理接口发送。
+ * 必要时轮换短期令牌，并限制报表会话不能调用其他管理接口。
+ * @param requiredScope 调用方所需的页面范围。
  * @returns 可使用的访问令牌。
  */
-export async function adminAccessToken(): Promise<string> {
+export async function adminAccessToken(requiredScope: 'admin' | 'reports' = 'admin'): Promise<string> {
   if (!current || current.tokens.mustChangePassword) throw new Error('请先完成管理员登录。')
+  if (current.scope === 'reports' && requiredScope !== 'reports') throw new Error('此会话仅可查看报表。')
   if (Date.parse(current.tokens.accessExpiresAt) > Date.now() + 30_000) return current.tokens.accessToken
   const tokens = await requestJson<unknown>('/api/v1/identity/refresh', {
     method: 'POST', body: { refreshToken: current.tokens.refreshToken }, cache: 'no-store',

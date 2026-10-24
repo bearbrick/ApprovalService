@@ -1,5 +1,9 @@
 .admin-reports { display: grid; gap: 17px; }
 .admin-report-filters { margin-bottom: 2px; }
+.admin-report-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.admin-report-export-error, .admin-report-export-success { margin: 0 20px 16px; font-size: 13px; }
+.admin-report-export-error { color: #b42318; }
+.admin-report-export-success { color: #176c42; }
 .admin-report-fields { display: grid; grid-template-columns: repeat(5, minmax(145px, 1fr)); gap: 12px; padding: 17px 20px 20px; }
 .admin-report-fields label { display: grid; align-content: start; gap: 7px; color: #46556b; font-size: 12px; }
 .admin-report-fields input { width: 100%; min-height: 39px; padding: 8px 10px; border: 1px solid #dbe2ec; border-radius: 4px; background: #fff; color: var(--ink); }
@@ -14,4 +18,4 @@
 .admin-report-empty { padding: 14px 18px; border: 1px dashed #cbd8e8; border-radius: 5px; color: var(--muted); font-size: 13px; }
 @media (max-width: 1150px) { .admin-report-fields { grid-template-columns: repeat(3, minmax(145px, 1fr)); } }
 @media (max-width: 720px) { .admin-report-fields, .admin-report-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } .admin-report-secret small { margin-left: 0; } }
-@media (max-width: 480px) { .admin-report-fields, .admin-report-summary { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 480px) { .admin-report-fields, .admin-report-summary { grid-template-columns: minmax(0, 1fr); } .admin-report-actions { justify-content: flex-start; } }

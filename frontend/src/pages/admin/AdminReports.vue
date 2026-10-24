@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { ApiError } from '../../api/http.ts'
-import { loadAdminReports } from '../../api/admin-reports.ts'
+import { downloadAdminReport, loadAdminReports } from '../../api/admin-reports.ts'
 import type { ReportBundle, ReportFilter } from '../../api/admin-reports.ts'
 import UiEmptyState from '../../components/ui/UiEmptyState.vue'
 import '../../styles/admin-reports.css'
@@ -56,9 +56,25 @@ const report = ref<ReportBundle | null>(null)
  */
 const error = ref('')
 /**
+ * Excel 导出中的等待状态。
+ */
+const exporting = ref(false)
+/**
+ * Excel 导出失败的中文说明。
+ */
+const exportError = ref('')
+/**
+ * Excel 导出完成的反馈。
+ */
+const exportSuccess = ref('')
+/**
  * 最新请求的取消控制器。
  */
 let request: AbortController | null = null
+/**
+ * 导出请求的取消控制器。
+ */
+let exportRequest: AbortController | null = null
 
 /**
  * 查询全部报表数据并阻止旧请求覆盖最新筛选。
@@ -66,6 +82,11 @@ let request: AbortController | null = null
  */
 async function load(): Promise<void> {
   request?.abort()
+  exportRequest?.abort()
+  exportRequest = null
+  exporting.value = false
+  exportError.value = ''
+  exportSuccess.value = ''
   const current = new AbortController()
   request = current
   report.value = null
@@ -82,6 +103,47 @@ async function load(): Promise<void> {
     if (cause instanceof ApiError && cause.status === 401) { emit('lost'); return }
     error.value = cause instanceof Error ? cause.message : '读取报表失败，请稍后重试。'
     state.value = cause instanceof ApiError && cause.status === 403 ? 'forbidden' : 'error'
+  }
+}
+
+/**
+ * 用当前筛选和报表会话下载服务端生成的四表 Excel 汇总。
+ * @returns 下载操作完成。
+ */
+async function download(): Promise<void> {
+  if (exporting.value) return
+  const current = new AbortController()
+  exportRequest = current
+  exporting.value = true
+  exportError.value = ''
+  exportSuccess.value = ''
+  try {
+    const workbook = await downloadAdminReport({ ...filter.value }, current.signal)
+    if (exportRequest !== current || current.signal.aborted) return
+    const url = URL.createObjectURL(workbook.blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = workbook.fileName
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    exportSuccess.value = 'Excel 汇总已下载。'
+  } catch (cause) {
+    if (exportRequest !== current || current.signal.aborted) return
+    if (cause instanceof ApiError && cause.status === 401) { emit('lost'); return }
+    if (cause instanceof ApiError && cause.status === 403) {
+      report.value = null
+      error.value = cause.message
+      state.value = 'forbidden'
+      return
+    }
+    exportError.value = cause instanceof Error ? cause.message : '导出 Excel 失败，请稍后重试。'
+  } finally {
+    if (exportRequest === current) {
+      exportRequest = null
+      exporting.value = false
+    }
   }
 }
 
@@ -105,13 +167,13 @@ function rate(numerator: number, denominator: number): string {
 }
 
 watch(() => props.tab, () => { void load() }, { immediate: true })
-onBeforeUnmount(() => request?.abort())
+onBeforeUnmount(() => { request?.abort(); exportRequest?.abort() })
 </script>
 
 <template>
   <section class="admin-reports">
     <form class="admin-panel admin-report-filters" @submit.prevent="load">
-      <div class="admin-panel-head"><div><h2>统计范围</h2><p>按发起时的部门快照筛选；时间范围左闭右开，当前待办以查询时刻为准。</p></div><button class="btn btn-primary" type="submit" :disabled="state === 'loading'">{{ state === 'loading' ? '查询中…' : '查询报表' }}</button></div>
+      <div class="admin-panel-head"><div><h2>统计范围</h2><p>按发起时的部门快照筛选；时间范围左闭右开，当前待办以查询时刻为准。</p></div><div class="admin-report-actions"><button class="btn" type="button" :disabled="exporting || state === 'loading' || state === 'forbidden'" @click="download">{{ exporting ? '导出中…' : '导出 Excel' }}</button><button class="btn btn-primary" type="submit" :disabled="state === 'loading'">{{ state === 'loading' ? '查询中…' : '查询报表' }}</button></div></div>
       <div class="admin-report-fields">
         <label>开始时间（包含）<input v-model="filter.fromLocal" type="datetime-local" required></label>
         <label>结束时间（不包含）<input v-model="filter.untilLocal" type="datetime-local" required></label>
@@ -119,6 +181,8 @@ onBeforeUnmount(() => request?.abort())
         <label>来源应用编码<input v-model="filter.clientAppCode" type="text" placeholder="全部应用"></label>
         <label>发起部门 ID<input v-model="filter.departmentId" type="text" placeholder="仅查询有权查看的部门"></label>
       </div>
+      <p v-if="exportError" class="admin-report-export-error" role="alert">{{ exportError }}</p>
+      <p v-if="exportSuccess" class="admin-report-export-success" role="status">{{ exportSuccess }}</p>
     </form>
 
     <UiEmptyState v-if="state === 'loading'" title="正在读取统计" description="将同时读取概览、流程、节点和人员指标。" icon="refresh" />

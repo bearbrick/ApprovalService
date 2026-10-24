@@ -1,5 +1,27 @@
-import { getJson } from './http.ts'
+import { ApiError, getJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
+
+/**
+ * 与后端报表工作簿契约一致的媒体类型和文件名。
+ */
+const reportWorkbook = {
+  contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  fileName: 'approval-report.xlsx',
+} as const
+
+/**
+ * 已验证的报表工作簿下载内容。
+ */
+export interface ReportWorkbook {
+  /**
+   * Excel Open XML 文件。
+   */
+  blob: Blob
+  /**
+   * 固定安全下载文件名。
+   */
+  fileName: string
+}
 
 /**
  * 管理报表的本地时间与维度筛选。
@@ -271,4 +293,62 @@ export async function loadAdminReports(filter: ReportFilter, signal: AbortSignal
   }
   return { overview, flows: flows.items as ReportFlow[], nodes: nodes.items as ReportNode[],
     people: people.items as ReportPerson[] }
+}
+
+/**
+ * 在与 JSON 报表相同的权限和筛选下下载四表汇总工作簿。
+ * @param filter 页面当前日期与维度筛选。
+ * @param signal 页面切换或新查询的取消信号。
+ * @returns 经媒体类型和 ZIP 文件头验证的工作簿。
+ */
+export async function downloadAdminReport(filter: ReportFilter, signal: AbortSignal): Promise<ReportWorkbook> {
+  const token = await adminAccessToken('reports')
+  const query = reportQuery(filter)
+  if (signal.aborted) throw new ApiError('CANCELLED', '导出已取消。', '', { kind: 'cancelled' })
+  let response: Response
+  try {
+    response = await fetch('/api/v1/admin/reports/export' + query, {
+      method: 'GET', headers: { Authorization: `Bearer ${token}`, Accept: reportWorkbook.contentType },
+      cache: 'no-store', signal,
+    })
+  } catch {
+    if (signal.aborted) throw new ApiError('CANCELLED', '导出已取消。', '', { kind: 'cancelled' })
+    throw new ApiError('NETWORK_ERROR', '无法连接审批流服务，请检查网络后重试。', '', { kind: 'network' })
+  }
+  if (!response.ok) {
+    let code = `HTTP_${response.status}`
+    let message = `报表导出失败（HTTP ${response.status}）。`
+    let traceId = response.headers.get('X-Trace-Id') ?? ''
+    try {
+      const body: unknown = await response.json()
+      if (isRecord(body)) {
+        if (typeof body.code === 'string' && body.code) code = body.code
+        if (typeof body.message === 'string' && body.message) message = body.message
+        if (typeof body.traceId === 'string' && body.traceId) traceId = body.traceId
+      }
+    } catch {
+      // 网关可能返回 HTML，错误仍保留 HTTP 状态和可理解的中文说明。
+    }
+    throw new ApiError(code, message, traceId, { status: response.status })
+  }
+  if (response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase() !== reportWorkbook.contentType) {
+    throw new ApiError('INVALID_RESPONSE', '服务返回的报表文件类型不正确。', '',
+      { status: response.status, kind: 'invalid-response' })
+  }
+  let blob: Blob
+  let header: Uint8Array
+  try {
+    blob = await response.blob()
+    header = new Uint8Array(await blob.slice(0, 4).arrayBuffer())
+  } catch {
+    if (signal.aborted) throw new ApiError('CANCELLED', '导出已取消。', '', { kind: 'cancelled' })
+    throw new ApiError('NETWORK_ERROR', '读取报表文件失败，请检查网络后重试。', '',
+      { status: response.status, kind: 'network' })
+  }
+  if (signal.aborted) throw new ApiError('CANCELLED', '导出已取消。', '', { kind: 'cancelled' })
+  if (header.length !== 4 || header[0] !== 0x50 || header[1] !== 0x4b || header[2] !== 0x03 || header[3] !== 0x04) {
+    throw new ApiError('INVALID_RESPONSE', '服务返回的报表文件已损坏，请重试。', '',
+      { status: response.status, kind: 'invalid-response' })
+  }
+  return { blob, fileName: reportWorkbook.fileName }
 }

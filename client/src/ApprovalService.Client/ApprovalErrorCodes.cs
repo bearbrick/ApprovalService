@@ -32,6 +32,11 @@ public static class ApprovalErrorCodes
     public const string ValidationFailed = "VALIDATION_FAILED";
 
     /// <summary>
+    /// 业务系统钩子超时、不可用或响应无效。
+    /// </summary>
+    public const string BusinessHookFailed = "BUSINESS_HOOK_FAILED";
+
+    /// <summary>
     /// 和当前状态冲突，如审批单已经结束。
     /// </summary>
     public const string Conflict = "CONFLICT";

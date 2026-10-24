@@ -1,0 +1,299 @@
+{
+  "schemaVersion": 1,
+  "code": "EXPENSE",
+  "name": "费用报销审批",
+  "canvas": {
+    "nodes": [
+      {
+        "id": "start",
+        "type": "start",
+        "name": "业务系统发起",
+        "x": 80,
+        "y": 260
+      },
+      {
+        "id": "manager",
+        "type": "approval",
+        "name": "直属主管审批",
+        "x": 290,
+        "y": 260,
+        "assignee": {
+          "source": "manager"
+        },
+        "approval": {
+          "allowedActions": [
+            "approve",
+            "reject",
+            "return"
+          ],
+          "commentRequired": true
+        }
+      },
+      {
+        "id": "split",
+        "type": "inclusiveGateway",
+        "name": "按金额与类别复核",
+        "x": 520,
+        "y": 260,
+        "gatewayPairId": "reviews",
+        "gatewayDirection": "split"
+      },
+      {
+        "id": "finance",
+        "type": "approval",
+        "name": "财务审核票据",
+        "x": 750,
+        "y": 100,
+        "assignee": {
+          "source": "role",
+          "value": "FINANCE_REVIEWER"
+        },
+        "approval": {
+          "mode": "all",
+          "allowedActions": [
+            "approve",
+            "reject"
+          ]
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "verifiedAmount",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "travel",
+        "type": "approval",
+        "name": "差旅合规复核",
+        "x": 750,
+        "y": 400,
+        "assignee": {
+          "source": "role",
+          "value": "TRAVEL_REVIEWER"
+        },
+        "approval": {
+          "allowedActions": [
+            "approve",
+            "reject"
+          ]
+        }
+      },
+      {
+        "id": "join",
+        "type": "inclusiveGateway",
+        "name": "复核汇合",
+        "x": 1010,
+        "y": 260,
+        "gatewayPairId": "reviews",
+        "gatewayDirection": "join"
+      },
+      {
+        "id": "payment",
+        "type": "handling",
+        "name": "出纳办理付款",
+        "x": 1250,
+        "y": 260,
+        "assignee": {
+          "source": "role",
+          "value": "CASHIER"
+        },
+        "approval": {
+          "allowedActions": [
+            "submit"
+          ]
+        },
+        "fieldPermissions": [
+          {
+            "fieldKey": "paymentReference",
+            "access": "editable"
+          }
+        ]
+      },
+      {
+        "id": "end",
+        "type": "end",
+        "name": "结束",
+        "x": 1480,
+        "y": 260
+      }
+    ],
+    "edges": [
+      {
+        "id": "e01",
+        "sourceId": "start",
+        "targetId": "manager"
+      },
+      {
+        "id": "e02",
+        "sourceId": "manager",
+        "targetId": "split"
+      },
+      {
+        "id": "e03",
+        "sourceId": "split",
+        "targetId": "finance",
+        "priority": 1,
+        "condition": "${claimAmount} >= 3000"
+      },
+      {
+        "id": "e04",
+        "sourceId": "split",
+        "targetId": "travel",
+        "priority": 2,
+        "condition": "${category} == \"travel\""
+      },
+      {
+        "id": "e05",
+        "sourceId": "split",
+        "targetId": "join",
+        "priority": 3,
+        "isDefault": true
+      },
+      {
+        "id": "e06",
+        "sourceId": "finance",
+        "targetId": "join"
+      },
+      {
+        "id": "e07",
+        "sourceId": "travel",
+        "targetId": "join"
+      },
+      {
+        "id": "e08",
+        "sourceId": "join",
+        "targetId": "payment"
+      },
+      {
+        "id": "e09",
+        "sourceId": "payment",
+        "targetId": "end"
+      }
+    ]
+  },
+  "data": {
+    "fields": [
+      {
+        "key": "title",
+        "name": "报销事由",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "category",
+        "name": "费用类别",
+        "type": "text",
+        "required": true
+      },
+      {
+        "key": "claimAmount",
+        "name": "申请金额",
+        "type": "money",
+        "required": true
+      },
+      {
+        "key": "receipt",
+        "name": "票据附件",
+        "type": "attachment",
+        "required": true
+      },
+      {
+        "key": "lines",
+        "name": "费用明细",
+        "type": "detailTable",
+        "children": [
+          {
+            "key": "date",
+            "name": "消费日期",
+            "type": "date"
+          },
+          {
+            "key": "description",
+            "name": "说明",
+            "type": "text"
+          },
+          {
+            "key": "amount",
+            "name": "金额",
+            "type": "money"
+          }
+        ]
+      },
+      {
+        "key": "verifiedAmount",
+        "name": "核定金额",
+        "type": "money",
+        "approverInput": true
+      },
+      {
+        "key": "paymentReference",
+        "name": "付款流水号",
+        "type": "text",
+        "approverInput": true
+      }
+    ],
+    "summaryFields": [
+      "title",
+      "category",
+      "claimAmount"
+    ]
+  },
+  "detailLayout": {
+    "mode": "custom",
+    "groups": [
+      {
+        "title": "报销信息",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "title"
+          },
+          {
+            "fieldKey": "category"
+          },
+          {
+            "fieldKey": "claimAmount"
+          },
+          {
+            "fieldKey": "receipt"
+          }
+        ]
+      },
+      {
+        "title": "费用与核定",
+        "columns": 2,
+        "items": [
+          {
+            "fieldKey": "lines"
+          },
+          {
+            "fieldKey": "verifiedAmount"
+          },
+          {
+            "fieldKey": "paymentReference"
+          }
+        ]
+      }
+    ]
+  },
+  "printSettings": {
+    "orientation": "portrait",
+    "fieldKeys": [
+      "title",
+      "category",
+      "claimAmount",
+      "receipt",
+      "lines",
+      "verifiedAmount",
+      "paymentReference"
+    ],
+    "showComments": true,
+    "showSignatures": true,
+    "showQrCode": true,
+    "includeReceiptPages": true
+  },
+  "allowedClientApps": [
+    "DEMO_WINUI"
+  ]
+}

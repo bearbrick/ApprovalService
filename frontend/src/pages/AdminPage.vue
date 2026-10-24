@@ -5,7 +5,7 @@ import { ADMIN_TABS, TAB_TITLES } from '../model/navigation.ts'
 import { resolveAdminView } from '../model/admin.ts'
 import type { AdminViewData } from '../model/admin.ts'
 import { adminAdapter, AdminAdapterUnavailableError } from '../api/admin-adapter.ts'
-import { adminSession, changeAdminPassword, loginAdmin, logoutAdmin } from '../api/admin-session.ts'
+import { adminSession, canReadAdminSection, changeAdminPassword, loginAdmin, logoutAdmin } from '../api/admin-session.ts'
 import type { AdminSession } from '../api/admin-session.ts'
 import { ApiError } from '../api/http.ts'
 import UiEmptyState from '../components/ui/UiEmptyState.vue'
@@ -19,6 +19,7 @@ import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
 import AdminClientAppEditor from './admin/AdminClientAppEditor.vue'
 import AdminAccountEditor from './admin/AdminAccountEditor.vue'
 import AdminPasswordEditor from './admin/AdminPasswordEditor.vue'
+import AdminReports from './admin/AdminReports.vue'
 import '../styles/admin.css'
 
 /**
@@ -152,7 +153,8 @@ async function submitLogin(): Promise<void> {
   signingIn.value = true
   signInError.value = ''
   try {
-    const result = await loginAdmin(employeeNumber.value.trim(), password.value)
+    const result = await loginAdmin(employeeNumber.value.trim(), password.value,
+      view.value?.section === 'reports' ? 'reports' : 'admin')
     session.value = result
     if (result.tokens.mustChangePassword) currentPassword.value = password.value
     else void load()
@@ -173,7 +175,8 @@ async function submitPasswordChange(): Promise<void> {
   signingIn.value = true
   signInError.value = ''
   try {
-    session.value = await changeAdminPassword(currentPassword.value, newPassword.value)
+    session.value = await changeAdminPassword(currentPassword.value, newPassword.value,
+      view.value?.section === 'reports' ? 'reports' : 'admin')
     currentPassword.value = ''
     newPassword.value = ''
     void load()
@@ -221,6 +224,13 @@ async function load(): Promise<void> {
   error.value = ''
   if (!session.value || session.value.tokens.mustChangePassword) { state.value = 'unavailable'; return }
   if (!view.value) { state.value = 'error'; error.value = '管理页面不存在。'; return }
+  if (!canReadAdminSection(session.value, view.value.section)) {
+    state.value = 'error'
+    error.value = '此会话仅允许查看统计报表。请退出后使用组织管理员身份登录。'
+    return
+  }
+  // 报表组件独立调用四条受 JWT 保护的接口，不经管理员专属数据适配器。
+  if (view.value.section === 'reports') { state.value = 'ready'; return }
   const current = new AbortController()
   request = current
   state.value = 'loading'
@@ -244,14 +254,16 @@ onBeforeUnmount(() => request?.abort())
 </script>
 
 <template>
-  <header class="page-header admin-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>管理后台</span><template v-if="view && view.section !== 'overview'"><span>/</span><span>{{ view.title }}</span></template></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ view?.title ?? '管理后台' }}</h1><span class="badge">{{ session && !session.tokens.mustChangePassword ? '管理员已登录' : '需要登录' }}</span><button v-if="session && !session.tokens.mustChangePassword" class="btn" type="button" @click="signOut">退出登录</button></div><p>{{ view?.description ?? '查看管理模块。' }}</p></header>
+  <header class="page-header admin-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>管理后台</span><template v-if="view && view.section !== 'overview'"><span>/</span><span>{{ view.title }}</span></template></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ view?.title ?? '管理后台' }}</h1><span class="badge">{{ session && !session.tokens.mustChangePassword ? (session.scope === 'reports' ? '报表会话' : '管理员已登录') : '需要登录' }}</span><button v-if="session && !session.tokens.mustChangePassword" class="btn" type="button" @click="signOut">退出登录</button></div><p>{{ view?.description ?? '查看管理模块。' }}</p></header>
   <div class="page-body admin-page-body">
-    <section v-if="!session" class="admin-panel admin-login-card"><h2>管理员登录</h2><p>请使用本地组织管理员账号登录，管理权限由服务端实时核对。</p><form @submit.prevent="submitLogin"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><button class="btn btn-primary" type="submit" :disabled="signingIn">{{ signingIn ? '正在登录…' : '登录' }}</button></form></section>
+    <section v-if="!session" class="admin-panel admin-login-card"><h2>{{ view?.section === 'reports' ? '报表登录' : '管理员登录' }}</h2><p>{{ view?.section === 'reports' ? '组织管理员和直接负责部门的负责人可登录查看授权范围内的统计。' : '请使用本地组织管理员账号登录，管理权限由服务端实时核对。' }}</p><form @submit.prevent="submitLogin"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><button class="btn btn-primary" type="submit" :disabled="signingIn">{{ signingIn ? '正在登录…' : '登录' }}</button></form></section>
     <section v-else-if="session.tokens.mustChangePassword" class="admin-panel admin-login-card"><h2>首次登录请修改密码</h2><p>临时密码只能用于改密，完成后才可进入管理后台。</p><form @submit.prevent="submitPasswordChange"><label>当前密码<input v-model="currentPassword" type="password" autocomplete="current-password" required></label><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><div class="admin-login-actions"><button class="btn btn-primary" type="submit" :disabled="signingIn">保存新密码</button><button class="btn" type="button" @click="signOut">退出</button></div></form></section>
     <template v-else>
     <nav v-if="tabs.length" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
     <template v-if="view">
-      <AdminOverview v-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
+      <section v-if="!canReadAdminSection(session, view.section)" class="admin-panel"><UiEmptyState title="当前会话仅可查看报表" :description="error" icon="alert"><template #action><button class="btn btn-primary" type="button" @click="signOut">退出并重新登录</button></template></UiEmptyState></section>
+      <AdminReports v-else-if="view.section === 'reports'" :tab="view.tab" @lost="signOut" />
+      <AdminOverview v-else-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
       <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>

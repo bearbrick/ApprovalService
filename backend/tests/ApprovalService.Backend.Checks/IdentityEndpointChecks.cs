@@ -46,6 +46,12 @@ internal static class IdentityEndpointChecks
                         EmployeeNumber = "ADMIN-001",
                         Name = "组织管理员",
                     });
+                    db.People.Add(new PersonEntity
+                    {
+                        Id = "staff-person",
+                        EmployeeNumber = "STAFF-001",
+                        Name = "普通人员",
+                    });
                     db.OrganizationRoles.Add(new OrganizationRoleEntity
                     {
                         Code = "organization-admin",
@@ -83,6 +89,61 @@ internal static class IdentityEndpointChecks
             using (var template = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate, local.AccessToken))
             {
                 check("本地密码管理员令牌可下载组织模板", template.StatusCode == HttpStatusCode.OK);
+            }
+
+            using (var anonymous = await client.PostAsJsonAsync(ApiRoutes.IdentityProvision,
+                new IdentityProvisionRequest("staff-person", "temporary-staff-password")))
+            {
+                check("匿名请求不能开通本地人员账号", anonymous.StatusCode == HttpStatusCode.Unauthorized);
+            }
+
+            using (var provision = await PostAuthorizedAsync(client, ApiRoutes.IdentityProvision,
+                new IdentityProvisionRequest("staff-person", "temporary-staff-password"), local.AccessToken))
+            using (var duplicate = await PostAuthorizedAsync(client, ApiRoutes.IdentityProvision,
+                new IdentityProvisionRequest("staff-person", "temporary-staff-password"), local.AccessToken))
+            {
+                check("本地组织管理员可为在职人员开通账号且重复请求返回冲突",
+                    provision.StatusCode == HttpStatusCode.NoContent && duplicate.StatusCode == HttpStatusCode.Conflict);
+            }
+
+            IdentityTokensResponse staff;
+            using (var login = await client.PostAsJsonAsync(ApiRoutes.IdentityLogin,
+                new IdentityLoginRequest("STAFF-001", "temporary-staff-password")))
+            {
+                staff = (await login.Content.ReadFromJsonAsync<IdentityTokensResponse>())!;
+                check("管理员开通的账号首次登录只获得改密令牌",
+                    login.StatusCode == HttpStatusCode.OK && staff.MustChangePassword);
+            }
+
+            using (var change = await PostAuthorizedAsync(client, ApiRoutes.IdentityChangePassword,
+                new IdentityChangePasswordRequest("temporary-staff-password", "new-staff-password"), staff.AccessToken))
+            {
+                check("新开通人员首次改密成功", change.StatusCode == HttpStatusCode.NoContent);
+            }
+
+            using (var login = await client.PostAsJsonAsync(ApiRoutes.IdentityLogin,
+                new IdentityLoginRequest("STAFF-001", "new-staff-password")))
+            {
+                staff = (await login.Content.ReadFromJsonAsync<IdentityTokensResponse>())!;
+            }
+
+            using (var forbidden = await PostAuthorizedAsync(client, ApiRoutes.IdentityRevokeAll,
+                new IdentityRevokeRequest("admin-person"), staff.AccessToken))
+            {
+                check("普通本地人员不能作废管理员会话", forbidden.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var revoked = await PostAuthorizedAsync(client, ApiRoutes.IdentityRevokeAll,
+                new IdentityRevokeRequest("staff-person"), local.AccessToken))
+            using (var oldRefresh = await client.PostAsJsonAsync(ApiRoutes.IdentityRefresh,
+                new IdentityRefreshRequest(staff.RefreshToken)))
+            using (var renewedLogin = await client.PostAsJsonAsync(ApiRoutes.IdentityLogin,
+                new IdentityLoginRequest("STAFF-001", "new-staff-password")))
+            {
+                check("管理员作废人员旧会话后旧刷新令牌失效且密码仍可重新登录",
+                    revoked.StatusCode == HttpStatusCode.NoContent &&
+                    oldRefresh.StatusCode == HttpStatusCode.Unauthorized &&
+                    renewedLogin.StatusCode == HttpStatusCode.OK);
             }
 
             using (var unsigned = await client.PostAsJsonAsync(ApiRoutes.EmbedTokens,

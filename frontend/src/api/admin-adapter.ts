@@ -1,6 +1,6 @@
 import type { AdminViewData } from '../model/admin.ts'
 import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData } from '../model/admin-data.ts'
-import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory, AdminOutbox } from '../model/admin-data.ts'
+import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory, AdminOutbox, AdminPerson } from '../model/admin-data.ts'
 import { ApiError, getJson, requestJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
 
@@ -131,6 +131,50 @@ export async function loadAdminBindingOptions(): Promise<{ apps: AdminClientApp[
   if (!Array.isArray(apps) || !directory || !Array.isArray(directory.people)
     || !Array.isArray(directory.departments)) throw new Error('绑定选项响应不完整。')
   return { apps, directory }
+}
+
+/**
+ * 从受保护组织目录读取账号管理可选择的人员，不暴露密码或令牌。
+ * @returns 当前组织人员的安全摘要。
+ */
+export async function loadAdminAccountPeople(): Promise<AdminPerson[]> {
+  const token = await adminAccessToken()
+  const directory = await getJson<AdminDirectory>('/api/v1/admin/org/directory', {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+  })
+  if (!directory || !Array.isArray(directory.people) || directory.people.some(person => !person
+    || typeof person.id !== 'string' || typeof person.employeeNumber !== 'string'
+    || typeof person.name !== 'string' || typeof person.isActive !== 'boolean')) {
+    throw new Error('组织人员响应不完整。')
+  }
+  return directory.people
+}
+
+/**
+ * 为已有在职人员开通本地账号，临时密码只随本次请求发送。
+ * @param personId 内部人员 ID。
+ * @param temporaryPassword 首次登录专用的临时密码。
+ * @returns 保存完成。
+ */
+export async function provisionAdminAccount(personId: string, temporaryPassword: string): Promise<void> {
+  const token = await adminAccessToken()
+  await requestJson<void>('/api/v1/identity/provision', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    body: { personId, temporaryPassword },
+  })
+}
+
+/**
+ * 作废人员目前的访问与刷新令牌，账号和密码仍可继续使用。
+ * @param personId 内部人员 ID。
+ * @returns 作废完成。
+ */
+export async function revokeAdminSessions(personId: string): Promise<void> {
+  const token = await adminAccessToken()
+  await requestJson<void>('/api/v1/identity/revoke-all', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+    body: { personId },
+  })
 }
 
 /**

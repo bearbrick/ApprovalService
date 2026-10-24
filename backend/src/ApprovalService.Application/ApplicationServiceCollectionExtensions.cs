@@ -5,6 +5,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Application.Notifications;
 using ApprovalService.Application.Organization;
+using ApprovalService.Application.Reporting;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -50,6 +51,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<INotificationSettingsAppService, NotificationSettingsAppService>();
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
+        services.AddScoped<ReportingQueryAppService>();
         return services;
     }
 }

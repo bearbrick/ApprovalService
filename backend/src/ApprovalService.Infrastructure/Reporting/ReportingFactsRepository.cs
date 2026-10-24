@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.Json;
 using ApprovalService.Contracts;
+using ApprovalService.Contracts.Flows;
 using ApprovalService.Domain.Reporting;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Engine.Execution;
@@ -99,6 +100,39 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
         {
             await transaction.CommitAsync(cancellationToken);
             return new ReportingFacts();
+        }
+
+        // 保密性由发起时锁定的版本决定；找不到或损坏版本时不能默认公开。
+        var versionIds = instanceFacts.Select(item => item.FlowVersionId).Distinct(StringComparer.Ordinal).ToArray();
+        var versions = await db.FlowVersions.AsNoTracking()
+            .Where(item => versionIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.GraphJson })
+            .ToListAsync(cancellationToken);
+        var confidentialByVersion = new Dictionary<string, bool>(StringComparer.Ordinal);
+        foreach (var version in versions)
+        {
+            FlowExecutionGraph graph;
+            try
+            {
+                graph = JsonSerializer.Deserialize<FlowExecutionGraph>(version.GraphJson, ApprovalJson.Options) ??
+                    throw new InvalidDataException("流程执行图为空，不能判断报表保密范围。");
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException("流程执行图损坏，不能判断报表保密范围。", exception);
+            }
+
+            confidentialByVersion.Add(version.Id, graph.IsConfidential);
+        }
+
+        foreach (var item in instanceFacts)
+        {
+            if (!confidentialByVersion.TryGetValue(item.FlowVersionId, out var isConfidential))
+            {
+                throw new InvalidDataException("审批单的锁定流程版本不存在，不能判断报表保密范围。");
+            }
+
+            item.IsConfidential = isConfidential;
         }
 
         var instanceIds = instanceFacts.Select(item => item.Id).ToArray();

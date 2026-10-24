@@ -93,6 +93,14 @@ public sealed class ReportingInstanceFact
     public string FlowVersionId { get; set; } = string.Empty;
 
     /// <summary>
+    /// 发起时锁定流程版本的保密标记；旧执行图缺省为非保密。
+    /// </summary>
+    public bool IsConfidential
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 来源应用编码。
     /// </summary>
     public string ClientAppCode { get; set; } = string.Empty;

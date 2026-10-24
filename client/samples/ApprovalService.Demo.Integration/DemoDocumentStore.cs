@@ -10,13 +10,19 @@ namespace ApprovalService.Demo.Integration;
 /// </summary>
 public sealed class DemoDocumentStore
 {
-    /// <summary>本机业务文件的绝对路径。</summary>
+    /// <summary>
+    /// 本机业务文件的绝对路径。
+    /// </summary>
     private readonly string path;
 
-    /// <summary>保证同一进程内读取、去重与落盘为一个操作。</summary>
+    /// <summary>
+    /// 保证同一进程内读取、去重与落盘为一个操作。
+    /// </summary>
     private readonly object gate = new();
 
-    /// <summary>当前业务单据和已处理的回调事件。</summary>
+    /// <summary>
+    /// 当前业务单据和已处理的回调事件。
+    /// </summary>
     private DemoStoreSnapshot snapshot;
 
     /// <summary>
@@ -214,7 +220,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>检查业务单号非空。</summary>
+    /// <summary>
+    /// 检查业务单号非空。
+    /// </summary>
     /// <param name="businessKey">待检查单号。</param>
     private static void RequireKey(string businessKey)
     {
@@ -224,7 +232,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>防止另一审批单的回调覆盖已关联业务单据。</summary>
+    /// <summary>
+    /// 防止另一审批单的回调覆盖已关联业务单据。
+    /// </summary>
     /// <param name="current">已有实例 ID。</param>
     /// <param name="incoming">收到的实例 ID。</param>
     private static void CheckInstance(string? current, string incoming)
@@ -235,7 +245,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>将报销审批人字段保存在独立列。</summary>
+    /// <summary>
+    /// 将报销审批人字段保存在独立列。
+    /// </summary>
     /// <param name="item">业务原单。</param>
     /// <param name="values">审批人填写值。</param>
     private static void ApplyExpenseValues(ExpenseClaim item, Dictionary<string, object?>? values)
@@ -256,7 +268,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>将采购审批人字段保存在独立列。</summary>
+    /// <summary>
+    /// 将采购审批人字段保存在独立列。
+    /// </summary>
     /// <param name="item">业务原单。</param>
     /// <param name="values">审批人填写值。</param>
     private static void ApplyPurchaseValues(PurchaseRequest item, Dictionary<string, object?>? values)
@@ -272,7 +286,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>从按动作事件 ID 索引的结果里读取订单号。</summary>
+    /// <summary>
+    /// 从按动作事件 ID 索引的结果里读取订单号。
+    /// </summary>
     /// <param name="item">采购业务单。</param>
     /// <param name="results">回调携带的独立动作结果。</param>
     private static void ApplyOrderResult(PurchaseRequest item, Dictionary<string, object?>? results)
@@ -291,7 +307,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>将内存快照写入临时文件后原子替换业务文件。</summary>
+    /// <summary>
+    /// 将内存快照写入临时文件后原子替换业务文件。
+    /// </summary>
     private void Persist()
     {
         var directory = Path.GetDirectoryName(path) ?? throw new InvalidOperationException("业务文件目录无效。");
@@ -318,7 +336,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>读取已保存的数据，不把损坏文件当成新空库。</summary>
+    /// <summary>
+    /// 读取已保存的数据，不把损坏文件当成新空库。
+    /// </summary>
     /// <param name="bytes">文件字节。</param>
     /// <returns>已验证快照。</returns>
     private static DemoStoreSnapshot ReadSnapshot(byte[] bytes)
@@ -335,7 +355,9 @@ public sealed class DemoDocumentStore
         }
     }
 
-    /// <summary>序列化一个文档或整个业务库。</summary>
+    /// <summary>
+    /// 序列化一个文档或整个业务库。
+    /// </summary>
     /// <typeparam name="T">数据类型。</typeparam>
     /// <param name="value">待序列化对象。</param>
     /// <returns>JSON 原始字节。</returns>
@@ -346,7 +368,9 @@ public sealed class DemoDocumentStore
         return stream.ToArray();
     }
 
-    /// <summary>业务读取时返回副本，避免调用方绕过落盘。</summary>
+    /// <summary>
+    /// 业务读取时返回副本，避免调用方绕过落盘。
+    /// </summary>
     /// <typeparam name="T">数据类型。</typeparam>
     /// <param name="value">当前值。</param>
     /// <returns>独立副本。</returns>
@@ -364,15 +388,21 @@ public sealed class DemoDocumentStore
 [DataContract]
 internal sealed class DemoStoreSnapshot
 {
-    /// <summary>费用报销单。</summary>
+    /// <summary>
+    /// 费用报销单。
+    /// </summary>
     [DataMember(Name = "expenses")]
     public List<ExpenseClaim> Expenses { get; set; } = new();
 
-    /// <summary>采购申请单。</summary>
+    /// <summary>
+    /// 采购申请单。
+    /// </summary>
     [DataMember(Name = "purchases")]
     public List<PurchaseRequest> Purchases { get; set; } = new();
 
-    /// <summary>已经应用到原单的回调事件 ID。</summary>
+    /// <summary>
+    /// 已经应用到原单的回调事件 ID。
+    /// </summary>
     [DataMember(Name = "processedEventIds")]
     public List<string> ProcessedEventIds { get; set; } = new();
 }

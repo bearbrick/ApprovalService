@@ -39,6 +39,7 @@ internal static class Program
         await AdvancedApiChecks.RunAsync(Check);
         DemoIntegrationChecks.Run(Check);
         await DemoGatewayChecks.RunAsync(Check);
+        await DemoBusinessHttpChecks.RunAsync(Check);
         ArchitectureChecks.Run(clientRoot, Check);
         DocumentationChecks.Run(clientRoot, Check);
         await LiveServerChecks.RunAsync(Check);

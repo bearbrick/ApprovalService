@@ -125,6 +125,7 @@ app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
 app.MapReportingEndpoints();
 app.MapFlowManagementEndpoints();
+app.MapFlowSimulationEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();

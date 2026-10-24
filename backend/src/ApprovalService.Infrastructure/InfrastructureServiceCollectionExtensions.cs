@@ -1,3 +1,4 @@
+using ApprovalService.Application.Administration;
 using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
@@ -69,6 +70,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<IFlowManagementRepository, FlowManagementRepository>();
+        services.AddSingleton<IFlowSimulationSessionStore, MemoryFlowSimulationSessionStore>();
         services.AddScoped<IFlowTransferRepository, FlowTransferRepository>();
         services.AddScoped<IFlowVersionRepository, FlowVersionRepository>();
         services.AddScoped<FlowAdministratorIdentityReconciler>();

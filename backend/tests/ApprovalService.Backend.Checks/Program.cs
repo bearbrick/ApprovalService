@@ -105,6 +105,7 @@ internal static class Program
         await FlowManagementIdentityChecks.RunAsync(Check);
         await FlowManagementMigrationIntegrationChecks.RunAsync(Check);
         await FlowManagementHttpChecks.RunAsync(backendRoot, Check);
+        await FlowSimulationChecks.RunAsync(Check);
         await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);
         await FileChecks.RunAsync(backendRoot, Check);

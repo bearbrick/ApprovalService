@@ -159,6 +159,35 @@ public sealed class FlowManagementAppService(IFlowManagementRepository repositor
     }
 
     /// <summary>
+    /// 按预期状态停用或恢复新审批单发起，不影响已锁定版本的在途单。
+    /// </summary>
+    /// <param name="code">稳定流程编码。</param>
+    /// <param name="request">目标状态、预期状态和原因。</param>
+    /// <param name="actorId">已认证内部人员 ID。</param>
+    /// <param name="isLocalSession">是否本地账号会话。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>状态变更后的流程详情。</returns>
+    public async Task<AdminFlowResponse> SetEnabledAsync(string code, AdminFlowEnabledRequest request,
+        string actorId, bool isLocalSession, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        await RequireIdentityAsync(actorId, isLocalSession, cancellationToken);
+        ValidateReason(request.Reason);
+        var snapshot = await repository.SetEnabledAsync(new FlowEnabledWrite
+        {
+            Code = code,
+            ExpectedEnabled = request.ExpectedEnabled,
+            Enabled = request.Enabled,
+            ActorId = actorId,
+            IsLocalSession = isLocalSession,
+            Reason = request.Reason.Trim(),
+            AuditId = Guid.NewGuid().ToString("N"),
+            OccurredAt = timeProvider.GetUtcNow(),
+        }, cancellationToken);
+        return Response(snapshot, true);
+    }
+
+    /// <summary>
     /// 从当前组织主数据判断当前会话至少可管理一个范围。
     /// </summary>
     /// <param name="actorId">已认证人员。</param>

@@ -36,6 +36,11 @@ internal static class FlowManagementEndpoints
             CancellationToken cancellationToken) =>
             service.PublishAsync(code, request, PersonId(http), IsLocal(http), cancellationToken))
             .RequireAuthorization();
+        app.MapPut(ApiRoutes.AdminFlowEnabled, (HttpContext http, string code,
+            AdminFlowEnabledRequest request, FlowManagementAppService service,
+            CancellationToken cancellationToken) =>
+            service.SetEnabledAsync(code, request, PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
         return app;
     }
 

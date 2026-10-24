@@ -124,6 +124,33 @@ public sealed class AdminFlowPublishRequest
 }
 
 /// <summary>
+/// 按当前状态停用或恢复新审批单发起。
+/// </summary>
+public sealed class AdminFlowEnabledRequest
+{
+    /// <summary>
+    /// 操作者上次读取的启用状态。
+    /// </summary>
+    public bool ExpectedEnabled
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 目标启用状态。
+    /// </summary>
+    public bool Enabled
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 状态变更原因。
+    /// </summary>
+    public string Reason { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// 管理后台可访问的流程、草稿修订和当前发布版摘要。
 /// </summary>
 public sealed class AdminFlowResponse

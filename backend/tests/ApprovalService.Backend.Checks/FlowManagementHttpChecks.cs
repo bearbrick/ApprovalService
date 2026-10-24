@@ -6,6 +6,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Persistence;
@@ -178,6 +179,62 @@ internal static class FlowManagementHttpChecks
                 await db.FlowManagementAudits.CountAsync() == 4 &&
                 await db.FlowManagementAudits.AllAsync(item => item.ContentSha256 != null &&
                     item.ContentSha256.Length == 64));
+
+            var enabledPath = ApiRoutes.AdminFlowEnabled.Replace("{code}", "FLOW_MANAGED",
+                StringComparison.Ordinal);
+            using (var disabled = await SendAsync(client, HttpMethod.Put, enabledPath, manager,
+                new AdminFlowEnabledRequest
+                {
+                    ExpectedEnabled = true,
+                    Enabled = false,
+                    Reason = "试点暂停新单发起",
+                }))
+            {
+                var body = await disabled.Content.ReadFromJsonAsync<AdminFlowResponse>();
+                check("停用只切断新发起且保留当前发布版", disabled.IsSuccessStatusCode &&
+                    body is { IsEnabled: false, PublishedVersion: 2 } &&
+                    await db.FlowVersions.CountAsync(item => item.FlowId == flowId) == 2);
+            }
+
+            var catalog = scope.ServiceProvider.GetRequiredService<IFlowCatalogRepository>();
+            check("停用流程不再进入开放发起目录", await catalog.LoadPublishedAsync("FLOW_MANAGED") is null);
+            using (var staleEnabled = await SendAsync(client, HttpMethod.Put, enabledPath, manager,
+                new AdminFlowEnabledRequest
+                {
+                    ExpectedEnabled = true,
+                    Enabled = true,
+                    Reason = "使用旧启用状态",
+                }))
+            {
+                check("启停操作也拒绝过期状态", staleEnabled.StatusCode == HttpStatusCode.Conflict);
+            }
+
+            using (var same = await SendAsync(client, HttpMethod.Put, enabledPath, manager,
+                new AdminFlowEnabledRequest
+                {
+                    ExpectedEnabled = false,
+                    Enabled = false,
+                    Reason = "确认仍暂停新单",
+                }))
+            {
+                check("重复停用为幂等读取且不增加审计", same.IsSuccessStatusCode &&
+                    await db.FlowManagementAudits.CountAsync() == 5);
+            }
+
+            using (var enabled = await SendAsync(client, HttpMethod.Put, enabledPath, manager,
+                new AdminFlowEnabledRequest
+                {
+                    ExpectedEnabled = false,
+                    Enabled = true,
+                    Reason = "恢复试点新单发起",
+                }))
+            {
+                var body = await enabled.Content.ReadFromJsonAsync<AdminFlowResponse>();
+                check("恢复新发起沿用原发布版并保留停启用审计", enabled.IsSuccessStatusCode &&
+                    body is { IsEnabled: true, PublishedVersion: 2 } &&
+                    await catalog.LoadPublishedAsync("FLOW_MANAGED") is not null &&
+                    await db.FlowManagementAudits.CountAsync() == 6);
+            }
 
             var oldDefinition = ReadSample(backendRoot);
             oldDefinition.Code = "LEGACY_MANAGED";

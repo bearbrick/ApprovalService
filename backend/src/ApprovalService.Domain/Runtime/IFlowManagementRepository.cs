@@ -51,6 +51,15 @@ public interface IFlowManagementRepository
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>新发布后的快照。</returns>
     Task<ManagedFlowSnapshot> PublishAsync(FlowPublishWrite input, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 按预期状态停用或恢复新发起，保留所有在途发布版。
+    /// </summary>
+    /// <param name="input">带乐观并发前提的状态变更。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>状态变更后的流程快照。</returns>
+    Task<ManagedFlowSnapshot> SetEnabledAsync(FlowEnabledWrite input,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -288,6 +297,64 @@ public sealed class FlowPublishWrite
 
     /// <summary>
     /// 发布时间。
+    /// </summary>
+    public DateTimeOffset OccurredAt
+    {
+        get; set;
+    }
+}
+
+/// <summary>
+/// 管理员启停流程新发起的可信写入。
+/// </summary>
+public sealed class FlowEnabledWrite
+{
+    /// <summary>
+    /// 稳定流程编码。
+    /// </summary>
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 操作者上次读取的启用状态。
+    /// </summary>
+    public bool ExpectedEnabled
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 希望保存的新启用状态。
+    /// </summary>
+    public bool Enabled
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 已认证的内部人员 ID。
+    /// </summary>
+    public string ActorId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 是否由本地账号签发会话。
+    /// </summary>
+    public bool IsLocalSession
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 实际变更原因。
+    /// </summary>
+    public string Reason { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 新审计记录 ID。
+    /// </summary>
+    public string AuditId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 操作时间。
     /// </summary>
     public DateTimeOffset OccurredAt
     {

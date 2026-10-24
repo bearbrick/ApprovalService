@@ -240,6 +240,54 @@ public sealed class FlowManagementRepository(IDbContextFactory<ApprovalDbContext
         return new ManagedFlowSnapshot { Flow = flow, Draft = draft, Published = version };
     }
 
+    /// <inheritdoc />
+    public async Task<ManagedFlowSnapshot> SetEnabledAsync(FlowEnabledWrite input,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
+        var flow = await db.Flows.AsNoTracking().SingleOrDefaultAsync(item => item.Code == input.Code,
+            cancellationToken) ?? throw NotFound();
+        await RequireManagementAsync(db, input.ActorId, input.IsLocalSession, flow, cancellationToken);
+        if (flow.IsEnabled != input.ExpectedEnabled)
+        {
+            throw Conflict("流程启用状态已变化，请刷新后重试。");
+        }
+
+        if (flow.IsEnabled == input.Enabled)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return await SnapshotAsync(db, flow, cancellationToken);
+        }
+
+        var switched = await db.Flows.Where(item => item.Id == flow.Id &&
+                item.IsEnabled == input.ExpectedEnabled)
+            .ExecuteUpdateAsync(update => update.SetProperty(item => item.IsEnabled, input.Enabled),
+                cancellationToken);
+        if (switched != 1)
+        {
+            throw Conflict("流程启用状态已变化，请刷新后重试。");
+        }
+
+        var published = flow.PublishedVersionId is not null
+            ? await LoadVersionAsync(db, flow.PublishedVersionId, cancellationToken) : null;
+        db.FlowManagementAudits.Add(new FlowManagementAuditEntity
+        {
+            Id = input.AuditId,
+            FlowId = flow.Id,
+            ActorId = input.ActorId,
+            Action = input.Enabled ? "enable" : "disable",
+            Reason = input.Reason,
+            PublishedVersion = published?.Version,
+            OccurredAt = input.OccurredAt,
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        flow.IsEnabled = input.Enabled;
+        return await SnapshotAsync(db, flow, cancellationToken);
+    }
+
     /// <summary>
     /// 在当前数据库快照内读取人员、角色与直接部门关系。
     /// </summary>

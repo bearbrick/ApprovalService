@@ -166,6 +166,11 @@ public static class ApiRoutes
     public const string AdminFlowPublish = AdminFlowByCode + "/publish";
 
     /// <summary>
+    /// 停用或恢复流程的新审批单发起。
+    /// </summary>
+    public const string AdminFlowEnabled = AdminFlowByCode + "/enabled";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

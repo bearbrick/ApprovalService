@@ -66,6 +66,7 @@ internal static class Program
         await PersistenceChecks.RunAsync(Check);
         await ReportingChecks.RunAsync(Check);
         ReportingMetricsChecks.Run(Check);
+        ReportingProjectionChecks.Run(Check);
         await ReportingQueryChecks.RunAsync(Check);
         await ReportingEndpointChecks.RunAsync(backendRoot, Check);
         await EventAnchorChecks.RunAsync(Check);

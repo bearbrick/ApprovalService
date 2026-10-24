@@ -60,6 +60,14 @@ internal static class FlowSemanticValidator
                 Add(issues, node.Id, $"节点“{node.Id}”的处理人字段“{node.Assignee.FieldKey}”不存在。");
             }
 
+            // 指定人员兜底是静态必填配置；实际人员状态仍在到达节点时核对。
+            if (node.Type is FlowNodeTypes.Approval or FlowNodeTypes.Handling or FlowNodeTypes.Cc &&
+                node.Approval?.MissingAssigneeBehavior == FlowMissingAssigneeBehaviors.Specified &&
+                string.IsNullOrWhiteSpace(node.Approval.MissingAssigneeUserId))
+            {
+                Add(issues, node.Id, $"节点“{node.Id}”选择找不到处理人时转交指定人员，必须填写指定人员 ID。");
+            }
+
             foreach (var permission in node.FieldPermissions ?? [])
             {
                 if (!fields.Contains(permission.FieldKey))

@@ -188,6 +188,8 @@ export function validateCanvasDefinition(definition: FlowDefinition): CanvasIssu
   for (const node of nodes) {
     if (new Set<string>([flowNodeTypes.Approval, flowNodeTypes.Handling, flowNodeTypes.Cc]).has(node.type) && !node.assignee?.source?.trim()) add(node.id, `人工节点“${node.id}”必须配置处理人来源。`)
     if (node.assignee?.fieldKey?.trim() && !paths.has(node.assignee.fieldKey)) add(node.id, `节点“${node.id}”的处理人字段“${node.assignee.fieldKey}”不存在。`)
+    // 指定人员兜底缺少目标 ID 会在运行时失败，应在发布前定位到节点。
+    if (new Set<string>([flowNodeTypes.Approval, flowNodeTypes.Handling, flowNodeTypes.Cc]).has(node.type) && node.approval?.missingAssigneeBehavior === 'specified' && !node.approval.missingAssigneeUserId?.trim()) add(node.id, `节点“${node.id}”选择找不到处理人时转交指定人员，必须填写指定人员 ID。`)
     for (const permission of node.fieldPermissions ?? []) if (!paths.has(permission.fieldKey)) add(node.id, `节点“${node.id}”的字段权限引用了不存在的字段“${permission.fieldKey}”。`)
   }
   for (const key of definition.data?.summaryFields ?? []) if (!paths.has(key)) add(key, `摘要字段“${key}”不存在。`)

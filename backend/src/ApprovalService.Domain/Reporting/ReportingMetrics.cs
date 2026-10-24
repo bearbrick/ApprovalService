@@ -52,6 +52,14 @@ public sealed class ReportingMetricsQuery
     {
         get; set;
     }
+
+    /// <summary>
+    /// 可选的多个直接负责部门 ID；空集合表示无可见部门。
+    /// </summary>
+    public IReadOnlyList<string>? InitiatorDepartmentIds
+    {
+        get; set;
+    }
 }
 
 /// <summary>

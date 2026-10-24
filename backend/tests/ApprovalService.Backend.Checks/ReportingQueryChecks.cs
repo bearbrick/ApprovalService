@@ -43,7 +43,12 @@ internal static class ReportingQueryChecks
                 db.People.AddRange(
                     new PersonEntity { Id = "admin", EmployeeNumber = "A1", Name = "管理员" },
                     new PersonEntity { Id = "reader", EmployeeNumber = "R1", Name = "普通人员" },
+                    new PersonEntity { Id = "head", EmployeeNumber = "H1", Name = "部门负责人" },
                     new PersonEntity { Id = "inactive", EmployeeNumber = "I1", Name = "停用管理员", IsActive = false });
+                db.Departments.AddRange(
+                    new DepartmentEntity { Id = "D1", Code = "D1", Name = "公开部门", HeadPersonId = "head" },
+                    new DepartmentEntity { Id = "D2", Code = "D2", Name = "子部门", ParentId = "D1" },
+                    new DepartmentEntity { Id = "D3", Code = "D3", Name = "另一直属部门", HeadPersonId = "head" });
                 db.OrganizationRoles.Add(new OrganizationRoleEntity { Code = "organization-admin", Name = "组织管理员" });
                 db.PersonRoles.AddRange(
                     new PersonRoleEntity { PersonId = "admin", RoleCode = "organization-admin" },
@@ -191,6 +196,17 @@ internal static class ReportingQueryChecks
                 !responseJson.Contains("secret-review", StringComparison.Ordinal) &&
                 !responseJson.Contains("secret-person", StringComparison.Ordinal) &&
                 result.VisibleMetrics.People.Single().AssigneeId == "safe-person");
+            var headResult = await service.GetAsync(input, "head", IdentitySessionKinds.Local);
+            check("部门负责人只能看到直接负责部门，子部门保密数据不随父部门授权",
+                headResult.VisibleMetrics.Flows.Single().FlowCode == "PUBLIC" &&
+                headResult.ConfidentialStartedCount == 0 && headResult.ConfidentialCompletedCount == 0);
+            check("部门负责人显式请求下级或非直属部门被拒绝",
+                await IsRejectedAsync(() => service.GetAsync(new ReportingQueryInput
+                {
+                    FromUtc = start,
+                    UntilUtc = start.AddDays(1),
+                    InitiatorDepartmentId = "D2",
+                }, "head", IdentitySessionKinds.Local), ErrorCodes.Forbidden));
             check("嵌入会话、普通人员与停用管理员均不能调用内部报表",
                 await IsRejectedAsync(() => service.GetAsync(input, "admin", IdentitySessionKinds.Embed), ErrorCodes.Forbidden) &&
                 await IsRejectedAsync(() => service.GetAsync(input, "reader", IdentitySessionKinds.Local), ErrorCodes.Forbidden) &&

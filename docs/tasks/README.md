@@ -63,7 +63,9 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-043](T-043-confidential-visibility.md) | 保密流程与抄送收件人附件可见性 | 后端 + 契约镜像 | M3 | T-013、T-041、T-042 | Runtime、Files、Contracts/Flows、frontend/src/model |
 | [T-045](T-045-canvas-polish.md) | 自由画布走线与评审预览 | 前端 | M1 | T-009、T-011 | src/designer/canvas |
 | [T-046](T-046-bpmn-modeler.md) | 使用标准 BPMN 建模器替换自绘画布 | 前端 | M1 | T-009、T-045 | src/designer/canvas |
+| [T-053](T-053-service-node-properties.md) | BPMN 画布的审批服务属性 | 前端 | M1 | T-046 已验证稳定快照 | src/designer/workbench、src/designer/canvas |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
+
 
 新增任务：复制 [_template.md](_template.md)，编号取当前最大值加 1，并在上表追加一行（只追加，不改别的行）。

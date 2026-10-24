@@ -119,6 +119,7 @@
 ## 数据
 
 - MVP 用 SQLite（数据目录 `ApprovalService:Data:Directory`）；和标签服务一样用 EF Core，三种数据库的迁移都生成，不写某一种数据库特有的 SQL，切换只改配置（`DataOptions`）。
+- 部署可选单实例 Linux Docker 或 Windows 服务。`Api/Hosting/RequestMetrics` 以固定路由模板聚合 HTTP 数量和耗时，`/metrics` 默认仅本机访问，远程采集要求部署密钥；不把审批单号或人员写进标签。`Infrastructure/Hosting/SqliteBackupService` 用 `VACUUM INTO` 备份 SQLite 活动库，复制本地附件及登录签名密钥；每日按服务器本地时间执行，发现待执行迁移时先拍升级前快照，失败拒绝迁移。恢复过程与演练见 `backend/deploy/README.md`。
 - 审批库和业务库分开：审批服务不连业务库，业务数据只通过接口进出，审批库里只存审批要用的快照。
 - 主要数据表见设计书第 9 节。
 - `Domain/Runtime` 定义流程、版本、审批单、任务投影、只追加事件、待发项和定时任务；`Infrastructure/Persistence` 为三种提供程序维护同一模型和各自迁移。SQLite 启动时迁移，数据库不可连接时就绪检查返回 503。

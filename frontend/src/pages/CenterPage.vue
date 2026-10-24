@@ -9,9 +9,9 @@ import { loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, takeEmbed
 import type { CenterEmbedContext } from '../api/center-embed.ts'
 import { requestJson } from '../api/http.ts'
 import { ApiError } from '../api/http-types.ts'
-import UiEmptyState from '../components/ui/UiEmptyState.vue'
 import CenterList from './center/CenterList.vue'
 import CenterDetailView from './center/CenterDetailView.vue'
+import CenterSettings from './center/CenterSettings.vue'
 import '../styles/center.css'
 
 /**
@@ -319,7 +319,7 @@ onBeforeUnmount(() => request?.abort())
     <template v-else>
     <nav v-if="!route.resourceId" class="center-tabs" aria-label="审批列表"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined">{{ item.title }}</a><a href="#/center/settings" :aria-current="route.section === 'settings' ? 'page' : undefined">个人设置</a></nav>
     <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
-    <section v-else-if="route.section === 'settings'" class="center-card center-settings-empty"><UiEmptyState title="个人设置尚未接入" description="委托、签名、常用语和提醒偏好将在账号与审批中心接口接入后开放。当前不会保存任何设置。" icon="info" /></section>
+    <CenterSettings v-else-if="route.section === 'settings'" @unauthorized="signOut" />
     <CenterList v-else :section="section" :items="items" :state="state" :error="error" :busy="actionBusy" :batch-message="batchMessage" @reload="load" @batch="executeBatch" />
     <p class="workspace-note">审批中心只处理审批与查看进度，不创建或修改业务单据。</p>
     </template>

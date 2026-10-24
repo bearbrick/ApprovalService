@@ -5,6 +5,7 @@ import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/cente
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
 import { fetchCenterFile } from '../src/api/center-files.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
+import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -65,6 +66,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   const originalFetch = globalThis.fetch
   const requests: { path: string, authorization: string, method: string, body: string }[] = []
   let allowActions = false
+  let failPreference = false
+  const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
@@ -81,6 +84,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       if (path.endsWith('/files/file-visible')) {
         return new Response(new Blob(['PDF'], { type: 'application/pdf' }), { status: 200,
           headers: { 'Content-Type': 'application/pdf' } })
+      }
+      if (path.startsWith('/api/v1/notifications/preferences')) {
+        if (path !== '/api/v1/notifications/preferences') {
+          if (failPreference) return new Response(JSON.stringify({ code: 'CONFLICT', message: '保存失败。' }), { status: 409 })
+          const category = decodeURIComponent(path.split('/').at(-1) ?? '')
+          const value = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { emailEnabled: boolean, inAppEnabled: boolean }
+          savedPreferences.set(category, value)
+          return new Response(JSON.stringify({ category, ...value }), { status: 200 })
+        }
+        return new Response(JSON.stringify(notificationCategories.map(item => ({ category: item.code,
+          emailEnabled: savedPreferences.get(item.code)?.emailEnabled ?? true,
+          inAppEnabled: item.code === 'dailyDigest' ? false : savedPreferences.get(item.code)?.inAppEnabled ?? true }))), { status: 200 })
       }
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
@@ -148,6 +163,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.at(-2)?.body.includes('"action":"approve"') === true
       && requests.at(-1)?.body.includes('"taskIds":["task-1"]') === true
       && batch[0]?.succeeded === true && batch[0]?.instanceId === 'instance-1')
+    const preferences = await loadCenterPreferences()
+    const savedPreference = await saveCenterPreference({ ...preferences[0]!, emailEnabled: false })
+    const persisted = await loadCenterPreferences()
+    failPreference = true
+    let saveRejected = false
+    try { await saveCenterPreference({ ...persisted[0]!, emailEnabled: true }) } catch { saveRejected = true }
+    check('个人提醒偏好只用人员 JWT 持久读取和保存，失败不能假称成功',
+      preferences.length === 8 && preferences[7]?.inAppEnabled === false
+      && savedPreference.emailEnabled === false && persisted[0]?.emailEnabled === false && saveRejected
+      && requests.slice(-4).every(request => request.authorization === 'Bearer test-token')
+      && requests.at(-3)?.method === 'PUT' && requests.at(-3)?.body === '{"emailEnabled":false,"inAppEnabled":true}'
+      && requests.at(-2)?.method === 'GET')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()

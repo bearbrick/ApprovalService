@@ -55,7 +55,7 @@
 | `Notifications/Calendar` | 纯工作日历规则：周末、节假日与调休覆盖、指定时区投影；按默认 09:00–18:00 或调用方配置的工作时段累计节点分钟时限，通知模块负责写入任务期限 | 第 4、6 节 |
 | `Files` | 附件存储（本地、MinIO / S3）、权限检查、清理 | 第 9 节 |
 | `Printing` | 审批单 PDF | 第 7 节 |
-| `Reporting` | 统计汇总、报表 | 第 8 节 |
+| `Reporting` | 跨期事实读取、管理范围内的报表查询与后续汇总 | 第 8 节、ADR 0019 |
 | `Services` | 服务自身的信息（骨架已有） | — |
 
 模块之间只通过接口调用，以后哪个模块要拆成平台的公共服务（消息中心、文件服务、统一认证、主数据）都好拆。
@@ -150,3 +150,4 @@
 - `src/ApprovalService.Client`：SDK，兼容 net461，不依赖任何包，协议常量是后端 Contracts 的副本。
 - `samples/ApprovalService.Demo.Integration`：示例业务系统的对接类库（net48、net10.0），不依赖界面框架，业务系统照抄它。
 - `samples/ApprovalService.Demo.WinUI`（待建）：示例业务系统的 WinUI 3 界面，只引用对接类库。
+

@@ -27,7 +27,10 @@ public static class ReportingMetricsCalculator
         var instances = facts.Instances.Where(item =>
             (query.FlowCode is null || item.FlowCode == query.FlowCode) &&
             (query.ClientAppCode is null || item.ClientAppCode == query.ClientAppCode) &&
-            (query.InitiatorDepartmentId is null || item.InitiatorDepartmentId == query.InitiatorDepartmentId)).ToArray();
+            (query.InitiatorDepartmentId is null || item.InitiatorDepartmentId == query.InitiatorDepartmentId) &&
+            (query.InitiatorDepartmentIds is null ||
+                (item.InitiatorDepartmentId is not null &&
+                 query.InitiatorDepartmentIds.Contains(item.InitiatorDepartmentId)))).ToArray();
         var instanceById = instances.ToDictionary(item => item.Id, StringComparer.Ordinal);
         var tasks = facts.Tasks.Where(item => instanceById.ContainsKey(item.InstanceId)).ToArray();
         var started = instances.Where(item => InWindow(item.StartedAt, query)).ToArray();

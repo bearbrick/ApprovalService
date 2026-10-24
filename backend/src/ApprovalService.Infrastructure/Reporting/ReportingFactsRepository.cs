@@ -30,7 +30,7 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
         return ReadCoreAsync(db => db.Instances.AsNoTracking()
             .Where(item => item.StartedAt >= query.InstanceStartedFromUtc &&
                 item.StartedAt < query.InstanceStartedUntilUtc),
-            query.FlowCode, query.ClientAppCode, query.InitiatorDepartmentId, cancellationToken);
+            query.FlowCode, query.ClientAppCode, query.InitiatorDepartmentId, null, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -50,7 +50,8 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
                 ((task.CompletedAt >= query.FromUtc && task.CompletedAt < query.UntilUtc) ||
                  (task.DueAt >= query.FromUtc && task.DueAt < query.UntilUtc && task.DueAt <= query.AsOfUtc) ||
                  (task.Status == EngineTaskStatuses.Pending && task.CompletedAt == null)))),
-            query.FlowCode, query.ClientAppCode, query.InitiatorDepartmentId, cancellationToken);
+            query.FlowCode, query.ClientAppCode, query.InitiatorDepartmentId,
+            query.InitiatorDepartmentIds, cancellationToken);
     }
 
     /// <summary>
@@ -60,10 +61,12 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
     /// <param name="flowCode">可选流程编码。</param>
     /// <param name="clientAppCode">可选来源应用编码。</param>
     /// <param name="departmentId">可选发起部门快照。</param>
+    /// <param name="departmentIds">可选直接负责部门 ID 集合。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>不含标题和业务数据的统计事实。</returns>
     private async Task<ReportingFacts> ReadCoreAsync(Func<ApprovalDbContext, IQueryable<InstanceEntity>> selectInstances,
-        string? flowCode, string? clientAppCode, string? departmentId, CancellationToken cancellationToken)
+        string? flowCode, string? clientAppCode, string? departmentId,
+        IReadOnlyList<string>? departmentIds, CancellationToken cancellationToken)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
@@ -81,6 +84,12 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
         if (departmentId is not null)
         {
             instances = instances.Where(item => item.InitiatorDepartmentId == departmentId);
+        }
+
+        if (departmentIds is not null)
+        {
+            instances = instances.Where(item => item.InitiatorDepartmentId != null &&
+                departmentIds.Contains(item.InitiatorDepartmentId));
         }
 
         // 仅读取统计字段，避免业务数据及保密详情越过未来报表授权层。

@@ -74,6 +74,11 @@
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
+| `GET /api/v1/admin/reports/overview`、`/flows`、`/nodes`、`/people` | 本地 JWT + 当前组织管理员或直接负责部门的负责人 | 查询管理范围内的匿名报表指标；保密流程仅计入匿名数量 |
+
+四条报表 GET 共用查询参数：必填 `fromUtc`、`untilUtc` 是带零时区偏移的 ISO 8601 时间，区间为左闭右开；可选 `flowCode`、`clientAppCode`、`departmentId` 均为单个非空文本。重复参数、非 UTC 时间或空区间返回 `VALIDATION_FAILED`。组织管理员可查全部或指定发起部门；当前在职部门负责人只能查其直接负责的部门，可不传 `departmentId` 合并所有直属部门，不自动包含下级；越权返回 `FORBIDDEN`。嵌入会话和普通人员均返回 `FORBIDDEN`，未登录返回 `UNAUTHORIZED`。部门按审批发起时快照筛选。
+
+`overview` 返回 `{visibleStartedCount, visibleCompletedCount, visiblePendingCount, visibleOverdueCount, confidentialStartedCount, confidentialCompletedCount}`；`flows` 返回 `{items, confidentialStartedCount, confidentialCompletedCount}`，公开流程每项含 `flowCode, startedCount, completedCount, approvedCount, rejectedCount, withdrawnCount, averageDurationMinutes, p90DurationMinutes`；`nodes` 返回 `{items}`，每项含 `flowCode, nodeId, completedCount, averageDurationMinutes, dueCount, overdueCount`；`people` 返回 `{items}`，每项含 `assigneeId, pendingCount, completedCount, averageDurationMinutes, overdueCount`。无耗时样本时平均值、P90 为 `null`，按通用 JSON 约定省略。保密流程只贡献匿名发起与结束量，不出现在流程、节点或人员项中。发起量按 `StartedAt`，结束量与历时按 `EndedAt`，P90 只用已结束审批单；`dueCount` 是区间内到期且查询时已到期任务数，`overdueCount` 为其中逾期任务数；当前待办以查询时刻为准。
 
 `GET /api/v1/info` 的响应：
 

@@ -7,7 +7,7 @@ using ApprovalService.Domain.Shared;
 namespace ApprovalService.Application.Reporting;
 
 /// <summary>
-/// 内部组织管理员报表查询；保密审批只提供匿名数量。
+/// 本地组织管理员及直接负责部门的负责人报表查询；保密审批只提供匿名数量。
 /// </summary>
 /// <param name="organization">当前组织和角色权限。</param>
 /// <param name="factsRepository">跨期最小化事实读取。</param>
@@ -16,7 +16,7 @@ public sealed class ReportingQueryAppService(IOrganizationRepository organizatio
     IReportingFactsRepository factsRepository, TimeProvider timeProvider)
 {
     /// <summary>
-    /// 核对本地会话和当前组织管理员角色后计算内部报表。
+    /// 核对本地会话与当前组织管理范围后计算报表。
     /// </summary>
     /// <param name="input">时间、流程、来源和部门筛选。</param>
     /// <param name="actorId">已验证令牌中的内部人员 ID。</param>
@@ -32,10 +32,30 @@ public sealed class ReportingQueryAppService(IOrganizationRepository organizatio
             throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录。");
         }
 
-        if (sessionKind != IdentitySessionKinds.Local ||
-            !await organization.IsOrganizationAdminAsync(actorId, cancellationToken))
+        if (sessionKind != IdentitySessionKinds.Local)
         {
-            throw new UserFriendlyException(ErrorCodes.Forbidden, "仅本地登录的组织管理员可查看报表。");
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "仅本地登录的管理员或部门负责人可查看报表。");
+        }
+
+        var isOrganizationAdmin = await organization.IsOrganizationAdminAsync(actorId, cancellationToken);
+        string[]? directlyManagedDepartments = null;
+        if (!isOrganizationAdmin)
+        {
+            var master = await organization.LoadMasterDataAsync(cancellationToken);
+            if (!master.People.Any(item => item.Id == actorId && item.IsActive))
+            {
+                throw new UserFriendlyException(ErrorCodes.Forbidden, "当前人员不具备报表查看权限。");
+            }
+
+            directlyManagedDepartments = master.Departments
+                .Where(item => item.HeadPersonId == actorId)
+                .Select(item => item.Id).Distinct(StringComparer.Ordinal).ToArray();
+            if (directlyManagedDepartments.Length == 0 ||
+                (input.InitiatorDepartmentId is not null &&
+                 !directlyManagedDepartments.Contains(input.InitiatorDepartmentId, StringComparer.Ordinal)))
+            {
+                throw new UserFriendlyException(ErrorCodes.Forbidden, "只能查看直接负责部门的报表。");
+            }
         }
 
         var asOfUtc = timeProvider.GetUtcNow();
@@ -53,6 +73,7 @@ public sealed class ReportingQueryAppService(IOrganizationRepository organizatio
             FlowCode = input.FlowCode,
             ClientAppCode = input.ClientAppCode,
             InitiatorDepartmentId = input.InitiatorDepartmentId,
+            InitiatorDepartmentIds = directlyManagedDepartments,
         };
         var facts = await factsRepository.ReadForMetricsAsync(query, cancellationToken);
         var visibleInstances = facts.Instances.Where(item => !item.IsConfidential).ToArray();

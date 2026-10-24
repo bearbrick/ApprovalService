@@ -12,6 +12,7 @@ import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runCenterChecks } from './center-checks.ts'
 import { runAdminChecks } from './admin-checks.ts'
+import { runReportChecks } from './report-checks.ts'
 import { runMobileChecks } from './mobile-checks.ts'
 import { runWorkbenchChecks } from './workbench-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
@@ -98,6 +99,7 @@ checkFlowModel()
 runDataChecks(check)
 await runCenterChecks(check)
 await runAdminChecks(check)
+await runReportChecks(check)
 runMobileChecks(check)
 runWorkbenchChecks(check)
 await runHttpChecks(check)

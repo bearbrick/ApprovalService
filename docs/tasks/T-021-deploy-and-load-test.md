@@ -1,7 +1,7 @@
 # T-021 部署、监控、备份与压测
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-24
 里程碑：M5
 依赖：T-005、T-006
 设计书：§platform、§engine
@@ -39,4 +39,5 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 从已验证整合提交 `4bdfc4a` 认领，先核对服务现有就绪检查、SQLite 启动迁移、部署脚本和压测工具。计划在本任务范围增加安全的 Prometheus 指标、SQLite 在线备份与升级前快照、Docker/Windows 部署说明、k6 压测。共享 `backend/src/ApprovalService.Api/Program.cs`、`backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`backend/src/ApprovalService.Infrastructure/InfrastructureServiceCollectionExtensions.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs` 与 `docs/contracts.md`、`docs/architecture.md` 将先登记再按功能分开提交。当前机器有 k6 2.1.0，但无 Docker 命令；容器镜像只能做静态检查，不能在本机实际运行。
 <!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->

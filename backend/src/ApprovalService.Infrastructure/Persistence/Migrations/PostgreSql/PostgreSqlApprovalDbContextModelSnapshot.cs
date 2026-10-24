@@ -22,6 +22,26 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
+                {
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<long>("ReadThroughSequence")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("InstanceId", "PersonId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("CenterReadCursors", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -1122,6 +1142,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasIndex("Status", "DueAt", "LeaseUntil");
 
                     b.ToTable("ScheduledJobs", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>

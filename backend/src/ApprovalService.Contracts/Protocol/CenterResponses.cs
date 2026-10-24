@@ -123,6 +123,14 @@ public sealed class CenterInstanceResponse
     }
 
     /// <summary>
+    /// 当前登录人员有尚未看过的可见活动；不携带内部游标。
+    /// </summary>
+    public bool IsUnread
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 发起时间。
     /// </summary>
     public DateTimeOffset StartedAt

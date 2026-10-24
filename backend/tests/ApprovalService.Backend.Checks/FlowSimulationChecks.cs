@@ -241,6 +241,11 @@ internal static class FlowSimulationChecks
         }
 
         /// <inheritdoc />
+        public Task<IReadOnlyList<FlowDepartmentOption>> ListManageableDepartmentsAsync(string actorId,
+            bool isLocalSession, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("模拟不应列出持久部门。");
+
+        /// <inheritdoc />
         public Task<ManagedFlowSnapshot?> LoadAsync(string code, CancellationToken cancellationToken = default)
         {
             Reads++;

@@ -13,7 +13,7 @@ namespace ApprovalService.Api.Endpoints;
 internal static class ReportingEndpoints
 {
     /// <summary>
-    /// 登记四条受 JWT 保护的报表查询接口。
+    /// 登记受 JWT 保护的报表查询和工作簿导出接口。
     /// </summary>
     /// <param name="app">路由构造器。</param>
     /// <returns>原路由构造器。</returns>
@@ -86,6 +86,14 @@ internal static class ReportingEndpoints
                     OverdueCount = item.OverdueCount,
                 }).ToArray(),
             };
+        }).RequireAuthorization();
+        app.MapGet(ApiRoutes.AdminReportExport, async (HttpContext http, ReportingQueryAppService service,
+            IReportingWorkbookExporter exporter, CancellationToken cancellationToken) =>
+        {
+            // 与四条 JSON 路由复用同一查询入口，编码器仅接收已授权且去除保密维度的结果。
+            var result = await QueryAsync(http, service, cancellationToken);
+            return Results.File(exporter.Export(result), AdminReportExportFile.ContentType,
+                AdminReportExportFile.FileName);
         }).RequireAuthorization();
         return app;
     }

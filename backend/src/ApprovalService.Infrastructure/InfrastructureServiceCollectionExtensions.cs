@@ -2,6 +2,7 @@ using ApprovalService.Application.Files;
 using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Application.Notifications;
+using ApprovalService.Application.Reporting;
 using ApprovalService.Domain.Administration;
 using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Files;
@@ -52,6 +53,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddApprovalPersistence(configuration);
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
         services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
+        services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();

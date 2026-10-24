@@ -2,12 +2,15 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using ApprovalService.Application.Identity;
+using ApprovalService.Application.Reporting;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Reporting;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MiniExcelLibs;
 
 namespace ApprovalService.Backend.Checks;
 
@@ -128,10 +131,20 @@ internal static class ReportingEndpointChecks
                 check("匿名请求不能读取报表", response.StatusCode == HttpStatusCode.Unauthorized);
             }
 
+            using (var response = await client.GetAsync(ApiRoutes.AdminReportExport + query))
+            {
+                check("匿名请求不能导出报表", response.StatusCode == HttpStatusCode.Unauthorized);
+            }
+
             var ordinary = await LoginAsync(client, "RO");
             using (var response = await GetAsync(client, ApiRoutes.AdminReportOverview + query, ordinary))
             {
                 check("普通本地人员不能读取报表", response.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var response = await GetAsync(client, ApiRoutes.AdminReportExport + query, ordinary))
+            {
+                check("普通人员不能导出报表", response.StatusCode == HttpStatusCode.Forbidden);
             }
 
             var admin = await LoginAsync(client, "RA");
@@ -162,12 +175,53 @@ internal static class ReportingEndpointChecks
                     !raw.Contains("秘密内容", StringComparison.Ordinal));
             }
 
+            using (var response = await GetAsync(client, ApiRoutes.AdminReportExport + query, admin))
+            {
+                var workbook = await response.Content.ReadAsByteArrayAsync();
+                var flowRows = ReadSheet(workbook, "流程汇总");
+                var nodeRows = ReadSheet(workbook, "节点汇总");
+                var peopleRows = ReadSheet(workbook, "人员汇总");
+                var confidentialRows = ReadSheet(workbook, "保密匿名总量");
+                check("管理员导出真实四表 XLSX 且列名为中文", response.IsSuccessStatusCode &&
+                    response.Content.Headers.ContentType?.MediaType == AdminReportExportFile.ContentType &&
+                    workbook.Length > 4 && workbook[0] == 'P' && workbook[1] == 'K' &&
+                    flowRows.Count == 1 && flowRows[0].ContainsKey("流程编码") &&
+                    flowRows[0]["流程编码"]?.ToString() == "PUBLIC" &&
+                    confidentialRows.Count == 1 &&
+                    confidentialRows[0]["匿名发起量"]?.ToString() == "1" &&
+                    confidentialRows[0]["匿名结束量"]?.ToString() == "1");
+                check("保密维度不进入导出三张明细汇总表", !ContainsSecret(flowRows) &&
+                    !ContainsSecret(nodeRows) && !ContainsSecret(peopleRows) &&
+                    confidentialRows[0].Keys.SequenceEqual(new[] { "匿名发起量", "匿名结束量" }));
+            }
+
             var head = await LoginAsync(client, "RH");
             using (var response = await GetAsync(client, ApiRoutes.AdminReportOverview + query, head))
             {
                 var body = await response.Content.ReadFromJsonAsync<AdminReportOverviewResponse>();
                 check("部门负责人只看到直接负责部门", response.IsSuccessStatusCode &&
                     body?.VisibleStartedCount == 1 && body.ConfidentialStartedCount == 0);
+            }
+
+            using (var response = await GetAsync(client, ApiRoutes.AdminReportExport + query, head))
+            {
+                var workbook = await response.Content.ReadAsByteArrayAsync();
+                var flowRows = ReadSheet(workbook, "流程汇总");
+                var confidentialRows = ReadSheet(workbook, "保密匿名总量");
+                check("负责人导出只含直属部门且保密数量不跨部门", response.IsSuccessStatusCode &&
+                    flowRows.Count == 1 && flowRows[0]["流程编码"]?.ToString() == "PUBLIC" &&
+                    confidentialRows[0]["匿名发起量"]?.ToString() == "0");
+            }
+
+            using (var response = await GetAsync(client, ApiRoutes.AdminReportExport + query +
+                "&departmentId=D2", head))
+            {
+                check("负责人不能用导出部门参数扩展到子部门", response.StatusCode == HttpStatusCode.Forbidden);
+            }
+
+            using (var response = await GetAsync(client, ApiRoutes.AdminReportExport + "?fromUtc=invalid", admin))
+            {
+                check("导出与 JSON 查询采用相同时间校验", response.StatusCode == HttpStatusCode.BadRequest);
             }
 
             using (var response = await GetAsync(client, ApiRoutes.AdminReportOverview + query +
@@ -182,12 +236,70 @@ internal static class ReportingEndpointChecks
                 check("报表时间参数错误返回统一业务错误", response.StatusCode == HttpStatusCode.BadRequest &&
                     body?.Code == ErrorCodes.ValidationFailed);
             }
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var exporter = scope.ServiceProvider.GetRequiredService<IReportingWorkbookExporter>();
+                var oversized = new ReportingQueryDto
+                {
+                    VisibleMetrics = new ReportingMetrics
+                    {
+                        Flows = Enumerable.Range(0, 10001).Select(index => new ReportingFlowMetric
+                        {
+                            FlowCode = "F" + index,
+                        }).ToArray(),
+                    },
+                };
+                try
+                {
+                    exporter.Export(oversized);
+                    check("报表汇总超过行数上限时拒绝导出", false);
+                }
+                catch (ApprovalService.Domain.Shared.UserFriendlyException exception)
+                {
+                    check("报表汇总超过行数上限时拒绝导出", exception.Code == ErrorCodes.ValidationFailed);
+                }
+
+                var formulaMetric = new ReportingQueryDto
+                {
+                    VisibleMetrics = new ReportingMetrics
+                    {
+                        Flows = [new ReportingFlowMetric { FlowCode = "=SUM(1,1)" }],
+                    },
+                };
+                var formulaRows = ReadSheet(exporter.Export(formulaMetric), "流程汇总");
+                check("导出维度标识按文本转义表格公式", formulaRows.Count == 1 &&
+                    formulaRows[0]["流程编码"]?.ToString() == "'=SUM(1,1)");
+            }
         }
         finally
         {
             TempDataDirectory.Delete(directory);
         }
     }
+
+    /// <summary>
+    /// 从工作簿中读取指定中文工作表的真实单元格。
+    /// </summary>
+    /// <param name="workbook">XLSX 字节。</param>
+    /// <param name="sheetName">工作表名称。</param>
+    /// <returns>按表头命名的行。</returns>
+    private static IReadOnlyList<IDictionary<string, object>> ReadSheet(byte[] workbook, string sheetName)
+    {
+        using var stream = new MemoryStream(workbook);
+        return stream.Query(useHeaderRow: true, sheetName: sheetName, excelType: ExcelType.XLSX)
+            .Cast<IDictionary<string, object>>().ToArray();
+    }
+
+    /// <summary>
+    /// 检查工作表中的单元格是否出现保密流程标识或原始标题。
+    /// </summary>
+    /// <param name="rows">工作表行。</param>
+    /// <returns>出现保密值时为真。</returns>
+    private static bool ContainsSecret(IReadOnlyList<IDictionary<string, object>> rows) =>
+        rows.SelectMany(row => row.Values).Any(value =>
+            (value?.ToString() ?? string.Empty).Contains("SECRET", StringComparison.Ordinal) ||
+            (value?.ToString() ?? string.Empty).Contains("秘密内容", StringComparison.Ordinal));
 
     /// <summary>
     /// 使用真实身份接口创建本地访问令牌。

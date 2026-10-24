@@ -111,6 +111,11 @@ public static class ApiRoutes
     public const string AdminReportPeople = OpenApiPrefix + "/admin/reports/people";
 
     /// <summary>
+    /// 管理范围内的流程、节点和人员汇总工作簿。
+    /// </summary>
+    public const string AdminReportExport = OpenApiPrefix + "/admin/reports/export";
+
+    /// <summary>
     /// 组织管理员按原事件 ID 手动重发回调。
     /// </summary>
     public const string AdminCallbackRetry = OpenApiPrefix + "/admin/callbacks/{eventId}/retry";

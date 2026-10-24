@@ -80,6 +80,8 @@
 
 `overview` 返回 `{visibleStartedCount, visibleCompletedCount, visiblePendingCount, visibleOverdueCount, confidentialStartedCount, confidentialCompletedCount}`；`flows` 返回 `{items, confidentialStartedCount, confidentialCompletedCount}`，公开流程每项含 `flowCode, startedCount, completedCount, approvedCount, rejectedCount, withdrawnCount, averageDurationMinutes, p90DurationMinutes`；`nodes` 返回 `{items}`，每项含 `flowCode, nodeId, completedCount, averageDurationMinutes, dueCount, overdueCount`；`people` 返回 `{items}`，每项含 `assigneeId, pendingCount, completedCount, averageDurationMinutes, overdueCount`。无耗时样本时平均值、P90 为 `null`，按通用 JSON 约定省略。保密流程只贡献匿名发起与结束量，不出现在流程、节点或人员项中。发起量按 `StartedAt`，结束量与历时按 `EndedAt`，P90 只用已结束审批单；`dueCount` 是区间内到期且查询时已到期任务数，`overdueCount` 为其中逾期任务数；当前待办以查询时刻为准。
 
+  `GET /api/v1/admin/reports/export` 使用上述同一组查询参数、JWT 身份、直属部门范围和保密过滤，返回 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，下载名为 `approval-report.xlsx`。工作簿包含“流程汇总”“节点汇总”“人员汇总”“保密匿名总量”四张中文表；前三张只含公开流程的聚合指标，后一张只有匿名发起和结束数量，不包含保密流程、节点、人员或审批单原始字段。三张指标表累计最多 10,000 行，工作簿最多 16 MB，超出返回 `VALIDATION_FAILED`；导出维度标识作为文本写入，防止表格公式执行。逐单审批明细不在本接口导出。
+
 `GET /api/v1/info` 的响应：
 
 ```json

@@ -74,4 +74,23 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
   check('适配范围沿用审批节点中心坐标', bounds.width >= 360)
   const xml = await exportBpmn(simpleFlow)
   check('BPMN 导出包含标准节点、顺序流和带 SHA 的本服务扩展', xml.includes('bpmn:startEvent') && xml.includes('bpmn:sequenceFlow') && xml.includes('approval:flowDefinition') && /sha256="[0-9a-f]{64}"/.test(xml))
+  const configured: FlowDefinition = {
+    ...simpleFlow,
+    withdrawBeforeFirstDecision: true,
+    returnMode: 'returnNode',
+    canvas: {
+      ...simpleFlow.canvas,
+      nodes: simpleFlow.canvas.nodes.map(node => node.id === 'manager' ? {
+        ...node,
+        assignee: { source: 'role', value: 'FINANCE', limitToInitiatingDepartment: true, stopAtGrade: 'DIRECTOR' },
+        approval: { ...node.approval!, missingAssigneeBehavior: 'specified', missingAssigneeUserId: 'user-123' },
+      } : node),
+    },
+  }
+  const configuredXml = await exportBpmn(configured)
+  const encoded = configuredXml.match(/<approval:flowDefinition[^>]*>([^<]+)<\/approval:flowDefinition>/)?.[1] ?? ''
+  const exported = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded), char => char.charCodeAt(0)))) as FlowDefinition
+  const exportedNode = exported.canvas.nodes.find(node => node.id === 'manager')
+  check('BPMN 扩展保留找人兜底、部门限制和截止职级', exportedNode?.assignee?.limitToInitiatingDepartment === true && exportedNode.assignee.stopAtGrade === 'DIRECTOR' && exportedNode.approval?.missingAssigneeUserId === 'user-123')
+  check('BPMN 扩展保留流程撤回与退回重提策略', exported.withdrawBeforeFirstDecision === true && exported.returnMode === 'returnNode')
 }

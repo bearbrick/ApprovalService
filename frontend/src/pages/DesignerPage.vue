@@ -13,6 +13,7 @@ import FlowPrintPanel from '../designer/workbench/FlowPrintPanel.vue'
 import { checkPublication } from '../designer/workbench/publication-check.ts'
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, findEdge, findNode, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../designer/workbench/workbench-model.ts'
+import { buildCSharpStartSnippet } from '../designer/workbench/integration-snippet.ts'
 import type { DesignerIssue } from '../designer/workbench/workbench-model.ts'
 
 /**
@@ -69,6 +70,14 @@ const issues = ref<DesignerIssue[]>([])
  */
 const status = ref('本地草稿，尚未发布')
 /**
+ * 当前流程可复制的 SDK 接入示例。
+ */
+const integrationSnippet = ref('')
+/**
+ * 生成或复制代码时的反馈。
+ */
+const snippetStatus = ref('')
+/**
  * 画布元素的全部问题，供图形组件直接标记。
  */
 const canvasIssues = computed(() => issues.value.filter(issue => issue.elementId && (findNode(draft.value, issue.elementId) || findEdge(draft.value, issue.elementId))))
@@ -86,6 +95,14 @@ watch(flowCode, code => {
   issues.value = []
   pendingFocusId.value = null
   status.value = '本地草稿，尚未发布'
+  integrationSnippet.value = ''
+  snippetStatus.value = ''
+})
+
+watch(() => draft.value.code, () => {
+  // 改动编码后旧示例不能再复制，必须按当前草稿重新生成。
+  integrationSnippet.value = ''
+  snippetStatus.value = ''
 })
 
 /**
@@ -215,12 +232,37 @@ function updateEdge(edge: FlowEdge): void {
 function issuesFor(id: string): string[] {
   return issues.value.filter(issue => issue.elementId === id).map(issue => issue.message)
 }
+/**
+ * 生成当前流程的 C# SDK 发起示例，不包含接入应用密钥。
+ */
+function showIntegrationSnippet(): void {
+  try {
+    integrationSnippet.value = buildCSharpStartSnippet(draft.value.code)
+    snippetStatus.value = '示例已生成；正式调用前请先发布流程并授权接入应用。'
+  } catch (cause) {
+    integrationSnippet.value = ''
+    snippetStatus.value = cause instanceof Error ? cause.message : '无法生成示例代码。'
+  }
+}
+/**
+ * 将已生成的 C# 代码复制给业务系统开发人员。
+ * @returns 复制操作完成。
+ */
+async function copyIntegrationSnippet(): Promise<void> {
+  if (!integrationSnippet.value) return
+  try {
+    await navigator.clipboard.writeText(integrationSnippet.value)
+    snippetStatus.value = '代码已复制；API Key 请放在业务系统环境变量中。'
+  } catch {
+    snippetStatus.value = '浏览器未允许复制，请直接选中下方代码。'
+  }
+}
 </script>
 
 <template>
   <div class="designer-page">
     <header class="designer-header"><div class="designer-breadcrumb"><a href="#/designer">流程设计</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount" @click="redo">重做</button><button type="button" class="btn" @click="saveDraft">保存草稿</button><button type="button" class="btn btn-primary" @click="validatePublish">发布预检</button></div></div></header>
-    <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>三个示例来自后端正式流程定义，覆盖金额分支、会签、返工和并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
+    <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>十类常用审批模板可直接复制修改；采购、报销和质量异常示例还展示金额分支、会签、返工与并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
     <template v-else>
       <nav class="designer-tabs" aria-label="流程配置"><a v-for="tab in DESIGNER_TABS" :key="tab" :href="`#/designer/${encodeURIComponent(flowCode)}/${tab}`" :aria-current="activeTab === tab ? 'page' : undefined">{{ TAB_TITLES[tab] }}</a></nav>
       <div v-if="issues.length" class="publish-issues" role="alert"><div class="publish-issues-head"><strong>发布预检发现 {{ issues.length }} 个问题</strong><span>点击可定位到节点或连线</span></div><ul><li v-for="(issue, index) in issues" :key="index"><button v-if="issue.elementId && canvasIssues.includes(issue)" type="button" @click="focusIssue(issue)">{{ issue.message }} <small>定位：{{ issue.elementId }}</small></button><span v-else>{{ issue.message }}</span></li></ul></div>
@@ -235,7 +277,7 @@ function issuesFor(id: string): string[] {
       </div>
       <div v-else-if="activeTab === 'fields'" class="designer-content"><ApprovalFieldsEditor :data="draft.data" @update:data="updateDraft({ ...draft, data: $event })" /></div>
       <div v-else-if="activeTab === 'layout'" class="designer-content"><ApprovalDetailLayoutEditor :data="draft.data" :detail-layout="draft.detailLayout" @update:detail-layout="updateDraft({ ...draft, detailLayout: $event })" /></div>
-      <div v-else-if="activeTab === 'rules'" class="designer-content"><FlowRulesPanel :definition="draft" @update="updateDraft" /><section class="template-switch"><h2>应用内置模板</h2><p>使用模板会替换当前流程草稿；已保存的本地草稿可通过刷新恢复。</p><button v-for="template in flowTemplates" :key="template.code" type="button" class="btn" @click="loadTemplate(template.code)">{{ template.name }}</button></section></div>
+      <div v-else-if="activeTab === 'rules'" class="designer-content"><FlowRulesPanel :definition="draft" @update="updateDraft" /><section class="template-switch"><h2>应用内置模板</h2><p>使用模板会替换当前流程草稿；已保存的本地草稿可通过刷新恢复。</p><button v-for="template in flowTemplates" :key="template.code" type="button" class="btn" @click="loadTemplate(template.code)">{{ template.name }}</button></section><section class="template-switch integration-example"><h2>业务系统 C# 接入示例</h2><p>发布流程并授权接入应用后使用；服务地址和 API Key 从业务系统环境变量读取，代码不包含明文密钥。</p><button type="button" class="btn" @click="showIntegrationSnippet">生成 SDK 发起代码</button><button v-if="integrationSnippet" type="button" class="btn" @click="copyIntegrationSnippet">复制代码</button><p v-if="snippetStatus" role="status">{{ snippetStatus }}</p><pre v-if="integrationSnippet"><code>{{ integrationSnippet }}</code></pre></section></div>
       <div v-else-if="activeTab === 'print'" class="designer-content"><FlowPrintPanel :settings="draft.printSettings" :data="draft.data" @update="updateDraft({ ...draft, printSettings: $event })" /></div>
       <div v-else class="designer-content"><section class="version-panel"><span>版本管理</span><h2>当前仅有本地草稿</h2><p>正式版本由服务端发布并保存。管理接口接入后，此处会展示不可修改的发布版本和差异。</p><button type="button" class="btn btn-primary" @click="validatePublish">先检查当前草稿</button></section></div>
     </template>
@@ -282,6 +324,7 @@ function issuesFor(id: string): string[] {
 .template-switch h2, .version-panel h2 { font-size: 16px; }
 .template-switch p, .version-panel p { margin: 9px 0 15px; color: var(--muted); }
 .template-switch .btn { margin: 0 8px 8px 0; }
+.integration-example pre { max-height: 360px; margin-top: 14px; padding: 16px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; background: #f7f9fd; color: var(--ink); font: 12px/1.6 Consolas, monospace; }
 .version-panel span { color: var(--blue); font-size: 11px; font-weight: 700; }
 @media (max-width: 1150px) { .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 120px minmax(0, 1fr) 280px; } }
 @media (max-width: 920px) { .designer-title { align-items: start; flex-direction: column; } }

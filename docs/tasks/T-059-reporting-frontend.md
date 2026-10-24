@@ -1,6 +1,6 @@
 # T-059 管理后台真实报表页面
 
-状态：进行中
+状态：待验收
 负责人：Codex 2026-10-24
 里程碑：M5
 依赖：T-058 已验证稳定快照
@@ -16,20 +16,21 @@
 - `frontend/src/pages/admin/AdminReports.vue`、`frontend/src/styles/admin-reports.css`：报表交互和真实指标展示。
 - `frontend/src/pages/AdminPage.vue`、`frontend/src/api/admin-session.ts`、`frontend/src/model/admin.ts`：统计页入口、负责人本地登录与页面文字。
 - `frontend/tests/report-checks.ts`、`frontend/tests/checks.ts`：报表响应、筛选和权限错误场景。
-- `frontend/README.md`、`docs/tasks/T-059-reporting-frontend.md`：文档和交接。
+- `frontend/README.md`、`docs/design/approval-service-design.html`、`docs/tasks/T-059-reporting-frontend.md`：文档同步和交接。
 
 ## 共享文件
 
 - `frontend/src/pages/AdminPage.vue`：只加统计页分支和登录范围参数，另行提交；已通知并行管理页开发者避开同一文件。
 - `frontend/src/api/admin-session.ts`：只让报表页登录跳过组织管理员专属预检查，报表接口仍独立鉴权；另行提交。
 - `frontend/tests/checks.ts`、`docs/tasks/README.md`：只追加检查或任务索引，另行提交。
+- `docs/design/approval-service-design.html`：只同步已接通的真实报表页面状态，另行提交。
 
 ## 验收标准
 
-- [ ] 四条真实报表接口在统计页使用本地 JWT，显示明确的加载、空结果、失败与无权状态。
-- [ ] 时间半开区间与流程、来源应用、部门筛选可用，负责人只看到服务端授权范围。
-- [ ] 公开流程、节点、人员指标和保密匿名数量分别显示，不制造未返回的数值。
-- [ ] 场景检查和完整 `verify.ps1` 通过，前端文档已同步。
+- [x] 四条真实报表接口在统计页使用本地 JWT，显示明确的加载、空结果、失败与无权状态。
+- [x] 时间半开区间与流程、来源应用、部门筛选可用，负责人只看到服务端授权范围。
+- [x] 公开流程、节点、人员指标和保密匿名数量分别显示，不制造未返回的数值。
+- [x] 场景检查和完整 `verify.ps1` 通过，前端文档已同步。
 
 ## 不做
 
@@ -38,4 +39,5 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 管理统计页已接四条真实 JWT 报表接口，支持本地时间到 UTC 半开区间、流程/应用/部门筛选及流程、节点、人员指标；保密数据只显示匿名数量。报表会话不能进入或调用其他管理功能，401 清除会话、403 显示无权，失败清除旧数据。前端模拟 HTTP 场景覆盖负责人会话、越权导航、四接口 JWT、403 与损坏响应；T-058 的真实 HTTP 场景覆盖后端授权。同步了 `frontend/README.md` 和设计书 §stats 的页面状态；完整 `verify.ps1` 通过：后端 922、调用端 68、前端 157。后续 T-019 仍需小时汇总、趋势和导出。
 - 2026-10-24 · Codex · 从已合入 T-058 的集成快照开始独立前端切片。统计页需读取四条真实 JWT 接口；现有管理员登录先检查组织管理员身份，因此本任务将为报表页单独允许部门负责人建立本地会话，其他管理页仍维持原检查。

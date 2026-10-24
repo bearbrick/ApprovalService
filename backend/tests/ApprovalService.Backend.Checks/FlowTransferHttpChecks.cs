@@ -7,6 +7,7 @@ using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Runtime;
 using ApprovalService.Engine.Definitions;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -193,6 +194,139 @@ internal static class FlowTransferHttpChecks
                 check("导入仅审计操作者原因版本与内容摘要", await db.FlowManagementAudits.CountAsync() == 3 &&
                     await db.FlowManagementAudits.AllAsync(item => item.ContentSha256 != null &&
                         item.ContentSha256.Length == 64));
+            }
+
+            using var secondPublish = await SendAsync(client, HttpMethod.Post, publishPath, admin,
+                new AdminFlowPublishRequest
+                {
+                    ExpectedRevision = 2,
+                    ExpectedPublishedVersionId = firstVersion?.PublishedVersionId,
+                    Reason = "发布修改后第二版",
+                });
+            var secondVersion = await secondPublish.Content.ReadFromJsonAsync<AdminFlowResponse>();
+            check("第二稿发布为追加的不可变版本", secondPublish.IsSuccessStatusCode &&
+                secondVersion is { PublishedVersion: 2 } &&
+                secondVersion.PublishedVersionId != firstVersion?.PublishedVersionId);
+
+            var versionsPath = ApiRoutes.AdminFlowVersions.Replace("{code}", definition.Code,
+                StringComparison.Ordinal);
+            using (var versions = await SendAsync(client, HttpMethod.Get, versionsPath, admin))
+            {
+                var body = await versions.Content.ReadFromJsonAsync<AdminFlowVersionResponse[]>();
+                check("版本历史只返回倒序摘要与当前标记", versions.IsSuccessStatusCode &&
+                    body is { Length: 2 } && body[0].Version == 2 && body[0].IsCurrent &&
+                    body[1].Version == 1 && !body[1].IsCurrent);
+            }
+
+            using (var outsideVersions = await SendAsync(client, HttpMethod.Get, versionsPath, manager))
+            {
+                check("其他部门流程管理员不能读取版本历史", outsideVersions.StatusCode == HttpStatusCode.NotFound);
+            }
+
+            var restorePath = ApiRoutes.AdminFlowVersionRestore
+                .Replace("{code}", definition.Code, StringComparison.Ordinal)
+                .Replace("{version}", "1", StringComparison.Ordinal);
+            using (var staleRestore = await SendAsync(client, HttpMethod.Post, restorePath, admin,
+                new AdminFlowVersionRestoreRequest
+                {
+                    ExpectedRevision = 1,
+                    ExpectedPublishedVersionId = secondVersion?.PublishedVersionId,
+                    Reason = "使用旧草稿修订恢复",
+                }))
+            {
+                check("恢复旧版拒绝过期草稿修订", staleRestore.StatusCode == HttpStatusCode.Conflict);
+            }
+
+            using (var stalePublished = await SendAsync(client, HttpMethod.Post, restorePath, admin,
+                new AdminFlowVersionRestoreRequest
+                {
+                    ExpectedRevision = 2,
+                    ExpectedPublishedVersionId = firstVersion?.PublishedVersionId,
+                    Reason = "使用旧发布指针恢复",
+                }))
+            {
+                check("恢复旧版拒绝过期当前发布版", stalePublished.StatusCode == HttpStatusCode.Conflict);
+            }
+
+            using var restored = await SendAsync(client, HttpMethod.Post, restorePath, admin,
+                new AdminFlowVersionRestoreRequest
+                {
+                    ExpectedRevision = 2,
+                    ExpectedPublishedVersionId = secondVersion?.PublishedVersionId,
+                    Reason = "将第一版复制到草稿",
+                });
+            var restoredBody = await restored.Content.ReadFromJsonAsync<AdminFlowResponse>();
+            check("恢复第一版仅生成修订三草稿并保留当前第二版", restored.IsSuccessStatusCode &&
+                restoredBody is { DraftRevision: 3, PublishedVersion: 2 } &&
+                restoredBody.Draft?.Name == "导入导出流程" &&
+                restoredBody.PublishedVersionId == secondVersion?.PublishedVersionId);
+
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                check("旧版恢复审计包含来源版本与摘要而不改旧版本", await db.FlowManagementAudits
+                    .AnyAsync(item => item.Action == "restore-version" && item.PublishedVersion == 1 &&
+                        item.DraftRevision == 3 && item.ContentSha256 != null &&
+                        item.ContentSha256.Length == 64) &&
+                    await db.FlowVersions.CountAsync() == 2);
+            }
+
+            using var republished = await SendAsync(client, HttpMethod.Post, publishPath, admin,
+                new AdminFlowPublishRequest
+                {
+                    ExpectedRevision = 3,
+                    ExpectedPublishedVersionId = secondVersion?.PublishedVersionId,
+                    Reason = "把恢复草稿发布为第三版",
+                });
+            var thirdVersion = await republished.Content.ReadFromJsonAsync<AdminFlowResponse>();
+            check("恢复内容重新发布时生成新第三版", republished.IsSuccessStatusCode &&
+                thirdVersion is { PublishedVersion: 3 } &&
+                thirdVersion.PublishedVersionId != firstVersion?.PublishedVersionId &&
+                thirdVersion.PublishedVersionId != secondVersion?.PublishedVersionId);
+
+            var legacyDefinition = ReadSample(backendRoot);
+            legacyDefinition.Code = "LEGACY_TRANSFER";
+            legacyDefinition.Name = "存量待恢复流程";
+            using (var scope = factory.Services.CreateScope())
+            {
+                var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using var db = await dbFactory.CreateDbContextAsync();
+                db.Flows.Add(new FlowEntity
+                {
+                    Id = "legacy-transfer-flow",
+                    Code = legacyDefinition.Code,
+                    Name = legacyDefinition.Name,
+                    OwnerDepartmentId = "child",
+                    PublishedVersionId = "legacy-transfer-version",
+                });
+                db.FlowVersions.Add(new FlowVersionEntity
+                {
+                    Id = "legacy-transfer-version",
+                    FlowId = "legacy-transfer-flow",
+                    Version = 1,
+                    SchemaVersion = legacyDefinition.SchemaVersion,
+                    DefinitionJson = JsonSerializer.Serialize(legacyDefinition, ApprovalJson.Options),
+                    GraphJson = "{}",
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var legacyRestorePath = ApiRoutes.AdminFlowVersionRestore
+                .Replace("{code}", legacyDefinition.Code, StringComparison.Ordinal)
+                .Replace("{version}", "1", StringComparison.Ordinal);
+            using (var legacyRestored = await SendAsync(client, HttpMethod.Post, legacyRestorePath, admin,
+                new AdminFlowVersionRestoreRequest
+                {
+                    ExpectedRevision = 0,
+                    ExpectedPublishedVersionId = "legacy-transfer-version",
+                    Reason = "从存量发布版建立草稿",
+                }))
+            {
+                var body = await legacyRestored.Content.ReadFromJsonAsync<AdminFlowResponse>();
+                check("存量无草稿流程可按修订零恢复第一份实体草稿", legacyRestored.IsSuccessStatusCode &&
+                    body is { DraftRevision: 1, PublishedVersion: 1 } &&
+                    body.Draft?.Code == legacyDefinition.Code);
             }
         }
         finally

@@ -58,6 +58,15 @@ internal static class FlowManagementEndpoints
                 cancellationToken);
             return Results.File(Encoding.UTF8.GetBytes(xml), "application/xml", "approval-flow.bpmn");
         }).RequireAuthorization();
+        app.MapGet(ApiRoutes.AdminFlowVersions, (HttpContext http, string code,
+            FlowVersionAppService service, CancellationToken cancellationToken) =>
+            service.ListAsync(code, PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
+        app.MapPost(ApiRoutes.AdminFlowVersionRestore, (HttpContext http, string code, int version,
+            AdminFlowVersionRestoreRequest request, FlowVersionAppService service,
+            CancellationToken cancellationToken) =>
+            service.RestoreAsync(code, version, request, PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
         return app;
     }
 

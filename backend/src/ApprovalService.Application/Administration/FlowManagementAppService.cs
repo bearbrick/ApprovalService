@@ -306,7 +306,7 @@ public sealed class FlowManagementAppService(IFlowManagementRepository repositor
     /// <param name="snapshot">数据库快照。</param>
     /// <param name="includeDefinition">是否包含完整草稿。</param>
     /// <returns>安全管理视图。</returns>
-    private static AdminFlowResponse Response(ManagedFlowSnapshot snapshot, bool includeDefinition) => new()
+    internal static AdminFlowResponse Response(ManagedFlowSnapshot snapshot, bool includeDefinition) => new()
     {
         Code = snapshot.Flow.Code,
         Name = snapshot.Flow.Name,

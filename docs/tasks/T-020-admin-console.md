@@ -42,7 +42,8 @@
 
 ## 交接记录
 
-- 2026-10-24 · Codex · 本轮从已验证整合提交 `219a85c` 独立接前端真实流程管理：计划在 `frontend/src/api/admin-flow-management.ts`、`admin-session.ts`、`pages/AdminPage.vue`、`pages/DesignerPage.vue`、`pages/admin/AdminFlows.vue`、前端检查及 README 中接入本地流程管理员登录、授权列表、草稿修订 CAS、发布、启停和兼容 BPMN 文件预检/导出。`frontend/src/App.vue` 与 `frontend/src/model/routes.ts` 暂不修改；如确需共享文件，先补登记。保留 T-022 已提交的十类模板与 C# 示例，不碰其他 agent 的后端文件。后端当前仅回当前发布版摘要，版本历史接口由并行切片开发；本轮先基于现有契约接线。
+- 2026-10-24 · Codex · 已新增流程版本历史和旧版复制到草稿：共享路由、应用及基础设施登记已接通，`GET /admin/flows/{code}/versions` 只返回倒序版本摘要；`POST /admin/flows/{code}/versions/{version}/restore` 同事务核对管理范围、草稿修订及当前发布版，复制旧定义到新草稿修订，审计来源版本与 SHA，当前发布指针及旧版本均不变。存量无草稿流程支持从修订零恢复，后续需显式发布为新版本。无需三库迁移；真实 HTTP/SQLite 增加 9 个场景，`verify.ps1` 全量通过（后端 794、调用端 50、前端 124 项；发起/审批/待办 P95 9.7/8.6/2.1ms）。后续仍需前端流程管理页面，本任务保持进行中。
+- 2026-10-24 · Codex · 本轮从已验证整合提交 `219a85c` 独立接前端真实流程管理：计划在 `frontend/src/api/admin-flow-management.ts`、`admin-session.ts`、`pages/AdminPage.vue`、`pages/DesignerPage.vue`、`pages/admin/AdminFlows.vue`、前端检查及 README 中接入本地流程管理员登录、授权列表、草稿修订 CAS、发布、启停和兼容 BPMN 文件预检/导出。`frontend/src/App.vue` 与 `frontend/src/model/routes.ts` 暂不修改；如确需共享文件，先补登记。保留 T-022 已提交的十类模板与 C# 示例，不碰其他 agent 的后端文件。起始基线仅回当前发布版摘要，版本历史接口由并行切片开发。
 - 2026-10-24 · Codex · 已接通兼容 BPMN 导入导出：本地流程管理员可只读预检文件和发布问题，同编码默认冲突，显式目标与预期草稿修订才可覆盖，导入仅保存草稿；导出须选择草稿或指定不可变发布版本，并在同一事务复核直接部门管理范围。共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs` 增加路由、应用和基础设施登记文件增加用例/仓储、检查程序登记 17 个真实 HTTP/SQLite 场景，`docs/contracts.md`、`docs/architecture.md` 和后端 README 已同步。无需新增依赖或数据库字段。全量 `verify.ps1` 通过（后端 785、调用端 50、前端 124 项；发起/审批/待办 P95 27.7/21.0/7.0ms）。后续仍需版本历史与旧版恢复、前端流程管理页面，本任务保持进行中。
 
 - 2026-10-24 · Codex · 增加流程停启用管理接口 `PUT /admin/flows/{code}/enabled`：要求当前本地管理范围、2–200 字原因和预期启用状态；实际变化按条件更新并在同一事务记不含定义 JSON 的审计，重复目标状态不加审计。停用使开放流程目录与新发起不可用，发布版和在途实例保留；恢复复用当前发布版。真实 HTTP/SQLite 场景覆盖直接部门管理员停用、过期状态冲突、幂等与恢复，`verify.ps1` 全量通过（后端 768、调用端 50、前端 124 项；发起/审批/待办 P95 20.9/15.5/4.4ms）。后续仍需兼容 BPMN 导入导出、版本恢复与前端管理页面，任务保持进行中。

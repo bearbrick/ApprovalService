@@ -131,6 +131,22 @@ internal static class FlowDefinitionChecks
         check("同一节点重复配置字段权限时拒绝发布",
             FlowCompiler.Compile(duplicatePermissions).Issues.Any(issue =>
                 issue.ElementId == permissionNode.Id && issue.Message.Contains("重复权限", StringComparison.Ordinal)));
+
+        var specifiedFallback = Copy(flows[0]);
+        var fallbackNode = specifiedFallback.Canvas.Nodes.First(node => node.Type == FlowNodeTypes.Approval);
+        fallbackNode.Approval ??= new FlowApprovalSettings();
+        fallbackNode.Approval.MissingAssigneeBehavior = FlowMissingAssigneeBehaviors.Specified;
+        fallbackNode.Approval.MissingAssigneeUserId = "  ";
+        check("指定人员兜底缺少人员 ID 时拒绝发布并定位节点",
+            FlowCompiler.Compile(specifiedFallback).Issues.Any(issue =>
+                issue.ElementId == fallbackNode.Id && issue.Message.Contains("指定人员 ID", StringComparison.Ordinal)));
+        fallbackNode.Approval.MissingAssigneeUserId = "person-1";
+        check("指定人员兜底填入人员 ID 后允许发布",
+            FlowCompiler.Compile(specifiedFallback).Graph is not null);
+        fallbackNode.Approval.MissingAssigneeBehavior = FlowMissingAssigneeBehaviors.Block;
+        fallbackNode.Approval.MissingAssigneeUserId = null;
+        check("其他缺人策略不要求指定人员 ID",
+            FlowCompiler.Compile(specifiedFallback).Graph is not null);
     }
 
     /// <summary>

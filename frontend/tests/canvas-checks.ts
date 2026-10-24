@@ -40,6 +40,10 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
   const copiedProxy = copyCanvasFlow(reactive(simpleFlow))
   check('画布历史能复制 Vue 响应式流程定义且不保留代理引用', copiedProxy.code === simpleFlow.code && copiedProxy !== simpleFlow && copiedProxy.canvas.nodes !== simpleFlow.canvas.nodes)
   check('完整顺序审批的画布静态校验通过', validateCanvasDefinition(simpleFlow).length === 0)
+  const specifiedFallback: FlowDefinition = { ...simpleFlow, canvas: { ...simpleFlow.canvas, nodes: simpleFlow.canvas.nodes.map(node => node.id === 'manager' ? { ...node, approval: { ...node.approval!, missingAssigneeBehavior: 'specified', missingAssigneeUserId: ' ' } } : node) } }
+  check('指定人员兜底缺少人员 ID 时前端预检定位节点', validateCanvasDefinition(specifiedFallback).some(issue => issue.elementId === 'manager' && issue.message.includes('指定人员 ID')))
+  specifiedFallback.canvas.nodes[1]!.approval!.missingAssigneeUserId = 'person-1'
+  check('指定人员兜底填入人员 ID 后通过前端预检', validateCanvasDefinition(specifiedFallback).length === 0)
   const newNode = createCanvasNode(flowNodeTypes.Handling, 'handling', 407, 241)
   const added = addCanvasNode(simpleFlow.canvas, newNode)
   check('十种节点有完整工具箱且新节点吸附到网格', added.nodes.length === 4 && newNode.x === 400 && newNode.y === 240)

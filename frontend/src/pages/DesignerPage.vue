@@ -238,6 +238,7 @@ function redo(): void {
  */
 async function saveDraft(): Promise<void> {
   if (busy.value) return
+  if (managed.value && !managed.value.draft) { status.value = '旧流程没有草稿，请先从已发布版本恢复草稿'; return }
   if (!managed.value && !canCreate.value) { status.value = '请先确认服务端流程状态'; return }
   if (reason.value.trim().length < 2) { status.value = '请填写至少两个字的审计原因'; return }
   if (managed.value && draft.value.code !== managed.value.code) {
@@ -384,6 +385,7 @@ async function copyIntegrationSnippet(): Promise<void> {
     <div v-else-if="!authorized" class="designer-content"><p role="alert">请先以流程管理员身份登录，再读取或编辑流程。</p><a href="#/admin/flows">前往流程管理登录</a></div>
     <div v-else-if="loadError" class="designer-content" role="alert"><p>{{ loadError }}</p><button type="button" class="btn" @click="loadManaged(flowCode)">重新读取</button><a href="#/admin/flows">返回流程管理</a></div>
     <div v-else-if="busy && !managed && !canCreate" class="designer-content" role="status">正在读取服务端流程…</div>
+    <div v-else-if="managed && !managed.draft" class="designer-content" role="status"><p>此流程尚无服务端草稿。请从已发布版本恢复草稿后再编辑，避免以空白画布覆盖旧流程。</p><a href="#/admin/flows">返回流程管理</a></div>
     <template v-else>
       <nav class="designer-tabs" aria-label="流程配置"><a v-for="tab in DESIGNER_TABS" :key="tab" :href="`#/designer/${encodeURIComponent(flowCode)}/${tab}`" :aria-current="activeTab === tab ? 'page' : undefined">{{ TAB_TITLES[tab] }}</a></nav>
       <div v-if="issues.length" class="publish-issues" role="alert"><div class="publish-issues-head"><strong>发布预检发现 {{ issues.length }} 个问题</strong><span>点击可定位到节点或连线</span></div><ul><li v-for="(issue, index) in issues" :key="index"><button v-if="issue.elementId && canvasIssues.includes(issue)" type="button" @click="focusIssue(issue)">{{ issue.message }} <small>定位：{{ issue.elementId }}</small></button><span v-else>{{ issue.message }}</span></li></ul></div>

@@ -303,6 +303,10 @@ export interface CenterActionTask {
  */
 export interface CenterDetail {
   /**
+   * 本次详情实际包含的最大活动序号，仅用于确认已读，零表示没有活动。
+   */
+  readSequence: number
+  /**
    * 与列表相同的摘要。
    */
   item: CenterItem

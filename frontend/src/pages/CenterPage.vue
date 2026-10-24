@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
 import { centerAdapter } from '../api/center-adapter.ts'
@@ -45,6 +45,10 @@ const state = ref<'loading' | 'ready' | 'error' | 'unavailable'>('loading')
  * 失败时的中文说明。
  */
 const error = ref('')
+/**
+ * 详情已显示但本人已读游标未能持久化时的提示。
+ */
+const readError = ref('')
 /**
  * 当前用户有权查看的列表数据。
  */
@@ -137,6 +141,7 @@ async function load(): Promise<void> {
   items.value = []
   detail.value = null
   error.value = ''
+  readError.value = ''
   if (!signedIn.value || embedding.value) { state.value = 'unavailable'; return }
   if (props.route.section === 'settings') { state.value = 'unavailable'; return }
   const current = new AbortController()
@@ -145,7 +150,23 @@ async function load(): Promise<void> {
   try {
     if (props.route.resourceId) detail.value = await centerAdapter.loadDetail(props.route.resourceId, current.signal)
     else items.value = await centerAdapter.loadList(section.value, current.signal, searchTerm.value)
-    if (request === current && !current.signal.aborted) state.value = 'ready'
+    if (request === current && !current.signal.aborted) {
+      state.value = 'ready'
+      if (props.route.resourceId && detail.value) {
+        // 等详情真正进入页面后才显式确认已读，列表查询本身不产生写入。
+        await nextTick()
+        if (request === current && !current.signal.aborted) {
+          try { await centerAdapter.markRead(props.route.resourceId, current.signal, detail.value.readSequence) } catch (cause) {
+            if (request === current && !current.signal.aborted) {
+              if (cause instanceof ApiError && cause.status === 401) {
+                signOut()
+                identityError.value = '登录已失效，请重新登录。'
+              } else readError.value = '已读状态未同步，请刷新详情重试。'
+            }
+          }
+        }
+      }
+    }
   } catch (cause) {
     if (request !== current || current.signal.aborted) return
     if (cause instanceof ApiError && cause.status === 401) {
@@ -341,7 +362,7 @@ onBeforeUnmount(() => { request?.abort(); if (searchTimer) clearTimeout(searchTi
     </section>
     <template v-else>
     <nav v-if="!route.resourceId" class="center-tabs" aria-label="审批列表"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined">{{ item.title }}</a><a href="#/center/settings" :aria-current="route.section === 'settings' ? 'page' : undefined">个人设置</a></nav>
-    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
+    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :read-error="readError" :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
     <CenterSettings v-else-if="route.section === 'settings'" @unauthorized="signOut" />
     <CenterList v-else :section="section" :items="items" :state="state" :error="error" :busy="actionBusy" :batch-message="batchMessage" @reload="load" @batch="executeBatch" @search="search" />
     <p class="workspace-note">审批中心只处理审批与查看进度，不创建或修改业务单据。</p>

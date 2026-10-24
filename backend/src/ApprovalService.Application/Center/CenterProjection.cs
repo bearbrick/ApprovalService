@@ -57,6 +57,9 @@ internal static class CenterProjection
             InitiatorId = instance.InitiatorId,
             SubmittedById = instance.SubmittedById,
             IsUrgent = instance.IsUrgent,
+            IsUnread = record.Events.Any(item => item.Sequence > record.ReadThroughSequence &&
+                item.Kind != "opinionDraftSaved" &&
+                Read<EngineEvent>(item.PayloadJson).Audit?.ActorId != personId),
             StartedAt = instance.StartedAt,
             EndedAt = instance.EndedAt,
             Summary = visibleSummary,

@@ -26,6 +26,10 @@ public static class CenterRoutes
     /// </summary>
     public const string Instance = Instances + "/{id}";
     /// <summary>
+    /// 当前登录人员显式确认已显示的一张审批详情。
+    /// </summary>
+    public const string MarkRead = Instances + "/{id}/read";
+    /// <summary>
     /// 使用当前登录人员身份办理一项人工任务。
     /// </summary>
     public const string TaskActions = "/api/v1/center/tasks/{taskId}/actions";

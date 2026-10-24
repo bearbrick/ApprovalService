@@ -1,3 +1,4 @@
+using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
@@ -66,6 +67,11 @@ public class ApprovalDbContext : DbContext
     /// 只追加的操作记录。
     /// </summary>
     public DbSet<OperationEventEntity> OperationEvents => Set<OperationEventEntity>();
+
+    /// <summary>
+    /// 审批中心按人员和审批单保存的已读活动游标。
+    /// </summary>
+    public DbSet<CenterReadCursorEntity> CenterReadCursors => Set<CenterReadCursorEntity>();
 
     /// <summary>
     /// 事务待发队列。
@@ -354,6 +360,17 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Hash).HasMaxLength(64).IsRequired();
             entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.InstanceId, item.Sequence }).IsUnique();
+        });
+
+        modelBuilder.Entity<CenterReadCursorEntity>(entity =>
+        {
+            entity.ToTable("CenterReadCursors");
+            entity.HasKey(item => new { item.InstanceId, item.PersonId });
+            entity.Property(item => item.InstanceId).HasMaxLength(64);
+            entity.Property(item => item.PersonId).HasMaxLength(128);
+            entity.HasOne<InstanceEntity>().WithMany().HasForeignKey(item => item.InstanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(item => item.PersonId);
         });
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>

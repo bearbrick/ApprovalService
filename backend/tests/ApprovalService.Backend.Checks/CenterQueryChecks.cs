@@ -1,11 +1,16 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using ApprovalService.Application.Center;
 using ApprovalService.Application.Identity;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Center;
+using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
+using ApprovalService.Engine.Commands;
+using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,6 +59,8 @@ internal static class CenterQueryChecks
                 local.Items[0].Id == "a-todo" && local.Items[0].Summary.GetProperty("amount").GetInt32() == 12 &&
                 !local.Items[0].Summary.TryGetProperty("secret", out _) &&
                 !local.Items[0].Summary.GetProperty("lines")[0].TryGetProperty("cost", out _));
+            check("本人已有操作和私人草稿不让审批单重新变未读",
+                !local.Items.Single(item => item.Id == "a-todo").IsUnread);
             check("列表摘要只带锁定发布版本中已授权的字段名称和明细列",
                 local.Items[0].SummaryFieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "明细"]) &&
                 local.Items[0].SummaryFieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量", "行票据"]));
@@ -185,6 +192,43 @@ internal static class CenterQueryChecks
                     await db.OperationEvents.CountAsync() == 12);
             }
             await VerifyRepositoryAsync(serviceScope.ServiceProvider, check);
+            await AddActivityAsync(factory, "c-done", 2, "other");
+            var newlyUnread = await ListAsync(http, tokens.Local, "done");
+            using var seenResponse = await GetAsync(http, Path("c-done"), tokens.Local);
+            var seenDetail = await seenResponse.Content.ReadFromJsonAsync<CenterDetailResponse>();
+            await using (var beforeReadDb = await factory.CreateDbContextAsync())
+            {
+                check("列表和详情 GET 均不写入已读游标", await beforeReadDb.CenterReadCursors.CountAsync() == 0);
+            }
+            await AddActivityAsync(factory, "c-done", 3, "other");
+            using var invalidRead = await PostReadAsync(http, "c-done", tokens.Local, -1);
+            using var deniedRead = await PostReadAsync(http, "c-done", tokens.Stranger, 2);
+            using var foreignRead = await PostReadAsync(http, "b-cross", tokens.Embed, 2);
+            using var read = await PostReadAsync(http, "c-done", tokens.Local, 2);
+            using var repeatRead = await PostReadAsync(http, "c-done", tokens.Local, 2);
+            var afterOldRead = await ListAsync(http, tokens.Local, "done");
+            using var currentRead = await PostReadAsync(http, "c-done", tokens.Local, 3);
+            var afterRead = await ListAsync(http, tokens.Local, "done");
+            check("未读按人员和审批单计算，标记前重查参与关系及嵌入来源且重复标记幂等",
+                newlyUnread.Items.Single(item => item.Id == "c-done").IsUnread &&
+                seenDetail?.Events.Max(item => item.Sequence) == 2 &&
+                invalidRead.StatusCode == HttpStatusCode.BadRequest &&
+                deniedRead.StatusCode == HttpStatusCode.NotFound && foreignRead.StatusCode == HttpStatusCode.NotFound &&
+                read.StatusCode == HttpStatusCode.NoContent && repeatRead.StatusCode == HttpStatusCode.NoContent &&
+                currentRead.StatusCode == HttpStatusCode.NoContent && afterOldRead.Items.Single(item => item.Id == "c-done").IsUnread &&
+                !afterRead.Items.Single(item => item.Id == "c-done").IsUnread);
+            await AddActivityAsync(factory, "c-done", 4, "viewer");
+            var afterOwn = await ListAsync(http, tokens.Local, "done");
+            await AddActivityAsync(factory, "c-done", 5, "other");
+            var afterOther = await ListAsync(http, tokens.Local, "done");
+            await using (var readDb = await factory.CreateDbContextAsync())
+            {
+                check("已读游标持久且只推进到已看过的活动，本人动作不触发、他人新活动触发未读",
+                    !afterOwn.Items.Single(item => item.Id == "c-done").IsUnread &&
+                    afterOther.Items.Single(item => item.Id == "c-done").IsUnread &&
+                    await readDb.CenterReadCursors.SingleAsync(item => item.InstanceId == "c-done" && item.PersonId == "viewer") is
+                    { ReadThroughSequence: 3 });
+            }
             using var comment = await PostActionAsync(http, "a-todo-task", tokens.Local,
                 new CenterTaskActionRequest { Action = "comment", Opinion = "请核对金额" });
             var commented = await comment.Content.ReadFromJsonAsync<CenterTaskActionResponse>();
@@ -274,6 +318,52 @@ internal static class CenterQueryChecks
     /// <param name="id">审批单标识。</param>
     /// <returns>可请求的相对地址。</returns>
     private static string Path(string id) => CenterRoutes.Instance.Replace("{id}", Uri.EscapeDataString(id), StringComparison.Ordinal);
+
+    /// <summary>
+    /// 使用真实人员 JWT 显式确认已读，列表读取本身不会调用此入口。
+    /// </summary>
+    /// <param name="http">测试服务客户端。</param>
+    /// <param name="id">审批单 ID。</param>
+    /// <param name="token">登录令牌。</param>
+    /// <param name="seenThroughSequence">本次详情实际显示的活动序号。</param>
+    /// <returns>调用方负责释放的响应。</returns>
+    private static async Task<HttpResponseMessage> PostReadAsync(HttpClient http, string id, string token,
+        long seenThroughSequence)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post,
+            CenterRoutes.MarkRead.Replace("{id}", Uri.EscapeDataString(id), StringComparison.Ordinal));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = JsonContent.Create(new CenterReadRequest { SeenThroughSequence = seenThroughSequence });
+        return await http.SendAsync(request);
+    }
+
+    /// <summary>
+    /// 在不改写旧审计记录的前提下追加可辨认操作人的活动。
+    /// </summary>
+    /// <param name="factory">测试库上下文工厂。</param>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <param name="sequence">单据内递增序号。</param>
+    /// <param name="actorId">实际操作人员。</param>
+    /// <returns>活动入库完成。</returns>
+    private static async Task AddActivityAsync(IDbContextFactory<ApprovalDbContext> factory,
+        string instanceId, long sequence, string actorId)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        db.OperationEvents.Add(new OperationEventEntity
+        {
+            Id = instanceId + "-read-" + sequence,
+            InstanceId = instanceId,
+            Sequence = sequence,
+            Kind = "commentAdded",
+            OccurredAt = DateTimeOffset.UtcNow,
+            PayloadJson = JsonSerializer.Serialize(new EngineEvent
+            {
+                Kind = "commentAdded",
+                Audit = new OperationAudit { ActorId = actorId },
+            }, ApprovalJson.Options),
+        });
+        await db.SaveChangesAsync();
+    }
 
     /// <summary>
     /// 使用人员 JWT 向真实任务写路由提交操作。

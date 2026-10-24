@@ -56,7 +56,7 @@
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
 | `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
 | `GET /api/v1/info` | 无 | 服务信息 |
-| `GET /api/v1/center/instances`、`/center/instances/{id}` | 本地或嵌入 JWT | 当前人员的四类列表和已授权详情；不接受 API Key 代替人员登录 |
+| `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
 | `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
@@ -149,9 +149,11 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - `cc`：普通抄送节点实际送达或人工抄送的收件人；未到达的将来抄送不授予可见性。
 - `started`：发起人或实际代发人，只供看进度。
 
-摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, startedAt, endedAt?, summary, summaryFieldDefinitions, pendingTaskIds, canBulkApprove, bulkApprovableTaskIds`。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系；`bulkApprovableTaskIds` 只列当前人员可批量同意的实际任务 ID。全部操作提交时仍按最新状态和节点规则重验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。`summaryFieldDefinitions` 按发布顺序只描述实际返回的字段，每项含 `key, name, type, children`；隐藏字段及隐藏明细列的名称也不返回。
+摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, isUnread, startedAt, endedAt?, summary, summaryFieldDefinitions, pendingTaskIds, canBulkApprove, bulkApprovableTaskIds`。`isUnread` 只针对当前 JWT 人员，不返回其他人的读游标；列表纯读。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系；`bulkApprovableTaskIds` 只列当前人员可批量同意的实际任务 ID。全部操作提交时仍按最新状态和节点规则重验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。`summaryFieldDefinitions` 按发布顺序只描述实际返回的字段，每项含 `key, name, type, children`；隐藏字段及隐藏明细列的名称也不返回。
 
-`GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式尚未接入，回退自动排版，不返回嵌入页面编码或地址。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。图布局和读标记协议仍待接入。
+`GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式尚未接入，回退自动排版，不返回嵌入页面编码或地址。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。图布局仍待接入。
+
+`POST /api/v1/center/instances/{id}/read` 请求 `{seenThroughSequence}`（非负整数，为本次详情时间线实际显示的最大事件序号；没有事件为零），成功返回 204。仅详情已显示的当前人员主动调用；服务端在同一事务重新核对该人员的参与关系、保密范围与嵌入应用，再把（人员、审批单）的持久游标单调推进到不超过当前最大事件序号的已显示序号。因此 GET 详情后新发生的活动不会被误标已读。无权与不存在统一 404。列表和详情 GET 不写游标；游标未保存成功时页面仍展示详情并提示可刷新重试。他人之后产生的新可见审计活动使 `isUnread=true`，本人动作与私人意见草稿不触发未读；完整原始事件和游标均不返回给前端。
 
 `POST /api/v1/center/tasks/{id}/actions` 请求 `{action, opinion?, targetPersonId?, targetNodeId?, relatedId?, mode?, mentionedPersonIds?, fieldValues?}`，任务 ID 含斜杠时需将整个 ID 编码；人员参数使用审批服务内部 ID。响应 `{taskId, instanceId, detail}`，详情再次执行人员与应用授权。`action` 只允许人工任务命令，当前人、节点许可、意见及字段规则由服务端重新校验，变更经过统一引擎写入事件与任务状态。`fieldValues` 只接受当前节点显式可编辑的顶层审批人字段；人员、部门值须为现存内部 ID，必填仅在成功推进时强制；明细和附件字段目前没有安全提交协议，明确拒绝。节点同意前的业务校验钩子仍会运行，中心登录人员作为审批服务内部人员 ID 传给钩子的 `actor`。无权或失效任务不会因列表先前显示过按钮而获准。
 

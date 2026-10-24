@@ -84,6 +84,29 @@ public sealed class CenterQueryAppService(ICenterQueryRepository repository, ISt
     }
 
     /// <summary>
+    /// 详情成功显示后，由当前登录人员显式确认已经看过这张审批单。
+    /// </summary>
+    /// <param name="scope">服务端可信会话范围。</param>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <param name="input">详情响应中实际显示的活动序号。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>标记完成。</returns>
+    public async Task MarkReadAsync(CenterScope scope, string instanceId, CenterReadRequest input,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateScope(scope);
+        if (string.IsNullOrWhiteSpace(instanceId) || instanceId.Length > 100 ||
+            input is null || input.SeenThroughSequence < 0)
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "已读请求不正确。");
+        }
+        if (await repository.MarkReadAsync(scope, instanceId, input.SeenThroughSequence, cancellationToken) is null)
+        {
+            throw new UserFriendlyException(ErrorCodes.NotFound, "审批单不存在或当前人员无权查看。");
+        }
+    }
+
+    /// <summary>
     /// 拒绝空人员或伪装为无限制范围的空应用字符串。
     /// </summary>
     /// <param name="scope">可信身份范围。</param>

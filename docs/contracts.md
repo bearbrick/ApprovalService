@@ -73,6 +73,7 @@
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
+| `POST /api/v1/admin/flows/simulations`、`GET/DELETE /api/v1/admin/flows/simulations/{id}`、`POST /api/v1/admin/flows/simulations/{id}/steps` | 本地 JWT + 当前流程管理权限 | 完整草稿和假输入创建、读取、逐步推进及删除内存模拟会话 |
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
 | `GET/POST /api/v1/admin/flows`、`GET /api/v1/admin/flows/{code}`、`PUT /api/v1/admin/flows/{code}/draft`、`POST /api/v1/admin/flows/{code}/publish` | 本地 JWT + 当前流程管理范围 | 读取、创建、按修订保存草稿及原子发布新版本 |
@@ -113,6 +114,8 @@
 `PUT /admin/flows/{code}/enabled` 接受 `{expectedEnabled, enabled, reason}`，实际状态改变时按旧启用状态条件更新并留管理员、原因和当前发布版本号；重复提交相同状态不增加审计。停用后开放流程目录与新发起接口不再返回该流程，已在途实例仍按原 `FlowVersion` 快照运行；恢复启用不改发布版本指针。
 
 `GET /admin/apps/{code}/embed-origins` 返回 `{code, origins}`；`PUT` 接受 `{origins, reason}` 并返回相同结构。`origins` 是完整来源列表，最多 20 项、每项不超过 256 字符，去重后保存；仅允许 HTTPS 网站来源，开发时 HTTP 只允许 `localhost` 或 `127.0.0.1`，不得包含路径、查询、片段、用户信息或通配符。`reason` 须为 2 至 200 字符。保存使用旧值条件更新防止覆盖并发修改，在同一事务记录管理员、原因和不含密钥的前后来源快照。
+
+流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,success?,actionResult?}`，人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
 
 `POST /admin/apps` 接受 `{code, name, allowedFlowCodes, canViewAllTasks, callbackUrl?, dataUrl?, validationUrl?, assigneeUrl?, actionUrl?, reason}`。应用编码只含 ASCII 字母、数字、`-`、`_`，最长 128 字符；名称最长 256 字符，出站地址必须满足部署的 HTTPS/显式内网 HTTP 策略。`PUT /admin/apps/{code}/enabled` 接受 `{enabled, reason}` 并返回 204；`POST /admin/apps/{code}/rotate-secrets` 接受 `{reason}`。三种管理操作的原因均须为 2 至 200 字符，实际变更与不含凭据的管理员审计在同一事务提交。创建和轮换只在本次响应返回 `{code, apiKey, signingSecret}`；后续列表和日志均不能再次读取明文。轮换或实际启停使旧嵌入会话永久失效，停用时旧 API Key 不可调用；重新启用不会恢复旧嵌入会话。
 

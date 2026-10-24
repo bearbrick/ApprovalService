@@ -57,3 +57,4 @@
 | [0018](0018-flow-management-lifecycle.md) | 流程管理按直属部门授权，草稿和发布版本分离 | 已采纳 |
 | [0019](0019-reporting-query-access.md) | 报表查询范围与保密统计 | 已采纳 |
 | [0020](0020-deployment-and-backup.md) | 单实例部署、受限指标与 SQLite 在线备份 | 已采纳 |
+| [0021](0021-simulation-and-integration-test.md) | 流程模拟与接入测试使用互相隔离的协议 | 已采纳 |

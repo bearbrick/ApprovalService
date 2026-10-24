@@ -201,6 +201,21 @@ public static class ApiRoutes
     public const string AdminFlowVersionRestore = AdminFlowVersions + "/{version}/restore";
 
     /// <summary>
+    /// 创建仅驻留内存的流程模拟会话。
+    /// </summary>
+    public const string AdminFlowSimulations = AdminFlows + "/simulations";
+
+    /// <summary>
+    /// 读取或删除一场流程模拟。
+    /// </summary>
+    public const string AdminFlowSimulationById = AdminFlowSimulations + "/{id}";
+
+    /// <summary>
+    /// 对流程模拟执行一步纯引擎命令。
+    /// </summary>
+    public const string AdminFlowSimulationSteps = AdminFlowSimulationById + "/steps";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

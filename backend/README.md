@@ -94,6 +94,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 开放流程预览使用已发布定义、当前组织和与发起相同的审批数据在内存中运行纯引擎：按同意/成功路径逐步模拟，返回预计到达节点及当前候选审批人。业务接口找人只在模拟实际命中的节点预取；业务单号可省略，钩子此时收到空业务单号。预览不创建审批单、占用业务单号或产生待发项；实际到达节点时仍以最新组织和业务数据重算。
 
+发布前测试模式由本地组织管理员或该流程管理员通过 `POST /api/v1/admin/flows/simulations` 提交完整草稿、假数据、假发起人及各人工节点假处理人。创建人用 `GET/DELETE /api/v1/admin/flows/simulations/{id}` 读取或删除，并以 `POST /api/v1/admin/flows/simulations/{id}/steps` 逐项模拟人工处理及显式自动动作、子流程假结果。会话在内存中闲置 30 分钟过期，进程重启即丢失；不写审批单、不发真实通知、钩子或回调。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：

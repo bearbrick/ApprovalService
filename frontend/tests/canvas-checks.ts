@@ -78,6 +78,7 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
     ...simpleFlow,
     withdrawBeforeFirstDecision: true,
     returnMode: 'returnNode',
+    data: { fields: [{ key: 'amount', name: '金额', type: 'number', required: true, approverInput: false, businessUpdateAllowed: true, children: [] }], summaryFields: ['amount'] },
     canvas: {
       ...simpleFlow.canvas,
       nodes: simpleFlow.canvas.nodes.map(node => node.id === 'manager' ? {
@@ -93,4 +94,5 @@ export async function runCanvasChecks(check: (name: string, value: boolean) => v
   const exportedNode = exported.canvas.nodes.find(node => node.id === 'manager')
   check('BPMN 扩展保留找人兜底、部门限制和截止职级', exportedNode?.assignee?.limitToInitiatingDepartment === true && exportedNode.assignee.stopAtGrade === 'DIRECTOR' && exportedNode.approval?.missingAssigneeUserId === 'user-123')
   check('BPMN 扩展保留流程撤回与退回重提策略', exported.withdrawBeforeFirstDecision === true && exported.returnMode === 'returnNode')
+  check('BPMN 扩展保留业务系统审批中更新字段的授权', exported.data.fields[0]?.businessUpdateAllowed === true)
 }

@@ -24,6 +24,35 @@ public sealed class FlowManagementRepository(IDbContextFactory<ApprovalDbContext
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<FlowDepartmentOption>> ListManageableDepartmentsAsync(string actorId,
+        bool isLocalSession, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable,
+            cancellationToken);
+        var identity = await ReadIdentityAsync(db, actorId, cancellationToken);
+        if (!identity.IsActive || !isLocalSession ||
+            !(identity.IsOrganizationAdmin || identity.IsFlowAdmin))
+        {
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "当前账号不能管理流程。");
+        }
+
+        var query = db.Departments.AsNoTracking().AsQueryable();
+        if (!identity.IsOrganizationAdmin)
+        {
+            // 人员与部门的直接关系是唯一范围；不遍历父子部门树。
+            var directIds = identity.DirectDepartmentIds.ToArray();
+            query = query.Where(item => directIds.Contains(item.Id));
+        }
+
+        var options = await query.OrderBy(item => item.Name).ThenBy(item => item.Id)
+            .Select(item => new FlowDepartmentOption { Id = item.Id, Name = item.Name })
+            .ToArrayAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return options;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<ManagedFlowSnapshot>> ListAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);

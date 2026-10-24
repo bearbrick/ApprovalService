@@ -47,7 +47,53 @@ internal static class FlowManagementHttpChecks
             var admin = await LoginAsync(client, "A001", "admin-password-new");
             var manager = await LoginAsync(client, "M001", "manager-password-new");
             var parentManager = await LoginAsync(client, "P001", "parent-password-new");
+            var unassignedManager = await LoginAsync(client, "U001", "unassigned-password-new");
             var viewer = await LoginAsync(client, "V001", "viewer-password-new");
+            using (var anonymousDepartments = await client.GetAsync(ApiRoutes.AdminFlowDepartments))
+            {
+                check("匿名不能读取流程所属部门选项",
+                    anonymousDepartments.StatusCode == HttpStatusCode.Unauthorized);
+            }
+
+            using (var adminDepartments = await SendAsync(client, HttpMethod.Get,
+                ApiRoutes.AdminFlowDepartments, admin))
+            {
+                var body = await adminDepartments.Content.ReadFromJsonAsync<AdminFlowDepartmentOption[]>();
+                check("组织管理员只获得所有现存部门的内部 ID 和名称", adminDepartments.IsSuccessStatusCode &&
+                    body is { Length: 2 } && body.Select(item => item.Id).OrderBy(item => item)
+                        .SequenceEqual(["child", "parent"]));
+            }
+
+            using (var ownDepartments = await SendAsync(client, HttpMethod.Get,
+                ApiRoutes.AdminFlowDepartments, manager))
+            {
+                var body = await ownDepartments.Content.ReadFromJsonAsync<AdminFlowDepartmentOption[]>();
+                check("部门流程管理员只看直接加入的现存部门", ownDepartments.IsSuccessStatusCode &&
+                    body is [{ Id: "child", Name: "直属部门" }]);
+            }
+
+            using (var parentDepartments = await SendAsync(client, HttpMethod.Get,
+                ApiRoutes.AdminFlowDepartments, parentManager))
+            {
+                var body = await parentDepartments.Content.ReadFromJsonAsync<AdminFlowDepartmentOption[]>();
+                check("上级部门流程管理员不继承下级部门选项", parentDepartments.IsSuccessStatusCode &&
+                    body is [{ Id: "parent", Name: "上级部门" }]);
+            }
+
+            using (var unassigned = await SendAsync(client, HttpMethod.Get,
+                ApiRoutes.AdminFlowDepartments, unassignedManager))
+            {
+                var body = await unassigned.Content.ReadFromJsonAsync<AdminFlowDepartmentOption[]>();
+                check("没有直属部门的流程管理员仅得到空选项", unassigned.IsSuccessStatusCode &&
+                    body is { Length: 0 });
+            }
+
+            using (var forbiddenDepartments = await SendAsync(client, HttpMethod.Get,
+                ApiRoutes.AdminFlowDepartments, viewer))
+            {
+                check("普通本地人员不能读取流程部门选项",
+                    forbiddenDepartments.StatusCode == HttpStatusCode.Forbidden);
+            }
             using (var forbidden = await SendAsync(client, HttpMethod.Get, ApiRoutes.AdminFlows, viewer))
             {
                 check("普通本地人员不能读取流程管理列表", forbidden.StatusCode == HttpStatusCode.Forbidden);
@@ -308,6 +354,7 @@ internal static class FlowManagementHttpChecks
                 new PersonEntity { Id = "admin", EmployeeNumber = "A001", Name = "组织管理员" },
                 new PersonEntity { Id = "manager", EmployeeNumber = "M001", Name = "部门流程管理员" },
                 new PersonEntity { Id = "parent-manager", EmployeeNumber = "P001", Name = "上级流程管理员" },
+                new PersonEntity { Id = "unassigned-manager", EmployeeNumber = "U001", Name = "无部门流程管理员" },
                 new PersonEntity { Id = "viewer", EmployeeNumber = "V001", Name = "普通人员" });
             db.OrganizationRoles.AddRange(
                 new OrganizationRoleEntity { Code = "organization-admin", Name = "组织管理员" },
@@ -316,6 +363,11 @@ internal static class FlowManagementHttpChecks
                 new PersonRoleEntity { PersonId = "admin", RoleCode = "organization-admin" },
                 new PersonRoleEntity { PersonId = "manager", RoleCode = "flow-admin" },
                 new PersonRoleEntity { PersonId = "parent-manager", RoleCode = "flow-admin" });
+            db.PersonRoles.Add(new PersonRoleEntity
+            {
+                PersonId = "unassigned-manager",
+                RoleCode = "flow-admin",
+            });
             db.PersonDepartments.AddRange(
                 new PersonDepartmentEntity { PersonId = "manager", DepartmentId = "child", IsPrimary = true },
                 new PersonDepartmentEntity { PersonId = "parent-manager", DepartmentId = "parent", IsPrimary = true });
@@ -326,6 +378,7 @@ internal static class FlowManagementHttpChecks
         await ProvisionAsync(identity, "admin", "admin-password-new");
         await ProvisionAsync(identity, "manager", "manager-password-new");
         await ProvisionAsync(identity, "parent-manager", "parent-password-new");
+        await ProvisionAsync(identity, "unassigned-manager", "unassigned-password-new");
         await ProvisionAsync(identity, "viewer", "viewer-password-new");
     }
 

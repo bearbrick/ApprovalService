@@ -253,6 +253,142 @@ internal static class ReportingChecks
             }
 
             check("统计事实读取拒绝空时间区间", invalidRangeRejected);
+
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                // 三张旧审批单分别验证当前待办、到期任务及观察时刻之后才到期的排除边界。
+                db.Instances.AddRange(
+                    new InstanceEntity
+                    {
+                        Id = "d",
+                        SerialNo = "AP-R-4",
+                        FlowId = "purchase",
+                        FlowVersionId = "purchase-v1",
+                        FlowCode = "PURCHASE",
+                        BusinessKey = "PO-4",
+                        Title = "旧单当前待办",
+                        InitiatorId = "starter",
+                        InitiatorDepartmentId = "D1",
+                        ClientAppCode = "ERP",
+                        Status = EngineInstanceStatuses.Running,
+                        StartedAt = start.AddHours(-1),
+                    },
+                    new InstanceEntity
+                    {
+                        Id = "e",
+                        SerialNo = "AP-R-5",
+                        FlowId = "expense",
+                        FlowVersionId = "expense-v1",
+                        FlowCode = "EXPENSE",
+                        BusinessKey = "EX-5",
+                        Title = "旧单仅因到期纳入",
+                        InitiatorId = "starter",
+                        InitiatorDepartmentId = "D2",
+                        ClientAppCode = "FINANCE",
+                        Status = EngineInstanceStatuses.Approved,
+                        StartedAt = start.AddHours(-3),
+                        EndedAt = start.AddHours(-1),
+                    },
+                    new InstanceEntity
+                    {
+                        Id = "f",
+                        SerialNo = "AP-R-6",
+                        FlowId = "expense",
+                        FlowVersionId = "expense-v1",
+                        FlowCode = "EXPENSE",
+                        BusinessKey = "EX-6",
+                        Title = "观察时尚未到期",
+                        InitiatorId = "starter",
+                        InitiatorDepartmentId = "D2",
+                        ClientAppCode = "FINANCE",
+                        Status = EngineInstanceStatuses.Approved,
+                        StartedAt = start.AddHours(-4),
+                        EndedAt = start.AddHours(-2),
+                    });
+                db.ApprovalTasks.AddRange(
+                    new ApprovalTaskEntity
+                    {
+                        Id = "task-d1",
+                        InstanceId = "d",
+                        NodeId = "manager",
+                        AssigneeId = "reviewer",
+                        Status = EngineTaskStatuses.Pending,
+                    },
+                    new ApprovalTaskEntity
+                    {
+                        Id = "task-e1",
+                        InstanceId = "e",
+                        NodeId = "finance",
+                        AssigneeId = "reviewer",
+                        Status = EngineTaskStatuses.Approved,
+                        DueAt = nextDay.AddHours(2),
+                        CompletedAt = start.AddHours(-1),
+                    },
+                    new ApprovalTaskEntity
+                    {
+                        Id = "task-f1",
+                        InstanceId = "f",
+                        NodeId = "finance",
+                        AssigneeId = "reviewer",
+                        Status = EngineTaskStatuses.Approved,
+                        DueAt = nextDay.AddHours(18),
+                        CompletedAt = start.AddHours(-2),
+                    });
+                await db.SaveChangesAsync();
+            }
+
+            var metricsQuery = new ReportingMetricsQuery
+            {
+                FromUtc = nextDay,
+                UntilUtc = nextDay.AddDays(1),
+                AsOfUtc = nextDay.AddHours(12),
+            };
+            var metricFacts = await repository.ReadForMetricsAsync(metricsQuery);
+            check("跨期报表事实取发起、结束、已到期和当前待办的并集",
+                metricFacts.Instances.Select(item => item.Id).Order().SequenceEqual(["a", "b", "d", "e"]));
+            check("观察时未到期的旧单和筛选期前完成且未到期的旧单不混入",
+                !metricFacts.Instances.Any(item => item.Id == "f" || item.Id == "c") &&
+                metricFacts.Tasks.Any(item => item.Id == "task-e1") &&
+                metricFacts.Tasks.Any(item => item.Id == "task-d1"));
+            var metricResult = ReportingMetricsCalculator.Calculate(metricFacts, metricsQuery);
+            check("期前发起但期内结束的审批单计入完成量且期内新单计入发起量",
+                metricResult.Flows.Single(item => item.FlowCode == "PURCHASE").StartedCount == 1 &&
+                metricResult.Flows.Single(item => item.FlowCode == "PURCHASE").CompletedCount == 1);
+            check("到期分母纳入期前发起的审批任务，当前积压也跨发起时间读取",
+                metricResult.Nodes.Sum(item => item.DueCount) == 2 &&
+                metricResult.People.Sum(item => item.PendingCount) == 3);
+
+            var scopedFacts = await repository.ReadForMetricsAsync(new ReportingMetricsQuery
+            {
+                FromUtc = nextDay,
+                UntilUtc = nextDay.AddDays(1),
+                AsOfUtc = nextDay.AddHours(12),
+                FlowCode = "PURCHASE",
+                ClientAppCode = "ERP",
+                InitiatorDepartmentId = "D1",
+            });
+            check("跨期各入口统一应用流程、来源应用和发起部门快照筛选",
+                scopedFacts.Instances.Select(item => item.Id).Order().SequenceEqual(["a", "d"]));
+            var safeProjection = JsonSerializer.Serialize(metricFacts);
+            check("跨期事实仍不读取审批标题与业务数据",
+                !safeProjection.Contains("旧单", StringComparison.Ordinal) &&
+                !safeProjection.Contains("业务数据", StringComparison.Ordinal));
+            var invalidMetricsRange = false;
+            try
+            {
+                await repository.ReadForMetricsAsync(new ReportingMetricsQuery
+                {
+                    FromUtc = nextDay,
+                    UntilUtc = nextDay,
+                    AsOfUtc = nextDay,
+                });
+            }
+            catch (ArgumentException)
+            {
+                invalidMetricsRange = true;
+            }
+
+            check("跨期读取拒绝空时间范围", invalidMetricsRange);
         }
         finally
         {

@@ -80,11 +80,13 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
                 CompletedAt = item.CompletedAt,
             }).ToListAsync(cancellationToken);
         var events = await db.OperationEvents.AsNoTracking()
-            .Where(item => instanceIds.Contains(item.InstanceId) && item.Kind == "taskCreated")
+            .Where(item => instanceIds.Contains(item.InstanceId) &&
+                (item.Kind == "taskCreated" || item.Kind == "taskActivated"))
             .OrderBy(item => item.InstanceId).ThenBy(item => item.Sequence)
-            .Select(item => new { item.Id, item.InstanceId, item.PayloadJson, item.OccurredAt })
+            .Select(item => new { item.Id, item.InstanceId, item.Kind, item.PayloadJson, item.OccurredAt })
             .ToListAsync(cancellationToken);
         var createdFacts = new List<ReportingTaskCreatedFact>(events.Count);
+        var activatedFacts = new List<ReportingTaskActivatedFact>();
         foreach (var entry in events)
         {
             var payload = JsonSerializer.Deserialize<EngineEvent>(entry.PayloadJson, ApprovalJson.Options);
@@ -92,6 +94,16 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
             {
                 // 损坏的审计日志不能悄悄变成准确的任务时长。
                 throw new InvalidDataException("任务创建事件缺少任务 ID，无法生成可信统计事实。");
+            }
+
+            if (entry.Kind == "taskActivated")
+            {
+                activatedFacts.Add(new ReportingTaskActivatedFact
+                {
+                    TaskId = payload.TaskId,
+                    OccurredAt = entry.OccurredAt,
+                });
+                continue;
             }
 
             createdFacts.Add(new ReportingTaskCreatedFact
@@ -110,6 +122,7 @@ public sealed class ReportingFactsRepository(IDbContextFactory<ApprovalDbContext
             Instances = instanceFacts,
             Tasks = tasks,
             TaskCreatedEvents = createdFacts,
+            TaskActivatedEvents = activatedFacts,
         };
     }
 }

@@ -1,6 +1,7 @@
 import { adminAccessToken, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { createManagedFlow, exportManagedFlow, getManagedFlow, importManagedFlow, listManagedFlows,
-  previewManagedImport, publishManagedFlow, saveManagedFlow, setManagedFlowEnabled } from '../src/api/admin-flow-management.ts'
+  listManagedFlowVersions, previewManagedImport, publishManagedFlow, restoreManagedFlowVersion,
+  saveManagedFlow, setManagedFlowEnabled } from '../src/api/admin-flow-management.ts'
 import { createEmptyFlow } from '../src/designer/workbench/workbench-model.ts'
 
 /**
@@ -50,6 +51,14 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
     if (path === '/api/v1/admin/flows/FLOW_A/enabled') return Response.json({
       code: 'FLOW_A', name: '流程 A', isEnabled: false, draftRevision: revision,
     })
+    if (path === '/api/v1/admin/flows/FLOW_A/versions' && method === 'GET') return Response.json([
+      { id: 'version-2', version: 2, publishedAt: '2026-10-24T00:00:00Z', isCurrent: true },
+      { id: 'version-1', version: 1, publishedAt: '2026-10-23T00:00:00Z', isCurrent: false },
+    ])
+    if (path === '/api/v1/admin/flows/FLOW_A/versions/1/restore') return Response.json({
+      code: 'FLOW_A', name: '流程 A', isEnabled: true, draftRevision: revision + 1, draft: definition,
+      publishedVersionId: 'version-2', publishedVersion: 2,
+    })
     if (path === '/api/v1/admin/flows/import/preview') return Response.json({
       code: 'FLOW_A', name: '流程 A', nodeCount: 2, hasCodeConflict: true, canOverwrite: true,
       existingDraftRevision: revision, publishIssues: [{ message: '审批节点尚未设置', elementId: 'review' }],
@@ -98,6 +107,14 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
     check('停用需要预期旧状态且不改变发布版',
       (seen.at(-1)?.body as { expectedEnabled?: boolean; enabled?: boolean }).expectedEnabled === true
       && (seen.at(-1)?.body as { enabled?: boolean }).enabled === false)
+    const versions = await listManagedFlowVersions('FLOW_A')
+    check('版本历史只读取不可变摘要并标出当前发布版',
+      versions.length === 2 && versions[0]?.isCurrent === true && versions[1]?.version === 1)
+    const restored = await restoreManagedFlowVersion(published, 1, '恢复旧版内容')
+    check('恢复旧版需要草稿和发布版双重 CAS 且不直接切换发布指针',
+      restored.draftRevision === 4 && restored.publishedVersionId === 'version-2'
+      && (seen.at(-1)?.body as { expectedRevision?: number }).expectedRevision === 3
+      && (seen.at(-1)?.body as { expectedPublishedVersionId?: string }).expectedPublishedVersionId === 'version-2')
     const preview = await previewManagedImport('<definitions/>')
     check('兼容文件先预检同编码冲突和当前可覆盖修订', preview.hasCodeConflict
       && preview.canOverwrite && preview.existingDraftRevision === 3 && preview.publishIssues[0]?.elementId === 'review')

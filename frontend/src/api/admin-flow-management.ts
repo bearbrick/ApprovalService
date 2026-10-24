@@ -101,6 +101,28 @@ export interface FlowImportPreview {
 }
 
 /**
+ * 一份不可变发布版本的安全摘要。
+ */
+export interface ManagedFlowVersion {
+  /**
+   * 不可变版本 ID。
+   */
+  id: string
+  /**
+   * 流程内版本号。
+   */
+  version: number
+  /**
+   * 发布时间。
+   */
+  publishedAt: string
+  /**
+   * 是否当前新发起所用版。
+   */
+  isCurrent: boolean
+}
+
+/**
  * 服务端管理路由前缀。
  */
 const path = '/api/v1/admin/flows'
@@ -237,6 +259,38 @@ export async function setManagedFlowEnabled(flow: ManagedFlow, enabled: boolean,
   const value = await requestJson<unknown>(`${path}/${encodeURIComponent(flow.code)}/enabled`, {
     method: 'PUT', headers: await headers(), body: { expectedEnabled: flow.isEnabled, enabled, reason },
     cache: 'no-store',
+  })
+  return requireFlow(value)
+}
+
+/**
+ * 读取当前管理范围内的不可变发布版本摘要。
+ * @param code 流程编码。
+ * @returns 按版本号排列的安全摘要。
+ */
+export async function listManagedFlowVersions(code: string): Promise<ManagedFlowVersion[]> {
+  const value = await getJson<unknown>(`${path}/${encodeURIComponent(code)}/versions`,
+    { headers: await headers(), cache: 'no-store' })
+  if (!Array.isArray(value) || !value.every(item => record(item) && typeof item.id === 'string'
+    && typeof item.version === 'number' && Number.isSafeInteger(item.version)
+    && typeof item.publishedAt === 'string' && typeof item.isCurrent === 'boolean')) {
+    throw new Error('发布版本列表响应不完整，请刷新后重试。')
+  }
+  return value
+}
+
+/**
+ * 把旧版内容复制成新的草稿修订，发布指针仍保持不变。
+ * @param flow 上次读取的流程摘要，提供双重并发前提。
+ * @param version 要复制的不可变版本号。
+ * @param reason 审计原因。
+ * @returns 新的草稿与修订号。
+ */
+export async function restoreManagedFlowVersion(flow: ManagedFlow, version: number,
+  reason: string): Promise<ManagedFlow> {
+  const value = await requestJson<unknown>(`${path}/${encodeURIComponent(flow.code)}/versions/${version}/restore`, {
+    method: 'POST', headers: await headers(), body: { expectedRevision: flow.draftRevision,
+      expectedPublishedVersionId: flow.publishedVersionId, reason }, cache: 'no-store',
   })
   return requireFlow(value)
 }

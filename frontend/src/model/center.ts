@@ -175,6 +175,60 @@ export interface CenterDetailColumn {
 }
 
 /**
+ * 当前人员可见的锁定版本详情排版。
+ */
+export interface CenterDetailLayout {
+  /**
+   * 自动排版或自定义排版。
+   */
+  mode: 'auto' | 'custom'
+  /**
+   * 仅含当前人员可见字段的排版分组。
+   */
+  groups: readonly CenterDetailLayoutGroup[]
+}
+
+/**
+ * 详情排版中的一个可见分组。
+ */
+export interface CenterDetailLayoutGroup {
+  /**
+   * 安全展示标题。
+   */
+  title: string
+  /**
+   * 每行列数。
+   */
+  columns: number
+  /**
+   * 按发布顺序排列的可见字段。
+   */
+  items: readonly CenterDetailLayoutItem[]
+}
+
+/**
+ * 已授权详情字段的排版参数。
+ */
+export interface CenterDetailLayoutItem {
+  /**
+   * 已授权的只读展示字段。
+   */
+  field: CenterDetailField
+  /**
+   * 占用的分组列数。
+   */
+  columnSpan: number
+  /**
+   * 仅含可见明细列的宽度百分比。
+   */
+  detailColumnWidths: Readonly<Record<string, number>>
+  /**
+   * 已授权金额字段的人民币大写。
+   */
+  moneyUppercase?: string
+}
+
+/**
  * 当前审批详情中已授权且已关联的附件元数据。
  */
 export interface CenterAttachment {
@@ -260,6 +314,10 @@ export interface CenterDetail {
    * 由服务端授权后返回的业务字段快照。
    */
   fields: readonly CenterDetailField[]
+  /**
+   * 按已授权字段裁剪的发布版本详情排版。
+   */
+  layout: CenterDetailLayout
   /**
    * 审批进度与已发生的操作。
    */

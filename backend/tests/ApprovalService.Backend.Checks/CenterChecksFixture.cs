@@ -60,7 +60,7 @@ internal static class CenterChecksFixture
                     SummaryFields = ["amount", "secret", "lines"],
                     Fields =
                     [
-                        new FlowFieldDefinition { Key = "amount", Name = "金额", Type = FlowFieldTypes.Number },
+                        new FlowFieldDefinition { Key = "amount", Name = "金额", Type = FlowFieldTypes.Money },
                         new FlowFieldDefinition { Key = "secret", Name = "保密字段" },
                         new FlowFieldDefinition { Key = "receipt", Name = "票据", Type = FlowFieldTypes.Attachment },
                         new FlowFieldDefinition { Key = "secretReceipt", Name = "隐藏票据", Type = FlowFieldTypes.Attachment },
@@ -69,6 +69,23 @@ internal static class CenterChecksFixture
                                 new FlowFieldDefinition { Key = "cost", Name = "成本" },
                                 new FlowFieldDefinition { Key = "receipt", Name = "行票据", Type = FlowFieldTypes.Attachment },
                                 new FlowFieldDefinition { Key = "costReceipt", Name = "隐藏行票据", Type = FlowFieldTypes.Attachment }] },
+                    ],
+                },
+                DetailLayout = new FlowDetailLayout
+                {
+                    Mode = "custom",
+                    Groups =
+                    [
+                        new FlowLayoutGroup { Title = "基本信息", Columns = 2, Items =
+                            [new FlowLayoutItem { FieldKey = "amount", ShowMoneyUppercase = true },
+                                new FlowLayoutItem { FieldKey = "receipt" }] },
+                        new FlowLayoutGroup { Title = "隐藏成本分组", Columns = 3, Items =
+                            [new FlowLayoutItem { FieldKey = "lines", ColumnSpan = 3,
+                                DetailColumnWidths = new Dictionary<string, int> { ["qty"] = 35, ["cost"] = 30, ["receipt"] = 65 } },
+                                new FlowLayoutItem { FieldKey = "secret" },
+                                new FlowLayoutItem { FieldKey = "secretReceipt" }] },
+                        new FlowLayoutGroup { Title = "全部隐藏", Items =
+                            [new FlowLayoutItem { FieldKey = "secret" }] },
                     ],
                 },
             };
@@ -84,6 +101,7 @@ internal static class CenterChecksFixture
             });
             // 最新发布版本更名不应改写既有审批单已锁定版本的字段名称。
             definition.Data.Fields[0].Name = "新版金额";
+            definition.DetailLayout.Groups[0].Title = "新版分组";
             db.FlowVersions.Add(new FlowVersionEntity
             {
                 Id = "version-new",

@@ -49,6 +49,11 @@
 .center-card { overflow: hidden; }
 .center-card h3 { padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fafcff; font-size: 13px; font-weight: 600; }
 .center-data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 20px; margin: 0; padding: 20px; }
+.center-layout-groups { display: grid; gap: 2px; padding-bottom: 12px; }
+.center-layout-group h4 { margin: 0 20px; padding: 18px 0 0; color: var(--ink); font-size: 13px; }
+.center-layout-grid { display: grid; grid-template-columns: repeat(var(--detail-columns), minmax(0, 1fr)); gap: 22px 20px; margin: 0; padding: 16px 20px 20px; }
+.center-layout-grid > div { min-width: 0; }
+.center-money-uppercase { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
 .center-data-grid dt, .center-meta dt { color: #8390a1; font-size: 12px; }
 .center-data-grid dd, .center-meta dd { margin: 5px 0 0; color: var(--ink); overflow-wrap: anywhere; }
 .center-data-table-field { grid-column: 1 / -1; min-width: 0; }
@@ -92,5 +97,5 @@
 .center-login input { min-height: 39px; padding: 8px 10px; border: 1px solid #dbe2ec; border-radius: 4px; }
 .center-login-error { color: #b34b57 !important; }
 @media (max-width: 1100px) { .center-detail-grid { grid-template-columns: minmax(0, 1fr); } .center-detail-side { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 700px) { .center-page-body { padding-inline: 12px; } .center-tabs a { padding-inline: 12px; } .center-data-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .center-detail-side { grid-template-columns: 1fr; } .center-action-bar { grid-template-columns: 1fr; } }
-@media (max-width: 480px) { .center-filterbar { padding-inline: 12px; } .center-date { flex: 1 1 100%; justify-content: space-between; } .center-date input { flex: 1; } .center-data-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { .center-page-body { padding-inline: 12px; } .center-tabs a { padding-inline: 12px; } .center-data-grid, .center-layout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .center-layout-grid > div { grid-column: auto !important; } .center-detail-side { grid-template-columns: 1fr; } .center-action-bar { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .center-filterbar { padding-inline: 12px; } .center-date { flex: 1 1 100%; justify-content: space-between; } .center-date input { flex: 1; } .center-data-grid, .center-layout-grid { grid-template-columns: 1fr; } .center-layout-grid > div { grid-column: 1 / -1 !important; } }

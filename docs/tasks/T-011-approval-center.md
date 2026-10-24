@@ -24,6 +24,7 @@
 - `frontend/src/api/center-actions.ts`：拆出中心 JWT 写请求，保持适配器单文件低于 500 行
 - `frontend/src/api/center-embed.ts`：内嵌令牌片段消费、登记来源读取及最小完成通知
 - `frontend/src/api/center-files.ts`：用当前 JWT 经现有权限下载接口读取附件内容，不向链接或 URL 写入令牌
+- `frontend/src/api/center-layout.ts`、`frontend/src/api/center-fields.ts`：裁剪后的排版与字段展示映射，保持中心适配器单文件低于规模上限
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
@@ -59,6 +60,8 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 完成锁定发布版本的自定义详情排版切片：应用投影只从已授权的字段定义选排版项和明细列宽，整个隐藏分组不返回，部分隐藏分组使用通用标题；可见金额由纯引擎转换人民币大写。前端按分组、列数与跨度绘制并在旧响应缺少排版时回退自动排版，字段展示映射拆入 `center-fields.ts` 以保持文件规模。真实 SQLite/JWT/HTTP 场景检查覆盖旧版本分组、隐藏字段及宽度不泄露；前端检查覆盖已授权映射。全量 `verify.ps1` 通过：后端 739、调用端 50、前端 133 项，生产构建通过；先前并发执行的本机发起 P95 336.6 ms 性能波动在独占复验时为 7.9 ms。原单嵌入安全地址、审批单读标记、字段内容搜索和个人设置仍待完成。外置 Chrome 扩展在本轮环境未连接，未做页面视觉复核。
+- 2026-10-24 · Codex · 本段预登记：将发布版本的自定义详情排版按当前登录人员已授权字段裁剪后，通过共享 `Contracts/Protocol/CenterResponses.cs` 向后兼容返回；前端 `center-adapter.ts`、`center-layout.ts`、`center-fields.ts`、`model/center.ts`、`CenterDetailView.vue` 和样式据此排版，抽出字段展示逻辑以满足单文件规模上限。同步共享 `docs/contracts.md`、`docs/architecture.md`，以及前后端 README 与设计书 §center；在 CenterQueryChecks 与 center-checks 增加隐藏字段、分组顺序和列宽检查。不改业务系统嵌入原单模式，它仍需独立安全地址协议。
 - 2026-10-24 · Codex · 接手续写已暂存的附件展示切片，修正增加明细附件后摘要展示列检查的预期。中心详情只从已授权字段取附件 ID，逐项核对文件仍关联当前审批单；前端以人员 JWT 经文件权限接口读取，图片/PDF 可预览，其他文件下载，令牌不放 URL。全量 `verify.ps1` 通过：后端 738、调用端 50、前端 131 项，构建通过。任务仍进行中；未完成读标记、字段内容搜索、完整自定义详情排版及个人设置，未合并主分支或推送。
 - 2026-10-23 · Codex · 下一段范围登记：仅复用 T-013 已公开的 IStoredFileRepository 与 GET /api/v1/files/{id}，不修改其在认领文件。中心详情从已授权且已裁剪的附件字段提取文件 ID，再核对元数据仍属于本审批单，向后兼容新增附件元数据；前端新增 center-files.ts，用当前 JWT 下载及预览图片/PDF，删除附件占位提示。同步 Contracts、contracts.md、前后端 README、设计书 §center 和中心场景检查。尚不处理附件上传或审批人字段附件写入。
 - 2026-10-23 · Codex · 完成已授权字段展示切片：中心列表新增 `summaryFieldDefinitions`、详情新增 `fieldDefinitions`，只从审批单锁定的发布版本及当前人员已裁剪的数据生成名称、种类和明细子列；即使流程新版本更名、当前查看者为历史参与人，隐藏字段名称不泄露。前端摘要显示发布名称，详情将明细数据绘成只读表格，不把明细对象直接渲染为 JSON；缺失展示定义时仍安全回退到已有可见字段编码。真实 SQLite/JWT 检查验证锁定版本、顶层及明细列隐藏，前端检查验证映射与表格数据。contracts、设计书 §center、前后端 README 同步。全量 `verify.ps1` 通过：后端 737、调用端 50、前端 130 项，构建零警告。完整自定义详情排版、附件、已读和个人设置仍未接入；没有新增依赖。

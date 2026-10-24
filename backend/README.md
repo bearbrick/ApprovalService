@@ -33,7 +33,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 | `GET /health/live` | 存活检查 |
 | `GET /health/ready` | 数据库可连接时返回 `ready`；不可连接时返回 503 |
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
-| `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤 |
+| `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤，详情排版按锁定版本及可见字段裁剪 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 登录人员对当前任务提交引擎命令，批量同意逐项独立处理 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |

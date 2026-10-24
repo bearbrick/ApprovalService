@@ -4,6 +4,7 @@ import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-
 import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
 import { fetchCenterFile } from '../src/api/center-files.ts'
+import { centerDetailLayout } from '../src/api/center-layout.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -94,6 +95,11 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         : path.includes('instances/instance-1')
           ? { instance: { ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] },
             data: { amount: 200, lines: [{ qty: 2 }] }, fieldDefinitions: summary.summaryFieldDefinitions,
+            layout: { mode: 'custom', groups: [{ title: '采购信息', columns: 2, items: [
+              { fieldKey: 'amount', columnSpan: 1, detailColumnWidths: {}, moneyUppercase: '贰佰元整' },
+              { fieldKey: 'lines', columnSpan: 2, detailColumnWidths: { qty: 100, cost: 20 } },
+              { fieldKey: 'secret', columnSpan: 1, detailColumnWidths: {} },
+            ] }] },
             attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
             tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
@@ -117,6 +123,13 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       list[0]?.summary[0]?.label === '金额' && list[0]?.summary[1]?.label === '明细'
       && list[0]?.summary[1]?.value === '1 条明细' && detail.fields[1]?.columns?.[0]?.label === '数量'
       && detail.fields[1]?.rows?.[0]?.[0] === '2')
+    check('详情只按已授权字段绘制自定义分组、列宽和金额大写',
+      detail.layout.mode === 'custom' && detail.layout.groups[0]?.title === '采购信息'
+      && detail.layout.groups[0]?.items.map(entry => entry.field.key).join(',') === 'amount,lines'
+      && detail.layout.groups[0]?.items[0]?.moneyUppercase === '贰佰元整'
+      && JSON.stringify(detail.layout).includes('"qty":100')
+      && !JSON.stringify(detail.layout).includes('secret') && !JSON.stringify(detail.layout).includes('cost'))
+    check('旧服务缺少详情排版时安全回退自动排版', centerDetailLayout(undefined, detail.fields).mode === 'auto')
     const downloaded = await fetchCenterFile('file-visible')
     check('详情附件使用人员 JWT 从独立验权接口下载，令牌不出现在 URL',
       detail.attachments[0]?.fileName === '票据.pdf' && detail.attachmentNames[0] === '票据.pdf'

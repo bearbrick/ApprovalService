@@ -9,6 +9,7 @@ using ApprovalService.Domain.Identity;
 using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Reporting;
 using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Files;
@@ -19,6 +20,7 @@ using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Organization;
 using ApprovalService.Infrastructure.Persistence;
+using ApprovalService.Infrastructure.Reporting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -49,6 +51,7 @@ public static class InfrastructureServiceCollectionExtensions
             .ValidateOnStart();
         services.AddApprovalPersistence(configuration);
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
+        services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();

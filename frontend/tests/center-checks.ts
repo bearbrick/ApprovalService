@@ -145,6 +145,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && JSON.stringify(detail.layout).includes('"qty":100')
       && !JSON.stringify(detail.layout).includes('secret') && !JSON.stringify(detail.layout).includes('cost'))
     check('旧服务缺少详情排版时安全回退自动排版', centerDetailLayout(undefined, detail.fields).mode === 'auto')
+    const fieldSearch = await centerAdapter.loadList('todo', controller.signal, '行票据')
+    check('审批列表把字段内容搜索交给 JWT 服务端且保留授权结果',
+      fieldSearch.length === 1 && requests.at(-1)?.path.includes('search=%E8%A1%8C%E7%A5%A8') === true &&
+      requests.at(-1)?.authorization === 'Bearer test-token')
     const downloaded = await fetchCenterFile('file-visible')
     check('详情附件使用人员 JWT 从独立验权接口下载，令牌不出现在 URL',
       detail.attachments[0]?.fileName === '票据.pdf' && detail.attachmentNames[0] === '票据.pdf'

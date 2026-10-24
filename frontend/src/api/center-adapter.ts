@@ -247,9 +247,10 @@ export interface CenterDataAdapter {
    * 读取当前人员有权查看的整类列表。
    * @param section 列表分组。
    * @param signal 路由切换时的取消信号。
+   * @param search 可见字段内容或单据元数据搜索词。
    * @returns 已授权的审批摘要。
    */
-  loadList(section: CenterSection, signal: AbortSignal): Promise<readonly CenterItem[]>
+  loadList(section: CenterSection, signal: AbortSignal, search?: string): Promise<readonly CenterItem[]>
   /**
    * 读取一张审批单的授权详情。
    * @param id 审批单标识。
@@ -382,12 +383,13 @@ export const centerAdapter: CenterDataAdapter = {
    * @inheritdoc
    */
 
-  async loadList(section, signal) {
+  async loadList(section, signal, search = '') {
     const rows: CenterItem[] = []
     let skip = 0
     let total = 0
     do {
       const query = new URLSearchParams({ section, skip: String(skip), take: '100' })
+      if (search.trim()) query.set('search', search.trim())
       const page = await getJson<CenterWirePage>(`/api/v1/center/instances?${query}`, {
         headers: await headers(), signal, cache: 'no-store',
       })

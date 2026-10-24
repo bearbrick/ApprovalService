@@ -47,10 +47,14 @@ const emit = defineEmits<{
    * 提交已选审批单的批量任务。
    */
   batch: [instanceIds: string[], opinion: string]
+  /**
+   * 将搜索词交由服务端按当前人的字段权限匹配。
+   */
+  search: [value: string]
 }>()
 
 /**
- * 本地筛选只改变当前用户已授权的记录展示。
+ * 流程、状态及日期在已授权的服务端搜索结果上本地筛选。
  */
 const filters = ref<CenterFilters>({ search: '', flowCode: '', status: '', dateFrom: '', dateTo: '' })
 /**
@@ -60,7 +64,7 @@ const selectedIds = ref<string[]>([])
 /**
  * 筛选后的记录。
  */
-const visibleItems = computed(() => filterCenterItems(props.items, props.section, filters.value))
+const visibleItems = computed(() => filterCenterItems(props.items, props.section, { ...filters.value, search: '' }))
 /**
  * 可用的流程筛选项。
  */
@@ -88,6 +92,7 @@ const batchOpinion = ref('')
 
 watch(() => props.section, () => { filters.value = { search: '', flowCode: '', status: '', dateFrom: '', dateTo: '' }; selectedIds.value = [] })
 watch(() => props.items, () => { selectedIds.value = [] })
+watch(() => filters.value.search, value => emit('search', value.trim()))
 
 /**
  * 切换一条可批量待办的选择状态。
@@ -123,7 +128,7 @@ function detailHash(id: string): string {
       <button class="btn" type="button" :disabled="state === 'loading'" @click="emit('reload')"><UiIcon name="refresh" />刷新</button>
     </div>
     <div class="center-filterbar">
-      <label class="center-search"><span class="sr-only">搜索审批</span><UiIcon name="search" /><input v-model="filters.search" type="search" placeholder="搜索标题、编号、单号或摘要" :disabled="state !== 'ready'"></label>
+      <label class="center-search"><span class="sr-only">搜索审批</span><UiIcon name="search" /><input v-model="filters.search" type="search" maxlength="200" placeholder="搜索标题、编号、单号或字段内容" :disabled="state === 'unavailable' || state === 'error'"></label>
       <label><span class="sr-only">按流程筛选</span><select v-model="filters.flowCode" :disabled="state !== 'ready'"><option value="">全部流程</option><option v-for="[code, name] in flows" :key="code" :value="code">{{ name }}</option></select></label>
       <label><span class="sr-only">按状态筛选</span><select v-model="filters.status" :disabled="state !== 'ready'"><option value="">全部状态</option><option v-for="status in statuses" :key="status">{{ status }}</option></select></label>
       <label class="center-date"><span>起始</span><input v-model="filters.dateFrom" type="date" :disabled="state !== 'ready'"></label>

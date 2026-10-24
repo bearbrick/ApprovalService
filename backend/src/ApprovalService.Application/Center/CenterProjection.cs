@@ -27,7 +27,7 @@ internal static class CenterProjection
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var instance = record.Instance;
         var state = Read<EngineState>(instance.StateJson);
-        var visibleSummary = VisibleData(record, personId, definition.Data.SummaryFields, definition.Data.Fields, graph);
+        var visibleSummary = CenterFieldVisibility.Filter(record, personId, definition.Data.SummaryFields, definition.Data.Fields, graph);
         var currentNodeIds = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending)
             .Select(task => task.NodeId).Distinct(StringComparer.Ordinal).ToArray();
         var currentStep = currentNodeIds.Length switch
@@ -79,7 +79,7 @@ internal static class CenterProjection
         var graph = Read<FlowExecutionGraph>(record.FlowVersion.GraphJson);
         var definition = Read<FlowDefinition>(record.FlowVersion.DefinitionJson);
         var state = Read<EngineState>(record.Instance.StateJson);
-        var visibleData = VisibleData(record, personId, definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph);
+        var visibleData = CenterFieldVisibility.Filter(record, personId, definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph);
         var visibleFields = DescribeFields(visibleData, definition.Data.Fields);
         return new CenterDetailResponse
         {
@@ -292,71 +292,6 @@ internal static class CenterProjection
         {
             ids.Add(id);
         }
-    }
-
-    /// <summary>
-    /// 按当前人员待办节点的隐藏规则过滤字段，不让摘要绕过详情权限。
-    /// </summary>
-    /// <param name="record">已授权审批记录。</param>
-    /// <param name="personId">当前人员。</param>
-    /// <param name="keys">本次允许投影的字段。</param>
-    /// <param name="fields">发布时的字段定义，含明细列。</param>
-    /// <param name="graph">固定版本执行图。</param>
-    /// <returns>独立持有的 JSON 数据。</returns>
-    private static JsonElement VisibleData(CenterRecord record, string personId, IEnumerable<string> keys,
-        IReadOnlyList<FlowFieldDefinition> fields, FlowExecutionGraph graph)
-    {
-        var ownNodes = record.Tasks.Where(task => task.Status == EngineTaskStatuses.Pending &&
-                (task.AssigneeId == personId || task.DelegatedForId == personId))
-            .Select(task => task.NodeId).ToHashSet(StringComparer.Ordinal);
-        // 未携带节点上下文的历史参与人采用全部节点隐藏集合；多节点权限冲突时隐藏优先。
-        // 发起人与代发人仍只读取发布定义中的字段，不返回额外业务数据。
-        var sourceOwner = record.Instance.InitiatorId == personId || record.Instance.SubmittedById == personId;
-        var hidden = sourceOwner ? new HashSet<string>(StringComparer.Ordinal) : graph.Nodes
-            .Where(node => ownNodes.Count == 0 || ownNodes.Contains(node.Id))
-            .SelectMany(node => node.FieldPermissions).Where(permission => permission.Access == FlowFieldAccess.Hidden)
-            .Select(permission => permission.FieldKey).ToHashSet(StringComparer.Ordinal);
-        using var data = JsonDocument.Parse(record.Instance.ApprovalDataJson);
-        var selected = keys.ToHashSet(StringComparer.Ordinal);
-        var visible = FilterFields(data.RootElement, fields, hidden, selected, string.Empty, false);
-        return JsonSerializer.SerializeToElement(visible, ApprovalJson.Options);
-    }
-
-    /// <summary>
-    /// 逐层投影已定义字段，隐藏明细列且不透传业务系统额外夹带的键。
-    /// </summary>
-    /// <param name="source">当前层级的对象。</param>
-    /// <param name="fields">当前层级字段定义。</param>
-    /// <param name="hidden">完整隐藏路径集合。</param>
-    /// <param name="selected">需要展示的完整路径集合。</param>
-    /// <param name="prefix">当前路径前缀。</param>
-    /// <param name="whole">父字段已被选中时读取其余可见子字段。</param>
-    /// <returns>安全的字段对象。</returns>
-    private static Dictionary<string, object> FilterFields(JsonElement source,
-        IReadOnlyList<FlowFieldDefinition> fields, HashSet<string> hidden, HashSet<string> selected,
-        string prefix, bool whole)
-    {
-        var result = new Dictionary<string, object>(StringComparer.Ordinal);
-        foreach (var field in fields)
-        {
-            var path = prefix + field.Key;
-            var include = whole || selected.Contains(path);
-            if (hidden.Contains(path) || (!include && !selected.Any(key => key.StartsWith(path + ".", StringComparison.Ordinal))) ||
-                source.ValueKind != JsonValueKind.Object || !source.TryGetProperty(field.Key, out var value))
-            {
-                continue;
-            }
-            if (field.Children.Count > 0 && value.ValueKind == JsonValueKind.Array)
-            {
-                result[field.Key] = value.EnumerateArray().Select(row => FilterFields(row, field.Children,
-                    hidden, selected, path + ".", include)).ToArray();
-            }
-            else if (field.Children.Count == 0 && include)
-            {
-                result[field.Key] = value.Clone();
-            }
-        }
-        return result;
     }
 
     /// <summary>

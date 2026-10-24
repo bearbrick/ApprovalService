@@ -1,4 +1,7 @@
 using System.Data;
+using System.Text.Json;
+using ApprovalService.Contracts;
+using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Runtime;
@@ -42,13 +45,6 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         {
             instances = instances.Where(instance => instance.Status == query.Status);
         }
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            // 不搜索原始业务 JSON，防止隐藏字段通过搜索是否命中泄露。
-            var search = query.Search.Trim();
-            instances = instances.Where(instance => instance.Title.Contains(search) ||
-                instance.SerialNo.Contains(search) || instance.BusinessKey.Contains(search));
-        }
         if (query.From.HasValue)
         {
             instances = instances.Where(instance => instance.StartedAt >= query.From.Value);
@@ -56,6 +52,13 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         if (query.To.HasValue)
         {
             instances = instances.Where(instance => instance.StartedAt < query.To.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            // 内容搜索须在参与关系和字段权限过滤后计算命中数与分页，不对原始 JSON 做命中判定。
+            var searched = await SearchAsync(db, instances, scope.PersonId, query, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return searched;
         }
         var count = await instances.CountAsync(cancellationToken);
         var page = instances.OrderByDescending(instance => instance.IsUrgent)
@@ -73,6 +76,71 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         }
         await transaction.CommitAsync(cancellationToken);
         return new CenterPage { Total = count, Items = records };
+    }
+
+    /// <summary>
+    /// 分批扫描已授权单据，先裁剪可见字段，再计算搜索命中总数与分页。
+    /// </summary>
+    /// <param name="db">当前读取事务的数据库上下文。</param>
+    /// <param name="instances">已按人员、应用及结构条件过滤的单据查询。</param>
+    /// <param name="personId">可信登录人员 ID。</param>
+    /// <param name="query">搜索与分页条件。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>可见内容命中后的分页结果。</returns>
+    private static async Task<CenterPage> SearchAsync(ApprovalDbContext db, IQueryable<InstanceEntity> instances,
+        string personId, CenterQuery query, CancellationToken cancellationToken)
+    {
+        const int batchSize = 100;
+        var search = query.Search!.Trim();
+        var ordered = instances.OrderByDescending(instance => instance.IsUrgent)
+            .ThenByDescending(instance => instance.StartedAt).ThenBy(instance => instance.Id);
+        var count = 0;
+        var offset = 0;
+        var selected = new List<CenterRecord>();
+        while (true)
+        {
+            var records = await Project(db, ordered.Skip(offset).Take(batchSize))
+                .OrderByDescending(record => record.Instance.IsUrgent)
+                .ThenByDescending(record => record.Instance.StartedAt).ThenBy(record => record.Instance.Id)
+                .ToArrayAsync(cancellationToken);
+            if (records.Length == 0)
+            {
+                break;
+            }
+            var ids = records.Select(record => record.Instance.Id).ToArray();
+            var tasks = await db.ApprovalTasks.AsNoTracking().Where(task => ids.Contains(task.InstanceId))
+                .OrderBy(task => task.Id).ToArrayAsync(cancellationToken);
+            foreach (var record in records)
+            {
+                record.Tasks = tasks.Where(task => task.InstanceId == record.Instance.Id).ToArray();
+                var instance = record.Instance;
+                var metadataMatch = instance.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    instance.SerialNo.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    instance.BusinessKey.Contains(search, StringComparison.OrdinalIgnoreCase);
+                if (!metadataMatch)
+                {
+                    var definition = JsonSerializer.Deserialize<FlowDefinition>(record.FlowVersion.DefinitionJson, ApprovalJson.Options)!;
+                    var graph = JsonSerializer.Deserialize<FlowExecutionGraph>(record.FlowVersion.GraphJson, ApprovalJson.Options)!;
+                    var visible = CenterFieldVisibility.Filter(record, personId,
+                        definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph);
+                    if (!CenterFieldVisibility.ContainsValue(visible, search))
+                    {
+                        continue;
+                    }
+                }
+                count++;
+                if (count > query.Skip && selected.Count < query.Take)
+                {
+                    selected.Add(record);
+                }
+            }
+            offset += records.Length;
+            if (records.Length < batchSize)
+            {
+                break;
+            }
+        }
+        return new CenterPage { Total = count, Items = selected };
     }
 
     /// <inheritdoc />

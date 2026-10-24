@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 {
     /// <inheritdoc />
-    public partial class AddFlowManagementDrafts : Migration
+    public partial class AddFlowManagementIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,6 +17,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                 type: "INTEGER",
                 nullable: false,
                 defaultValue: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "OwnerDepartmentId",
+                table: "Flows",
+                type: "TEXT",
+                maxLength: 64,
+                nullable: true);
+
+            migrationBuilder.CreateTable(
+                name: "FlowAdministratorIdentityIssues",
+                columns: table => new
+                {
+                    FlowId = table.Column<string>(type: "TEXT", maxLength: 64, nullable: false),
+                    LegacyValue = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    MatchCount = table.Column<int>(type: "INTEGER", nullable: false),
+                    DetectedAt = table.Column<DateTime>(type: "TEXT", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FlowAdministratorIdentityIssues", x => x.FlowId);
+                });
 
             migrationBuilder.CreateTable(
                 name: "FlowDrafts",
@@ -67,6 +88,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "FlowAdministratorIdentityIssues");
+
+            migrationBuilder.DropTable(
                 name: "FlowDrafts");
 
             migrationBuilder.DropTable(
@@ -74,6 +98,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 
             migrationBuilder.DropColumn(
                 name: "IsEnabled",
+                table: "Flows");
+
+            migrationBuilder.DropColumn(
+                name: "OwnerDepartmentId",
                 table: "Flows");
         }
     }

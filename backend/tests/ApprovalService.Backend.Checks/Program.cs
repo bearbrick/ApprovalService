@@ -103,6 +103,7 @@ internal static class Program
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);
         await FlowManagementIdentityChecks.RunAsync(Check);
+        await FlowManagementMigrationIntegrationChecks.RunAsync(Check);
         await FlowManagementHttpChecks.RunAsync(backendRoot, Check);
         await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);

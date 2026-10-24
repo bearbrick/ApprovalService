@@ -799,6 +799,50 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("ApprovalTasks", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowAdministratorIdentityIssueEntity", b =>
+                {
+                    b.Property<string>("FlowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("DetectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LegacyValue")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("MatchCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("FlowId");
+
+                    b.ToTable("FlowAdministratorIdentityIssues", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.Property<string>("FlowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("FlowId");
+
+                    b.ToTable("FlowDrafts", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -821,10 +865,19 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<string>("OwnerDepartmentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("PublishedVersionId")
                         .HasMaxLength(64)
@@ -836,6 +889,52 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .IsUnique();
 
                     b.ToTable("Flows", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowManagementAuditEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContentSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long?>("DraftRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FlowId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PublishedVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FlowId", "OccurredAt");
+
+                    b.ToTable("FlowManagementAudits", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowVersionEntity", b =>
@@ -1202,6 +1301,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
                         .WithMany()
                         .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.FlowEntity", null)
+                        .WithOne()
+                        .HasForeignKey("ApprovalService.Domain.Runtime.FlowDraftEntity", "FlowId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

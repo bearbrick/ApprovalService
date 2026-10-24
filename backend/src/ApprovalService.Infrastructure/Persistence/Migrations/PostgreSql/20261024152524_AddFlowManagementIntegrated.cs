@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 {
     /// <inheritdoc />
-    public partial class AddFlowManagementDrafts : Migration
+    public partial class AddFlowManagementIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,6 +17,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                 type: "boolean",
                 nullable: false,
                 defaultValue: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "OwnerDepartmentId",
+                table: "Flows",
+                type: "character varying(64)",
+                maxLength: 64,
+                nullable: true);
+
+            migrationBuilder.CreateTable(
+                name: "FlowAdministratorIdentityIssues",
+                columns: table => new
+                {
+                    FlowId = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    LegacyValue = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    MatchCount = table.Column<int>(type: "integer", nullable: false),
+                    DetectedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FlowAdministratorIdentityIssues", x => x.FlowId);
+                });
 
             migrationBuilder.CreateTable(
                 name: "FlowDrafts",
@@ -67,6 +88,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "FlowAdministratorIdentityIssues");
+
+            migrationBuilder.DropTable(
                 name: "FlowDrafts");
 
             migrationBuilder.DropTable(
@@ -74,6 +98,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 
             migrationBuilder.DropColumn(
                 name: "IsEnabled",
+                table: "Flows");
+
+            migrationBuilder.DropColumn(
+                name: "OwnerDepartmentId",
                 table: "Flows");
         }
     }

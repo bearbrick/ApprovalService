@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     [DbContext(typeof(SqlServerApprovalDbContext))]
-    [Migration("20261024140616_AddFlowAdministratorIdentityIssues")]
-    partial class AddFlowAdministratorIdentityIssues
+    [Migration("20261024152520_AddFlowManagementIntegrated")]
+    partial class AddFlowManagementIntegrated
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,26 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
+                {
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<long>("ReadThroughSequence")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("InstanceId", "PersonId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("CenterReadCursors", (string)null);
+                });
 
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
@@ -353,6 +373,21 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.ToTable("SerialNumberCounters", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.DailyDigestSettingsEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("LocalSendTime")
+                        .HasMaxLength(5)
+                        .HasColumnType("nvarchar(5)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailyDigestSettings", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Notifications.InAppNotificationEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -389,6 +424,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasIndex("RecipientId", "CreatedAt");
 
                     b.ToTable("InAppNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Notifications.NotificationPreferenceEntity", b =>
+                {
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(48)
+                        .HasColumnType("nvarchar(48)");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("InAppEnabled")
+                        .HasColumnType("bit");
+
+                    b.HasKey("PersonId", "Category");
+
+                    b.ToTable("NotificationPreferences", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Organization.DepartmentEntity", b =>
@@ -768,6 +824,28 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.ToTable("FlowAdministratorIdentityIssues", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.Property<string>("FlowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("FlowId");
+
+                    b.ToTable("FlowDrafts", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -790,6 +868,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -809,6 +892,52 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .IsUnique();
 
                     b.ToTable("Flows", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowManagementAuditEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("nvarchar(48)");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ContentSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long?>("DraftRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FlowId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("PublishedVersion")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FlowId", "OccurredAt");
+
+                    b.ToTable("FlowManagementAudits", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowVersionEntity", b =>
@@ -958,6 +1087,35 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasIndex("Status", "StartedAt");
 
                     b.ToTable("Instances", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.InstanceParticipantEntity", b =>
+                {
+                    b.Property<string>("InstanceId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("PersonId")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Kind")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("GrantedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("InstanceId", "PersonId", "Kind");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("InstanceParticipants", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.OperationEventEntity", b =>
@@ -1124,6 +1282,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.ToTable("ScheduledJobs", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
@@ -1137,6 +1304,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
                         .WithMany()
                         .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.FlowEntity", null)
+                        .WithOne()
+                        .HasForeignKey("ApprovalService.Domain.Runtime.FlowDraftEntity", "FlowId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1155,6 +1331,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.HasOne("ApprovalService.Domain.Runtime.FlowVersionEntity", null)
                         .WithMany()
                         .HasForeignKey("FlowVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.InstanceParticipantEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

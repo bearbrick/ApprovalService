@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     /// <inheritdoc />
-    public partial class AddFlowManagementDrafts : Migration
+    public partial class AddFlowManagementIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -17,6 +17,27 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                 type: "bit",
                 nullable: false,
                 defaultValue: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "OwnerDepartmentId",
+                table: "Flows",
+                type: "nvarchar(64)",
+                maxLength: 64,
+                nullable: true);
+
+            migrationBuilder.CreateTable(
+                name: "FlowAdministratorIdentityIssues",
+                columns: table => new
+                {
+                    FlowId = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
+                    LegacyValue = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
+                    MatchCount = table.Column<int>(type: "int", nullable: false),
+                    DetectedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FlowAdministratorIdentityIssues", x => x.FlowId);
+                });
 
             migrationBuilder.CreateTable(
                 name: "FlowDrafts",
@@ -67,6 +88,9 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "FlowAdministratorIdentityIssues");
+
+            migrationBuilder.DropTable(
                 name: "FlowDrafts");
 
             migrationBuilder.DropTable(
@@ -74,6 +98,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 
             migrationBuilder.DropColumn(
                 name: "IsEnabled",
+                table: "Flows");
+
+            migrationBuilder.DropColumn(
+                name: "OwnerDepartmentId",
                 table: "Flows");
         }
     }

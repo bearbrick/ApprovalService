@@ -794,6 +794,50 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("ApprovalTasks", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowAdministratorIdentityIssueEntity", b =>
+                {
+                    b.Property<string>("FlowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("DetectedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LegacyValue")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("MatchCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("FlowId");
+
+                    b.ToTable("FlowAdministratorIdentityIssues", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.Property<string>("FlowId")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FlowId");
+
+                    b.ToTable("FlowDrafts", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -816,9 +860,18 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("IsEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OwnerDepartmentId")
+                        .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PublishedVersionId")
@@ -831,6 +884,52 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .IsUnique();
 
                     b.ToTable("Flows", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowManagementAuditEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(48)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ContentSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("DraftRevision")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("FlowId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PublishedVersion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FlowId", "OccurredAt");
+
+                    b.ToTable("FlowManagementAudits", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowVersionEntity", b =>
@@ -1197,6 +1296,15 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasOne("ApprovalService.Domain.Runtime.InstanceEntity", null)
                         .WithMany()
                         .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Runtime.FlowDraftEntity", b =>
+                {
+                    b.HasOne("ApprovalService.Domain.Runtime.FlowEntity", null)
+                        .WithOne()
+                        .HasForeignKey("ApprovalService.Domain.Runtime.FlowDraftEntity", "FlowId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -24,6 +24,8 @@ dotnet run --project backend/tests/ApprovalService.Backend.Checks -- docs    # �
 dotnet run --project backend/src/ApprovalService.Api                         # http://localhost:5280
 ```
 
+Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份及恢复、k6 压测命令见 [部署说明](deploy/README.md)。运行时 `/metrics` 默认只允许本机读取；远程 Prometheus 采集必须配置至少 32 字符的 `ApprovalService:Metrics:BearerToken` 并限制在受控内网或 TLS 代理后。
+
 统一验证会在随机回环端口启动真实服务。后端检查程序的 `seed-sdk-e2e` 命令只供 `verify.ps1` 使用：在全新临时 SQLite 库中创建测试应用、发布流程和人员绑定，并将本次随机生成的 API Key 写进同目录的临时文件。它不注册生产 HTTP 路由；脚本完成后会停服并清理整个临时目录。
 
 ## 现在有的接口
@@ -147,7 +149,7 @@ dotnet run --project backend/src/ApprovalService.Api                         # h
 
 `ReportingHourBucketCalculator` 是尚未持久化的纯小时汇总规则：只处理第一个未关闭 UTC 小时以前的事实，按流程、来源应用、发起部门快照和非保密任务的节点/人员维度分桶，保留排序后的真实耗时样本以便以后跨小时精确计算 P90；保密流程只生成发起和结束数量，不生成任务桶。`ReportingProjectionPlanner` 按每审批单 `LastEventSequence` 规划整实例替换，序号不变则跳过、更高序号即使事件时间迟到也重投影，未关闭小时的事件延后。两个规则目前不改数据库，也不影响现有报表查询；待管理任务的三库迁移合入后再接持久化、小时汇总查询与当日补算。
 
-流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录并执行迁移；SQL Server 和 PostgreSQL 使用各自的迁移，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。
+流程元数据、不可变的发布版本、审批单、任务投影、操作记录、待发队列和定时任务使用 EF Core 保存。SQLite 在启动时自动创建数据目录，发现待执行迁移时先生成 `preupgrade` 快照，成功后才执行迁移；每天本地 02:30 在线备份主库、本地附件和登录签名密钥，默认保留最近 7 份每日快照。SQL Server 和 PostgreSQL 使用各自的迁移与数据库备份工具，配置连接串后按部署流程执行。三种数据库的模型与迁移一致性由检查程序核对，设置 `APPROVAL_TEST_SQLSERVER` 或 `APPROVAL_TEST_POSTGRES` 后还会在对应测试数据库执行发起和审批场景。
 
 审批命令由应用服务加载固定的流程版本和引擎状态，以 `Version` 乐观锁一次写入新状态、任务、只追加事件及待发项。事件按顺序串接 SHA-256 校验值，审批单保存最终序号和哈希锚点，可检查历史记录被改写或末尾被删除；校验时在同一数据库事务快照内读取锚点和事件。后台任务使用数据库租约抢占工作；进程重启或租约到期后可以接着执行，执行超过租约的旧工作者不能再确认完成，领取后回读仍核对本次租约，失败按退避表重试并只保存有界错误码，成功后清除旧错误码。接入应用的 API Key 只存 SHA-256 摘要，回调签名密钥使用部署主密钥加密。回调正文在审批事务中固定，后台发送器用 HMAC-SHA256 签名、5 秒超时；每次发送留不含正文的结果日志，管理用例可重排原事件且不改变 `eventId`。四类业务钩子按已采纳的 ADR 0010 使用 POST JSON、双向 HMAC、请求 ID 回显与 5 秒超时；取数、发起和同意前校验、实际命中节点取人以及事务提交后由持久队列执行的自动动作均已接通。
 

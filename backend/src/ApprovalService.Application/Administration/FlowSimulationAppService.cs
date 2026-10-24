@@ -54,7 +54,8 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
         }
 
         var graph = compiled.Graph;
-        var data = OpenApprovalDataPreparer.Prepare(request.Definition.Data, request.Data);
+        // 测试附件仅校验字段格式；假文件 ID 不查真实存储，也不关联任何审批单。
+        var data = OpenApprovalDataPreparer.PrepareWithAttachments(request.Definition.Data, request.Data).Data;
         var snapshot = BuildFakeSnapshot(graph, request.InitiatorId, request.FakeAssignees);
         var conditions = EvaluateConditions(graph, data);
         var id = Guid.NewGuid().ToString("N");

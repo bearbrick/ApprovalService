@@ -117,6 +117,24 @@ internal static class FlowSimulationChecks
             TokenId = childWaiting.Waits[0].TokenId,
         }, "admin", true);
         check("假子流程完成由统一引擎推进", afterChild.Status == EngineInstanceStatuses.Approved);
+
+        var attachmentFlow = Definition();
+        attachmentFlow.Data.Fields.Add(new FlowFieldDefinition
+        {
+            Key = "document",
+            Name = "假文件",
+            Type = FlowFieldTypes.Attachment,
+            Required = true,
+        });
+        var attached = await service.CreateAsync(new FlowSimulationCreateRequest
+        {
+            Definition = attachmentFlow,
+            Data = JsonSerializer.SerializeToElement(new { document = new[] { "fake-file-id" } }),
+            InitiatorId = "fake-initiator",
+            FakeAssignees = new(StringComparer.Ordinal) { ["approval"] = ["fake-approver"] },
+        }, "admin", true);
+        check("必填附件可用假文件 ID 模拟且不写真实存储", attached.Tasks.Count == 1 &&
+            repository.Writes == 0);
     }
 
     /// <summary>

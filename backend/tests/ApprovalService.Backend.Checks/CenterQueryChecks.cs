@@ -77,6 +77,16 @@ internal static class CenterQueryChecks
             check("中心筛选和分页总数在授权后计算，外部查询参数不能扩张人员应用范围",
                 paged.Total == 2 && paged.Items.Count == 1 && filtered.Items is [{ Id: "b-cross" }] &&
                 noLeak.Total == 0 && noLeak.Items.Count == 0 && forged.Total == 2 && forged.Items.All(item => item.ClientAppCode == "one"));
+            var fieldMatch = await ListAsync(http, tokens.Local, "todo&search=file-visible&take=1&skip=1");
+            var fieldEmbed = await ListAsync(http, tokens.Embed, "todo&search=file-visible");
+            var hiddenValue = await ListAsync(http, tokens.Local, "todo&search=hidden-business-secret");
+            var hiddenColumn = await ListAsync(http, tokens.Local, "todo&search=100");
+            var extraValue = await ListAsync(http, tokens.Local, "todo&search=unregistered-secret");
+            check("字段内容搜索在可见字段裁剪后计数分页，非摘要字段和嵌入范围正确",
+                fieldMatch.Total == 3 && fieldMatch.Items.Count == 1 &&
+                fieldEmbed.Total == 2 && fieldEmbed.Items.All(item => item.ClientAppCode == "one"));
+            check("隐藏字段、隐藏明细列和未定义键不会经搜索命中泄露",
+                hiddenValue.Total == 0 && hiddenColumn.Total == 0 && extraValue.Total == 0);
 
             using var detailResponse = await GetAsync(http, Path("a-todo"), tokens.Local);
             var detailText = await detailResponse.Content.ReadAsStringAsync();

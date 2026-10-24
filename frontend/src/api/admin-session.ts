@@ -45,7 +45,7 @@ export interface AdminSession {
   /**
    * 本次登录获准进入的管理范围；报表登录不能进入其他管理页面。
    */
-  scope: 'admin' | 'reports'
+  scope: 'admin' | 'reports' | 'flows'
 }
 
 /**
@@ -74,7 +74,7 @@ function isTokens(value: unknown): value is AdminTokens {
  * @returns 登录结果；首次登录须先改密。
  */
 export async function loginAdmin(employeeNumber: string, password: string,
-  scope: 'admin' | 'reports' = 'admin'): Promise<AdminSession> {
+  scope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<AdminSession> {
   const tokens = await requestJson<unknown>('/api/v1/identity/login', {
     method: 'POST', body: { employeeNumber, password }, cache: 'no-store',
   })
@@ -82,6 +82,7 @@ export async function loginAdmin(employeeNumber: string, password: string,
   current = { employeeNumber, tokens, scope }
   try {
     if (!tokens.mustChangePassword && scope === 'admin') await verifyAdminSession()
+    if (!tokens.mustChangePassword && scope === 'flows') await verifyFlowManagerSession()
     return current
   } catch (error) {
     current = null
@@ -97,7 +98,7 @@ export async function loginAdmin(employeeNumber: string, password: string,
  * @returns 新会话。
  */
 export async function changeAdminPassword(currentPassword: string, newPassword: string,
-  scope: 'admin' | 'reports' = 'admin'): Promise<AdminSession> {
+  scope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<AdminSession> {
   if (!current) throw new Error('请先登录。')
   const employeeNumber = current.employeeNumber
   await requestJson<void>('/api/v1/identity/change-password', {
@@ -115,7 +116,8 @@ export async function changeAdminPassword(currentPassword: string, newPassword: 
  * @returns 是否允许进入该模块。
  */
 export function canReadAdminSection(session: AdminSession | null, section: string): boolean {
-  return !!session && (session.scope === 'admin' || section === 'reports')
+  return !!session && (session.scope === 'admin' || session.scope === 'reports' && section === 'reports'
+    || session.scope === 'flows' && section === 'flows')
 }
 
 /**
@@ -134,9 +136,10 @@ export function logoutAdmin(): void { current = null }
  * @param requiredScope 调用方所需的页面范围。
  * @returns 可使用的访问令牌。
  */
-export async function adminAccessToken(requiredScope: 'admin' | 'reports' = 'admin'): Promise<string> {
+export async function adminAccessToken(requiredScope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<string> {
   if (!current || current.tokens.mustChangePassword) throw new Error('请先完成管理员登录。')
   if (current.scope === 'reports' && requiredScope !== 'reports') throw new Error('此会话仅可查看报表。')
+  if (current.scope === 'flows' && requiredScope !== 'flows') throw new Error('此会话仅可管理流程。')
   if (Date.parse(current.tokens.accessExpiresAt) > Date.now() + 30_000) return current.tokens.accessToken
   const tokens = await requestJson<unknown>('/api/v1/identity/refresh', {
     method: 'POST', body: { refreshToken: current.tokens.refreshToken }, cache: 'no-store',
@@ -160,4 +163,17 @@ export async function verifyAdminSession(): Promise<string> {
   })
   if (!result || result.personId !== current.tokens.personId) throw new Error('管理员身份核验失败，请重新登录。')
   return result.personId
+}
+
+/**
+ * 用受保护的流程目录核对当前本地会话有直接部门管理权限。
+ * @returns 已核对的内部人员 ID。
+ */
+export async function verifyFlowManagerSession(): Promise<string> {
+  if (!current) throw new Error('请先登录。')
+  const result = await getJson<unknown>('/api/v1/admin/flows', {
+    headers: { Authorization: `Bearer ${current.tokens.accessToken}` }, cache: 'no-store',
+  })
+  if (!Array.isArray(result)) throw new Error('流程管理权限核验失败，请重新登录。')
+  return current.tokens.personId
 }

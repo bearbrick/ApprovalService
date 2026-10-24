@@ -86,7 +86,7 @@ function setNode(key: 'name' | 'gatewayPairId' | 'gatewayDirection', value: stri
  * @param key 配置属性。
  * @param value 输入值。
  */
-function setAssignee(key: keyof FlowAssignee, value: string | number | null): void {
+function setAssignee(key: keyof FlowAssignee, value: string | number | boolean | null): void {
   emit('update', { ...props.node, assignee: { source: props.node.assignee?.source ?? 'member', ...props.node.assignee, [key]: value } })
 }
 /**
@@ -169,6 +169,8 @@ function setMappings(text: string): void {
       <label v-if="['member','role','position','grade','divisionLeader','matrix','businessApi'].includes(node.assignee?.source ?? '')" class="form-row">来源编码<input :value="node.assignee?.value ?? ''" placeholder="成员、角色、矩阵或接口编码" @input="setAssignee('value', ($event.target as HTMLInputElement).value)" /></label>
       <label v-if="['dataPerson','dataDepartmentHead'].includes(node.assignee?.source ?? '')" class="form-row">业务字段<select :value="node.assignee?.fieldKey ?? ''" @change="setAssignee('fieldKey', ($event.target as HTMLSelectElement).value)"><option value="">选择字段</option><option v-for="field in fields" :key="field.key" :value="field.key">{{ field.label }}</option></select></label>
       <label v-if="['manager','managerChain','departmentHead'].includes(node.assignee?.source ?? '')" class="form-row">上级层级<input type="number" min="1" :value="node.assignee?.level ?? 1" @change="setAssignee('level', Number(($event.target as HTMLInputElement).value))" /></label>
+      <label v-if="node.assignee?.source === 'role'" class="check-row"><input type="checkbox" :checked="node.assignee?.limitToInitiatingDepartment ?? false" @change="setAssignee('limitToInitiatingDepartment', ($event.target as HTMLInputElement).checked)" />只在发起部门内查找该角色</label>
+      <label v-if="node.assignee?.source === 'managerChain'" class="form-row">截止职级编码<input :value="node.assignee?.stopAtGrade ?? ''" placeholder="留空则只按上级层级截止" @change="setAssignee('stopAtGrade', ($event.target as HTMLInputElement).value.trim() || null)" /></label>
       <h3>{{ node.type === 'cc' ? '抄送规则' : '审批规则' }}</h3>
       <template v-if="node.type !== 'cc'">
         <label class="form-row">多人方式<select :value="approval.mode" @change="setApproval('mode', ($event.target as HTMLSelectElement).value)"><option value="sequential">依次审批</option><option value="all">会签</option><option value="any">或签</option><option value="vote">票签</option></select></label>
@@ -177,6 +179,7 @@ function setMappings(text: string): void {
         <label v-if="approval.mode === 'all'" class="form-row">有人拒绝时<select :value="approval.rejectBehavior" @change="setApproval('rejectBehavior', ($event.target as HTMLSelectElement).value)"><option value="immediate">立即结束</option><option value="waitAll">等全部审完</option></select></label>
       </template>
       <label class="form-row">找不到处理人<select :value="approval.missingAssigneeBehavior" @change="setApproval('missingAssigneeBehavior', ($event.target as HTMLSelectElement).value)"><option value="block">阻止发起</option><option value="approve">自动通过</option><option value="administrator">流程管理员</option><option value="specified">指定人员</option></select></label>
+      <label v-if="approval.missingAssigneeBehavior === 'specified'" class="form-row">指定人员 ID<input :value="approval.missingAssigneeUserId ?? ''" placeholder="输入组织人员 ID" @change="setApproval('missingAssigneeUserId', ($event.target as HTMLInputElement).value.trim() || null)" /></label>
       <label class="form-row">处理人就是发起人<select :value="approval.selfApprovalBehavior" @change="setApproval('selfApprovalBehavior', ($event.target as HTMLSelectElement).value)"><option value="skip">自动跳过</option><option value="self">本人审批</option><option value="manager">转交直属上级</option></select></label>
       <label class="form-row">重复出现同一人<select :value="approval.duplicateAssigneeBehavior" @change="setApproval('duplicateAssigneeBehavior', ($event.target as HTMLSelectElement).value)"><option value="adjacentOnce">相邻只审一次</option><option value="once">全流程只审一次</option><option value="everyTime">每次都审</option></select></label>
       <label class="form-row">处理人离职停用<select :value="approval.inactiveAssigneeBehavior" @change="setApproval('inactiveAssigneeBehavior', ($event.target as HTMLSelectElement).value)"><option value="manager">转直属上级</option><option value="administrator">转流程管理员</option></select></label>

@@ -67,7 +67,9 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-050](T-050-feature-integration.md) | 功能分支整合与统一验收 | 全部 | M5 | 已提交稳定快照 | backend、frontend、client、docs |
 | [T-051](T-051-sdk-completion.md) | SDK 开放接口补全切片 | 调用端 | M4 | T-006 稳定快照 | client/src、client/tests |
 | [T-052](T-052-embed-host.md) | 同源审批中心页面托管与内嵌来源限制 | 后端 + 契约镜像 | M3 | T-011 稳定快照 | Api/Hosting、Center、Application/Integration |
+| [T-053](T-053-service-node-properties.md) | BPMN 画布的审批服务属性 | 前端 | M1 | T-046 已验证稳定快照 | src/designer/workbench、src/designer/canvas |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
+
 
 新增任务：复制 [_template.md](_template.md)，编号取当前最大值加 1，并在上表追加一行（只追加，不改别的行）。

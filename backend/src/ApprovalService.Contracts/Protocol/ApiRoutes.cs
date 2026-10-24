@@ -171,6 +171,21 @@ public static class ApiRoutes
     public const string AdminFlowEnabled = AdminFlowByCode + "/enabled";
 
     /// <summary>
+    /// 仅检查本服务兼容 BPMN 文件与同编码冲突。
+    /// </summary>
+    public const string AdminFlowImportPreview = AdminFlows + "/import/preview";
+
+    /// <summary>
+    /// 预检通过后把兼容 BPMN 内容保存为草稿。
+    /// </summary>
+    public const string AdminFlowImport = AdminFlows + "/import";
+
+    /// <summary>
+    /// 显式导出草稿或指定不可变发布版本。
+    /// </summary>
+    public const string AdminFlowExport = AdminFlowByCode + "/export";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

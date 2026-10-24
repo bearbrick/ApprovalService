@@ -68,7 +68,7 @@
 
 `Administration/AdminConsoleAppService` 复用组织和接入应用仓储读取管理列表，API 对每个管理 GET 端点单独应用本地组织管理员策略。目录只映射部门、人员的展示字段，不提供联系方式；接入应用仓储查询只投影编码、名称、授权流程及启停状态，不装载密钥列。管理前端的令牌只存页面内存，首次登录改密前不读取管理数据；组织导入仍走现有预检和事务化审计写入。
 
-流程管理身份基础由 `Domain/Runtime/FlowManagementAccessRules` 统一判断：在职本地组织管理员可管理全部流程；`flow-admin` 角色只覆盖人员直接加入的流程所属部门，无归属流程只由组织管理员管理。`Flow.AdministratorId` 继续作为运行期指定管理员的内部人员 ID，不单独授予编辑权限。`Infrastructure/Administration/FlowAdministratorIdentityReconciler` 由服务器本机一次性命令调用，先预览再按指纹提交；唯一匹配才改写，零匹配和多匹配存入待人工处理表，服务启动时不自动执行。`Administration/FlowManagementAppService` 负责草稿基础校验、发布编译和当前范围筛选，`Persistence/FlowManagementRepository` 在同一事务内复核角色/直属部门与草稿修订、追加不可变版本和安全审计。兼容 BPMN 导入导出及启停管理按 ADR 0018 后续接入。
+流程管理身份基础由 `Domain/Runtime/FlowManagementAccessRules` 统一判断：在职本地组织管理员可管理全部流程；`flow-admin` 角色只覆盖人员直接加入的流程所属部门，无归属流程只由组织管理员管理。`Flow.AdministratorId` 继续作为运行期指定管理员的内部人员 ID，不单独授予编辑权限。`Infrastructure/Administration/FlowAdministratorIdentityReconciler` 由服务器本机一次性命令调用，先预览再按指纹提交；唯一匹配才改写，零匹配和多匹配存入待人工处理表，服务启动时不自动执行。`Administration/FlowManagementAppService` 负责草稿基础校验、发布编译和当前范围筛选，`Persistence/FlowManagementRepository` 在同一事务内复核角色/直属部门与草稿修订、追加不可变版本和安全审计。`Administration/FlowTransferAppService` 通过引擎的 BPMN 编解码器检查本服务兼容文件，预检只读、导入只写草稿；`Persistence/FlowTransferRepository` 在同一事务内复核管理范围后读取草稿或不可变发布版供导出。
 
 ## 引擎核心
 

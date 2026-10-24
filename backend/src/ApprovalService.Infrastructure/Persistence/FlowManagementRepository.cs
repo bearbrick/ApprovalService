@@ -323,7 +323,7 @@ public sealed class FlowManagementRepository(IDbContextFactory<ApprovalDbContext
     /// <param name="flow">待操作流程。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>异步操作。</returns>
-    private static async Task RequireManagementAsync(ApprovalDbContext db, string actorId, bool isLocalSession,
+    internal static async Task RequireManagementAsync(ApprovalDbContext db, string actorId, bool isLocalSession,
         FlowEntity flow, CancellationToken cancellationToken)
     {
         var identity = await ReadIdentityAsync(db, actorId, cancellationToken);

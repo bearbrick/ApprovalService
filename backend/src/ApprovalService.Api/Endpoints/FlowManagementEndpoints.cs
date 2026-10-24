@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using ApprovalService.Application.Administration;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
@@ -41,6 +42,22 @@ internal static class FlowManagementEndpoints
             CancellationToken cancellationToken) =>
             service.SetEnabledAsync(code, request, PersonId(http), IsLocal(http), cancellationToken))
             .RequireAuthorization();
+        app.MapPost(ApiRoutes.AdminFlowImportPreview, (HttpContext http,
+            AdminFlowImportPreviewRequest request, FlowTransferAppService service,
+            CancellationToken cancellationToken) =>
+            service.PreviewImportAsync(request, PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
+        app.MapPost(ApiRoutes.AdminFlowImport, (HttpContext http, AdminFlowImportRequest request,
+            FlowTransferAppService service, CancellationToken cancellationToken) =>
+            service.ImportAsync(request, PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
+        app.MapGet(ApiRoutes.AdminFlowExport, async (HttpContext http, string code, string? source,
+            int? version, FlowTransferAppService service, CancellationToken cancellationToken) =>
+        {
+            var xml = await service.ExportAsync(code, source, version, PersonId(http), IsLocal(http),
+                cancellationToken);
+            return Results.File(Encoding.UTF8.GetBytes(xml), "application/xml", "approval-flow.bpmn");
+        }).RequireAuthorization();
         return app;
     }
 

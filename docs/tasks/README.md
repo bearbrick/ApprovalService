@@ -70,6 +70,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-053](T-053-service-node-properties.md) | BPMN 画布的审批服务属性 | 前端 | M1 | T-046 已验证稳定快照 | src/designer/workbench、src/designer/canvas |
 | [T-054](T-054-reporting-metrics.md) | 真实统计事实的指标计算 | 后端 | M5 | T-049 已验证稳定快照 | Domain/Reporting、backend/tests |
 | [T-055](T-055-assignee-publication.md) | 指定审批人兜底的发布校验 | 前端 + 后端 | M1 | T-053 已验证稳定快照 | Engine/Definitions、frontend/src/designer/canvas |
+| [T-056](T-056-reporting-cross-period.md) | 跨期报表事实读取 | 后端 | M5 | T-049、T-054 已验证稳定快照 | Domain/Reporting、Infrastructure/Reporting |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

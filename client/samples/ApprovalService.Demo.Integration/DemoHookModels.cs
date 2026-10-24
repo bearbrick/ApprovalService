@@ -101,7 +101,10 @@ internal sealed class DemoExpenseHookData
     /// 申请金额。
     /// </summary>
     [DataMember(Name = "claimAmount")]
-    public decimal ClaimAmount { get; set; }
+    public decimal ClaimAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 票据附件 ID。
@@ -163,13 +166,19 @@ internal sealed class DemoPurchaseHookData
     /// 未税金额。
     /// </summary>
     [DataMember(Name = "baseAmount")]
-    public decimal BaseAmount { get; set; }
+    public decimal BaseAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 税额。
     /// </summary>
     [DataMember(Name = "taxAmount")]
-    public decimal TaxAmount { get; set; }
+    public decimal TaxAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 采购明细。
@@ -213,13 +222,19 @@ internal sealed class DemoValidationResponse
     /// 是否允许推进。
     /// </summary>
     [DataMember(Name = "allowed")]
-    public bool Allowed { get; set; }
+    public bool Allowed
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 拒绝原因。
     /// </summary>
     [DataMember(Name = "reason", EmitDefaultValue = false)]
-    public string? Reason { get; set; }
+    public string? Reason
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -250,7 +265,10 @@ internal sealed class DemoAssigneeHookRequest
     /// 节点传入的可选项目编码。
     /// </summary>
     [DataMember(Name = "sourceValue", EmitDefaultValue = false)]
-    public string? SourceValue { get; set; }
+    public string? SourceValue
+    {
+        get; set;
+    }
 }
 
 /// <summary>
@@ -307,19 +325,28 @@ internal sealed class DemoActionResponse
     /// 是否成功。
     /// </summary>
     [DataMember(Name = "success")]
-    public bool Success { get; set; }
+    public bool Success
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 失败原因。
     /// </summary>
     [DataMember(Name = "message", EmitDefaultValue = false)]
-    public string? Message { get; set; }
+    public string? Message
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 成功时独立的订单号结果。
     /// </summary>
     [DataMember(Name = "result", EmitDefaultValue = false)]
-    public DemoOrderResult? Result { get; set; }
+    public DemoOrderResult? Result
+    {
+        get; set;
+    }
 }
 
 /// <summary>

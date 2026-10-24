@@ -39,14 +39,20 @@ internal static class DemoGatewayChecks
             });
             using var sdk = new ApprovalServiceClient(new ApprovalServiceClientOptions
             {
-                BaseAddress = new Uri("https://approval.example.test/"), ApiKey = "demo-key",
+                BaseAddress = new Uri("https://approval.example.test/"),
+                ApiKey = "demo-key",
             }, handler);
             var store = new DemoDocumentStore(path);
             var gateway = new DemoApprovalGateway(sdk, store);
             var expense = await gateway.SubmitExpenseAsync(new ExpenseClaim
             {
-                BusinessKey = "EXP-1", Initiator = "wang", Department = "production",
-                Title = "车票", Category = "交通", ClaimAmount = 860m, ReceiptFileId = "receipt-1",
+                BusinessKey = "EXP-1",
+                Initiator = "wang",
+                Department = "production",
+                Title = "车票",
+                Category = "交通",
+                ClaimAmount = 860m,
+                ReceiptFileId = "receipt-1",
                 Lines = new List<ExpenseLine> { new() { Date = "2026-10-24", Description = "高铁", Amount = 860m } },
             }, "expense-start-1").ConfigureAwait(false);
             check("报销对接先保存原单并把快照和稳定请求 ID 发给 SDK", expense.Id == "inst-e"
@@ -56,8 +62,12 @@ internal static class DemoGatewayChecks
 
             var purchase = await gateway.SubmitPurchaseAsync(new PurchaseRequest
             {
-                BusinessKey = "PUR-1", Initiator = "zheng", Department = "purchase",
-                Title = "采购电源", BaseAmount = 100m, TaxAmount = 13m,
+                BusinessKey = "PUR-1",
+                Initiator = "zheng",
+                Department = "purchase",
+                Title = "采购电源",
+                BaseAmount = 100m,
+                TaxAmount = 13m,
                 Items = new List<PurchaseLine> { new() { ItemName = "电源", Quantity = 2m, UnitPrice = 50m } },
             }, "purchase-start-1").ConfigureAwait(false);
             check("采购对接传未税额和税额，由审批服务计算总额", purchase.Id == "inst-p"

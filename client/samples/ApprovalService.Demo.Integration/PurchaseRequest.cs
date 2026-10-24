@@ -36,25 +36,37 @@ public sealed class PurchaseRequest
     /// 未税金额。
     /// </summary>
     [DataMember(Name = "baseAmount")]
-    public decimal BaseAmount { get; set; }
+    public decimal BaseAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 税额。
     /// </summary>
     [DataMember(Name = "taxAmount")]
-    public decimal TaxAmount { get; set; }
+    public decimal TaxAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 是否在预算内；示例预算钩子使用。
     /// </summary>
     [DataMember(Name = "withinBudget")]
-    public bool WithinBudget { get; set; }
+    public bool WithinBudget
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 演示项目编码；取人钩子使用。
     /// </summary>
     [DataMember(Name = "projectCode")]
-    public string? ProjectCode { get; set; }
+    public string? ProjectCode
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 采购明细。
@@ -66,7 +78,10 @@ public sealed class PurchaseRequest
     /// 审批服务生成的审批单 ID。
     /// </summary>
     [DataMember(Name = "approvalInstanceId")]
-    public string? ApprovalInstanceId { get; set; }
+    public string? ApprovalInstanceId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 最近一次同步的审批状态。
@@ -78,13 +93,19 @@ public sealed class PurchaseRequest
     /// 审批人核定的预算。
     /// </summary>
     [DataMember(Name = "approvedBudget")]
-    public decimal? ApprovedBudget { get; set; }
+    public decimal? ApprovedBudget
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 自动业务动作生成的采购订单号。
     /// </summary>
     [DataMember(Name = "orderNumber")]
-    public string? OrderNumber { get; set; }
+    public string? OrderNumber
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 生成和当前演示采购流程字段一致的审批数据快照。
@@ -126,11 +147,17 @@ public sealed class PurchaseLine
     /// 数量。
     /// </summary>
     [DataMember(Name = "quantity")]
-    public decimal Quantity { get; set; }
+    public decimal Quantity
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 未税单价。
     /// </summary>
     [DataMember(Name = "unitPrice")]
-    public decimal UnitPrice { get; set; }
+    public decimal UnitPrice
+    {
+        get; set;
+    }
 }

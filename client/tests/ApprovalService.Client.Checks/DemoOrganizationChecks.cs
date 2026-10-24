@@ -50,7 +50,8 @@ internal static class DemoOrganizationChecks
         });
         using var sdk = new ApprovalServiceClient(new ApprovalServiceClientOptions
         {
-            BaseAddress = new Uri("https://approval.example.test/"), ApiKey = "demo-key",
+            BaseAddress = new Uri("https://approval.example.test/"),
+            ApiKey = "demo-key",
         }, handler);
         await DemoOrganizationSeed.ApplyAsync(sdk).ConfigureAwait(false);
         check("一键准备先推送组织，再逐一绑定十九名人员和七个部门", seen.Count == 27

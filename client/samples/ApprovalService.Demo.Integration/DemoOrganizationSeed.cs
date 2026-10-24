@@ -46,7 +46,9 @@ public static class DemoOrganizationSeed
         // 李娜以研发部发起时，服务端能验证她确实属于所选部门。
         changes.Memberships.Add(new OrganizationMembership
         {
-            PersonId = PersonId("li-na"), DepartmentId = DepartmentId("research"), IsPrimary = false,
+            PersonId = PersonId("li-na"),
+            DepartmentId = DepartmentId("research"),
+            IsPrimary = false,
         });
         return new DemoOrganizationPlan(changes, bindings);
     }
@@ -108,8 +110,11 @@ public static class DemoOrganizationSeed
         var id = DepartmentId(code);
         changes.Departments.Add(new OrganizationDepartment
         {
-            Id = id, Code = "DEMO-" + code.ToUpperInvariant(), Name = name,
-            ParentId = parent == null ? null : DepartmentId(parent), HeadPersonId = PersonId(head),
+            Id = id,
+            Code = "DEMO-" + code.ToUpperInvariant(),
+            Name = name,
+            ParentId = parent == null ? null : DepartmentId(parent),
+            HeadPersonId = PersonId(head),
         });
         bindings.Add(new OrganizationBinding { Kind = "department", ExternalId = code, InternalId = id });
     }
@@ -132,13 +137,20 @@ public static class DemoOrganizationSeed
         var employeeNumber = "DEMO-" + code.ToUpperInvariant();
         changes.People.Add(new OrganizationPerson
         {
-            Id = id, EmployeeNumber = employeeNumber, Name = name,
+            Id = id,
+            EmployeeNumber = employeeNumber,
+            Name = name,
             ManagerId = manager == null ? null : PersonId(manager),
-            Position = position, Grade = "G" + rank, GradeRank = rank, IsActive = true,
+            Position = position,
+            Grade = "G" + rank,
+            GradeRank = rank,
+            IsActive = true,
         });
         changes.Memberships.Add(new OrganizationMembership
         {
-            PersonId = id, DepartmentId = DepartmentId(department), IsPrimary = true,
+            PersonId = id,
+            DepartmentId = DepartmentId(department),
+            IsPrimary = true,
         });
         bindings.Add(new OrganizationBinding { Kind = "person", ExternalId = code, EmployeeNumber = employeeNumber });
     }
@@ -163,10 +175,16 @@ public sealed class DemoOrganizationPlan
     /// <summary>
     /// 将要推送的组织资料。
     /// </summary>
-    public OrganizationChangesRequest Changes { get; }
+    public OrganizationChangesRequest Changes
+    {
+        get;
+    }
 
     /// <summary>
     /// 将要建立的人员及部门绑定。
     /// </summary>
-    public IReadOnlyList<OrganizationBinding> Bindings { get; }
+    public IReadOnlyList<OrganizationBinding> Bindings
+    {
+        get;
+    }
 }

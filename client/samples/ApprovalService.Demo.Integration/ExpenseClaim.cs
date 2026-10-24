@@ -42,7 +42,10 @@ public sealed class ExpenseClaim
     /// 申请金额。
     /// </summary>
     [DataMember(Name = "claimAmount")]
-    public decimal ClaimAmount { get; set; }
+    public decimal ClaimAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 本应用预先上传的票据附件 ID。
@@ -60,7 +63,10 @@ public sealed class ExpenseClaim
     /// 审批服务生成的审批单 ID。
     /// </summary>
     [DataMember(Name = "approvalInstanceId")]
-    public string? ApprovalInstanceId { get; set; }
+    public string? ApprovalInstanceId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 最近一次同步的审批状态。
@@ -72,13 +78,19 @@ public sealed class ExpenseClaim
     /// 审批人核定的金额，和申请金额分开保存。
     /// </summary>
     [DataMember(Name = "verifiedAmount")]
-    public decimal? VerifiedAmount { get; set; }
+    public decimal? VerifiedAmount
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 出纳填写的付款流水号。
     /// </summary>
     [DataMember(Name = "paymentReference")]
-    public string? PaymentReference { get; set; }
+    public string? PaymentReference
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 生成和当前演示报销流程字段一致的审批数据快照。
@@ -125,5 +137,8 @@ public sealed class ExpenseLine
     /// 本行金额。
     /// </summary>
     [DataMember(Name = "amount")]
-    public decimal Amount { get; set; }
+    public decimal Amount
+    {
+        get; set;
+    }
 }

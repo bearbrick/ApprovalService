@@ -26,14 +26,25 @@ internal static class DemoBusinessHttpChecks
             var store = new DemoDocumentStore(path);
             store.SaveExpense(new ExpenseClaim
             {
-                BusinessKey = "EXP-HOOK", Initiator = "wang", Department = "production",
-                Title = "车票", Category = "交通", ClaimAmount = 860m, ReceiptFileId = "file-hook",
+                BusinessKey = "EXP-HOOK",
+                Initiator = "wang",
+                Department = "production",
+                Title = "车票",
+                Category = "交通",
+                ClaimAmount = 860m,
+                ReceiptFileId = "file-hook",
                 Lines = new List<ExpenseLine> { new() { Date = "2026-10-24", Description = "高铁", Amount = 860m } },
             });
             store.SavePurchase(new PurchaseRequest
             {
-                BusinessKey = "PUR-HOOK", Initiator = "zheng", Department = "purchase", Title = "采购电源",
-                BaseAmount = 100m, TaxAmount = 13m, WithinBudget = true, ProjectCode = "P1",
+                BusinessKey = "PUR-HOOK",
+                Initiator = "zheng",
+                Department = "purchase",
+                Title = "采购电源",
+                BaseAmount = 100m,
+                TaxAmount = 13m,
+                WithinBudget = true,
+                ProjectCode = "P1",
             });
             var port = FreePort();
             var prefix = "http://127.0.0.1:" + port + "/";

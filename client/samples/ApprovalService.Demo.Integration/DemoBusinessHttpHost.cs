@@ -230,85 +230,97 @@ public sealed class DemoBusinessHttpHost : IDisposable
         switch (path)
         {
             case "/data":
-            {
-                var input = DemoHookJson.Read<DemoDataHookRequest>(body);
-                if (input.RequestId != requestId)
                 {
-                    return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "请求 ID 与正文不一致。" }));
-                }
-
-                if (input.FlowCode == "EXPENSE")
-                {
-                    var claim = store.FindExpense(input.BusinessKey) ?? throw new InvalidOperationException("费用报销原单不存在。");
-                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoExpenseDataResponse
+                    var input = DemoHookJson.Read<DemoDataHookRequest>(body);
+                    if (input.RequestId != requestId)
                     {
-                        Title = claim.Title,
-                        Data = new DemoExpenseHookData { Title = claim.Title, Category = claim.Category,
-                            ClaimAmount = claim.ClaimAmount, Receipt = claim.ReceiptFileId, Lines = claim.Lines },
+                        return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "请求 ID 与正文不一致。" }));
+                    }
+
+                    if (input.FlowCode == "EXPENSE")
+                    {
+                        var claim = store.FindExpense(input.BusinessKey) ?? throw new InvalidOperationException("费用报销原单不存在。");
+                        return new DemoHttpResult(200, DemoHookJson.Write(new DemoExpenseDataResponse
+                        {
+                            Title = claim.Title,
+                            Data = new DemoExpenseHookData
+                            {
+                                Title = claim.Title,
+                                Category = claim.Category,
+                                ClaimAmount = claim.ClaimAmount,
+                                Receipt = claim.ReceiptFileId,
+                                Lines = claim.Lines
+                            },
+                        }));
+                    }
+
+                    if (input.FlowCode != "PURCHASE_REQUEST")
+                    {
+                        return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "示例业务系统不支持该流程。" }));
+                    }
+
+                    var purchase = store.FindPurchase(input.BusinessKey) ?? throw new InvalidOperationException("采购原单不存在。");
+                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoPurchaseDataResponse
+                    {
+                        Title = purchase.Title,
+                        Data = new DemoPurchaseHookData
+                        {
+                            Title = purchase.Title,
+                            Requester = purchase.Initiator,
+                            Department = purchase.Department,
+                            BaseAmount = purchase.BaseAmount,
+                            TaxAmount = purchase.TaxAmount,
+                            Items = purchase.Items
+                        },
                     }));
                 }
-
-                if (input.FlowCode != "PURCHASE_REQUEST")
-                {
-                    return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "示例业务系统不支持该流程。" }));
-                }
-
-                var purchase = store.FindPurchase(input.BusinessKey) ?? throw new InvalidOperationException("采购原单不存在。");
-                return new DemoHttpResult(200, DemoHookJson.Write(new DemoPurchaseDataResponse
-                {
-                    Title = purchase.Title,
-                    Data = new DemoPurchaseHookData { Title = purchase.Title, Requester = purchase.Initiator,
-                        Department = purchase.Department, BaseAmount = purchase.BaseAmount,
-                        TaxAmount = purchase.TaxAmount, Items = purchase.Items },
-                }));
-            }
             case "/validate":
-            {
-                var input = DemoHookJson.Read<DemoValidationHookRequest>(body);
-                var purchase = input.FlowCode == "PURCHASE_REQUEST" ? store.FindPurchase(input.BusinessKey) : null;
-                var shortage = purchase != null && purchase.WithinBudget ?
-                    purchase.BaseAmount + purchase.TaxAmount - budgetRemaining : 0m;
-                return new DemoHttpResult(200, DemoHookJson.Write(new DemoValidationResponse
                 {
-                    Allowed = shortage <= 0m,
-                    Reason = shortage > 0m ? $"预算不足，还差 {shortage:0.00} 元。" : null,
-                }));
-            }
+                    var input = DemoHookJson.Read<DemoValidationHookRequest>(body);
+                    var purchase = input.FlowCode == "PURCHASE_REQUEST" ? store.FindPurchase(input.BusinessKey) : null;
+                    var shortage = purchase != null && purchase.WithinBudget ?
+                        purchase.BaseAmount + purchase.TaxAmount - budgetRemaining : 0m;
+                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoValidationResponse
+                    {
+                        Allowed = shortage <= 0m,
+                        Reason = shortage > 0m ? $"预算不足，还差 {shortage:0.00} 元。" : null,
+                    }));
+                }
             case "/assignees":
-            {
-                var input = DemoHookJson.Read<DemoAssigneeHookRequest>(body);
-                var project = input.SourceValue;
-                if (string.IsNullOrWhiteSpace(project))
                 {
-                    project = input.FlowCode == "EXPENSE" ? null : store.FindPurchase(input.BusinessKey)?.ProjectCode;
-                }
+                    var input = DemoHookJson.Read<DemoAssigneeHookRequest>(body);
+                    var project = input.SourceValue;
+                    if (string.IsNullOrWhiteSpace(project))
+                    {
+                        project = input.FlowCode == "EXPENSE" ? null : store.FindPurchase(input.BusinessKey)?.ProjectCode;
+                    }
 
-                var people = project != null && projectManagers.TryGetValue(project, out var manager) ?
-                    new List<string> { manager } : new List<string>();
-                return new DemoHttpResult(200, DemoHookJson.Write(new DemoAssigneeResponse { UserIds = people }));
-            }
+                    var people = project != null && projectManagers.TryGetValue(project, out var manager) ?
+                        new List<string> { manager } : new List<string>();
+                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoAssigneeResponse { UserIds = people }));
+                }
             case "/action":
-            {
-                var input = DemoHookJson.Read<DemoActionHookRequest>(body);
-                if (input.FlowCode != "PURCHASE_REQUEST" || input.ActionCode != "createPurchaseOrder")
                 {
-                    return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "示例业务动作不支持该流程或动作。" }));
-                }
+                    var input = DemoHookJson.Read<DemoActionHookRequest>(body);
+                    if (input.FlowCode != "PURCHASE_REQUEST" || input.ActionCode != "createPurchaseOrder")
+                    {
+                        return new DemoHttpResult(400, DemoHookJson.Write(new DemoErrorResponse { Message = "示例业务动作不支持该流程或动作。" }));
+                    }
 
-                var action = store.RunPurchaseAction(input.EventId, input.BusinessKey, actionFailures);
-                return new DemoHttpResult(200, DemoHookJson.Write(new DemoActionResponse
-                {
-                    Success = action.Success,
-                    Message = action.Success ? null : "演示采购接口暂时失败，请按原事件 ID 重试。",
-                    Result = action.OrderNumber == null ? null : new DemoOrderResult { OrderNo = action.OrderNumber },
-                }));
-            }
+                    var action = store.RunPurchaseAction(input.EventId, input.BusinessKey, actionFailures);
+                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoActionResponse
+                    {
+                        Success = action.Success,
+                        Message = action.Success ? null : "演示采购接口暂时失败，请按原事件 ID 重试。",
+                        Result = action.OrderNumber == null ? null : new DemoOrderResult { OrderNo = action.OrderNumber },
+                    }));
+                }
             case "/callback":
-            {
-                var notification = ApprovalCallbackVerifier.VerifyAndParse(body, signature, signingSecret);
-                store.ApplyCallback(notification);
-                return new DemoHttpResult(200, DemoHookJson.Write(new DemoAcceptedResponse { Accepted = true }));
-            }
+                {
+                    var notification = ApprovalCallbackVerifier.VerifyAndParse(body, signature, signingSecret);
+                    store.ApplyCallback(notification);
+                    return new DemoHttpResult(200, DemoHookJson.Write(new DemoAcceptedResponse { Accepted = true }));
+                }
             default:
                 return new DemoHttpResult(404, DemoHookJson.Write(new DemoErrorResponse { Message = "业务钩子地址不存在。" }));
         }
@@ -381,12 +393,18 @@ internal sealed class DemoHttpResult
     /// <summary>
     /// 响应状态码。
     /// </summary>
-    internal int StatusCode { get; }
+    internal int StatusCode
+    {
+        get;
+    }
 
     /// <summary>
     /// 响应字节。
     /// </summary>
-    internal byte[] Body { get; }
+    internal byte[] Body
+    {
+        get;
+    }
 }
 
 /// <summary>
@@ -399,7 +417,10 @@ internal sealed class DemoAcceptedResponse
     /// 是否接收。
     /// </summary>
     [DataMember(Name = "accepted")]
-    public bool Accepted { get; set; }
+    public bool Accepted
+    {
+        get; set;
+    }
 }
 
 /// <summary>

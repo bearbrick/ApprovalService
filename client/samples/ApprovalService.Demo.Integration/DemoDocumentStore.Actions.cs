@@ -77,17 +77,26 @@ internal sealed class DemoActionResult
     /// <summary>
     /// 是否成功。
     /// </summary>
-    internal bool Success { get; }
+    internal bool Success
+    {
+        get;
+    }
 
     /// <summary>
     /// 稳定订单号。
     /// </summary>
-    internal string? OrderNumber { get; }
+    internal string? OrderNumber
+    {
+        get;
+    }
 
     /// <summary>
     /// 累计尝试次数。
     /// </summary>
-    internal int Attempts { get; }
+    internal int Attempts
+    {
+        get;
+    }
 }
 
 /// <summary>
@@ -112,11 +121,17 @@ internal sealed class DemoActionRecord
     /// 已发生的尝试次数。
     /// </summary>
     [DataMember(Name = "attempts")]
-    public int Attempts { get; set; }
+    public int Attempts
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 成功后固定的订单号。
     /// </summary>
     [DataMember(Name = "orderNumber")]
-    public string? OrderNumber { get; set; }
+    public string? OrderNumber
+    {
+        get; set;
+    }
 }

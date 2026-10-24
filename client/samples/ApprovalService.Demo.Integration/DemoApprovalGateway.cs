@@ -46,8 +46,11 @@ public sealed class DemoApprovalGateway
         store.SaveExpense(claim);
         var instance = await client.StartAsync(new StartApprovalRequest
         {
-            FlowCode = "EXPENSE", BusinessKey = claim.BusinessKey, Title = claim.Title,
-            Initiator = claim.Initiator, InitiatingDepartment = claim.Department,
+            FlowCode = "EXPENSE",
+            BusinessKey = claim.BusinessKey,
+            Title = claim.Title,
+            Initiator = claim.Initiator,
+            InitiatingDepartment = claim.Department,
             Data = claim.ToApprovalData(),
         }, requestId, cancellationToken).ConfigureAwait(false);
         store.RecordStart(instance);
@@ -72,8 +75,11 @@ public sealed class DemoApprovalGateway
         store.SavePurchase(purchase);
         var instance = await client.StartAsync(new StartApprovalRequest
         {
-            FlowCode = "PURCHASE_REQUEST", BusinessKey = purchase.BusinessKey, Title = purchase.Title,
-            Initiator = purchase.Initiator, InitiatingDepartment = purchase.Department,
+            FlowCode = "PURCHASE_REQUEST",
+            BusinessKey = purchase.BusinessKey,
+            Title = purchase.Title,
+            Initiator = purchase.Initiator,
+            InitiatingDepartment = purchase.Department,
             Data = purchase.ToApprovalData(),
         }, requestId, cancellationToken).ConfigureAwait(false);
         store.RecordStart(instance);
@@ -127,7 +133,8 @@ public sealed class DemoApprovalGateway
 
         var instance = await client.ResubmitAsync(instanceId, new ApprovalResubmitRequest
         {
-            User = claim.Initiator, Data = claim.ToApprovalData(),
+            User = claim.Initiator,
+            Data = claim.ToApprovalData(),
         }, requestId, cancellationToken).ConfigureAwait(false);
         store.UpdateFromQuery(instance);
         return instance;
@@ -152,7 +159,8 @@ public sealed class DemoApprovalGateway
 
         var instance = await client.ResubmitAsync(instanceId, new ApprovalResubmitRequest
         {
-            User = purchase.Initiator, Data = purchase.ToApprovalData(),
+            User = purchase.Initiator,
+            Data = purchase.ToApprovalData(),
         }, requestId, cancellationToken).ConfigureAwait(false);
         store.UpdateFromQuery(instance);
         return instance;

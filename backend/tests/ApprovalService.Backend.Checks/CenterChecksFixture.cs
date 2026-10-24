@@ -3,6 +3,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
+using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Engine.Commands;
@@ -47,6 +48,8 @@ internal static class CenterChecksFixture
             [
                 new FlowFieldPermission { FieldKey = "secret", Access = FlowFieldAccess.Hidden },
                 new FlowFieldPermission { FieldKey = "lines.cost", Access = FlowFieldAccess.Hidden },
+                new FlowFieldPermission { FieldKey = "secretReceipt", Access = FlowFieldAccess.Hidden },
+                new FlowFieldPermission { FieldKey = "lines.costReceipt", Access = FlowFieldAccess.Hidden },
             ];
             var definition = new FlowDefinition
             {
@@ -59,9 +62,13 @@ internal static class CenterChecksFixture
                     [
                         new FlowFieldDefinition { Key = "amount", Name = "金额", Type = FlowFieldTypes.Number },
                         new FlowFieldDefinition { Key = "secret", Name = "保密字段" },
+                        new FlowFieldDefinition { Key = "receipt", Name = "票据", Type = FlowFieldTypes.Attachment },
+                        new FlowFieldDefinition { Key = "secretReceipt", Name = "隐藏票据", Type = FlowFieldTypes.Attachment },
                         new FlowFieldDefinition { Key = "lines", Name = "明细", Type = FlowFieldTypes.DetailTable,
                             Children = [new FlowFieldDefinition { Key = "qty", Name = "数量" },
-                                new FlowFieldDefinition { Key = "cost", Name = "成本" }] },
+                                new FlowFieldDefinition { Key = "cost", Name = "成本" },
+                                new FlowFieldDefinition { Key = "receipt", Name = "行票据", Type = FlowFieldTypes.Attachment },
+                                new FlowFieldDefinition { Key = "costReceipt", Name = "隐藏行票据", Type = FlowFieldTypes.Attachment }] },
                     ],
                 },
             };
@@ -100,6 +107,26 @@ internal static class CenterChecksFixture
             AddInstance(db, "j-delegated", "one", node.Id, "other", "other", EngineTaskStatuses.Pending);
             db.ApprovalTasks.Local.Single(item => item.InstanceId == "j-delegated").DelegatedForId = "viewer";
             AddInstance(db, "k-history", "one", node.Id, "other", "viewer", EngineTaskStatuses.Queued);
+            foreach (var (id, instanceId) in new[]
+            {
+                ("file-visible", "a-todo"), ("file-row", "a-todo"), ("file-hidden", "a-todo"),
+                ("file-hidden-row", "a-todo"), ("file-foreign", "b-cross"),
+            })
+            {
+                db.StoredFiles.Add(new StoredFileEntity
+                {
+                    Id = id,
+                    FileName = id + ".pdf",
+                    Size = 42,
+                    ContentType = "application/pdf",
+                    Sha256 = new string('0', 64),
+                    StorageKind = "local",
+                    StorageKey = id,
+                    InstanceId = instanceId,
+                    UploadedById = "other",
+                    UploadedAt = DateTimeOffset.UtcNow,
+                });
+            }
             db.ApprovalTasks.Local.Single(item => item.InstanceId == "k-history").NodeId = graph.Nodes.Last(item => item.Type == FlowNodeTypes.Approval).Id;
             // 同一审批单多个本人待办不能导致列表重复或总数膨胀。
             db.ApprovalTasks.Add(new ApprovalTaskEntity { Id = "a-second", InstanceId = "a-todo", NodeId = node.Id, AssigneeId = "viewer", Status = EngineTaskStatuses.Pending });
@@ -186,7 +213,7 @@ internal static class CenterChecksFixture
             Status = EngineInstanceStatuses.Running,
             StartedAt = now,
             IsUrgent = urgent,
-            ApprovalDataJson = "{\"amount\":12,\"secret\":\"hidden-business-secret\",\"extra\":\"unregistered-secret\",\"lines\":[{\"qty\":2,\"cost\":100,\"extra\":\"unregistered-column\"}]}",
+            ApprovalDataJson = "{\"amount\":12,\"secret\":\"hidden-business-secret\",\"receipt\":[\"file-visible\",\"file-foreign\"],\"secretReceipt\":\"file-hidden\",\"extra\":\"unregistered-secret\",\"lines\":[{\"qty\":2,\"cost\":100,\"receipt\":\"file-row\",\"costReceipt\":\"file-hidden-row\",\"extra\":\"unregistered-column\"}]}",
             StateJson = JsonSerializer.Serialize(new EngineState { InstanceId = id, Tokens = [new EngineToken { Id = id + "-token", NodeId = node }] }, ApprovalJson.Options),
         });
         if (assignee is not null)

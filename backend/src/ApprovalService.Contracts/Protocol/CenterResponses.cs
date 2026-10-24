@@ -195,6 +195,11 @@ public sealed class CenterDetailResponse
     public IReadOnlyList<CenterFieldDefinitionResponse> FieldDefinitions { get; set; } = [];
 
     /// <summary>
+    /// 当前人员可见的附件字段所引用、且仍关联本审批单的文件元数据。
+    /// </summary>
+    public IReadOnlyList<CenterAttachmentResponse> Attachments { get; set; } = [];
+
+    /// <summary>
     /// 当前与历史人工任务的只读展示。
     /// </summary>
     public IReadOnlyList<CenterTaskResponse> Tasks { get; set; } = [];
@@ -235,6 +240,35 @@ public sealed class CenterFieldDefinitionResponse
     /// 仅含已返回明细列的子定义。
     /// </summary>
     public IReadOnlyList<CenterFieldDefinitionResponse> Children { get; set; } = [];
+}
+
+/// <summary>
+/// 审批详情中已授权附件的展示元数据，内容通过独立验权接口下载。
+/// </summary>
+public sealed class CenterAttachmentResponse
+{
+    /// <summary>
+    /// 文件 ID。
+    /// </summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 上传时的文件名称。
+    /// </summary>
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 按内容识别的媒体类型。
+    /// </summary>
+    public string ContentType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 原始字节数。
+    /// </summary>
+    public long Size
+    {
+        get; set;
+    }
 }
 
 /// <summary>

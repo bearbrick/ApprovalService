@@ -56,7 +56,7 @@ internal static class CenterQueryChecks
                 !local.Items[0].Summary.GetProperty("lines")[0].TryGetProperty("cost", out _));
             check("列表摘要只带锁定发布版本中已授权的字段名称和明细列",
                 local.Items[0].SummaryFieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "明细"]) &&
-                local.Items[0].SummaryFieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量"]));
+                local.Items[0].SummaryFieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量", "行票据"]));
             check("中心列表返回真实人员、来源应用和当前环节名称",
                 local.Items[0].InitiatorName == "测试人员" && local.Items[0].SourceName == "应用一" &&
                 !string.IsNullOrWhiteSpace(local.Items[0].CurrentStep));
@@ -91,10 +91,16 @@ internal static class CenterQueryChecks
                 !detailText.Contains("stateJson", StringComparison.Ordinal) &&
                 detailResponse.Headers.CacheControl?.NoStore == true);
             check("详情字段名称和明细列按发布版本展示且不泄露隐藏定义",
-                detail is not null && detail.FieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "明细"]) &&
-                detail.FieldDefinitions[1].Children.Select(field => field.Name).SequenceEqual(["数量"]) &&
+                detail is not null && detail.FieldDefinitions.Select(field => field.Name).SequenceEqual(["金额", "票据", "明细"]) &&
+                detail.FieldDefinitions[2].Children.Select(field => field.Name).SequenceEqual(["数量", "行票据"]) &&
                 !detailText.Contains("保密字段", StringComparison.Ordinal) &&
-                !detailText.Contains("成本", StringComparison.Ordinal));
+                !detailText.Contains("成本", StringComparison.Ordinal) &&
+                !detailText.Contains("隐藏票据", StringComparison.Ordinal));
+            check("中心附件只列可见字段所引用且仍关联本审批单的文件",
+                detail is not null && detail.Attachments.Select(file => file.Id)
+                    .SequenceEqual(["file-visible", "file-row"]) &&
+                detail.Attachments.All(file => file.ContentType == "application/pdf" && file.Size == 42) &&
+                !detailText.Contains("file-hidden", StringComparison.Ordinal));
             check("中心详情按认证人员和当前状态返回任务操作许可",
                 detail is not null && detail.Tasks.All(task =>
                     task.AllowedActions.Contains("approve", StringComparer.Ordinal) &&

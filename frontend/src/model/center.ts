@@ -175,6 +175,28 @@ export interface CenterDetailColumn {
 }
 
 /**
+ * 当前审批详情中已授权且已关联的附件元数据。
+ */
+export interface CenterAttachment {
+  /**
+   * 服务端文件 ID。
+   */
+  id: string
+  /**
+   * 上传时的显示名称。
+   */
+  fileName: string
+  /**
+   * 实际媒体类型。
+   */
+  contentType: string
+  /**
+   * 文件字节数。
+   */
+  size: number
+}
+
+/**
  * 审批进度中的一条节点记录。
  */
 export interface CenterTimelineEntry {
@@ -246,6 +268,10 @@ export interface CenterDetail {
    * 可展示的附件名称；正式下载由独立权限接口处理。
    */
   attachmentNames: readonly string[]
+  /**
+   * 可经现有验权下载接口读取的附件。
+   */
+  attachments: readonly CenterAttachment[]
 }
 
 /**

@@ -361,6 +361,8 @@ public sealed class DemoBusinessHttpHost : IDisposable
     {
         var response = context.Response;
         response.StatusCode = status;
+        // HttpListener 在响应结束后关闭输出流；不复用该连接可避免本机频繁钩子请求碰到半关闭连接。
+        response.KeepAlive = false;
         response.ContentType = "application/json; charset=utf-8";
         response.Headers.Add("X-Approval-Signature", DemoHmacSignature.Sign(body, signingSecret));
         if (!string.IsNullOrWhiteSpace(requestId))

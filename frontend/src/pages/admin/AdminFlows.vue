@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref } from 'vue'
 import { ApiError } from '../../api/http.ts'
-import { exportManagedFlow, importManagedFlow, listManagedFlows, previewManagedImport,
+import { exportManagedFlow, importManagedFlow, listFlowDepartments, listManagedFlows, previewManagedImport,
   setManagedFlowEnabled } from '../../api/admin-flow-management.ts'
-import type { FlowImportPreview, ManagedFlow } from '../../api/admin-flow-management.ts'
+import type { FlowDepartment, FlowImportPreview, ManagedFlow } from '../../api/admin-flow-management.ts'
 import '../../styles/admin-flows.css'
 
 /**
@@ -20,6 +20,10 @@ const emit = defineEmits<{
  * 当前本人获授权的流程摘要。
  */
 const flows = ref<ManagedFlow[]>([])
+/**
+ * 服务端按管理范围过滤后的所属部门选项。
+ */
+const departments = ref<FlowDepartment[]>([])
 /**
  * 读取、写入与导出共用的等待状态。
  */
@@ -84,6 +88,15 @@ let request: AbortController | null = null
 const visible = () => flows.value.filter(flow => !search.value.trim()
   || `${flow.name} ${flow.code} ${flow.group ?? ''}`.toLocaleLowerCase()
     .includes(search.value.trim().toLocaleLowerCase()))
+/**
+ * 把服务端内部部门 ID 转为已授权显示名称。
+ * @param id 流程保存的所属部门 ID。
+ * @returns 当前目录中的部门名称。
+ */
+function departmentName(id: string | null): string {
+  if (!id) return '组织级'
+  return departments.value.find(item => item.id === id)?.name ?? '原所属部门'
+}
 
 /**
  * 从有权限的管理接口重读流程目录。
@@ -95,8 +108,12 @@ async function load(): Promise<void> {
   request = current
   error.value = ''
   try {
-    const result = await listManagedFlows(current.signal)
-    if (request === current && !current.signal.aborted) flows.value = result
+    const [result, choices] = await Promise.all([listManagedFlows(current.signal),
+      listFlowDepartments(current.signal)])
+    if (request === current && !current.signal.aborted) {
+      flows.value = result
+      departments.value = choices
+    }
   } catch (cause) {
     if (request !== current || current.signal.aborted) return
     if (cause instanceof ApiError && cause.status === 401) { emit('lost'); return }
@@ -239,8 +256,8 @@ onBeforeUnmount(() => request?.abort())
   <section class="admin-flow-manager">
     <div class="admin-panel admin-flow-heading"><div><h2>流程管理</h2><p>只展示当前账号有权管理的流程。草稿可修改；发布版不可变。</p></div><div class="admin-flow-actions"><a class="btn btn-primary" href="#/designer/NEW_FLOW/design">＋ 新建流程</a><a class="btn" href="#/designer/templates">使用模板</a><button class="btn" type="button" :disabled="busy" @click="load">刷新</button></div></div>
     <p v-if="error" class="admin-flow-error" role="alert">{{ error }}</p><p v-if="message" class="admin-flow-success" role="status">{{ message }}</p>
-    <div class="admin-panel admin-flow-list"><label>筛选流程<input v-model="search" type="search" placeholder="名称、编码或分组"></label><div v-if="!visible().length" class="admin-flow-empty">当前范围没有流程。可从空白画布或模板建立草稿。</div><table v-else><thead><tr><th>流程</th><th>分组 / 所属部门</th><th>草稿 / 发布版</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="flow in visible()" :key="flow.code"><td><strong>{{ flow.name }}</strong><small>{{ flow.code }}</small></td><td>{{ flow.group || '未分组' }}<small>{{ flow.ownerDepartmentId || '组织级' }}</small></td><td>修订 {{ flow.draftRevision }}<small>{{ flow.publishedVersion ? `发布 v${flow.publishedVersion}` : '尚未发布' }}</small></td><td><span :class="flow.isEnabled ? 'on' : 'off'">{{ flow.isEnabled ? '可发起' : '已停用' }}</span></td><td class="admin-flow-row-actions"><a :href="`#/designer/${encodeURIComponent(flow.code)}/design`">设计</a><button type="button" :disabled="busy" @click="chooseStatus(flow)">{{ flow.isEnabled ? '停用' : '恢复' }}</button><button type="button" :disabled="busy" @click="download(flow, 'draft')">导出草稿</button><button type="button" :disabled="busy || !flow.publishedVersion" @click="download(flow, 'published')">导出发布版</button></td></tr></tbody></table></div>
+    <div class="admin-panel admin-flow-list"><label>筛选流程<input v-model="search" type="search" placeholder="名称、编码或分组"></label><div v-if="!visible().length" class="admin-flow-empty">当前范围没有流程。可从空白画布或模板建立草稿。</div><table v-else><thead><tr><th>流程</th><th>分组 / 所属部门</th><th>草稿 / 发布版</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="flow in visible()" :key="flow.code"><td><strong>{{ flow.name }}</strong><small>{{ flow.code }}</small></td><td>{{ flow.group || '未分组' }}<small>{{ departmentName(flow.ownerDepartmentId) }}</small></td><td>修订 {{ flow.draftRevision }}<small>{{ flow.publishedVersion ? `发布 v${flow.publishedVersion}` : '尚未发布' }}</small></td><td><span :class="flow.isEnabled ? 'on' : 'off'">{{ flow.isEnabled ? '可发起' : '已停用' }}</span></td><td class="admin-flow-row-actions"><a :href="`#/designer/${encodeURIComponent(flow.code)}/design`">设计</a><button type="button" :disabled="busy" @click="chooseStatus(flow)">{{ flow.isEnabled ? '停用' : '恢复' }}</button><button type="button" :disabled="busy" @click="download(flow, 'draft')">导出草稿</button><button type="button" :disabled="busy || !flow.publishedVersion" @click="download(flow, 'published')">导出发布版</button></td></tr></tbody></table></div>
     <form v-if="statusFlow" class="admin-panel admin-flow-inline-form" @submit.prevent="changeStatus"><h3>{{ statusFlow.isEnabled ? '停用' : '恢复' }} {{ statusFlow.name }}</h3><p>服务端会再次核对当前状态与权限；停用仅阻止新发起。</p><label>变更原因<input v-model="statusReason" minlength="2" maxlength="200" required></label><div><button class="btn btn-primary" type="submit" :disabled="busy">确认{{ statusFlow.isEnabled ? '停用' : '恢复' }}</button><button class="btn" type="button" @click="statusFlow = null">取消</button></div></form>
-    <form class="admin-panel admin-flow-import" @submit.prevent="saveImport"><h3>导入兼容 BPMN</h3><p>先在服务端预检文件。导入只保存草稿，发布须另行确认。</p><label>选择本服务导出的 .bpmn 文件<input type="file" accept=".bpmn,.xml,application/xml,text/xml" :disabled="busy" @change="chooseImport"></label><template v-if="preview"><p class="admin-flow-preview"><strong>{{ preview.name }}</strong>（{{ preview.code }}）· {{ preview.nodeCount }} 个节点</p><p v-if="preview.hasCodeConflict" class="admin-flow-error">同编码流程已存在。默认拒绝；仅有管理权限时可显式覆盖当前草稿。</p><label v-if="preview.hasCodeConflict && preview.canOverwrite"><input v-model="overwrite" type="checkbox"> 覆盖 {{ preview.code }} 的草稿修订 {{ preview.existingDraftRevision }}</label><p v-if="preview.hasCodeConflict && !preview.canOverwrite" class="admin-flow-error">当前账号无权覆盖该流程。</p><ul v-if="preview.publishIssues.length"><li v-for="(issue, index) in preview.publishIssues" :key="index">{{ issue.message }}<small v-if="issue.elementId"> · {{ issue.elementId }}</small></li></ul><div class="admin-flow-import-fields"><label>分组<input v-model="importGroup" maxlength="128"></label><label>所属部门内部 ID<input v-model="importOwnerDepartmentId" maxlength="64" placeholder="组织管理员可留空"></label><label>运行期管理员内部 ID<input v-model="importAdministratorId" maxlength="64"></label><label>导入原因<input v-model="importReason" minlength="2" maxlength="200" required></label></div><button class="btn btn-primary" type="submit" :disabled="busy || preview.hasCodeConflict && (!preview.canOverwrite || !overwrite)">保存为草稿</button></template></form>
+    <form class="admin-panel admin-flow-import" @submit.prevent="saveImport"><h3>导入兼容 BPMN</h3><p>先在服务端预检文件。导入只保存草稿，发布须另行确认。</p><label>选择本服务导出的 .bpmn 文件<input type="file" accept=".bpmn,.xml,application/xml,text/xml" :disabled="busy" @change="chooseImport"></label><template v-if="preview"><p class="admin-flow-preview"><strong>{{ preview.name }}</strong>（{{ preview.code }}）· {{ preview.nodeCount }} 个节点</p><p v-if="preview.hasCodeConflict" class="admin-flow-error">同编码流程已存在。默认拒绝；仅有管理权限时可显式覆盖当前草稿。</p><label v-if="preview.hasCodeConflict && preview.canOverwrite"><input v-model="overwrite" type="checkbox"> 覆盖 {{ preview.code }} 的草稿修订 {{ preview.existingDraftRevision }}</label><p v-if="preview.hasCodeConflict && !preview.canOverwrite" class="admin-flow-error">当前账号无权覆盖该流程。</p><ul v-if="preview.publishIssues.length"><li v-for="(issue, index) in preview.publishIssues" :key="index">{{ issue.message }}<small v-if="issue.elementId"> · {{ issue.elementId }}</small></li></ul><div class="admin-flow-import-fields"><label>分组<input v-model="importGroup" maxlength="128"></label><label>所属部门<select v-model="importOwnerDepartmentId"><option value="">组织级（仅组织管理员）</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><label>运行期管理员内部 ID<input v-model="importAdministratorId" maxlength="64"></label><label>导入原因<input v-model="importReason" minlength="2" maxlength="200" required></label></div><button class="btn btn-primary" type="submit" :disabled="busy || preview.hasCodeConflict && (!preview.canOverwrite || !overwrite)">保存为草稿</button></template></form>
   </section>
 </template>

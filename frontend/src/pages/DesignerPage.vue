@@ -2,8 +2,9 @@
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '../api/http.ts'
 import { adminSession, canReadAdminSection } from '../api/admin-session.ts'
-import { createManagedFlow, getManagedFlow, publishManagedFlow, saveManagedFlow } from '../api/admin-flow-management.ts'
-import type { ManagedFlow } from '../api/admin-flow-management.ts'
+import { createManagedFlow, getManagedFlow, listFlowDepartments, publishManagedFlow,
+  saveManagedFlow } from '../api/admin-flow-management.ts'
+import type { FlowDepartment, ManagedFlow } from '../api/admin-flow-management.ts'
 import type { AppRoute } from '../model/routes.ts'
 import type { FlowDefinition, FlowEdge, FlowNode } from '../model/flow.ts'
 import { DESIGNER_TABS, TAB_TITLES } from '../model/navigation.ts'
@@ -84,6 +85,18 @@ const group = ref('')
  */
 const ownerDepartmentId = ref('')
 /**
+ * 当前人员能选择的直属所属部门。
+ */
+const departments = ref<FlowDepartment[]>([])
+/**
+ * 部门选项成功读取前不允许创建新流程。
+ */
+const departmentsLoaded = ref(false)
+/**
+ * 部门选项读取失败的可见信息。
+ */
+const departmentError = ref('')
+/**
  * 当前请求序号，防止切换流程后的旧响应覆盖新草稿。
  */
 let loadSequence = 0
@@ -140,13 +153,19 @@ watch(flowCode, code => {
   managed.value = null
   canCreate.value = false
   loadError.value = ''
+  departments.value = []
+  departmentsLoaded.value = false
+  departmentError.value = ''
   dirty.value = false
   issues.value = []
   pendingFocusId.value = null
   status.value = code ? '正在读取服务端草稿' : '请选择流程模板'
   integrationSnippet.value = ''
   snippetStatus.value = ''
-  if (code && authorized.value) void loadManaged(code)
+  if (code && authorized.value) {
+    void loadManaged(code)
+    void loadDepartments(code)
+  }
 }, { immediate: true })
 
 watch(() => draft.value.code, () => {
@@ -191,6 +210,23 @@ async function loadManaged(code: string): Promise<void> {
       ? '新流程尚未保存到服务端' : cause instanceof Error ? cause.message : '读取服务端草稿失败'
   } finally {
     if (sequence === loadSequence) busy.value = false
+  }
+}
+/**
+ * 从服务端读取当前管理范围内的直属部门选项。
+ * @param code 发起请求时的当前流程编码。
+ * @returns 选项读取完成。
+ */
+async function loadDepartments(code: string): Promise<void> {
+  departmentError.value = ''
+  try {
+    const result = await listFlowDepartments()
+    if (flowCode.value !== code) return
+    departments.value = result
+    departmentsLoaded.value = true
+  } catch (cause) {
+    if (flowCode.value !== code) return
+    departmentError.value = cause instanceof Error ? cause.message : '所属部门读取失败'
   }
 }
 /**
@@ -240,6 +276,7 @@ async function saveDraft(): Promise<void> {
   if (busy.value) return
   if (managed.value && !managed.value.draft) { status.value = '旧流程没有草稿，请先从已发布版本恢复草稿'; return }
   if (!managed.value && !canCreate.value) { status.value = '请先确认服务端流程状态'; return }
+  if (!managed.value && !departmentsLoaded.value) { status.value = '请先读取可选所属部门'; return }
   if (reason.value.trim().length < 2) { status.value = '请填写至少两个字的审计原因'; return }
   if (managed.value && draft.value.code !== managed.value.code) {
     status.value = '已有流程的编码不能修改；请恢复原编码后保存'
@@ -380,7 +417,7 @@ async function copyIntegrationSnippet(): Promise<void> {
 
 <template>
   <div class="designer-page">
-    <header class="designer-header"><div class="designer-breadcrumb"><a href="#/admin/flows">流程管理</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode && authorized" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button><button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button></div></div><div v-if="flowCode && authorized" class="publish-form"><label>审计原因<input v-model="reason" maxlength="200" placeholder="保存或发布时必填" /></label><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" /></label><label>所属部门 ID<input v-model="ownerDepartmentId" placeholder="部门流程管理员必填" /></label></div></header>
+    <header class="designer-header"><div class="designer-breadcrumb"><a href="#/admin/flows">流程管理</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode && authorized" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button><button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button></div></div><div v-if="flowCode && authorized" class="publish-form"><label>审计原因<input v-model="reason" maxlength="200" placeholder="保存或发布时必填" /></label><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" /></label><label>所属部门<select v-model="ownerDepartmentId"><option value="">组织级（仅组织管理员）</option><option v-if="ownerDepartmentId && !departments.some(item => item.id === ownerDepartmentId)" :value="ownerDepartmentId">原所属部门</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><span v-if="departmentError" role="alert">{{ departmentError }} <button type="button" class="btn" @click="loadDepartments(flowCode)">重试</button></span></div></header>
     <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>十类常用审批模板可直接复制修改；采购、报销和质量异常示例还展示金额分支、会签、返工与并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
     <div v-else-if="!authorized" class="designer-content"><p role="alert">请先以流程管理员身份登录，再读取或编辑流程。</p><a href="#/admin/flows">前往流程管理登录</a></div>
     <div v-else-if="loadError" class="designer-content" role="alert"><p>{{ loadError }}</p><button type="button" class="btn" @click="loadManaged(flowCode)">重新读取</button><a href="#/admin/flows">返回流程管理</a></div>
@@ -419,7 +456,7 @@ async function copyIntegrationSnippet(): Promise<void> {
 .designer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .publish-form { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
 .publish-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
-.publish-form input { min-width: 190px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; }
+.publish-form input, .publish-form select { min-width: 190px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
 .designer-tabs { display: flex; gap: 24px; padding: 0 28px; min-height: 54px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; }
 .designer-tabs a { display: inline-flex; align-items: center; white-space: nowrap; border-bottom: 3px solid transparent; color: var(--muted); }
 .designer-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 700; }

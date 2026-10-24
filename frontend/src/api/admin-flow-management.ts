@@ -67,6 +67,20 @@ export interface FlowMetadata {
 }
 
 /**
+ * 当前管理人员可选择的直属所属部门。
+ */
+export interface FlowDepartment {
+  /**
+   * 内部部门 ID。
+   */
+  id: string
+  /**
+   * 部门显示名称。
+   */
+  name: string
+}
+
+/**
  * 服务端对兼容 BPMN 文件的只读预检。
  */
 export interface FlowImportPreview {
@@ -184,6 +198,21 @@ export async function listManagedFlows(signal?: AbortSignal): Promise<ManagedFlo
   const value = await getJson<unknown>(path, { headers: await headers(), signal, cache: 'no-store' })
   if (!Array.isArray(value) || !value.every(managedFlow)) throw new Error('流程目录响应不完整，请刷新后重试。')
   return value.map(requireFlow)
+}
+
+/**
+ * 读取当前管理人员可为流程选择的部门。
+ * @param signal 页面切换时的取消标记。
+ * @returns 服务端按管理范围过滤的部门选项。
+ */
+export async function listFlowDepartments(signal?: AbortSignal): Promise<FlowDepartment[]> {
+  const value = await getJson<unknown>(`${path}/departments`,
+    { headers: await headers(), signal, cache: 'no-store' })
+  if (!Array.isArray(value) || !value.every(item => record(item)
+    && typeof item.id === 'string' && !!item.id && typeof item.name === 'string' && !!item.name)) {
+    throw new Error('所属部门选项响应不完整，请刷新后重试。')
+  }
+  return value as FlowDepartment[]
 }
 
 /**

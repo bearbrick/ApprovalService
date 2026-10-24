@@ -1,5 +1,6 @@
 import { adminAccessToken, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
-import { createManagedFlow, exportManagedFlow, getManagedFlow, importManagedFlow, listManagedFlows,
+import { createManagedFlow, exportManagedFlow, getManagedFlow, importManagedFlow,
+  listFlowDepartments, listManagedFlows,
   listManagedFlowVersions, previewManagedImport, publishManagedFlow, restoreManagedFlowVersion,
   saveManagedFlow, setManagedFlowEnabled } from '../src/api/admin-flow-management.ts'
 import { createEmptyFlow } from '../src/designer/workbench/workbench-model.ts'
@@ -29,6 +30,9 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
     if (path === '/api/v1/admin/flows' && method === 'GET') return Response.json([{
       code: 'FLOW_A', name: '流程 A', isEnabled: true, draftRevision: revision,
     }])
+    if (path === '/api/v1/admin/flows/departments' && method === 'GET') {
+      return Response.json([{ id: 'dept-1', name: '采购部' }])
+    }
     if (path === '/api/v1/admin/flows/FLOW_A' && method === 'GET') return Response.json({
       code: 'FLOW_A', name: '流程 A', isEnabled: true, draftRevision: revision, draft: definition,
       publishedVersionId: 'version-1', publishedVersion: 1,
@@ -81,6 +85,10 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
     try { await adminAccessToken('admin') } catch { blockedOtherScope = true }
     check('流程范围会话不能调用组织管理员接口', blockedOtherScope)
     const list = await listManagedFlows()
+    const departments = await listFlowDepartments()
+    check('流程所属部门只从本地 JWT 授权选项读取名称和内部 ID',
+      departments.length === 1 && departments[0]?.id === 'dept-1'
+      && departments[0]?.name === '采购部' && seen.at(-1)?.authorization === 'Bearer flow-token')
     const detail = await getManagedFlow('FLOW_A')
     check('管理目录与详情允许省略空属性且保留草稿修订和发布指针',
       list[0]?.group === null && list[0]?.draft === null && detail.draft?.code === 'FLOW_A'

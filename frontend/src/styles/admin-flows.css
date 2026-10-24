@@ -9,7 +9,7 @@
 .admin-flow-success { color: #267149; background: #f0faf4; border: 1px solid #b7dfc5; }
 .admin-flow-list { overflow-x: auto; }
 .admin-flow-list > label { display: grid; gap: 6px; max-width: 320px; margin-bottom: 15px; color: var(--muted); font-size: 12px; }
-.admin-flow-list input, .admin-flow-inline-form input, .admin-flow-import input:not([type="checkbox"]) { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); }
+.admin-flow-list input, .admin-flow-inline-form input, .admin-flow-import input:not([type="checkbox"]), .admin-flow-import select { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); }
 .admin-flow-list table { width: 100%; min-width: 870px; border-collapse: collapse; text-align: left; }
 .admin-flow-list th, .admin-flow-list td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .admin-flow-list th { color: var(--muted); font-size: 12px; font-weight: 600; }

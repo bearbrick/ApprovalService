@@ -17,7 +17,7 @@ internal static class Program
     /// <summary>
     /// 运行全部检查。
     /// </summary>
-    /// <param name="args">命令行参数；docs 只检查注释，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
+    /// <param name="args">命令行参数；docs 只检查注释，flow-transfer 只检查流程文件接口，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
     /// <returns>全部通过时为 0；有失败时抛异常，进程以非零退出。</returns>
     private static async Task<int> Main(string[] args)
     {
@@ -34,6 +34,13 @@ internal static class Program
 
         var backendRoot = Fixtures.BackendRoot();
         var repositoryRoot = Directory.GetParent(backendRoot)!.FullName;
+        if (args.FirstOrDefault() == "flow-transfer")
+        {
+            await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
+            Console.WriteLine($"流程文件接口检查全部通过：{passed} 项");
+            return 0;
+        }
+
         if (args.Contains("docs"))
         {
             // 只检查注释：列出全部问题，不在第一项失败时停下。
@@ -95,6 +102,10 @@ internal static class Program
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);
+        await FlowManagementIdentityChecks.RunAsync(Check);
+        await FlowManagementMigrationIntegrationChecks.RunAsync(Check);
+        await FlowManagementHttpChecks.RunAsync(backendRoot, Check);
+        await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);
         await FileChecks.RunAsync(backendRoot, Check);
         await ConfidentialVisibilityChecks.RunAsync(Check);

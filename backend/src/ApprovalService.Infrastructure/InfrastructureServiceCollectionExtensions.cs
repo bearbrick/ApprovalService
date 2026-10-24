@@ -11,6 +11,7 @@ using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Reporting;
+using ApprovalService.Domain.Runtime;
 using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Files;
@@ -67,6 +68,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
+        services.AddScoped<IFlowManagementRepository, FlowManagementRepository>();
+        services.AddScoped<IFlowTransferRepository, FlowTransferRepository>();
+        services.AddScoped<FlowAdministratorIdentityReconciler>();
         services.AddScoped<ICallbackDeliveryRepository, CallbackDeliveryRepository>();
         services.AddScoped<IActionRetryRepository, ActionRetryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();

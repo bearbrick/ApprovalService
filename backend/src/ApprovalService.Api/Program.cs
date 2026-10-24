@@ -18,9 +18,11 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
+var reconcileFlowAdministrators = args.Length > 0 && args[0] == "reconcile-flow-admins";
 var migrateFiles = args.Contains("--migrate-files", StringComparer.Ordinal);
 var backupNow = args.Length == 1 && args[0] == "backup-now";
-var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args.Where(arg => arg is not ("--migrate-files" or "backup-now")).ToArray());
+var builder = WebApplication.CreateBuilder(bootstrapCommand || reconcileFlowAdministrators ? [] :
+    args.Where(arg => arg is not ("--migrate-files" or "backup-now")).ToArray());
 builder.Host.UseWindowsService(options => options.ServiceName = "ApprovalService");
 if (bootstrapCommand)
 {
@@ -122,6 +124,7 @@ app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
 app.MapReportingEndpoints();
+app.MapFlowManagementEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();
@@ -137,6 +140,19 @@ if (bootstrapCommand)
     }
 
     Environment.ExitCode = await BootstrapAdminCommand.RunAsync(app.Services);
+    return;
+}
+
+if (reconcileFlowAdministrators)
+{
+    if (args.Length != 1)
+    {
+        Console.Error.WriteLine("用法：dotnet run --project backend/src/ApprovalService.Api -- reconcile-flow-admins");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    Environment.ExitCode = await ReconcileFlowAdministratorsCommand.RunAsync(app.Services);
     return;
 }
 

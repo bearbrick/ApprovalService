@@ -146,6 +146,46 @@ public static class ApiRoutes
     public const string AdminAppEmbedOrigins = AdminClientApps + "/{code}/embed-origins";
 
     /// <summary>
+    /// 读取或创建有权限的流程草稿。
+    /// </summary>
+    public const string AdminFlows = OpenApiPrefix + "/admin/flows";
+
+    /// <summary>
+    /// 按稳定编码读取流程和当前草稿。
+    /// </summary>
+    public const string AdminFlowByCode = AdminFlows + "/{code}";
+
+    /// <summary>
+    /// 按预期修订保存流程草稿。
+    /// </summary>
+    public const string AdminFlowDraft = AdminFlowByCode + "/draft";
+
+    /// <summary>
+    /// 校验草稿并原子发布新版本。
+    /// </summary>
+    public const string AdminFlowPublish = AdminFlowByCode + "/publish";
+
+    /// <summary>
+    /// 停用或恢复流程的新审批单发起。
+    /// </summary>
+    public const string AdminFlowEnabled = AdminFlowByCode + "/enabled";
+
+    /// <summary>
+    /// 仅检查本服务兼容 BPMN 文件与同编码冲突。
+    /// </summary>
+    public const string AdminFlowImportPreview = AdminFlows + "/import/preview";
+
+    /// <summary>
+    /// 预检通过后把兼容 BPMN 内容保存为草稿。
+    /// </summary>
+    public const string AdminFlowImport = AdminFlows + "/import";
+
+    /// <summary>
+    /// 显式导出草稿或指定不可变发布版本。
+    /// </summary>
+    public const string AdminFlowExport = AdminFlowByCode + "/export";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

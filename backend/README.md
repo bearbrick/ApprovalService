@@ -68,6 +68,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 ## 流程定义
 
+流程元数据现保存可选的直接所属部门 ID，流程管理员标识统一为内部人员 ID。服务器本机运行 `dotnet run --project backend/src/ApprovalService.Api -- reconcile-flow-admins`，会先预览唯一修正与零/多匹配歧义；操作人输入 `APPLY` 后才在事务中修正并记录待人工处理事项。命令支持三种数据库，HTTP 服务启动不会自动对账。部门流程管理员的授权以当前本地会话、在职状态、`flow-admin` 角色和直接部门关系共同核对，流程上的管理员 ID 本身不授予管理权限。受保护管理 API 已支持创建、读取、按修订保存草稿、发布不可变版本、停启用新发起及兼容 BPMN 的只读预检、草稿导入、草稿或发布版导出；协议见 [ADR 0018](../docs/adr/0018-flow-management-lifecycle.md)。
+
 正式流程定义模型位于 `src/ApprovalService.Contracts/Flows/`，只接受统一自由画布的 JSON；`schemaVersion` 标识格式版本。`src/ApprovalService.Engine/Definitions/` 负责在发布前检查设计内容并生成不含画布坐标的执行图。可导入的 BPMN 文件必须由本服务导出且携带本服务扩展信息。开发样例放在 `samples/flows/`，完整字段约定见 [docs/contracts.md](../docs/contracts.md)。
 
 流程级 `withdrawBeforeFirstDecision` 和 `returnMode` 是可省略的发布策略：旧定义分别按“审批结束前可撤回”和“退回后从头重提”处理。业务系统发起时把编译图中的值固定到审批单操作状态，不接受每次操作临时更改。

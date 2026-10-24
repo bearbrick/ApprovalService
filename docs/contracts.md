@@ -75,6 +75,9 @@
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
+| `GET/POST /api/v1/admin/flows`、`GET /api/v1/admin/flows/{code}`、`PUT /api/v1/admin/flows/{code}/draft`、`POST /api/v1/admin/flows/{code}/publish` | 本地 JWT + 当前流程管理范围 | 读取、创建、按修订保存草稿及原子发布新版本 |
+| `PUT /api/v1/admin/flows/{code}/enabled` | 本地 JWT + 当前流程管理范围 | 按预期启用状态停用或恢复新审批单发起 |
+| `POST /api/v1/admin/flows/import/preview`、`POST /api/v1/admin/flows/import`、`GET /api/v1/admin/flows/{code}/export` | 本地 JWT + 当前流程管理范围 | 预检本服务兼容 BPMN、仅导入草稿及导出指定来源 |
 | `GET /api/v1/admin/reports/overview`、`/flows`、`/nodes`、`/people` | 本地 JWT + 当前组织管理员或直接负责部门的负责人 | 查询管理范围内的匿名报表指标；保密流程仅计入匿名数量 |
 
 四条报表 GET 共用查询参数：必填 `fromUtc`、`untilUtc` 是带零时区偏移的 ISO 8601 时间，区间为左闭右开；可选 `flowCode`、`clientAppCode`、`departmentId` 均为单个非空文本。重复参数、非 UTC 时间或空区间返回 `VALIDATION_FAILED`。组织管理员可查全部或指定发起部门；当前在职部门负责人只能查其直接负责的部门，可不传 `departmentId` 合并所有直属部门，不自动包含下级；越权返回 `FORBIDDEN`。嵌入会话和普通人员均返回 `FORBIDDEN`，未登录返回 `UNAUTHORIZED`。部门按审批发起时快照筛选。
@@ -94,6 +97,14 @@
 `GET/PUT /api/v1/admin/notifications/daily-digest` 的响应为 `{localTime}`；PUT 请求同形，`localTime` 为严格 `HH:mm` 或 `null`（停发）。未配置时不安排每日汇总。组织管理员权限在请求时重新验证，嵌入人员会话不能修改全局时间。
 
 管理后台三个 GET 接口都要求本地密码会话和当前有效的 `organization-admin` 角色；匿名请求返回 401，普通人员或嵌入会话返回 403。`/admin/session` 返回 `{personId}`；`/admin/org/directory` 返回 `{departments, people}`，部门含 `id, code, name, parentName, managerName, source`，人员含 `id, employeeNumber, name, departments, position, isActive`，不包含联系方式和账号凭据；`/admin/apps` 返回应用数组，每项只含 `code, name, allowedFlowCodes, isEnabled`，不返回 API Key 摘要、签名密钥密文或出站地址。管理页使用访问令牌请求这些接口；组织 CSV/XLSX 导入继续使用既有 `/admin/org/import`，预检通过后正式导入时服务端再次校验并留变更记录。
+
+流程管理接口只接受本地登录 JWT。当前在职组织管理员可管全部；有 `flow-admin` 角色的在职人员只能管理自己直接加入的 `ownerDepartmentId` 所属流程，不继承上级部门范围；无所属部门的流程仅组织管理员可管。`administratorId` 是运行期指定管理员的内部人员 ID，本身不授予管理权。列表仅返回可管理流程摘要，单个无权流程详情返回 404。`POST /admin/flows` 接受 `{definition, group?, ownerDepartmentId?, administratorId?, reason}`，创建草稿修订 1；`GET /admin/flows/{code}` 返回草稿及 `{code, name, group, ownerDepartmentId, administratorId, isEnabled, draftRevision, publishedVersionId, publishedVersion}`。`PUT /admin/flows/{code}/draft` 接受同样的定义和元数据，另带 `expectedRevision`，成功时修订号递增，过期返回 409。流程编码创建后不能更改；指定管理员必须是当前在职的内部人员 ID。管理写入的 `reason` 为 2–200 字。
+
+`POST /admin/flows/{code}/publish` 接受 `{expectedRevision, expectedPublishedVersionId, reason}`；首次发布的当前版本 ID 为 null。服务端先按完整定义编译并报告发布错误，再在同一事务内核对草稿修订及当前发布指针、追加不可变版本并切换当前版本。任一并发前提过期返回 409，已在途审批单仍使用原锁定版本。审计只存操作人、原因、修订/版本号及定义 SHA-256，不存完整流程 JSON。旧数据的流程管理员 ID 对账由服务器本机 `reconcile-flow-admins` 命令执行：先预览唯一修正与零/多匹配事项，输入 `APPLY` 后再次核对预览指纹并提交；没有自动启动修正。
+
+`POST /admin/flows/import/preview` 接受 `{bpmnXml}`，仅解析本服务兼容文件并返回 `{code, name, nodeCount, hasCodeConflict, canOverwrite, existingDraftRevision, publishIssues}`，不写库；发布检查问题不阻止保存草稿。`POST /admin/flows/import` 接受 `{bpmnXml, targetCode?, expectedRevision?, group?, ownerDepartmentId?, administratorId?, reason}`。省略目标时只允许新建，同编码返回 409；覆盖时 `targetCode` 须与文件编码相同且必须填写 `expectedRevision`，过期返回 409，未填写的管理元数据沿用目标当前值。导入只保存草稿，不自动发布。`GET /admin/flows/{code}/export?source=draft` 导出当前草稿；`source=published&version=N` 导出指定不可变发布版。两种来源都再次核对当前流程管理范围；无权流程返回 404。文件内容为 `application/xml`，固定下载名 `approval-flow.bpmn`。
+
+`PUT /admin/flows/{code}/enabled` 接受 `{expectedEnabled, enabled, reason}`，实际状态改变时按旧启用状态条件更新并留管理员、原因和当前发布版本号；重复提交相同状态不增加审计。停用后开放流程目录与新发起接口不再返回该流程，已在途实例仍按原 `FlowVersion` 快照运行；恢复启用不改发布版本指针。
 
 `GET /admin/apps/{code}/embed-origins` 返回 `{code, origins}`；`PUT` 接受 `{origins, reason}` 并返回相同结构。`origins` 是完整来源列表，最多 20 项、每项不超过 256 字符，去重后保存；仅允许 HTTPS 网站来源，开发时 HTTP 只允许 `localhost` 或 `127.0.0.1`，不得包含路径、查询、片段、用户信息或通配符。`reason` 须为 2 至 200 字符。保存使用旧值条件更新防止覆盖并发修改，在同一事务记录管理员、原因和不含密钥的前后来源快照。
 

@@ -65,6 +65,7 @@ internal static class Program
         await DatabaseProviderChecks.RunAsync(Check);
         await PersistenceChecks.RunAsync(Check);
         await ReportingChecks.RunAsync(Check);
+        ReportingMetricsChecks.Run(Check);
         await EventAnchorChecks.RunAsync(Check);
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);

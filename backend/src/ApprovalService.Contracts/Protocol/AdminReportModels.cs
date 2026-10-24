@@ -1,6 +1,22 @@
 namespace ApprovalService.Contracts.Protocol;
 
 /// <summary>
+/// 报表工作簿的固定文件约定。
+/// </summary>
+public static class AdminReportExportFile
+{
+    /// <summary>
+    /// Excel Open XML 文件的媒体类型。
+    /// </summary>
+    public const string ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /// <summary>
+    /// 下载文件名。
+    /// </summary>
+    public const string FileName = "approval-report.xlsx";
+}
+
+/// <summary>
 /// 四条报表 GET 请求共用的查询参数名称。
 /// </summary>
 public static class AdminReportQueryNames

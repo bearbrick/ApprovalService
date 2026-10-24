@@ -29,12 +29,25 @@ public sealed class FlowEntity
     }
 
     /// <summary>
-    /// 流程管理员的工号。
+    /// 流程管理员的内部人员 ID。
     /// </summary>
     public string? AdministratorId
     {
         get; set;
     }
+
+    /// <summary>
+    /// 流程直接所属部门的内部 ID；未指定时仅组织管理员可管理。
+    /// </summary>
+    public string? OwnerDepartmentId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 是否允许新的审批单发起；不影响已在途审批单。
+    /// </summary>
+    public bool IsEnabled { get; set; } = true;
 
     /// <summary>
     /// 当前发布版本 ID；尚未发布时为空。
@@ -98,6 +111,38 @@ public sealed class FlowVersionEntity
     /// 发布时间。
     /// </summary>
     public DateTimeOffset PublishedAt
+    {
+        get; set;
+    }
+}
+
+/// <summary>
+/// 存量流程管理员标识无法唯一确认时的人工处理事项。
+/// </summary>
+public sealed class FlowAdministratorIdentityIssueEntity
+{
+    /// <summary>
+    /// 存在歧义的流程 ID。
+    /// </summary>
+    public string FlowId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 原管理员标识。
+    /// </summary>
+    public string LegacyValue { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 同时按内部 ID 与工号匹配到的不同人员数。
+    /// </summary>
+    public int MatchCount
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 首次发现时间。
+    /// </summary>
+    public DateTimeOffset DetectedAt
     {
         get; set;
     }

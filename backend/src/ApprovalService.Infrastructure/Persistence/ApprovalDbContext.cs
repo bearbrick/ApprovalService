@@ -44,6 +44,21 @@ public class ApprovalDbContext : DbContext
     public DbSet<FlowVersionEntity> FlowVersions => Set<FlowVersionEntity>();
 
     /// <summary>
+    /// 每流程唯一可编辑草稿。
+    /// </summary>
+    public DbSet<FlowDraftEntity> FlowDrafts => Set<FlowDraftEntity>();
+
+    /// <summary>
+    /// 流程管理操作的只追加审计元数据。
+    /// </summary>
+    public DbSet<FlowManagementAuditEntity> FlowManagementAudits => Set<FlowManagementAuditEntity>();
+
+    /// <summary>
+    /// 无法自动确定内部人员 ID 的存量流程管理员标识。
+    /// </summary>
+    public DbSet<FlowAdministratorIdentityIssueEntity> FlowAdministratorIdentityIssues => Set<FlowAdministratorIdentityIssueEntity>();
+
+    /// <summary>
     /// 审批单状态。
     /// </summary>
     public DbSet<InstanceEntity> Instances => Set<InstanceEntity>();
@@ -198,10 +213,11 @@ public class ApprovalDbContext : DbContext
     private void GuardImmutableRecords()
     {
         if (ChangeTracker.Entries<FlowVersionEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<FlowManagementAuditEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<InstanceParticipantEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
-            throw new InvalidOperationException("已发布版本、操作记录和历史参与人只能追加，不能修改或删除。");
+            throw new InvalidOperationException("已发布版本、管理审计、操作记录和历史参与人只能追加，不能修改或删除。");
         }
     }
 
@@ -277,6 +293,8 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired();
             entity.Property(item => item.Group).HasMaxLength(128);
             entity.Property(item => item.AdministratorId).HasMaxLength(128);
+            entity.Property(item => item.OwnerDepartmentId).HasMaxLength(64);
+            entity.Property(item => item.IsEnabled).HasDefaultValue(true).IsRequired();
             entity.Property(item => item.PublishedVersionId).HasMaxLength(64);
             entity.HasIndex(item => item.Code).IsUnique();
         });
@@ -291,6 +309,38 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.GraphJson).IsRequired();
             entity.HasOne<FlowEntity>().WithMany().HasForeignKey(item => item.FlowId).OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => new { item.FlowId, item.Version }).IsUnique();
+        });
+
+        modelBuilder.Entity<FlowDraftEntity>(entity =>
+        {
+            entity.ToTable("FlowDrafts");
+            entity.HasKey(item => item.FlowId);
+            entity.Property(item => item.FlowId).HasMaxLength(64);
+            entity.Property(item => item.DefinitionJson).IsRequired();
+            entity.Property(item => item.Revision).IsConcurrencyToken();
+            entity.HasOne<FlowEntity>().WithOne().HasForeignKey<FlowDraftEntity>(item => item.FlowId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FlowManagementAuditEntity>(entity =>
+        {
+            entity.ToTable("FlowManagementAudits");
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasMaxLength(64);
+            entity.Property(item => item.FlowId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.ActorId).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.Action).HasMaxLength(48).IsRequired();
+            entity.Property(item => item.Reason).HasMaxLength(200).IsRequired();
+            entity.Property(item => item.ContentSha256).HasMaxLength(64);
+            entity.HasIndex(item => new { item.FlowId, item.OccurredAt });
+        });
+
+        modelBuilder.Entity<FlowAdministratorIdentityIssueEntity>(entity =>
+        {
+            entity.ToTable("FlowAdministratorIdentityIssues");
+            entity.HasKey(item => item.FlowId);
+            entity.Property(item => item.FlowId).HasMaxLength(64);
+            entity.Property(item => item.LegacyValue).HasMaxLength(128).IsRequired();
         });
 
         modelBuilder.Entity<InstanceEntity>(entity =>

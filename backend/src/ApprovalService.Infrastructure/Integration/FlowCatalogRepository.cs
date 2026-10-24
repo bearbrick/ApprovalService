@@ -16,6 +16,7 @@ public sealed class FlowCatalogRepository(IDbContextFactory<ApprovalDbContext> f
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         return await (from flow in db.Flows.AsNoTracking()
                       join version in db.FlowVersions.AsNoTracking() on flow.PublishedVersionId equals version.Id
+                      where flow.IsEnabled
                       orderby flow.Code
                       select new PublishedFlowSnapshot { Flow = flow, Version = version }).ToListAsync(cancellationToken);
     }
@@ -26,7 +27,7 @@ public sealed class FlowCatalogRepository(IDbContextFactory<ApprovalDbContext> f
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         return await (from flow in db.Flows.AsNoTracking()
                       join version in db.FlowVersions.AsNoTracking() on flow.PublishedVersionId equals version.Id
-                      where flow.Code == code
+                      where flow.Code == code && flow.IsEnabled
                       select new PublishedFlowSnapshot { Flow = flow, Version = version })
             .SingleOrDefaultAsync(cancellationToken);
     }

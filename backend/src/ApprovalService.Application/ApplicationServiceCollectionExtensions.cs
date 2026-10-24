@@ -52,6 +52,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
         services.AddScoped<ReportingQueryAppService>();
+        services.AddScoped<FlowManagementAppService>();
         return services;
     }
 }

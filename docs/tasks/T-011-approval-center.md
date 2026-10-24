@@ -25,6 +25,7 @@
 - `frontend/src/api/center-embed.ts`：内嵌令牌片段消费、登记来源读取及最小完成通知
 - `frontend/src/api/center-files.ts`：用当前 JWT 经现有权限下载接口读取附件内容，不向链接或 URL 写入令牌
 - `frontend/src/api/center-layout.ts`、`frontend/src/api/center-fields.ts`：裁剪后的排版与字段展示映射，保持中心适配器单文件低于规模上限
+- `frontend/src/api/center-settings.ts`、`frontend/src/pages/center/CenterSettings.vue`：按已稳定的 T-014 个人通知偏好接口提供真实 JWT 设置页
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
@@ -60,6 +61,8 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 完成本人通知偏好设置页，对接 T-014 已定的八类提醒 GET/PUT：每次进入从服务端读取，使用当前人员 JWT，页面不传人员 ID，邮件与站内开关只在服务端确认后更新；失败保持原勾选且不显示“已保存”，401 退出登录，每日待办汇总仅显示邮件。前端测试使用模拟 HTTP 验证持久值重新读取、失败响应和 JWT；全量 `verify.ps1` 通过：后端 739、调用端 50、前端 134 项，生产构建通过，本机发起 P95 9.5 ms。T-014 后端不在此工作树，须在集成分支做真实接口联机验证。常用意见、个人签名和委托无已定持久协议，本段未伪造保存；审批单读标记、字段内容搜索和原单嵌入仍待完成。外置 Chrome 未连接，未做视觉复核。
+- 2026-10-24 · Codex · 本段预登记：T-014 已在稳定集成分支提供 `GET/PUT /api/v1/notifications/preferences` 的本人 JWT 与持久化协议；本 T-011 分支尚未合入 T-014，当前只新增前端 `center-settings.ts`、`CenterSettings.vue`，修改 `CenterPage.vue`、`center.css`、`center-checks.ts` 和 `frontend/README.md`，集成时以 T-014 服务端为准复验。失败时不显示“已保存”，重新进入设置页向服务端读取。常用意见、签名与委托尚无已定接口，不做虚假保存。
 - 2026-10-24 · Codex · 完成锁定发布版本的自定义详情排版切片：应用投影只从已授权的字段定义选排版项和明细列宽，整个隐藏分组不返回，部分隐藏分组使用通用标题；可见金额由纯引擎转换人民币大写。前端按分组、列数与跨度绘制并在旧响应缺少排版时回退自动排版，字段展示映射拆入 `center-fields.ts` 以保持文件规模。真实 SQLite/JWT/HTTP 场景检查覆盖旧版本分组、隐藏字段及宽度不泄露；前端检查覆盖已授权映射。全量 `verify.ps1` 通过：后端 739、调用端 50、前端 133 项，生产构建通过；先前并发执行的本机发起 P95 336.6 ms 性能波动在独占复验时为 7.9 ms。原单嵌入安全地址、审批单读标记、字段内容搜索和个人设置仍待完成。外置 Chrome 扩展在本轮环境未连接，未做页面视觉复核。
 - 2026-10-24 · Codex · 本段预登记：将发布版本的自定义详情排版按当前登录人员已授权字段裁剪后，通过共享 `Contracts/Protocol/CenterResponses.cs` 向后兼容返回；前端 `center-adapter.ts`、`center-layout.ts`、`center-fields.ts`、`model/center.ts`、`CenterDetailView.vue` 和样式据此排版，抽出字段展示逻辑以满足单文件规模上限。同步共享 `docs/contracts.md`、`docs/architecture.md`，以及前后端 README 与设计书 §center；在 CenterQueryChecks 与 center-checks 增加隐藏字段、分组顺序和列宽检查。不改业务系统嵌入原单模式，它仍需独立安全地址协议。
 - 2026-10-24 · Codex · 接手续写已暂存的附件展示切片，修正增加明细附件后摘要展示列检查的预期。中心详情只从已授权字段取附件 ID，逐项核对文件仍关联当前审批单；前端以人员 JWT 经文件权限接口读取，图片/PDF 可预览，其他文件下载，令牌不放 URL。全量 `verify.ps1` 通过：后端 738、调用端 50、前端 131 项，构建通过。任务仍进行中；未完成读标记、字段内容搜索、完整自定义详情排版及个人设置，未合并主分支或推送。

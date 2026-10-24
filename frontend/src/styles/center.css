@@ -88,7 +88,19 @@
 .center-action-bar textarea { resize: vertical; }
 .center-action-bar > button[type='submit'] { justify-self: start; }
 .center-detail-empty { margin-bottom: 18px; }
-.center-settings-empty { margin-bottom: 18px; }
+.center-settings { max-width: 760px; margin-bottom: 12px; }
+.center-settings > header { padding: 19px 22px; border-bottom: 1px solid var(--line); }
+.center-settings > header h2 { font-size: 17px; }
+.center-settings > header p, .center-settings-note { margin-top: 7px; color: var(--muted); font-size: 12px; }
+.center-settings-table { padding: 8px 22px 18px; }
+.center-settings-heading, .center-settings-row { display: grid; grid-template-columns: minmax(150px, 1fr) 100px 100px; align-items: center; gap: 12px; min-height: 43px; border-bottom: 1px solid var(--line); }
+.center-settings-heading { color: var(--muted); font-size: 12px; }
+.center-settings-row { font-size: 13px; }
+.center-settings-row input { width: 16px; height: 16px; accent-color: var(--blue); }
+.center-settings-muted { color: var(--muted); font-size: 12px; }
+.center-settings-feedback { display: flex; gap: 12px; align-items: center; padding: 20px; }
+.center-settings-saved, .center-settings > p[role='alert'] { margin: 12px 22px 18px; }
+.center-settings-saved { color: #168051; }
 .center-login { max-width: 440px; margin: 38px auto; padding: 28px; }
 .center-login h2 { font-size: 20px; }
 .center-login > p { margin: 12px 0 20px; color: var(--muted); }
@@ -99,3 +111,4 @@
 @media (max-width: 1100px) { .center-detail-grid { grid-template-columns: minmax(0, 1fr); } .center-detail-side { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 700px) { .center-page-body { padding-inline: 12px; } .center-tabs a { padding-inline: 12px; } .center-data-grid, .center-layout-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .center-layout-grid > div { grid-column: auto !important; } .center-detail-side { grid-template-columns: 1fr; } .center-action-bar { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .center-filterbar { padding-inline: 12px; } .center-date { flex: 1 1 100%; justify-content: space-between; } .center-date input { flex: 1; } .center-data-grid, .center-layout-grid { grid-template-columns: 1fr; } .center-layout-grid > div { grid-column: 1 / -1 !important; } }
+@media (max-width: 480px) { .center-settings-heading, .center-settings-row { grid-template-columns: minmax(105px, 1fr) 64px 74px; gap: 5px; } .center-settings-table { padding-inline: 14px; } }

@@ -151,6 +151,11 @@ public static class ApiRoutes
     public const string AdminFlows = OpenApiPrefix + "/admin/flows";
 
     /// <summary>
+    /// 当前本地流程管理员可选择的直属流程所属部门。
+    /// </summary>
+    public const string AdminFlowDepartments = AdminFlows + "/departments";
+
+    /// <summary>
     /// 按稳定编码读取流程和当前草稿。
     /// </summary>
     public const string AdminFlowByCode = AdminFlows + "/{code}";

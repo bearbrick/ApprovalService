@@ -42,6 +42,8 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 已增加 `GET /api/v1/admin/flows/departments`：仓储在同一只读事务内核对本地 JWT、在职状态和组织/流程管理员角色，只投影当前可选的现存部门 ID/名称；组织管理员可见全部，部门流程管理员仅见本人直接加入的部门，不沿父子树扩权，无直属部门返回空列表。共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`docs/contracts.md`、`docs/architecture.md` 已同步；复用既有应用/仓储登记，无数据库模型或前端改动。6 个真实 HTTP/SQLite 场景覆盖匿名、普通人员、组织管理员、直属部门、上级不继承和空范围。全量 `verify.ps1` 通过（后端 1016、调用端 93、前端 169 项；发起/审批/待办 P95 13.9/12.6/3.4ms）。本任务仍需前端流程管理页，由另一任务接线。
+
 - 2026-10-24 · Codex · 已新增流程版本历史和旧版复制到草稿：共享路由、应用及基础设施登记已接通，`GET /admin/flows/{code}/versions` 只返回倒序版本摘要；`POST /admin/flows/{code}/versions/{version}/restore` 同事务核对管理范围、草稿修订及当前发布版，复制旧定义到新草稿修订，审计来源版本与 SHA，当前发布指针及旧版本均不变。存量无草稿流程支持从修订零恢复，后续需显式发布为新版本。无需三库迁移；真实 HTTP/SQLite 增加 9 个场景，`verify.ps1` 全量通过（后端 794、调用端 50、前端 124 项；发起/审批/待办 P95 9.7/8.6/2.1ms）。后续仍需前端流程管理页面，本任务保持进行中。
 
 - 2026-10-24 · Codex · 已接通兼容 BPMN 导入导出：本地流程管理员可只读预检文件和发布问题，同编码默认冲突，显式目标与预期草稿修订才可覆盖，导入仅保存草稿；导出须选择草稿或指定不可变发布版本，并在同一事务复核直接部门管理范围。共享 `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs` 增加路由、应用和基础设施登记文件增加用例/仓储、检查程序登记 17 个真实 HTTP/SQLite 场景，`docs/contracts.md`、`docs/architecture.md` 和后端 README 已同步。无需新增依赖或数据库字段。全量 `verify.ps1` 通过（后端 785、调用端 50、前端 124 项；发起/审批/待办 P95 27.7/21.0/7.0ms）。后续仍需版本历史与旧版恢复、前端流程管理页面，本任务保持进行中。

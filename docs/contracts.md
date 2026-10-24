@@ -76,6 +76,7 @@
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
 | `GET/POST /api/v1/admin/flows`、`GET /api/v1/admin/flows/{code}`、`PUT /api/v1/admin/flows/{code}/draft`、`POST /api/v1/admin/flows/{code}/publish` | 本地 JWT + 当前流程管理范围 | 读取、创建、按修订保存草稿及原子发布新版本 |
+| `GET /api/v1/admin/flows/departments` | 本地 JWT + 当前流程管理范围 | 只列出当前管理员可设置为流程直接归属的现存部门 |
 | `PUT /api/v1/admin/flows/{code}/enabled` | 本地 JWT + 当前流程管理范围 | 按预期启用状态停用或恢复新审批单发起 |
 | `POST /api/v1/admin/flows/import/preview`、`POST /api/v1/admin/flows/import`、`GET /api/v1/admin/flows/{code}/export` | 本地 JWT + 当前流程管理范围 | 预检本服务兼容 BPMN、仅导入草稿及导出指定来源 |
 | `GET /api/v1/admin/flows/{code}/versions`、`POST /api/v1/admin/flows/{code}/versions/{version}/restore` | 本地 JWT + 当前流程管理范围 | 读取不可变版本摘要、复制指定旧版为新草稿修订 |
@@ -100,6 +101,8 @@
 管理后台三个 GET 接口都要求本地密码会话和当前有效的 `organization-admin` 角色；匿名请求返回 401，普通人员或嵌入会话返回 403。`/admin/session` 返回 `{personId}`；`/admin/org/directory` 返回 `{departments, people}`，部门含 `id, code, name, parentName, managerName, source`，人员含 `id, employeeNumber, name, departments, position, isActive`，不包含联系方式和账号凭据；`/admin/apps` 返回应用数组，每项只含 `code, name, allowedFlowCodes, isEnabled`，不返回 API Key 摘要、签名密钥密文或出站地址。管理页使用访问令牌请求这些接口；组织 CSV/XLSX 导入继续使用既有 `/admin/org/import`，预检通过后正式导入时服务端再次校验并留变更记录。
 
 流程管理接口只接受本地登录 JWT。当前在职组织管理员可管全部；有 `flow-admin` 角色的在职人员只能管理自己直接加入的 `ownerDepartmentId` 所属流程，不继承上级部门范围；无所属部门的流程仅组织管理员可管。`administratorId` 是运行期指定管理员的内部人员 ID，本身不授予管理权。列表仅返回可管理流程摘要，单个无权流程详情返回 404。`POST /admin/flows` 接受 `{definition, group?, ownerDepartmentId?, administratorId?, reason}`，创建草稿修订 1；`GET /admin/flows/{code}` 返回草稿及 `{code, name, group, ownerDepartmentId, administratorId, isEnabled, draftRevision, publishedVersionId, publishedVersion}`。`PUT /admin/flows/{code}/draft` 接受同样的定义和元数据，另带 `expectedRevision`，成功时修订号递增，过期返回 409。流程编码创建后不能更改；指定管理员必须是当前在职的内部人员 ID。管理写入的 `reason` 为 2–200 字。
+
+`GET /admin/flows/departments` 只返回 `{id,name}[]`：组织管理员取得全部现存部门，部门流程管理员只取得当前本人直接加入且仍存在的部门；不会沿部门树扩展，也不返回部门编码、负责人、人员或其他部门细节。当前部门实体没有停用状态，只有现存记录可作为归属选项。无直属部门的流程管理员返回空数组，无在职本地管理权限返回 403；接口仍在流程创建和保存时按最新组织关系再次验权。
 
 `POST /admin/flows/{code}/publish` 接受 `{expectedRevision, expectedPublishedVersionId, reason}`；首次发布的当前版本 ID 为 null。服务端先按完整定义编译并报告发布错误，再在同一事务内核对草稿修订及当前发布指针、追加不可变版本并切换当前版本。任一并发前提过期返回 409，已在途审批单仍使用原锁定版本。审计只存操作人、原因、修订/版本号及定义 SHA-256，不存完整流程 JSON。旧数据的流程管理员 ID 对账由服务器本机 `reconcile-flow-admins` 命令执行：先预览唯一修正与零/多匹配事项，输入 `APPLY` 后再次核对预览指纹并提交；没有自动启动修正。
 

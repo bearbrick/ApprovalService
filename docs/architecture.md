@@ -70,6 +70,8 @@
 
 流程管理身份基础由 `Domain/Runtime/FlowManagementAccessRules` 统一判断：在职本地组织管理员可管理全部流程；`flow-admin` 角色只覆盖人员直接加入的流程所属部门，无归属流程只由组织管理员管理。`Flow.AdministratorId` 继续作为运行期指定管理员的内部人员 ID，不单独授予编辑权限。`Infrastructure/Administration/FlowAdministratorIdentityReconciler` 由服务器本机一次性命令调用，先预览再按指纹提交；唯一匹配才改写，零匹配和多匹配存入待人工处理表，服务启动时不自动执行。`Administration/FlowManagementAppService` 负责草稿基础校验、发布编译和当前范围筛选，`Persistence/FlowManagementRepository` 在同一事务内复核角色/直属部门与草稿修订、追加不可变版本和安全审计。`Administration/FlowTransferAppService` 通过引擎的 BPMN 编解码器检查本服务兼容文件，预检只读、导入只写草稿；`Persistence/FlowTransferRepository` 在同一事务内复核管理范围后读取草稿或不可变发布版供导出。`Administration/FlowVersionAppService` 展示版本摘要并协调旧版恢复；`Persistence/FlowVersionRepository` 在同一事务里核对权限、草稿与发布指针后只复制旧定义为新草稿修订。
 
+流程所属部门选项复用 `FlowManagementAppService` 与 `FlowManagementRepository`：仓储在同一可串行化读取事务中核对本地会话、在职状态和当前管理角色，再只投影可选现存部门的 ID/名称。组织管理员可取全部；部门流程管理员只取当前人员的直接部门关系，不沿组织树扩展。
+
 ## 引擎核心
 
 引擎核心是单独的项目，只有流程执行的逻辑，预览流程、测试模式直接在内存里跑同一个引擎（设计书第 9 节）。

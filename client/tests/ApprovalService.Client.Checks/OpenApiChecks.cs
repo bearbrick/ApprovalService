@@ -29,7 +29,8 @@ internal static class OpenApiChecks
         {
             var body = request.Content == null ? null : await request.Content.ReadAsStringAsync();
             seen.Add(new SeenRequest(request.Method.Method, request.RequestUri?.PathAndQuery ?? "", body,
-                request.Headers.TryGetValues("X-Api-Key", out var keys) ? keys.SingleOrDefault() : null));
+                request.Headers.TryGetValues("X-Api-Key", out var keys) ? keys.SingleOrDefault() : null,
+                request.Headers.TryGetValues("X-Request-Id", out var ids) ? ids.SingleOrDefault() : null));
             var path = request.RequestUri?.AbsolutePath ?? "";
             var method = request.Method.Method;
             if (path.EndsWith("/api/v1/flows", StringComparison.Ordinal))
@@ -88,6 +89,19 @@ internal static class OpenApiChecks
             && start is { Method: "POST", Path: "/prefix/api/v1/instances", ApiKey: "test-key" }
             && JsonField(start.Body, "businessKey") == "ORDER/1" && JsonField(start.Body, "initiator") == "staff-1"
             && JsonField(start.Body, "data", "amount") == "42" && JsonField(start.Body, "selectedAssignees", "approval", 0) == "staff-2");
+
+        var stableStart = await client.StartAsync(new StartApprovalRequest
+        {
+            FlowCode = "FLOW_A",
+            BusinessKey = "ORDER/2",
+            Title = "稳定请求审批",
+            Initiator = "staff-1",
+            Data = new Dictionary<string, object?> { ["amount"] = 5 },
+        }, "stable-start-1");
+        var stableRequest = seen.Last();
+        check("稳定请求 ID 发起重载透传原 ID 和业务单号", stableStart.Id == "instance-1"
+            && stableRequest is { Method: "POST", Path: "/prefix/api/v1/instances", RequestId: "stable-start-1" }
+            && JsonField(stableRequest.Body, "businessKey") == "ORDER/2");
 
         var instance = await client.GetInstanceAsync("instance/1");
         check("按 ID 查询审批单时编码路径并解析任务、事件和时间", instance.Tasks.Count == 1
@@ -201,7 +215,8 @@ internal static class OpenApiChecks
     /// <param name="Path">相对路径与查询。</param>
     /// <param name="Body">请求正文。</param>
     /// <param name="ApiKey">API Key。</param>
-    private sealed record SeenRequest(string Method, string Path, string? Body, string? ApiKey);
+    /// <param name="RequestId">调用方稳定请求 ID。</param>
+    private sealed record SeenRequest(string Method, string Path, string? Body, string? ApiKey, string? RequestId);
 
     /// <summary>
     /// 不发网络的 HTTP 处理器。

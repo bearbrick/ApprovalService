@@ -195,6 +195,11 @@ public sealed class CenterDetailResponse
     public IReadOnlyList<CenterFieldDefinitionResponse> FieldDefinitions { get; set; } = [];
 
     /// <summary>
+    /// 按当前人员可见字段裁剪后的锁定版本详情排版。
+    /// </summary>
+    public CenterDetailLayoutResponse Layout { get; set; } = new();
+
+    /// <summary>
     /// 当前人员可见的附件字段所引用、且仍关联本审批单的文件元数据。
     /// </summary>
     public IReadOnlyList<CenterAttachmentResponse> Attachments { get; set; } = [];

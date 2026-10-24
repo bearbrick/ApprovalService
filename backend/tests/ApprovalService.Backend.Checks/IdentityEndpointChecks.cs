@@ -284,6 +284,39 @@ internal static class IdentityEndpointChecks
                     response.IsSuccessStatusCode && exchange.IsSuccessStatusCode &&
                     access.StatusCode == HttpStatusCode.Forbidden);
             }
+
+            using (var wrongPassword = await PostAuthorizedAsync(client, ApiRoutes.IdentityChangePassword,
+                new IdentityChangePasswordRequest("wrong-password", "final-admin-password"),
+                localAfterBinding.AccessToken))
+            using (var stillAuthorized = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate,
+                localAfterBinding.AccessToken))
+            {
+                check("管理员日常改密时错误当前密码不改变已有会话",
+                    wrongPassword.StatusCode == HttpStatusCode.Unauthorized &&
+                    stillAuthorized.StatusCode == HttpStatusCode.OK);
+            }
+
+            using (var change = await PostAuthorizedAsync(client, ApiRoutes.IdentityChangePassword,
+                new IdentityChangePasswordRequest("new-password-123", "final-admin-password"),
+                localAfterBinding.AccessToken))
+            using (var oldAccess = await GetAuthorizedAsync(client, ApiRoutes.OrgTemplate,
+                localAfterBinding.AccessToken))
+            using (var oldRefresh = await client.PostAsJsonAsync(ApiRoutes.IdentityRefresh,
+                new IdentityRefreshRequest(localAfterBinding.RefreshToken)))
+            {
+                check("管理员日常改密作废旧访问与刷新令牌",
+                    change.StatusCode == HttpStatusCode.NoContent &&
+                    oldAccess.StatusCode == HttpStatusCode.Unauthorized &&
+                    oldRefresh.StatusCode == HttpStatusCode.Unauthorized);
+            }
+
+            var renewedAdmin = await LoginAsync(client, "final-admin-password");
+            using (var authorized = await GetAuthorizedAsync(client, ApiRoutes.AdminSession,
+                renewedAdmin.AccessToken))
+            {
+                check("管理员日常改密后可用新密码重新进入管理后台",
+                    !renewedAdmin.MustChangePassword && authorized.StatusCode == HttpStatusCode.OK);
+            }
         }
         finally
         {

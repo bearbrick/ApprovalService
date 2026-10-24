@@ -123,7 +123,7 @@ export const ADMIN_VIEWS: readonly AdminView[] = [
   { key: 'system/info', section: 'system', tab: 'info', title: '系统信息', description: '查看单位名称、品牌和服务配置；敏感配置不回显。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'value', title: '当前值' }], actions: ['保存信息'] },
   { key: 'system/notifications', section: 'system', tab: 'notifications', title: '消息配置', description: '查看邮件与站内消息的渠道状态和提醒规则。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '发送测试邮件'] },
   { key: 'system/storage', section: 'system', tab: 'storage', title: '附件与字体', description: '查看附件存储和已授权字体配置，不回显连接密钥。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '上传字体'] },
-  { key: 'system/security', section: 'system', tab: 'security', title: '安全设置', description: '查看登录方式、令牌与可信嵌入来源。', kind: 'settings', columns: [{ key: 'name', title: '设置项' }, { key: 'status', title: '状态' }], actions: ['保存安全设置'] },
+  { key: 'system/security', section: 'system', tab: 'security', title: '安全设置', description: '修改当前本地管理员密码；登录方式和令牌策略配置待正式管理接口接入。', kind: 'settings', columns: [], actions: [] },
   { key: 'system/logs', section: 'system', tab: 'logs', title: '操作日志', description: '只读查看最近的组织、接入应用及回调重发变更。', kind: 'audit', columns: [{ key: 'time', title: '时间' }, { key: 'actor', title: '操作人' }, { key: 'action', title: '操作' }, { key: 'target', title: '对象' }, { key: 'reason', title: '原因' }], actions: [] },
 ]
 

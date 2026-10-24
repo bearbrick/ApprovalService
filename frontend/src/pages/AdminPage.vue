@@ -18,6 +18,7 @@ import AdminBindingEditor from './admin/AdminBindingEditor.vue'
 import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
 import AdminClientAppEditor from './admin/AdminClientAppEditor.vue'
 import AdminAccountEditor from './admin/AdminAccountEditor.vue'
+import AdminPasswordEditor from './admin/AdminPasswordEditor.vue'
 import '../styles/admin.css'
 
 /**
@@ -195,6 +196,22 @@ function signOut(): void {
 }
 
 /**
+ * 改密后换用已通过管理员权限核对的新会话。
+ * @param updated 新密码签发的本地管理员会话。
+ */
+function passwordChanged(updated: AdminSession): void {
+  session.value = updated
+}
+
+/**
+ * 改密后重新登录失败时清除旧会话并提示使用新密码。
+ */
+function passwordSessionLost(): void {
+  signOut()
+  signInError.value = '密码可能已修改，请用新密码重新登录。'
+}
+
+/**
  * 只读取当前管理员有权查看的页面数据。
  * @returns 查询完成。
  */
@@ -235,7 +252,7 @@ onBeforeUnmount(() => request?.abort())
     <nav v-if="tabs.length" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
     <template v-if="view">
       <AdminOverview v-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
-      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminTable :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
+      <template v-else><div v-if="view.section === 'flows'" class="admin-flow-link">画布与流程规则在<a href="#/designer">流程设计</a>中维护；发布与版本管理待管理权限接口接入。</div><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>
     <p class="workspace-note">审批服务只管理流程与审批记录；业务单据由来源业务系统维护。</p>

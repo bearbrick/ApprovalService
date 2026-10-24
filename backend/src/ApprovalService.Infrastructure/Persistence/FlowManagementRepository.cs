@@ -398,7 +398,7 @@ public sealed class FlowManagementRepository(IDbContextFactory<ApprovalDbContext
     /// <param name="flow">流程元数据。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>流程读取快照。</returns>
-    private static async Task<ManagedFlowSnapshot> SnapshotAsync(ApprovalDbContext db, FlowEntity flow,
+    internal static async Task<ManagedFlowSnapshot> SnapshotAsync(ApprovalDbContext db, FlowEntity flow,
         CancellationToken cancellationToken)
     {
         var published = flow.PublishedVersionId is not null

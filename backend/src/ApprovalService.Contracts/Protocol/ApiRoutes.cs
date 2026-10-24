@@ -186,6 +186,16 @@ public static class ApiRoutes
     public const string AdminFlowExport = AdminFlowByCode + "/export";
 
     /// <summary>
+    /// 读取不可变发布版本摘要。
+    /// </summary>
+    public const string AdminFlowVersions = AdminFlowByCode + "/versions";
+
+    /// <summary>
+    /// 把旧发布版内容复制为待重新发布的草稿。
+    /// </summary>
+    public const string AdminFlowVersionRestore = AdminFlowVersions + "/{version}/restore";
+
+    /// <summary>
     /// 工号密码登录。
     /// </summary>
     public const string IdentityLogin = OpenApiPrefix + "/identity/login";

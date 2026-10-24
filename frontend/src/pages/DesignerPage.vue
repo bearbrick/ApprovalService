@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ApiError } from '../api/http.ts'
+import { adminSession, canReadAdminSection } from '../api/admin-session.ts'
+import { createManagedFlow, getManagedFlow, publishManagedFlow, saveManagedFlow } from '../api/admin-flow-management.ts'
+import type { ManagedFlow } from '../api/admin-flow-management.ts'
 import type { AppRoute } from '../model/routes.ts'
 import type { FlowDefinition, FlowEdge, FlowNode } from '../model/flow.ts'
 import { DESIGNER_TABS, TAB_TITLES } from '../model/navigation.ts'
@@ -26,9 +30,9 @@ const props = defineProps<{
   route: AppRoute
 }>()
 /**
- * 草稿存储前缀；仅表示当前浏览器里的设计草稿。
+ * 当前管理会话是否有流程管理权限。
  */
-const draftPrefix = 'approval-service-designer:'
+const authorized = computed(() => canReadAdminSection(adminSession(), 'flows'))
 /**
  * 当前流程编码，无参数时展示模板入口。
  */
@@ -41,6 +45,38 @@ const activeTab = computed(() => props.route.tab || 'design')
  * 当前流程草稿和唯一撤销历史。
  */
 const history = ref(createDraftHistory(loadDraft(flowCode.value)))
+/**
+ * 最近一次从服务读取或保存的流程及其并发修订。
+ */
+const managed = ref<ManagedFlow | null>(null)
+/**
+ * 服务端确认编码不存在后才允许创建。
+ */
+const canCreate = ref(false)
+/**
+ * 是否正在读取或写入服务端草稿。
+ */
+const busy = ref(false)
+/**
+ * 当前页面是否有未保存的编辑。
+ */
+const dirty = ref(false)
+/**
+ * 保存或发布时必须填写的审计原因。
+ */
+const reason = ref('')
+/**
+ * 新流程的分组；已有流程沿用服务端元数据。
+ */
+const group = ref('')
+/**
+ * 新流程的直属所属部门内部 ID。
+ */
+const ownerDepartmentId = ref('')
+/**
+ * 当前请求序号，防止切换流程后的旧响应覆盖新草稿。
+ */
+let loadSequence = 0
 /**
  * 当前流程草稿，供画布、属性面板和其他页签读取。
  */
@@ -68,7 +104,7 @@ const issues = ref<DesignerIssue[]>([])
 /**
  * 草稿状态说明。
  */
-const status = ref('本地草稿，尚未发布')
+const status = ref('正在读取服务端草稿')
 /**
  * 当前流程可复制的 SDK 接入示例。
  */
@@ -90,14 +126,17 @@ watch(canvasEditor, editor => {
 
 watch(flowCode, code => {
   // 工作台组件在流程间复用；切换流程时不能沿用上一份草稿和撤销栈。
-  if (draft.value.code === code) return
   history.value = createDraftHistory(loadDraft(code))
+  managed.value = null
+  canCreate.value = false
+  dirty.value = false
   issues.value = []
   pendingFocusId.value = null
-  status.value = '本地草稿，尚未发布'
+  status.value = code ? '正在读取服务端草稿' : '请选择流程模板'
   integrationSnippet.value = ''
   snippetStatus.value = ''
-})
+  if (code && authorized.value) void loadManaged(code)
+}, { immediate: true })
 
 watch(() => draft.value.code, () => {
   // 改动编码后旧示例不能再复制，必须按当前草稿重新生成。
@@ -106,20 +145,40 @@ watch(() => draft.value.code, () => {
 })
 
 /**
- * 读取浏览器中的草稿；不存在时使用正式示例的本地副本。
+ * 创建内置模板的独立副本；实际已有草稿随后从服务端读取。
  * @param code 流程编码。
  * @returns 可编辑的流程草稿。
  */
 function loadDraft(code: string): FlowDefinition {
   if (!code) return createEmptyFlow()
-  try {
-    const saved = localStorage.getItem(draftPrefix + code)
-    if (saved) return normalizeSample(JSON.parse(saved) as FlowDefinition)
-  } catch {
-    // 草稿无效或浏览器禁用存储时，继续使用只读示例的独立副本。
-  }
   const template = flowTemplates.find(item => item.code === code)
   return template ? copyFlow(template.definition) : createEmptyFlow(code)
+}
+/**
+ * 读取服务端草稿与发布指针；404 表示尚未创建的新流程。
+ * @param code 当前路由里的流程编码。
+ * @returns 读取操作完成。
+ */
+async function loadManaged(code: string): Promise<void> {
+  const sequence = ++loadSequence
+  busy.value = true
+  try {
+    const result = await getManagedFlow(code)
+    if (sequence !== loadSequence) return
+    managed.value = result
+    canCreate.value = false
+    group.value = result.group ?? ''
+    ownerDepartmentId.value = result.ownerDepartmentId ?? ''
+    if (result.draft) history.value = createDraftHistory(normalizeSample(result.draft))
+    status.value = result.draft ? `服务端草稿修订 ${result.draftRevision}` : '尚无可编辑草稿'
+  } catch (cause) {
+    if (sequence !== loadSequence) return
+    canCreate.value = cause instanceof ApiError && cause.status === 404
+    status.value = cause instanceof ApiError && cause.status === 404
+      ? '新流程尚未保存到服务端' : cause instanceof Error ? cause.message : '读取服务端草稿失败'
+  } finally {
+    if (sequence === loadSequence) busy.value = false
+  }
 }
 /**
  * 应用一次编辑，并在编辑完成时记录可撤销历史。
@@ -130,6 +189,7 @@ function updateDraft(next: FlowDefinition, remember = true): void {
   history.value = remember ? editDraft(history.value, next) : previewDraft(history.value, next)
   issues.value = []
   status.value = '草稿已修改，尚未保存'
+  dirty.value = true
 }
 /**
  * 画布连续拖动只在提交时记录一次修改前的完整草稿。
@@ -137,6 +197,7 @@ function updateDraft(next: FlowDefinition, remember = true): void {
  */
 function commitCanvasEdit(previous: FlowDefinition): void {
   history.value = commitDraft(history.value, previous)
+  dirty.value = true
 }
 /**
  * 撤销最近一次编辑。
@@ -146,6 +207,7 @@ function undo(): void {
   history.value = undoDraft(history.value)
   issues.value = []
   status.value = '已撤销，尚未保存'
+  dirty.value = true
 }
 /**
  * 重做最近一次撤销。
@@ -155,17 +217,60 @@ function redo(): void {
   history.value = redoDraft(history.value)
   issues.value = []
   status.value = '已重做，尚未保存'
+  dirty.value = true
 }
 /**
- * 保存当前浏览器内的设计草稿。
+ * 创建或按修订号保存服务端草稿，冲突时保留本页编辑。
+ * @returns 保存操作完成。
  */
-function saveDraft(): void {
+async function saveDraft(): Promise<void> {
+  if (busy.value) return
+  if (!managed.value && !canCreate.value) { status.value = '请先确认服务端流程状态'; return }
+  if (reason.value.trim().length < 2) { status.value = '请填写至少两个字的审计原因'; return }
+  if (managed.value && draft.value.code !== managed.value.code) {
+    status.value = '已有流程的编码不能修改；请恢复原编码后保存'
+    return
+  }
+  busy.value = true
   try {
-    localStorage.setItem(draftPrefix + draft.value.code, JSON.stringify(draft.value))
-    status.value = '已保存为本地草稿，尚未发布'
-    if (draft.value.code !== flowCode.value) location.hash = `#/designer/${encodeURIComponent(draft.value.code)}/${activeTab.value}`
-  } catch {
-    status.value = '浏览器无法保存草稿；可继续编辑，但离开页面可能丢失改动'
+    const metadata = { group: group.value.trim() || null,
+      ownerDepartmentId: ownerDepartmentId.value.trim() || null,
+      administratorId: managed.value?.administratorId ?? null }
+    const result = managed.value
+      ? await saveManagedFlow(managed.value.code, managed.value.draftRevision, draft.value, metadata, reason.value.trim())
+      : await createManagedFlow(draft.value, metadata, reason.value.trim())
+    managed.value = result
+    dirty.value = false
+    reason.value = ''
+    status.value = `草稿已保存，修订 ${result.draftRevision}`
+    if (result.code !== flowCode.value) location.hash = `#/designer/${encodeURIComponent(result.code)}/${activeTab.value}`
+  } catch (cause) {
+    status.value = cause instanceof Error ? cause.message : '保存草稿失败；当前编辑仍保留在页面'
+  } finally {
+    busy.value = false
+  }
+}
+/**
+ * 经本地预检后以双重 CAS 发布不可变版本。
+ * @returns 发布操作完成。
+ */
+async function publish(): Promise<void> {
+  if (!managed.value || busy.value) { status.value = '请先保存草稿'; return }
+  if (dirty.value) { status.value = '请先保存当前修改，再发布'; return }
+  issues.value = checkPublication(draft.value)
+  if (issues.value.length) { status.value = `发现 ${issues.value.length} 个发布问题`; return }
+  if (reason.value.trim().length < 2) { status.value = '请填写至少两个字的发布原因'; return }
+  busy.value = true
+  try {
+    const result = await publishManagedFlow(managed.value.code, managed.value.draftRevision,
+      managed.value.publishedVersionId, reason.value.trim())
+    managed.value = result
+    reason.value = ''
+    status.value = `已发布版本 ${result.publishedVersion}`
+  } catch (cause) {
+    status.value = cause instanceof Error ? cause.message : '发布失败；请检查服务端返回的问题'
+  } finally {
+    busy.value = false
   }
 }
 /**
@@ -261,8 +366,10 @@ async function copyIntegrationSnippet(): Promise<void> {
 
 <template>
   <div class="designer-page">
-    <header class="designer-header"><div class="designer-breadcrumb"><a href="#/designer">流程设计</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount" @click="redo">重做</button><button type="button" class="btn" @click="saveDraft">保存草稿</button><button type="button" class="btn btn-primary" @click="validatePublish">发布预检</button></div></div></header>
+    <header class="designer-header"><div class="designer-breadcrumb"><a href="#/admin/flows">流程管理</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode && authorized" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button><button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button></div></div><div v-if="flowCode && authorized" class="publish-form"><label>审计原因<input v-model="reason" maxlength="200" placeholder="保存或发布时必填" /></label><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" /></label><label>所属部门 ID<input v-model="ownerDepartmentId" placeholder="部门流程管理员必填" /></label></div></header>
     <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>十类常用审批模板可直接复制修改；采购、报销和质量异常示例还展示金额分支、会签、返工与并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
+    <div v-else-if="!authorized" class="designer-content"><p role="alert">请先以流程管理员身份登录，再读取或编辑流程。</p><a href="#/admin/flows">前往流程管理登录</a></div>
+    <div v-else-if="busy && !managed && !canCreate" class="designer-content" role="status">正在读取服务端流程…</div>
     <template v-else>
       <nav class="designer-tabs" aria-label="流程配置"><a v-for="tab in DESIGNER_TABS" :key="tab" :href="`#/designer/${encodeURIComponent(flowCode)}/${tab}`" :aria-current="activeTab === tab ? 'page' : undefined">{{ TAB_TITLES[tab] }}</a></nav>
       <div v-if="issues.length" class="publish-issues" role="alert"><div class="publish-issues-head"><strong>发布预检发现 {{ issues.length }} 个问题</strong><span>点击可定位到节点或连线</span></div><ul><li v-for="(issue, index) in issues" :key="index"><button v-if="issue.elementId && canvasIssues.includes(issue)" type="button" @click="focusIssue(issue)">{{ issue.message }} <small>定位：{{ issue.elementId }}</small></button><span v-else>{{ issue.message }}</span></li></ul></div>
@@ -277,9 +384,9 @@ async function copyIntegrationSnippet(): Promise<void> {
       </div>
       <div v-else-if="activeTab === 'fields'" class="designer-content"><ApprovalFieldsEditor :data="draft.data" @update:data="updateDraft({ ...draft, data: $event })" /></div>
       <div v-else-if="activeTab === 'layout'" class="designer-content"><ApprovalDetailLayoutEditor :data="draft.data" :detail-layout="draft.detailLayout" @update:detail-layout="updateDraft({ ...draft, detailLayout: $event })" /></div>
-      <div v-else-if="activeTab === 'rules'" class="designer-content"><FlowRulesPanel :definition="draft" @update="updateDraft" /><section class="template-switch"><h2>应用内置模板</h2><p>使用模板会替换当前流程草稿；已保存的本地草稿可通过刷新恢复。</p><button v-for="template in flowTemplates" :key="template.code" type="button" class="btn" @click="loadTemplate(template.code)">{{ template.name }}</button></section><section class="template-switch integration-example"><h2>业务系统 C# 接入示例</h2><p>发布流程并授权接入应用后使用；服务地址和 API Key 从业务系统环境变量读取，代码不包含明文密钥。</p><button type="button" class="btn" @click="showIntegrationSnippet">生成 SDK 发起代码</button><button v-if="integrationSnippet" type="button" class="btn" @click="copyIntegrationSnippet">复制代码</button><p v-if="snippetStatus" role="status">{{ snippetStatus }}</p><pre v-if="integrationSnippet"><code>{{ integrationSnippet }}</code></pre></section></div>
+      <div v-else-if="activeTab === 'rules'" class="designer-content"><FlowRulesPanel :definition="draft" @update="updateDraft" /><section class="template-switch"><h2>应用内置模板</h2><p>使用模板会替换当前页面的流程草稿；保存前仍可通过刷新恢复服务端草稿。</p><button v-for="template in flowTemplates" :key="template.code" type="button" class="btn" @click="loadTemplate(template.code)">{{ template.name }}</button></section><section class="template-switch integration-example"><h2>业务系统 C# 接入示例</h2><p>发布流程并授权接入应用后使用；服务地址和 API Key 从业务系统环境变量读取，代码不包含明文密钥。</p><button type="button" class="btn" @click="showIntegrationSnippet">生成 SDK 发起代码</button><button v-if="integrationSnippet" type="button" class="btn" @click="copyIntegrationSnippet">复制代码</button><p v-if="snippetStatus" role="status">{{ snippetStatus }}</p><pre v-if="integrationSnippet"><code>{{ integrationSnippet }}</code></pre></section></div>
       <div v-else-if="activeTab === 'print'" class="designer-content"><FlowPrintPanel :settings="draft.printSettings" :data="draft.data" @update="updateDraft({ ...draft, printSettings: $event })" /></div>
-      <div v-else class="designer-content"><section class="version-panel"><span>版本管理</span><h2>当前仅有本地草稿</h2><p>正式版本由服务端发布并保存。管理接口接入后，此处会展示不可修改的发布版本和差异。</p><button type="button" class="btn btn-primary" @click="validatePublish">先检查当前草稿</button></section></div>
+      <div v-else class="designer-content"><section class="version-panel"><span>版本管理</span><h2>{{ managed?.publishedVersion ? `当前发布版本 ${managed.publishedVersion}` : '尚未发布' }}</h2><p>草稿修订 {{ managed?.draftRevision ?? '尚未创建' }}。正式版本不可修改；保存草稿后可在上方发布新版本。</p><button type="button" class="btn btn-primary" @click="validatePublish">检查当前草稿</button></section></div>
     </template>
   </div>
 </template>
@@ -294,6 +401,9 @@ async function copyIntegrationSnippet(): Promise<void> {
 .designer-title p { color: var(--muted); }
 .eyebrow { color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
 .designer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.publish-form { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
+.publish-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
+.publish-form input { min-width: 190px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; }
 .designer-tabs { display: flex; gap: 24px; padding: 0 28px; min-height: 54px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; }
 .designer-tabs a { display: inline-flex; align-items: center; white-space: nowrap; border-bottom: 3px solid transparent; color: var(--muted); }
 .designer-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 700; }

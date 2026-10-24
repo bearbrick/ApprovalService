@@ -22,6 +22,11 @@ internal static class FlowManagementEndpoints
         app.MapGet(ApiRoutes.AdminFlows, (HttpContext http, FlowManagementAppService service,
             CancellationToken cancellationToken) =>
             service.ListAsync(PersonId(http), IsLocal(http), cancellationToken)).RequireAuthorization();
+        // 静态部门路径先于按流程编码的详情路径登记，避免把 departments 作为编码处理。
+        app.MapGet(ApiRoutes.AdminFlowDepartments, (HttpContext http, FlowManagementAppService service,
+            CancellationToken cancellationToken) =>
+            service.ListDepartmentsAsync(PersonId(http), IsLocal(http), cancellationToken))
+            .RequireAuthorization();
         app.MapPost(ApiRoutes.AdminFlows, (HttpContext http, AdminFlowCreateRequest request,
             FlowManagementAppService service, CancellationToken cancellationToken) =>
             service.CreateAsync(request, PersonId(http), IsLocal(http), cancellationToken)).RequireAuthorization();

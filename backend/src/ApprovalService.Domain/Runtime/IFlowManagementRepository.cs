@@ -14,6 +14,16 @@ public interface IFlowManagementRepository
     Task<FlowManagerIdentity> LoadIdentityAsync(string personId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 在同一组织读取事务内核对身份并只返回可归属的现存部门。
+    /// </summary>
+    /// <param name="actorId">已认证内部人员 ID。</param>
+    /// <param name="isLocalSession">是否本地账号会话。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>按名称和 ID 排序的安全部门选项。</returns>
+    Task<IReadOnlyList<FlowDepartmentOption>> ListManageableDepartmentsAsync(string actorId,
+        bool isLocalSession, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 列出流程与草稿修订，供应用层按当前身份筛选。
     /// </summary>
     /// <param name="cancellationToken">取消标记。</param>

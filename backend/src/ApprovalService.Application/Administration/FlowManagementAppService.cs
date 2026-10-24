@@ -18,6 +18,25 @@ namespace ApprovalService.Application.Administration;
 public sealed class FlowManagementAppService(IFlowManagementRepository repository, TimeProvider timeProvider)
 {
     /// <summary>
+    /// 列出当前本地流程管理员可设置为流程归属的现存部门。
+    /// </summary>
+    /// <param name="actorId">已认证内部人员 ID。</param>
+    /// <param name="isLocalSession">是否本地账号会话。</param>
+    /// <param name="cancellationToken">取消标记。</param>
+    /// <returns>只含 ID 和名称的安全选项。</returns>
+    public async Task<IReadOnlyList<AdminFlowDepartmentOption>> ListDepartmentsAsync(string actorId,
+        bool isLocalSession, CancellationToken cancellationToken = default)
+    {
+        var options = await repository.ListManageableDepartmentsAsync(actorId, isLocalSession,
+            cancellationToken);
+        return options.Select(item => new AdminFlowDepartmentOption
+        {
+            Id = item.Id,
+            Name = item.Name,
+        }).ToArray();
+    }
+
+    /// <summary>
     /// 只列出当前人员可管理的流程摘要。
     /// </summary>
     /// <param name="actorId">已认证的内部人员 ID。</param>

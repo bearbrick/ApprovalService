@@ -65,6 +65,11 @@ public sealed class ReportingFacts
     /// 任务创建事件事实；没有事件的任务不会生成虚构的起点。
     /// </summary>
     public IReadOnlyList<ReportingTaskCreatedFact> TaskCreatedEvents { get; set; } = [];
+
+    /// <summary>
+    /// 依次审批等待结束时的任务激活事件；初始即待办的任务没有此事件。
+    /// </summary>
+    public IReadOnlyList<ReportingTaskActivatedFact> TaskActivatedEvents { get; set; } = [];
 }
 
 /// <summary>
@@ -204,6 +209,25 @@ public sealed class ReportingTaskCreatedFact
     {
         get; set;
     }
+
+    /// <summary>
+    /// 事件发生时间。
+    /// </summary>
+    public DateTimeOffset OccurredAt
+    {
+        get; set;
+    }
+}
+
+/// <summary>
+/// 只追加日志中的任务激活事件事实，用于排除依次审批的排队时间。
+/// </summary>
+public sealed class ReportingTaskActivatedFact
+{
+    /// <summary>
+    /// 任务 ID。
+    /// </summary>
+    public string TaskId { get; set; } = string.Empty;
 
     /// <summary>
     /// 事件发生时间。

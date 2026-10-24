@@ -173,6 +173,22 @@ internal static class ReportingChecks
                             OccurredAt = nextDay.AddMinutes(1),
                         }, ApprovalJson.Options),
                         OccurredAt = nextDay.AddMinutes(1),
+                    },
+                    new OperationEventEntity
+                    {
+                        Id = "activated-a2",
+                        InstanceId = "a",
+                        Sequence = 3,
+                        Kind = "taskActivated",
+                        PayloadJson = JsonSerializer.Serialize(new EngineEvent
+                        {
+                            Id = "activated-a2",
+                            Kind = "taskActivated",
+                            TaskId = "task-a2",
+                            NodeId = "finance",
+                            OccurredAt = nextDay.AddMinutes(2),
+                        }, ApprovalJson.Options),
+                        OccurredAt = nextDay.AddMinutes(2),
                     });
                 await db.SaveChangesAsync();
             }
@@ -198,6 +214,9 @@ internal static class ReportingChecks
                 selected.TaskCreatedEvents.Count == 1 && selected.TaskCreatedEvents[0].TaskId == "task-a1" &&
                 selected.TaskCreatedEvents[0].OccurredAt == start.AddMinutes(3) &&
                 !selected.TaskCreatedEvents.Any(item => item.TaskId == "task-a2"));
+            check("依次审批的真实任务激活时间单独读取",
+                selected.TaskActivatedEvents.Count == 1 && selected.TaskActivatedEvents[0].TaskId == "task-a2" &&
+                selected.TaskActivatedEvents[0].OccurredAt == nextDay.AddMinutes(2));
             var serialized = JsonSerializer.Serialize(selected);
             check("统计事实不携带审批标题或业务数据", !serialized.Contains("保密标题", StringComparison.Ordinal) &&
                 !serialized.Contains("业务数据", StringComparison.Ordinal));

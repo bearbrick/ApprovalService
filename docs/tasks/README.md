@@ -68,6 +68,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-051](T-051-sdk-completion.md) | SDK 开放接口补全切片 | 调用端 | M4 | T-006 稳定快照 | client/src、client/tests |
 | [T-052](T-052-embed-host.md) | 同源审批中心页面托管与内嵌来源限制 | 后端 + 契约镜像 | M3 | T-011 稳定快照 | Api/Hosting、Center、Application/Integration |
 | [T-053](T-053-service-node-properties.md) | BPMN 画布的审批服务属性 | 前端 | M1 | T-046 已验证稳定快照 | src/designer/workbench、src/designer/canvas |
+| [T-054](T-054-reporting-metrics.md) | 真实统计事实的指标计算 | 后端 | M5 | T-049 已验证稳定快照 | Domain/Reporting、backend/tests |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

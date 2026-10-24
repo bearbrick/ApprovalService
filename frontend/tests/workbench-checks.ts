@@ -6,6 +6,7 @@ import { checkPublication } from '../src/designer/workbench/publication-check.ts
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../src/designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../src/designer/workbench/workbench-model.ts'
 import { simpleFlowTemplates } from '../src/designer/workbench/simple-templates.ts'
+import { buildCSharpStartSnippet } from '../src/designer/workbench/integration-snippet.ts'
 import { actionsForNodeType, defaultActionsForNodeType } from '../src/designer/workbench/rule-options.ts'
 
 /**
@@ -39,6 +40,16 @@ export function runWorkbenchChecks(check: (name: string, value: boolean) => void
   check('七类新增通用模板只定义审批图与业务字段，不带业务单据或外部动作', simpleFlowTemplates.length === 7 && simpleFlowTemplates.every(template =>
     template.definition.data.fields.length > 0 && template.definition.canvas.nodes.length > 0 &&
     template.definition.canvas.nodes.every(node => node.type !== 'automatic')))
+  const snippet = buildCSharpStartSnippet('CONTRACT_REVIEW')
+  check('接入示例使用 SDK 和已授权流程，API Key 从环境读取不写进源码', snippet.includes('new ApprovalServiceClient(') &&
+    snippet.includes('FlowCode = "CONTRACT_REVIEW"') && snippet.includes('GetEnvironmentVariable("APPROVAL_API_KEY")') &&
+    snippet.includes('StartApprovalRequest') && snippet.includes('requestId).ConfigureAwait(false)'))
+  const escapedCode = 'X"\\\n'
+  check('流程编码经字符串字面量转义，无法注入 C# 语句', buildCSharpStartSnippet(escapedCode).includes(String.raw`FlowCode = "X\"\\\u000a"`))
+  check('中文和 Unicode 行分隔符在 C# 源码里按码元转义', buildCSharpStartSnippet('中文\u2028').includes(String.raw`FlowCode = "\u4e2d\u6587\u2028"`))
+  let invalidSnippetRejected = false
+  try { buildCSharpStartSnippet('   ') } catch { invalidSnippetRejected = true }
+  check('接入示例拒绝空流程编码', invalidSnippetRejected)
   check('正式示例可展开明细字段并显示节点字段权限', flowTemplates.every(template => fieldReferences(template.definition.data).length >= template.definition.data.fields.length))
   check('办理节点默认只能提交且不能配置同意或拒绝', defaultActionsForNodeType('handling').join(',') === 'submit' && !actionsForNodeType('handling').includes('approve') && !actionsForNodeType('handling').includes('reject'))
   check('抄送节点不提供审批操作', defaultActionsForNodeType('cc').length === 0 && actionsForNodeType('cc').length === 0)

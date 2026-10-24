@@ -235,7 +235,19 @@ onBeforeUnmount(closePreview)
           <nav class="center-detail-tabs" aria-label="审批详情页签"><button type="button" :aria-current="tab === 'data' ? 'page' : undefined" @click="tab = 'data'">审批数据</button><button type="button" :aria-current="tab === 'progress' ? 'page' : undefined" @click="tab = 'progress'">流程进度</button></nav>
           <section v-if="tab === 'data'" class="center-card">
             <h3>业务数据快照</h3>
-            <dl v-if="detail.fields.length" class="center-data-grid">
+            <div v-if="detail.fields.length && detail.layout.mode === 'custom'" class="center-layout-groups">
+              <section v-for="(group, groupIndex) in detail.layout.groups" :key="groupIndex" class="center-layout-group">
+                <h4>{{ group.title || `分组 ${groupIndex + 1}` }}</h4>
+                <dl class="center-layout-grid" :style="{ '--detail-columns': group.columns }">
+                  <div v-for="entry in group.items" :key="entry.field.key" :style="{ gridColumn: `span ${entry.columnSpan}` }">
+                    <dt>{{ entry.field.label }}</dt>
+                    <dd v-if="entry.field.rows && entry.field.columns?.length" class="center-data-table-scroll"><table class="center-data-table"><thead><tr><th v-for="column in entry.field.columns" :key="column.key" :style="{ width: entry.detailColumnWidths[column.key] ? `${entry.detailColumnWidths[column.key]}%` : undefined }">{{ column.label }}</th></tr></thead><tbody><tr v-for="(row, rowIndex) in entry.field.rows" :key="rowIndex"><td v-for="(cell, columnIndex) in row" :key="columnIndex">{{ cell }}</td></tr></tbody></table></dd>
+                    <dd v-else>{{ entry.field.value }}<span v-if="entry.moneyUppercase" class="center-money-uppercase">{{ entry.moneyUppercase }}</span></dd>
+                  </div>
+                </dl>
+              </section>
+            </div>
+            <dl v-else-if="detail.fields.length" class="center-data-grid">
               <div v-for="field in detail.fields" :key="field.key" :class="{ 'center-data-table-field': field.rows }">
                 <dt>{{ field.label }}</dt>
                 <dd v-if="field.rows && field.columns?.length" class="center-data-table-scroll">

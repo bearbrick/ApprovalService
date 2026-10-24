@@ -6,6 +6,7 @@ using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
+using ApprovalService.Engine.Expressions;
 
 namespace ApprovalService.Application.Center;
 
@@ -79,11 +80,13 @@ internal static class CenterProjection
         var definition = Read<FlowDefinition>(record.FlowVersion.DefinitionJson);
         var state = Read<EngineState>(record.Instance.StateJson);
         var visibleData = VisibleData(record, personId, definition.Data.Fields.Select(field => field.Key), definition.Data.Fields, graph);
+        var visibleFields = DescribeFields(visibleData, definition.Data.Fields);
         return new CenterDetailResponse
         {
             Instance = Summary(record, personId),
             Data = visibleData,
-            FieldDefinitions = DescribeFields(visibleData, definition.Data.Fields),
+            FieldDefinitions = visibleFields,
+            Layout = DescribeLayout(definition.DetailLayout, visibleData, visibleFields),
             Tasks = record.Tasks.Select(task => new CenterTaskResponse
             {
                 Id = task.Id,
@@ -100,6 +103,71 @@ internal static class CenterProjection
             // 暂存意见仍是个人草稿，不能进入其他参与者可见的时间线。
             Events = record.Events.Where(item => item.Kind != "opinionDraftSaved").Select(ProjectEvent).ToArray(),
             ActiveNodeIds = state.Tokens.Select(token => token.NodeId).Distinct(StringComparer.Ordinal).ToArray(),
+        };
+    }
+
+    /// <summary>
+    /// 仅投影授权后实际返回的字段和明细列，防止排版结构泄露隐藏定义。
+    /// </summary>
+    /// <param name="layout">本审批单锁定发布版本的排版。</param>
+    /// <param name="visible">已按人员权限裁剪的数据。</param>
+    /// <param name="fields">仅包含可见字段的展示定义。</param>
+    /// <returns>安全详情排版；无可用自定义分组时回退自动排版。</returns>
+    private static CenterDetailLayoutResponse DescribeLayout(FlowDetailLayout layout, JsonElement visible,
+        IReadOnlyList<CenterFieldDefinitionResponse> fields)
+    {
+        if (layout.Mode != "custom")
+        {
+            return new CenterDetailLayoutResponse();
+        }
+        var known = fields.ToDictionary(field => field.Key, StringComparer.Ordinal);
+        var groups = new List<CenterLayoutGroupResponse>();
+        foreach (var group in layout.Groups)
+        {
+            var columns = Math.Clamp(group.Columns, 1, 3);
+            var items = new List<CenterLayoutItemResponse>();
+            foreach (var source in group.Items)
+            {
+                if (!known.TryGetValue(source.FieldKey, out var field))
+                {
+                    continue;
+                }
+                var children = field.Children.Select(child => child.Key).ToHashSet(StringComparer.Ordinal);
+                var widths = source.DetailColumnWidths.Where(pair => children.Contains(pair.Key) && pair.Value is > 0 and <= 100)
+                    .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+                string? uppercase = null;
+                if (source.ShowMoneyUppercase && field.Type == FlowFieldTypes.Money &&
+                    visible.TryGetProperty(field.Key, out var value) && value.ValueKind == JsonValueKind.Number &&
+                    value.TryGetDecimal(out var amount) &&
+                    amount is > -10000000000000000m and < 10000000000000000m)
+                {
+                    uppercase = RmbUppercase.Format(amount);
+                }
+                items.Add(new CenterLayoutItemResponse
+                {
+                    FieldKey = field.Key,
+                    ColumnSpan = Math.Clamp(source.ColumnSpan, 1, columns),
+                    DetailColumnWidths = widths,
+                    MoneyUppercase = uppercase,
+                });
+            }
+            if (items.Count == 0)
+            {
+                continue;
+            }
+            // 分组中存在隐藏字段时不返回原标题，避免标题暗示隐藏字段内容。
+            var allVisible = items.Count == group.Items.Count;
+            groups.Add(new CenterLayoutGroupResponse
+            {
+                Title = allVisible ? group.Title : "审批数据",
+                Columns = columns,
+                Items = items,
+            });
+        }
+        return groups.Count == 0 ? new CenterDetailLayoutResponse() : new CenterDetailLayoutResponse
+        {
+            Mode = "custom",
+            Groups = groups,
         };
     }
 

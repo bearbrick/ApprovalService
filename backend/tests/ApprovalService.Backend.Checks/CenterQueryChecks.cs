@@ -96,6 +96,17 @@ internal static class CenterQueryChecks
                 !detailText.Contains("保密字段", StringComparison.Ordinal) &&
                 !detailText.Contains("成本", StringComparison.Ordinal) &&
                 !detailText.Contains("隐藏票据", StringComparison.Ordinal));
+            check("自定义详情排版保留锁定版本顺序且只包含已授权字段和明细列",
+                detail?.Layout.Mode == "custom" && detail.Layout.Groups.Count == 2 &&
+                detail.Layout.Groups[0].Title == "基本信息" && detail.Layout.Groups[0].Columns == 2 &&
+                detail.Layout.Groups[0].Items.Select(item => item.FieldKey).SequenceEqual(["amount", "receipt"]) &&
+                detail.Layout.Groups[0].Items[0].MoneyUppercase == "壹拾贰元整" &&
+                detail.Layout.Groups[1].Title == "审批数据" && detail.Layout.Groups[1].Items is [{ FieldKey: "lines", ColumnSpan: 3 }] &&
+                detail.Layout.Groups[1].Items[0].DetailColumnWidths.Keys.Order()
+                    .SequenceEqual(new[] { "qty", "receipt" }.Order()) &&
+                !detailText.Contains("隐藏成本分组", StringComparison.Ordinal) &&
+                !detailText.Contains("全部隐藏", StringComparison.Ordinal) &&
+                !detailText.Contains("新版分组", StringComparison.Ordinal));
             check("中心附件只列可见字段所引用且仍关联本审批单的文件",
                 detail is not null && detail.Attachments.Select(file => file.Id)
                     .SequenceEqual(["file-visible", "file-row"]) &&

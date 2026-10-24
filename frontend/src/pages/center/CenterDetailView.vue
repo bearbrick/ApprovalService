@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import UiEmptyState from '../../components/ui/UiEmptyState.vue'
 import UiIcon from '../../components/ui/UiIcon.vue'
+import UiDialog from '../../components/ui/UiDialog.vue'
+import { fetchCenterFile } from '../../api/center-files.ts'
 import { visibleCenterActions } from '../../model/center.ts'
-import type { CenterAction, CenterDetail } from '../../model/center.ts'
+import type { CenterAction, CenterAttachment, CenterDetail } from '../../model/center.ts'
 import type { CenterActionInput } from '../../api/center-adapter.ts'
 
 /**
@@ -100,6 +102,26 @@ const fieldValuesText = ref('')
  */
 const localError = ref('')
 /**
+ * 当前正在读取的附件 ID。
+ */
+const busyFileId = ref('')
+/**
+ * 附件读取失败说明。
+ */
+const fileError = ref('')
+/**
+ * 只在当前对话框生命周期内有效的图片或 PDF 地址。
+ */
+const previewUrl = ref('')
+/**
+ * 预览文件的显示名称。
+ */
+const previewName = ref('')
+/**
+ * 预览文件的实际媒体类型。
+ */
+const previewType = ref('')
+/**
  * 操作名称与设计书术语保持一致。
  */
 const actionLabels: Readonly<Record<CenterAction, string>> = {
@@ -145,6 +167,62 @@ function submitAction(): void {
 }
 
 watch(() => props.requestedId, () => { tab.value = 'data' })
+
+/**
+ * 图片和 PDF 可以在当前页面预览，其他格式只允许下载。
+ * @param file 服务端已授权的文件元数据。
+ * @returns 是否支持预览。
+ */
+function canPreview(file: CenterAttachment): boolean {
+  return file.contentType.startsWith('image/') || file.contentType === 'application/pdf'
+}
+
+/**
+ * 关闭预览并释放暂存的浏览器对象地址。
+ */
+function closePreview(): void {
+  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
+  previewUrl.value = ''
+  previewName.value = ''
+  previewType.value = ''
+}
+
+/**
+ * 从现有验权接口取内容，预览或触发用户所选下载。
+ * @param file 当前详情已授权的附件。
+ * @param preview 是否希望在线预览。
+ * @returns 文件操作完成。
+ */
+async function openFile(file: CenterAttachment, preview: boolean): Promise<void> {
+  if (busyFileId.value) return
+  busyFileId.value = file.id
+  fileError.value = ''
+  try {
+    const blob = await fetchCenterFile(file.id)
+    const url = URL.createObjectURL(blob)
+    if (preview && canPreview(file)) {
+      closePreview()
+      previewName.value = file.fileName
+      previewType.value = file.contentType
+      previewUrl.value = url
+    } else {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = file.fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      // 下载启动后留一小段时间给浏览器读取对象地址。
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+  } catch (cause) {
+    fileError.value = cause instanceof Error ? cause.message : '附件读取失败，请稍后重试。'
+  } finally {
+    busyFileId.value = ''
+  }
+}
+
+onBeforeUnmount(closePreview)
 </script>
 
 <template>
@@ -171,7 +249,10 @@ watch(() => props.requestedId, () => { tab.value = 'data' })
             <p v-else class="center-blank">这张审批单没有可展示的业务字段。</p>
           </section>
           <section v-if="tab === 'progress'" class="center-card"><h3>审批经过</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }} <span v-if="entry.occurredAt">· {{ entry.occurredAt }}</span></p><blockquote v-if="entry.opinion">{{ entry.opinion }}</blockquote></li></ol><p v-else class="center-blank">暂无可展示的流程记录。</p></section>
-          <section class="center-card"><h3>附件</h3><ul v-if="detail.attachmentNames.length" class="center-attachment-list"><li v-for="name in detail.attachmentNames" :key="name">{{ name }} <span>下载与预览待权限接口接入</span></li></ul><p v-else class="center-blank">当前详情接口尚未返回附件信息。</p></section>
+          <section class="center-card"><h3>附件</h3>
+            <ul v-if="detail.attachments.length" class="center-attachment-list"><li v-for="file in detail.attachments" :key="file.id"><span class="center-attachment-name">{{ file.fileName }}</span><span>{{ Math.max(1, Math.ceil(file.size / 1024)) }} KB</span><button v-if="canPreview(file)" class="btn" type="button" :disabled="Boolean(busyFileId)" @click="openFile(file, true)">预览</button><button class="btn" type="button" :disabled="Boolean(busyFileId)" @click="openFile(file, false)">下载</button></li></ul>
+            <p v-else class="center-blank">没有可展示的附件。</p><p v-if="fileError" role="alert" class="center-login-error">{{ fileError }}</p>
+          </section>
         </div>
         <aside class="center-detail-side"><section class="center-card"><h3>审批信息</h3><dl class="center-meta"><dt>发起人</dt><dd>{{ detail.item.initiatorName }}</dd><dt>来源系统</dt><dd>{{ detail.item.sourceName }}</dd><dt>业务单号</dt><dd>{{ detail.item.businessKey }}</dd><dt>当前环节</dt><dd>{{ detail.item.currentStep }}</dd><dt>发起时间</dt><dd>{{ detail.item.createdAt }}</dd></dl></section><section class="center-card"><h3>当前进度</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }}</p></li></ol><p v-else class="center-blank">暂无进度记录。</p></section></aside>
       </div>
@@ -183,4 +264,9 @@ watch(() => props.requestedId, () => { tab.value = 'data' })
       <UiEmptyState v-else title="读取审批详情失败" :description="error" icon="alert"><template #action><button class="btn btn-primary" type="button" @click="emit('reload')">重试</button></template></UiEmptyState>
     </div>
   </div>
+  <UiDialog :open="Boolean(previewUrl)" :title="previewName || '附件预览'" class="center-preview-dialog" @close="closePreview">
+    <img v-if="previewType.startsWith('image/')" :src="previewUrl" :alt="previewName" class="center-preview-image">
+    <iframe v-else-if="previewType === 'application/pdf'" :src="previewUrl" :title="previewName" class="center-preview-pdf"></iframe>
+    <template #footer><button class="btn" type="button" @click="closePreview">关闭</button></template>
+  </UiDialog>
 </template>

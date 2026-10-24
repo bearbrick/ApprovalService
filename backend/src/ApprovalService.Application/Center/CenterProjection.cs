@@ -153,6 +153,80 @@ internal static class CenterProjection
     }
 
     /// <summary>
+    /// 只从已返回的附件字段读取文件 ID，隐藏字段与未定义键不会参与元数据查询。
+    /// </summary>
+    /// <param name="detail">已授权且已裁剪的详情响应。</param>
+    /// <returns>按首次出现顺序去重的文件 ID。</returns>
+    public static IReadOnlyList<string> VisibleAttachmentIds(CenterDetailResponse detail)
+    {
+        var ids = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        CollectAttachments(detail.Data, detail.FieldDefinitions, ids, seen);
+        return ids;
+    }
+
+    /// <summary>
+    /// 按可见字段元数据递归读取顶层及明细行中的附件。
+    /// </summary>
+    /// <param name="container">本层已裁剪数据。</param>
+    /// <param name="definitions">本层已裁剪字段定义。</param>
+    /// <param name="ids">结果集合。</param>
+    /// <param name="seen">跨字段去重集合。</param>
+    private static void CollectAttachments(JsonElement container,
+        IReadOnlyList<CenterFieldDefinitionResponse> definitions, List<string> ids, HashSet<string> seen)
+    {
+        if (container.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+        foreach (var definition in definitions)
+        {
+            if (!container.TryGetProperty(definition.Key, out var value))
+            {
+                continue;
+            }
+            if (definition.Type == FlowFieldTypes.Attachment)
+            {
+                if (value.ValueKind == JsonValueKind.String)
+                {
+                    AddAttachmentId(value.GetString(), ids, seen);
+                }
+                else if (value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in value.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String)
+                        {
+                            AddAttachmentId(item.GetString(), ids, seen);
+                        }
+                    }
+                }
+            }
+            else if (definition.Type == FlowFieldTypes.DetailTable && value.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var row in value.EnumerateArray())
+                {
+                    CollectAttachments(row, definition.Children, ids, seen);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 过滤空值并保留文件在审批数据中首次出现的顺序。
+    /// </summary>
+    /// <param name="id">审批数据里的文件 ID。</param>
+    /// <param name="ids">结果集合。</param>
+    /// <param name="seen">去重集合。</param>
+    private static void AddAttachmentId(string? id, List<string> ids, HashSet<string> seen)
+    {
+        if (!string.IsNullOrWhiteSpace(id) && seen.Add(id))
+        {
+            ids.Add(id);
+        }
+    }
+
+    /// <summary>
     /// 按当前人员待办节点的隐藏规则过滤字段，不让摘要绕过详情权限。
     /// </summary>
     /// <param name="record">已授权审批记录。</param>

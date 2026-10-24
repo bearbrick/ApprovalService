@@ -3,7 +3,7 @@ import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
 import type { CenterActionResult } from './center-actions.ts'
 import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 import { centerAccessToken, centerSession } from './center-session.ts'
-import type { CenterAction, CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
+import type { CenterAction, CenterAttachment, CenterDetail, CenterDetailField, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
 
 export type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 
@@ -240,6 +240,10 @@ interface CenterWireDetail {
    */
   fieldDefinitions?: CenterWireFieldDefinition[]
   /**
+   * 当前人员可见且仍关联本审批单的文件元数据。
+   */
+  attachments?: CenterAttachment[]
+  /**
    * 只读任务。
    */
   tasks: CenterWireTask[]
@@ -342,6 +346,9 @@ function isFieldDefinitions(value: unknown): value is CenterWireFieldDefinition[
 function isDetail(value: unknown): value is CenterWireDetail {
   return isObject(value) && isWireItem(value.instance) && isObject(value.data)
     && (value.fieldDefinitions === undefined || isFieldDefinitions(value.fieldDefinitions))
+    && (value.attachments === undefined || Array.isArray(value.attachments) && value.attachments.every(file =>
+      isObject(file) && typeof file.id === 'string' && typeof file.fileName === 'string' &&
+      typeof file.contentType === 'string' && typeof file.size === 'number'))
     && Array.isArray(value.tasks) && value.tasks.every(task => isObject(task)
       && ['id', 'nodeId', 'nodeName', 'assigneeId', 'status'].every(key => typeof task[key] === 'string'))
     && Array.isArray(value.events) && value.events.every(event => isObject(event)
@@ -374,7 +381,8 @@ function fields(data: Record<string, unknown>, definitions: readonly CenterWireF
   return Object.entries(data).map(([key, value]) => {
     const definition = byKey.get(key)
     const result: CenterDetailField = { key, label: definition?.name || key,
-      value: Array.isArray(value) && definition?.type === 'detailTable' ? `${value.length} 条明细` : displayValue(value) }
+      value: definition?.type === 'attachment' ? `${Array.isArray(value) ? value.length : 1} 个附件`
+        : Array.isArray(value) && definition?.type === 'detailTable' ? `${value.length} 条明细` : displayValue(value) }
     if (Array.isArray(value) && definition?.type === 'detailTable' && definition.children.length) {
       const columns = definition.children.map(child => ({ key: child.key, label: child.name || child.key }))
       result.columns = columns
@@ -479,7 +487,9 @@ export const centerAdapter: CenterDataAdapter = {
       taskId: task.id, nodeName: task.nodeName,
       actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
     }))
-    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: fields(wire.data, wire.fieldDefinitions), timeline, attachmentNames: [] }
+    const attachments = wire.attachments ?? []
+    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: fields(wire.data, wire.fieldDefinitions),
+      timeline, attachmentNames: attachments.map(file => file.fileName), attachments }
   },
   executeAction: executeCenterAction,
   batchApprove: batchApproveCenter,

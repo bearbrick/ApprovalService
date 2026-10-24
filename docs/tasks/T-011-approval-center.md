@@ -23,6 +23,7 @@
 - `frontend/src/pages/CenterPage.vue`、`frontend/src/api/center-adapter.ts`、`frontend/src/api/center-session.ts`、`frontend/src/model/center.ts`、`frontend/tests/center-checks.ts`、`frontend/src/styles/center.css`：登录会话、中心接口映射、真实列表与详情、场景检查及页面样式
 - `frontend/src/api/center-actions.ts`：拆出中心 JWT 写请求，保持适配器单文件低于 500 行
 - `frontend/src/api/center-embed.ts`：内嵌令牌片段消费、登记来源读取及最小完成通知
+- `frontend/src/api/center-files.ts`：用当前 JWT 经现有权限下载接口读取附件内容，不向链接或 URL 写入令牌
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
@@ -58,6 +59,8 @@
 
 ## 交接记录
 
+- 2026-10-24 · Codex · 接手续写已暂存的附件展示切片，修正增加明细附件后摘要展示列检查的预期。中心详情只从已授权字段取附件 ID，逐项核对文件仍关联当前审批单；前端以人员 JWT 经文件权限接口读取，图片/PDF 可预览，其他文件下载，令牌不放 URL。全量 `verify.ps1` 通过：后端 738、调用端 50、前端 131 项，构建通过。任务仍进行中；未完成读标记、字段内容搜索、完整自定义详情排版及个人设置，未合并主分支或推送。
+- 2026-10-23 · Codex · 下一段范围登记：仅复用 T-013 已公开的 IStoredFileRepository 与 GET /api/v1/files/{id}，不修改其在认领文件。中心详情从已授权且已裁剪的附件字段提取文件 ID，再核对元数据仍属于本审批单，向后兼容新增附件元数据；前端新增 center-files.ts，用当前 JWT 下载及预览图片/PDF，删除附件占位提示。同步 Contracts、contracts.md、前后端 README、设计书 §center 和中心场景检查。尚不处理附件上传或审批人字段附件写入。
 - 2026-10-23 · Codex · 完成已授权字段展示切片：中心列表新增 `summaryFieldDefinitions`、详情新增 `fieldDefinitions`，只从审批单锁定的发布版本及当前人员已裁剪的数据生成名称、种类和明细子列；即使流程新版本更名、当前查看者为历史参与人，隐藏字段名称不泄露。前端摘要显示发布名称，详情将明细数据绘成只读表格，不把明细对象直接渲染为 JSON；缺失展示定义时仍安全回退到已有可见字段编码。真实 SQLite/JWT 检查验证锁定版本、顶层及明细列隐藏，前端检查验证映射与表格数据。contracts、设计书 §center、前后端 README 同步。全量 `verify.ps1` 通过：后端 737、调用端 50、前端 130 项，构建零警告。完整自定义详情排版、附件、已读和个人设置仍未接入；没有新增依赖。
 - 2026-10-23 · Codex · 下一段共享文件登记：为发布版本中的已授权字段增加安全展示元数据，向后兼容地扩展 Contracts/Protocol/CenterResponses.cs，投影由 CenterProjection.cs 生成；同步 docs/contracts.md、设计书 §center/§api，前端 model/center.ts、center-adapter.ts 与 CenterDetailView.vue 接入字段名称及结构化明细，并在 CenterQueryChecks.cs/center-checks.ts 验证隐藏字段名称不泄露。T-052 的内嵌共享文档修改与本段按不同小节集成，暂不改其 HTML/CSP 文件。
 - 2026-10-23 · Codex · 完成 T-011 前端内嵌会话切片：合法中心地址中的 `embedToken` 在网络请求前从当前地址及历史条目同步清除，重复或无效令牌也先清除；兑换结果必须绑定清理后的目标路由，随后用嵌入 JWT 读取 `/api/v1/center/embed-context`。任务操作和逐项批量成功后，用服务端返回的审批单与任务 ID，仅向 referrer 精确匹配当前接入应用登记来源的父窗口发送 `{instanceId,taskId,status:"changed"}`，不传业务数据或令牌；普通登录、无 referrer 与未登记来源不发送。对应前端场景检查及 README 已同步；全量 `verify.ps1` 通过：后端 735、调用端 50、前端 129 项，前端类型检查与打包成功。T-052 独立分支负责后端 HTML 入口、CSP、同源托管与上述 embed-context 接口，本分支未实现或验收最终 iframe；字段标签、附件、已读、设置仍待续做。无新依赖、未用真实账号或密钥测试。

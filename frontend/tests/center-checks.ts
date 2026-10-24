@@ -3,6 +3,7 @@ import type { CenterFilters, CenterItem } from '../src/model/center.ts'
 import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-adapter.ts'
 import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
+import { fetchCenterFile } from '../src/api/center-files.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -76,6 +77,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       const path = String(input)
       requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '',
         method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
+      if (path.endsWith('/files/file-visible')) {
+        return new Response(new Blob(['PDF'], { type: 'application/pdf' }), { status: 200,
+          headers: { 'Content-Type': 'application/pdf' } })
+      }
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
         : path.endsWith('/embed-tokens/exchange')
@@ -89,6 +94,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         : path.includes('instances/instance-1')
           ? { instance: { ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] },
             data: { amount: 200, lines: [{ qty: 2 }] }, fieldDefinitions: summary.summaryFieldDefinitions,
+            attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
             tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -111,6 +117,11 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       list[0]?.summary[0]?.label === '金额' && list[0]?.summary[1]?.label === '明细'
       && list[0]?.summary[1]?.value === '1 条明细' && detail.fields[1]?.columns?.[0]?.label === '数量'
       && detail.fields[1]?.rows?.[0]?.[0] === '2')
+    const downloaded = await fetchCenterFile('file-visible')
+    check('详情附件使用人员 JWT 从独立验权接口下载，令牌不出现在 URL',
+      detail.attachments[0]?.fileName === '票据.pdf' && detail.attachmentNames[0] === '票据.pdf'
+      && downloaded.size === 3 && requests.at(-1)?.path === '/api/v1/files/file-visible'
+      && requests.at(-1)?.authorization === 'Bearer test-token')
     allowActions = true
     const permittedList = await centerAdapter.loadList('todo', controller.signal)
     const permittedDetail = await centerAdapter.loadDetail('instance-1', controller.signal)

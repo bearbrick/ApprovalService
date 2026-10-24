@@ -1,5 +1,6 @@
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Center;
+using ApprovalService.Domain.Files;
 using ApprovalService.Domain.Shared;
 
 namespace ApprovalService.Application.Center;
@@ -8,7 +9,8 @@ namespace ApprovalService.Application.Center;
 /// 审批中心只读用例，查询身份只能来自已验证的登录会话。
 /// </summary>
 /// <param name="repository">在数据库边界执行人员和应用过滤的查询仓储。</param>
-public sealed class CenterQueryAppService(ICenterQueryRepository repository)
+/// <param name="files">只读取当前详情已授权且关联本审批单的附件元数据。</param>
+public sealed class CenterQueryAppService(ICenterQueryRepository repository, IStoredFileRepository files)
 {
     /// <summary>
     /// 读取四类列表之一，并按节点权限裁剪摘要。
@@ -59,7 +61,26 @@ public sealed class CenterQueryAppService(ICenterQueryRepository repository)
         }
         var record = await repository.FindAsync(scope, instanceId, cancellationToken)
             ?? throw new UserFriendlyException(ErrorCodes.NotFound, "审批单不存在或当前人员无权查看。");
-        return CenterProjection.Detail(record, scope.PersonId);
+        var detail = CenterProjection.Detail(record, scope.PersonId);
+        var attachments = new List<CenterAttachmentResponse>();
+        foreach (var fileId in CenterProjection.VisibleAttachmentIds(detail))
+        {
+            var file = await files.FindAsync(fileId, cancellationToken);
+            // 数据快照中的 ID 不足以证明附件归属，下载接口仍会独立验权。
+            if (file?.InstanceId != instanceId)
+            {
+                continue;
+            }
+            attachments.Add(new CenterAttachmentResponse
+            {
+                Id = file.Id,
+                FileName = file.FileName,
+                ContentType = file.ContentType,
+                Size = file.Size,
+            });
+        }
+        detail.Attachments = attachments;
+        return detail;
     }
 
     /// <summary>

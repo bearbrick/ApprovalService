@@ -54,6 +54,10 @@ const managed = ref<ManagedFlow | null>(null)
  */
 const canCreate = ref(false)
 /**
+ * 读取失败时阻止把未知服务端状态当作新流程覆盖。
+ */
+const loadError = ref('')
+/**
  * 是否正在读取或写入服务端草稿。
  */
 const busy = ref(false)
@@ -61,6 +65,12 @@ const busy = ref(false)
  * 当前页面是否有未保存的编辑。
  */
 const dirty = ref(false)
+/**
+ * 分组或归属改动也必须先保存，才能按当前服务端修订发布。
+ */
+const metadataDirty = computed(() => !!managed.value && (
+  (managed.value.group ?? '') !== group.value.trim()
+  || (managed.value.ownerDepartmentId ?? '') !== ownerDepartmentId.value.trim()))
 /**
  * 保存或发布时必须填写的审计原因。
  */
@@ -129,6 +139,7 @@ watch(flowCode, code => {
   history.value = createDraftHistory(loadDraft(code))
   managed.value = null
   canCreate.value = false
+  loadError.value = ''
   dirty.value = false
   issues.value = []
   pendingFocusId.value = null
@@ -162,6 +173,7 @@ function loadDraft(code: string): FlowDefinition {
 async function loadManaged(code: string): Promise<void> {
   const sequence = ++loadSequence
   busy.value = true
+  loadError.value = ''
   try {
     const result = await getManagedFlow(code)
     if (sequence !== loadSequence) return
@@ -174,6 +186,7 @@ async function loadManaged(code: string): Promise<void> {
   } catch (cause) {
     if (sequence !== loadSequence) return
     canCreate.value = cause instanceof ApiError && cause.status === 404
+    if (!canCreate.value) loadError.value = cause instanceof Error ? cause.message : '读取服务端草稿失败'
     status.value = cause instanceof ApiError && cause.status === 404
       ? '新流程尚未保存到服务端' : cause instanceof Error ? cause.message : '读取服务端草稿失败'
   } finally {
@@ -256,7 +269,7 @@ async function saveDraft(): Promise<void> {
  */
 async function publish(): Promise<void> {
   if (!managed.value || busy.value) { status.value = '请先保存草稿'; return }
-  if (dirty.value) { status.value = '请先保存当前修改，再发布'; return }
+  if (dirty.value || metadataDirty.value) { status.value = '请先保存当前修改，再发布'; return }
   issues.value = checkPublication(draft.value)
   if (issues.value.length) { status.value = `发现 ${issues.value.length} 个发布问题`; return }
   if (reason.value.trim().length < 2) { status.value = '请填写至少两个字的发布原因'; return }
@@ -369,6 +382,7 @@ async function copyIntegrationSnippet(): Promise<void> {
     <header class="designer-header"><div class="designer-breadcrumb"><a href="#/admin/flows">流程管理</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode && authorized" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button><button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button></div></div><div v-if="flowCode && authorized" class="publish-form"><label>审计原因<input v-model="reason" maxlength="200" placeholder="保存或发布时必填" /></label><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" /></label><label>所属部门 ID<input v-model="ownerDepartmentId" placeholder="部门流程管理员必填" /></label></div></header>
     <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>十类常用审批模板可直接复制修改；采购、报销和质量异常示例还展示金额分支、会签、返工与并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
     <div v-else-if="!authorized" class="designer-content"><p role="alert">请先以流程管理员身份登录，再读取或编辑流程。</p><a href="#/admin/flows">前往流程管理登录</a></div>
+    <div v-else-if="loadError" class="designer-content" role="alert"><p>{{ loadError }}</p><button type="button" class="btn" @click="loadManaged(flowCode)">重新读取</button><a href="#/admin/flows">返回流程管理</a></div>
     <div v-else-if="busy && !managed && !canCreate" class="designer-content" role="status">正在读取服务端流程…</div>
     <template v-else>
       <nav class="designer-tabs" aria-label="流程配置"><a v-for="tab in DESIGNER_TABS" :key="tab" :href="`#/designer/${encodeURIComponent(flowCode)}/${tab}`" :aria-current="activeTab === tab ? 'page' : undefined">{{ TAB_TITLES[tab] }}</a></nav>

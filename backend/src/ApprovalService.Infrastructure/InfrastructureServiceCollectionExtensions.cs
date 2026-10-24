@@ -14,6 +14,7 @@ using ApprovalService.Domain.Reporting;
 using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Files;
+using ApprovalService.Infrastructure.Hosting;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Integration;
 using ApprovalService.Infrastructure.Jobs;
@@ -50,7 +51,17 @@ public static class InfrastructureServiceCollectionExtensions
             .Validate(options => options.Provider is not ("SqlServer" or "PostgreSql") || !string.IsNullOrWhiteSpace(options.ConnectionString),
                 "配置 SqlServer 或 PostgreSql 时，ApprovalService:Data:ConnectionString 不能为空。")
             .ValidateOnStart();
+        services.AddOptions<BackupOptions>()
+            .Bind(configuration.GetSection(BackupOptions.SectionName))
+            .Validate(options => TimeOnly.TryParseExact(options.Time, "HH:mm", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out _),
+                "配置 ApprovalService:Backup:Time 必须是 HH:mm。")
+            .Validate(options => options.Keep is >= 1 and <= 365,
+                "配置 ApprovalService:Backup:Keep 必须介于 1 到 365。")
+            .ValidateOnStart();
+        services.AddSingleton<SqliteBackupService>();
         services.AddApprovalPersistence(configuration);
+        services.AddHostedService<DailyBackupWorker>();
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
         services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();

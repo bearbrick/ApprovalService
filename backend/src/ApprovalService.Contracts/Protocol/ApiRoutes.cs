@@ -36,6 +36,11 @@ public static class ApiRoutes
     public const string HealthReady = "/health/ready";
 
     /// <summary>
+    /// 仅本机可读取的 Prometheus 请求聚合指标。
+    /// </summary>
+    public const string Metrics = "/metrics";
+
+    /// <summary>
     /// 接入应用推送组织变更。
     /// </summary>
     public const string OrgChanges = OpenApiPrefix + "/org/changes";

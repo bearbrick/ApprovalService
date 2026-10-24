@@ -11,6 +11,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Infrastructure;
+using ApprovalService.Infrastructure.Hosting;
 using ApprovalService.Infrastructure.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -18,7 +19,9 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 var bootstrapCommand = args.Length > 0 && args[0] == "bootstrap-admin";
 var migrateFiles = args.Contains("--migrate-files", StringComparer.Ordinal);
-var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args.Where(arg => arg != "--migrate-files").ToArray());
+var backupNow = args.Length == 1 && args[0] == "backup-now";
+var builder = WebApplication.CreateBuilder(bootstrapCommand ? [] : args.Where(arg => arg is not ("--migrate-files" or "backup-now")).ToArray());
+builder.Host.UseWindowsService(options => options.ServiceName = "ApprovalService");
 if (bootstrapCommand)
 {
     // 首次迁移会执行大量 SQL，控制台只保留告警，避免冲掉交互提示。
@@ -29,6 +32,7 @@ if (bootstrapCommand)
 builder.Services.AddApprovalApplication();
 builder.Services.AddApprovalInfrastructure(builder.Configuration);
 builder.Services.ConfigureHttpJsonOptions(options => ApprovalJson.Configure(options.SerializerOptions));
+builder.Services.AddSingleton<RequestMetrics>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
     .Configure<JwtIdentityTokenService>((options, tokenService) =>
@@ -96,6 +100,8 @@ var app = builder.Build();
 
 // 默认页面安全头包住异常处理；请求 ID 和链路 ID 紧随异常处理，出错响应也带上。
 app.UseFrontendDocumentSecurity();
+app.UseRouting();
+app.UseMiddleware<RequestMetricsMiddleware>();
 app.UseExceptionHandler(errorApp => errorApp.Run(ApiErrors.WriteUnhandledAsync));
 app.UseMiddleware<RequestTraceMiddleware>();
 app.UseStatusCodePages(context => ApiErrors.WriteStatusAsync(context.HttpContext));
@@ -140,6 +146,13 @@ if (migrateFiles)
     await using var scope = app.Services.CreateAsyncScope();
     var moved = await scope.ServiceProvider.GetRequiredService<IFileMigrationService>().MigrateAsync();
     Console.WriteLine($"已迁移 {moved} 个附件。");
+    return;
+}
+
+if (backupNow)
+{
+    var target = await app.Services.GetRequiredService<SqliteBackupService>().CreateAsync("daily");
+    Console.WriteLine($"已备份到 {target}。");
     return;
 }
 

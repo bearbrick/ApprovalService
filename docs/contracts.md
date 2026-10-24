@@ -55,6 +55,7 @@
 | --- | --- | --- |
 | `GET /health/live` | 无 | 存活检查，返回 `live` |
 | `GET /health/ready` | 无 | 数据库可连接时返回 `ready`，不可连接时返回 503 |
+| `GET /metrics` | 本机或部署级 Bearer 密钥 | Prometheus 0.0.4 聚合文本；只含 HTTP 方法、路由模板、状态码和耗时桶，不含业务标识。远程密钥由 `ApprovalService:Metrics:BearerToken` 配置，至少 32 字符；无权返回 403 |
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |

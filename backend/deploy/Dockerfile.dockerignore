@@ -1,0 +1,13 @@
+.git/
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/data/
+**/*.db
+**/*.db-wal
+**/*.db-shm
+**/coverage/
+backend/tests/
+client/
+docs/

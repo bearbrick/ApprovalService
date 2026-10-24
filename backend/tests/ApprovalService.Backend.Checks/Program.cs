@@ -99,6 +99,7 @@ internal static class Program
         await FileChecks.RunAsync(backendRoot, Check);
         await ConfidentialVisibilityChecks.RunAsync(Check);
         await ServerChecks.RunAsync(backendRoot, Check);
+        await DeploymentChecks.RunAsync(backendRoot, Check);
         ArchitectureChecks.Run(backendRoot, repositoryRoot, Check);
         RepositorySourceChecks.Run(repositoryRoot, Check);
         DocumentationChecks.Run(backendRoot, repositoryRoot, Check);

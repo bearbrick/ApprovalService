@@ -40,6 +40,7 @@ internal static class Program
         DemoIntegrationChecks.Run(Check);
         await DemoGatewayChecks.RunAsync(Check);
         await DemoBusinessHttpChecks.RunAsync(Check);
+        await DemoOrganizationChecks.RunAsync(Check);
         ArchitectureChecks.Run(clientRoot, Check);
         DocumentationChecks.Run(clientRoot, Check);
         await LiveServerChecks.RunAsync(Check);

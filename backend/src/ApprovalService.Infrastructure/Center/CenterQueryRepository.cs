@@ -57,6 +57,7 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         {
             // 内容搜索须在参与关系和字段权限过滤后计算命中数与分页，不对原始 JSON 做命中判定。
             var searched = await SearchAsync(db, instances, scope.PersonId, query, cancellationToken);
+            await AttachReadStateAsync(db, searched.Items, scope.PersonId, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return searched;
         }
@@ -74,6 +75,7 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
         {
             record.Tasks = tasks.Where(task => task.InstanceId == record.Instance.Id).ToArray();
         }
+        await AttachReadStateAsync(db, records, scope.PersonId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return new CenterPage { Total = count, Items = records };
     }
@@ -149,14 +151,7 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
-        var person = scope.PersonId;
-        // 已发布的保密流程也只按实际参与关系开放；管理员和额外查看人不隐式拥有本入口权限。
-        var visible = AppScope(db, scope).Where(instance => instance.Id == instanceId &&
-            (instance.InitiatorId == person || instance.SubmittedById == person ||
-                db.ApprovalTasks.Any(task => task.InstanceId == instance.Id && task.Status == EngineTaskStatuses.Pending &&
-                    (task.AssigneeId == person || task.DelegatedForId == person)) ||
-                db.InstanceParticipants.Any(participant => participant.InstanceId == instance.Id && participant.PersonId == person)));
-        var record = await Project(db, visible).SingleOrDefaultAsync(cancellationToken);
+        var record = await Project(db, VisibleDetail(db, scope, instanceId)).SingleOrDefaultAsync(cancellationToken);
         if (record is null)
         {
             return null;
@@ -165,8 +160,92 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
             .OrderBy(task => task.Id).ToArrayAsync(cancellationToken);
         record.Events = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
             .OrderBy(item => item.Sequence).ToArrayAsync(cancellationToken);
+        record.ReadThroughSequence = await db.CenterReadCursors.AsNoTracking()
+            .Where(item => item.InstanceId == instanceId && item.PersonId == scope.PersonId)
+            .Select(item => item.ReadThroughSequence).SingleOrDefaultAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return record;
+    }
+
+    /// <inheritdoc />
+    public async Task<long?> MarkReadAsync(CenterScope scope, string instanceId, long seenThroughSequence,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        if (!await VisibleDetail(db, scope, instanceId).AnyAsync(cancellationToken))
+        {
+            return null;
+        }
+        var latest = await db.OperationEvents.AsNoTracking().Where(item => item.InstanceId == instanceId)
+            .MaxAsync(item => (long?)item.Sequence, cancellationToken) ?? 0;
+        var seen = Math.Min(seenThroughSequence, latest);
+        var cursor = await db.CenterReadCursors.SingleOrDefaultAsync(item =>
+            item.InstanceId == instanceId && item.PersonId == scope.PersonId, cancellationToken);
+        if (cursor is null)
+        {
+            db.CenterReadCursors.Add(new CenterReadCursorEntity
+            {
+                InstanceId = instanceId,
+                PersonId = scope.PersonId,
+                ReadThroughSequence = seen,
+            });
+        }
+        else if (cursor.ReadThroughSequence < seen)
+        {
+            cursor.ReadThroughSequence = seen;
+        }
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Math.Max(cursor?.ReadThroughSequence ?? 0, seen);
+    }
+
+    /// <summary>
+    /// 在同一读取事务内装配列表页的个人游标及其后的活动记录。
+    /// </summary>
+    /// <param name="db">数据库上下文。</param>
+    /// <param name="records">已授权的本页记录。</param>
+    /// <param name="personId">可信登录人员 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>装配完成。</returns>
+    private static async Task AttachReadStateAsync(ApprovalDbContext db, IReadOnlyList<CenterRecord> records,
+        string personId, CancellationToken cancellationToken)
+    {
+        if (records.Count == 0)
+        {
+            return;
+        }
+        var ids = records.Select(record => record.Instance.Id).ToArray();
+        var cursors = await db.CenterReadCursors.AsNoTracking().Where(item =>
+            item.PersonId == personId && ids.Contains(item.InstanceId)).ToArrayAsync(cancellationToken);
+        var known = cursors.ToDictionary(item => item.InstanceId, item => item.ReadThroughSequence, StringComparer.Ordinal);
+        var firstUnread = records.Min(record => known.GetValueOrDefault(record.Instance.Id));
+        var events = await db.OperationEvents.AsNoTracking().Where(item =>
+            ids.Contains(item.InstanceId) && item.Sequence > firstUnread).ToArrayAsync(cancellationToken);
+        foreach (var record in records)
+        {
+            record.ReadThroughSequence = known.GetValueOrDefault(record.Instance.Id);
+            record.Events = events.Where(item => item.InstanceId == record.Instance.Id &&
+                item.Sequence > record.ReadThroughSequence).ToArray();
+        }
+    }
+
+    /// <summary>
+    /// 详情读取和标记已读共享同一保密参与关系与嵌入来源边界。
+    /// </summary>
+    /// <param name="db">数据库上下文。</param>
+    /// <param name="scope">可信人员及来源应用。</param>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <returns>仅当前人员可查看的一张单据查询。</returns>
+    private static IQueryable<InstanceEntity> VisibleDetail(ApprovalDbContext db, CenterScope scope, string instanceId)
+    {
+        var person = scope.PersonId;
+        // 保密流程也只按实际参与关系开放；管理员和额外查看人不隐式拥有本入口权限。
+        return AppScope(db, scope).Where(instance => instance.Id == instanceId &&
+            (instance.InitiatorId == person || instance.SubmittedById == person ||
+                db.ApprovalTasks.Any(task => task.InstanceId == instance.Id && task.Status == EngineTaskStatuses.Pending &&
+                    (task.AssigneeId == person || task.DelegatedForId == person)) ||
+                db.InstanceParticipants.Any(participant => participant.InstanceId == instance.Id && participant.PersonId == person)));
     }
 
     /// <summary>

@@ -50,7 +50,7 @@ public sealed class CenterQuery
     }
 
     /// <summary>
-    /// 标题、审批编号或业务单号搜索词。
+    /// 标题、审批编号、业务单号或可见字段内容搜索词。
     /// </summary>
     public string? Search
     {
@@ -127,6 +127,14 @@ public sealed class CenterRecord
     /// 详情所需的操作事件；列表为空。
     /// </summary>
     public IReadOnlyList<OperationEventEntity> Events { get; set; } = [];
+
+    /// <summary>
+    /// 当前人员在该审批单已看过的最大事件序号。
+    /// </summary>
+    public long ReadThroughSequence
+    {
+        get; set;
+    }
 
 }
 

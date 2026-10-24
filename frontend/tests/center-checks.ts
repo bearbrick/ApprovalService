@@ -66,6 +66,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   const originalFetch = globalThis.fetch
   const requests: { path: string, authorization: string, method: string, body: string }[] = []
   let allowActions = false
+  let serverUnread = true
   let failPreference = false
   const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
   const summary = {
@@ -84,6 +85,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       if (path.endsWith('/files/file-visible')) {
         return new Response(new Blob(['PDF'], { type: 'application/pdf' }), { status: 200,
           headers: { 'Content-Type': 'application/pdf' } })
+      }
+      if (path.endsWith('/center/instances/instance-1/read')) {
+        serverUnread = false
+        return new Response(null, { status: 204 })
       }
       if (path.startsWith('/api/v1/notifications/preferences')) {
         if (path !== '/api/v1/notifications/preferences') {
@@ -116,8 +121,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
               { fieldKey: 'secret', columnSpan: 1, detailColumnWidths: {} },
             ] }] },
             attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
-            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }], events: [], activeNodeIds: ['approval'] }
-          : { total: 1, skip: 0, take: 100, items: [{ ...summary, canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
+            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }],
+            events: [{ eventId: 'event-2', sequence: 2, kind: 'commentAdded', nodeId: 'approval', actorId: 'other', occurredAt: '2026-10-19T11:00:00Z', opinion: null }], activeNodeIds: ['approval'] }
+          : { total: 1, skip: 0, take: 100, items: [{ ...summary, isUnread: serverUnread,
+            canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
       return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     const controller = new AbortController()
@@ -149,6 +156,13 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     check('审批列表把字段内容搜索交给 JWT 服务端且保留授权结果',
       fieldSearch.length === 1 && requests.at(-1)?.path.includes('search=%E8%A1%8C%E7%A5%A8') === true &&
       requests.at(-1)?.authorization === 'Bearer test-token')
+    await centerAdapter.markRead('instance-1', controller.signal, detail.readSequence)
+    const markedList = await centerAdapter.loadList('todo', controller.signal)
+    check('详情显式标记使用本人 JWT，服务端确认后列表显示已读',
+      list[0]?.unread === true && markedList[0]?.unread === false &&
+      requests.at(-2)?.path === '/api/v1/center/instances/instance-1/read' &&
+      requests.at(-2)?.method === 'POST' && requests.at(-2)?.authorization === 'Bearer test-token'
+      && requests.at(-2)?.body === '{"seenThroughSequence":2}')
     const downloaded = await fetchCenterFile('file-visible')
     check('详情附件使用人员 JWT 从独立验权接口下载，令牌不出现在 URL',
       detail.attachments[0]?.fileName === '票据.pdf' && detail.attachmentNames[0] === '票据.pdf'

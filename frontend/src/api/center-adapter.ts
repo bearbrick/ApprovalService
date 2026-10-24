@@ -1,4 +1,4 @@
-import { getJson } from './http.ts'
+import { getJson, requestJson } from './http.ts'
 import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
 import type { CenterActionResult } from './center-actions.ts'
 import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
@@ -78,6 +78,10 @@ interface CenterWireItem {
    * 是否加急。
    */
   isUrgent: boolean
+  /**
+   * 当前登录人员是否有尚未看过的活动。
+   */
+  isUnread?: boolean
   /**
    * 发起时间。
    */
@@ -175,6 +179,10 @@ interface CenterWireTask {
 
 interface CenterWireEvent {
   /**
+   * 审批单内递增的活动序号。
+   */
+  sequence: number
+  /**
    * 事件标识。
    */
   eventId: string
@@ -259,6 +267,14 @@ export interface CenterDataAdapter {
    */
   loadDetail(id: string, signal: AbortSignal): Promise<CenterDetail>
   /**
+   * 详情成功显示后让服务端按当前 JWT 显式推进本人已读游标。
+   * @param id 审批单标识。
+   * @param signal 页面切换时的取消信号。
+   * @param seenThroughSequence 本次详情实际展示的最大活动序号。
+   * @returns 服务端确认完成。
+   */
+  markRead(id: string, signal: AbortSignal, seenThroughSequence: number): Promise<void>
+  /**
    * 使用当前 JWT 身份办理一项任务。
    * @param taskId 服务端返回的任务 ID。
    * @param input 任务命令。
@@ -323,7 +339,8 @@ function isDetail(value: unknown): value is CenterWireDetail {
     && Array.isArray(value.tasks) && value.tasks.every(task => isObject(task)
       && ['id', 'nodeId', 'nodeName', 'assigneeId', 'status'].every(key => typeof task[key] === 'string'))
     && Array.isArray(value.events) && value.events.every(event => isObject(event)
-      && typeof event.eventId === 'string' && typeof event.kind === 'string' && typeof event.occurredAt === 'string')
+      && typeof event.eventId === 'string' && typeof event.kind === 'string' && typeof event.occurredAt === 'string'
+      && Number.isSafeInteger(event.sequence) && (event.sequence as number) >= 0)
     && Array.isArray(value.activeNodeIds) && value.activeNodeIds.every(id => typeof id === 'string')
 }
 
@@ -361,7 +378,7 @@ function item(wire: CenterWireItem, section: CenterSection, tasks: readonly Cent
     flowCode: wire.flowCode, flowName: wire.flowName, sourceName: wire.sourceName || wire.clientAppCode,
     initiatorName: wire.initiatorName || wire.initiatorId, currentStep: wire.currentStep || (pending?.nodeName ?? latest?.nodeName ?? '—'),
     status: wire.status, createdAt: wire.startedAt, updatedAt: wire.endedAt ?? wire.startedAt,
-    urgent: wire.isUrgent, unread: false, allowsBatchApprove: Boolean(wire.canBulkApprove && bulkTaskIds.length),
+    urgent: wire.isUrgent, unread: wire.isUnread === true, allowsBatchApprove: Boolean(wire.canBulkApprove && bulkTaskIds.length),
     bulkTaskIds, allowedActions: [...new Set(allowed)], summary,
   }
 }
@@ -426,8 +443,18 @@ export const centerAdapter: CenterDataAdapter = {
     const attachments = wire.attachments ?? []
     const visibleFields = fields(wire.data, wire.fieldDefinitions)
     return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: visibleFields,
+      readSequence: wire.events.reduce((maximum, event) => Math.max(maximum, event.sequence), 0),
       layout: centerDetailLayout(wire.layout, visibleFields),
       timeline, attachmentNames: attachments.map(file => file.fileName), attachments }
+  },
+  /**
+   * @inheritdoc
+   */
+  async markRead(id, signal, seenThroughSequence) {
+    await requestJson<void>(`/api/v1/center/instances/${encodeURIComponent(id)}/read`, {
+      method: 'POST', headers: await headers(), signal, cache: 'no-store',
+      body: { seenThroughSequence },
+    })
   },
   executeAction: executeCenterAction,
   batchApprove: batchApproveCenter,

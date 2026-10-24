@@ -21,6 +21,7 @@ internal static class CenterQueryEndpoints
     {
         app.MapGet(CenterRoutes.Instances, ListAsync).RequireAuthorization();
         app.MapGet(CenterRoutes.Instance, FindAsync).RequireAuthorization();
+        app.MapPost(CenterRoutes.MarkRead, MarkReadAsync).RequireAuthorization();
         return app;
     }
 
@@ -32,7 +33,7 @@ internal static class CenterQueryEndpoints
     /// <param name="section">列表分组。</param>
     /// <param name="flowCode">流程编码筛选。</param>
     /// <param name="status">状态筛选。</param>
-    /// <param name="search">标题或编号搜索。</param>
+    /// <param name="search">标题、编号或可见字段内容搜索。</param>
     /// <param name="from">发起时间起点。</param>
     /// <param name="to">发起时间终点。</param>
     /// <param name="skip">跳过数量。</param>
@@ -64,6 +65,23 @@ internal static class CenterQueryEndpoints
     /// <returns>已授权详情。</returns>
     private static Task<CenterDetailResponse> FindAsync(HttpContext http, string id, CenterQueryAppService service,
         CancellationToken cancellationToken) => service.FindAsync(Scope(http), id, cancellationToken);
+
+    /// <summary>
+    /// 重新核对可信登录范围后标记当前人员已看过的活动。
+    /// </summary>
+    /// <param name="http">已执行认证的请求。</param>
+    /// <param name="id">审批单 ID。</param>
+    /// <param name="input">本次详情实际显示的活动序号。</param>
+    /// <param name="service">中心查询用例。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>成功时无响应体。</returns>
+    private static async Task<IResult> MarkReadAsync(HttpContext http, string id, CenterReadRequest input,
+        CenterQueryAppService service,
+        CancellationToken cancellationToken)
+    {
+        await service.MarkReadAsync(Scope(http), id, input, cancellationToken);
+        return Results.NoContent();
+    }
 
     /// <summary>
     /// 仅从认证声明取人员和应用，拒绝不完整或未知来源的会话。

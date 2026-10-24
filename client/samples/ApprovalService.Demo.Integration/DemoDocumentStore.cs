@@ -8,7 +8,7 @@ namespace ApprovalService.Demo.Integration;
 /// <summary>
 /// 把演示业务单据保存在审批服务数据库之外的本机 JSON 文件中。
 /// </summary>
-public sealed class DemoDocumentStore
+public sealed partial class DemoDocumentStore
 {
     /// <summary>
     /// 本机业务文件的绝对路径。
@@ -347,7 +347,16 @@ public sealed class DemoDocumentStore
         {
             using var stream = new MemoryStream(bytes);
             var value = new DataContractJsonSerializer(typeof(DemoStoreSnapshot)).ReadObject(stream) as DemoStoreSnapshot;
-            return value ?? throw new SerializationException("业务数据文件为空。");
+            if (value == null)
+            {
+                throw new SerializationException("业务数据文件为空。");
+            }
+
+            value.Expenses ??= new List<ExpenseClaim>();
+            value.Purchases ??= new List<PurchaseRequest>();
+            value.ProcessedEventIds ??= new List<string>();
+            value.Actions ??= new List<DemoActionRecord>();
+            return value;
         }
         catch (SerializationException ex)
         {
@@ -405,4 +414,10 @@ internal sealed class DemoStoreSnapshot
     /// </summary>
     [DataMember(Name = "processedEventIds")]
     public List<string> ProcessedEventIds { get; set; } = new();
+
+    /// <summary>
+    /// 自动采购动作按事件 ID 持久记录尝试次数和订单号。
+    /// </summary>
+    [DataMember(Name = "actions")]
+    public List<DemoActionRecord> Actions { get; set; } = new();
 }

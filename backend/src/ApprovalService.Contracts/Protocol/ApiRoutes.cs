@@ -91,6 +91,26 @@ public static class ApiRoutes
     public const string AdminOutbox = OpenApiPrefix + "/admin/outbox";
 
     /// <summary>
+    /// 管理范围内的报表概览。
+    /// </summary>
+    public const string AdminReportOverview = OpenApiPrefix + "/admin/reports/overview";
+
+    /// <summary>
+    /// 管理范围内的流程指标。
+    /// </summary>
+    public const string AdminReportFlows = OpenApiPrefix + "/admin/reports/flows";
+
+    /// <summary>
+    /// 管理范围内的节点指标。
+    /// </summary>
+    public const string AdminReportNodes = OpenApiPrefix + "/admin/reports/nodes";
+
+    /// <summary>
+    /// 管理范围内的人员指标。
+    /// </summary>
+    public const string AdminReportPeople = OpenApiPrefix + "/admin/reports/people";
+
+    /// <summary>
     /// 组织管理员按原事件 ID 手动重发回调。
     /// </summary>
     public const string AdminCallbackRetry = OpenApiPrefix + "/admin/callbacks/{eventId}/retry";

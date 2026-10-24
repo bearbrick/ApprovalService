@@ -54,3 +54,5 @@
 | [0015](0015-bpmn-js-modeler.md) | 标准 BPMN 建模器负责流程图编辑 | 已采纳 |
 | [0016](0016-embed-origin-and-token-handshake.md) | 按接入应用限制审批中心内嵌来源与一次性令牌交换 | 已采纳 |
 | [0017](0017-center-jwt-actions.md) | 审批中心使用人员 JWT 执行任务命令并返回逐项许可 | 已采纳 |
+| [0019](0019-reporting-query-access.md) | 报表查询范围与保密统计 | 已采纳 |
+

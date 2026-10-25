@@ -123,6 +123,7 @@ app.MapNotificationSettingsEndpoints();
 app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
+app.MapClientAppAdminEndpoints();
 app.MapReportingEndpoints();
 app.MapFlowManagementEndpoints();
 app.MapFlowSimulationEndpoints();

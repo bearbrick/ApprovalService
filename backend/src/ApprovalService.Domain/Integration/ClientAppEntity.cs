@@ -36,6 +36,11 @@ public sealed class ClientAppEntity
     public string AllowedEmbedOriginsJson { get; set; } = "[]";
 
     /// <summary>
+    /// 有权管理本应用的内部人员 ID JSON 数组；存量应用默认无人授权。
+    /// </summary>
+    public string AdministratorPersonIdsJson { get; set; } = "[]";
+
+    /// <summary>
     /// 是否可以查看所有接入应用的待办数量和列表。
     /// </summary>
     public bool CanViewAllTasks

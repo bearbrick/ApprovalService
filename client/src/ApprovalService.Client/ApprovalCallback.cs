@@ -40,6 +40,14 @@ public sealed class ApprovalCallback
     public string BusinessKey { get; set; } = string.Empty;
 
     /// <summary>
+    /// 测试回调所属的接入应用编码；真实审批回调为空。
+    /// </summary>
+    public string? ClientAppCode
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 相关任务 ID，事件没有任务时为空。
     /// </summary>
     public string? TaskId
@@ -141,6 +149,7 @@ public static class ApprovalCallbackVerifier
                 SerialNo = OpenApiJson.String(row, "serialNo"),
                 FlowCode = OpenApiJson.String(row, "flowCode"),
                 BusinessKey = OpenApiJson.String(row, "businessKey"),
+                ClientAppCode = OpenApiJson.OptionalString(row, "clientAppCode"),
                 TaskId = OpenApiJson.OptionalString(row, "taskId"),
                 Status = OpenApiJson.String(row, "status"),
                 Data = OpenApiJson.Object(OpenApiJson.Field(row, "data"), "data"),

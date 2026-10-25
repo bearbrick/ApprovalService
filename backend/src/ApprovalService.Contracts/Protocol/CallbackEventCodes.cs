@@ -6,6 +6,16 @@ namespace ApprovalService.Contracts.Protocol;
 public static class CallbackEventCodes
 {
     /// <summary>
+    /// 接入应用的签名测试回调，不关联真实审批单。
+    /// </summary>
+    public const string IntegrationTest = "integration.test";
+
+    /// <summary>
+    /// 合成接入测试事件 ID 的固定前缀。
+    /// </summary>
+    public const string TestEventIdPrefix = "test-";
+
+    /// <summary>
     /// 审批单已发起。
     /// </summary>
     public const string InstanceStarted = "instance.started";

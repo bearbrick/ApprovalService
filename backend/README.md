@@ -125,7 +125,7 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 接入应用允许嵌入来源由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/embed-origins` 配置。PUT 提交完整来源列表及变更原因；服务端限制 HTTPS 原点、本机开发 HTTP、数量和长度，并在同一数据库事务中记录操作者及不含密钥的前后快照。并发修改返回冲突，管理页须重新读取后再保存。
 
-接入应用管理员名单由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/administrators` 维护。存量应用默认空名单；PUT 提交读取时的旧人员 ID、新人员 ID 与原因，服务端检查当前在职人员、并发旧值，并与不含密钥的审计同事务保存。后续测试回调只可使用当前本地会话、已启用应用，以及当前在职的该应用管理员或组织管理员身份；该回调接口尚未实现。
+接入应用管理员名单由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/administrators` 维护。存量应用默认空名单；PUT 提交读取时的旧人员 ID、新人员 ID 与原因，服务端检查当前在职人员、并发旧值，并与不含密钥的审计同事务保存。`POST /api/v1/admin/apps/{code}/test-callback` 要求本地组织管理员或该应用管理员提交原因，重新核对应用、人员和回调地址后只排入 `integration.test` 合成事件；响应返回事件 ID，业务系统只需验签确认。事件不关联审批单，发送复用原有签名、重试及日志。
 
 `GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织、接入应用及回调重发变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
 

@@ -64,6 +64,8 @@ SDK 还提供 `PreviewAsync`、`StartBatchAsync`（逐张独立返回结果）�
 
 `ApprovalService.Demo.Integration` 现有费用报销和采购申请的业务原单、独立本机 JSON 数据文件，以及用 SDK 发起、撤回、重提、待办操作和查询同步的薄对接层。业务后端用 `DemoBusinessHttpHost` 在回环地址提供 `/data`、`/validate`、`/assignees`、`/action`、`/callback` 五个完整 URL；请求先对原始字节验 HMAC，响应签名并回显请求 ID。回调按 `eventId` 在业务文件中持久去重，自动采购动作按同一事件 ID 重试和复用订单号。关闭本机后端时，客户端仍可调用 `DemoApprovalGateway.RefreshAsync` 在打开单据时同步状态。
 
+示例 `/callback` 收到 `integration.test` 时只对原始正文验签并返回确认，不查业务单号或修改原单；SDK 的 `ApprovalCallbackEventCodes.IntegrationTest` 与可选 `ClientAppCode` 可供业务系统识别测试事件。真实审批事件仍按原事件 ID 持久去重和同步业务状态。
+
 启动本机后端时只使用回环地址，例如 `http://127.0.0.1:6017/`；将五个完整地址分别登记在演示接入应用配置中。API Key 和签名密钥应从运行环境读入，业务文件不存密钥。`DemoOrganizationSeed.Build()` 可先预览设计书中的 7 个部门、19 个人员和 26 项绑定，`ApplyAsync` 通过 SDK 顺序推送；当前演示流程的角色配置与兼容 BPMN 文件导入仍需管理后台完成，不能把组织推送视为已经发布流程。
 
 “对接改动”按源码文件统计（不含 SDK 和界面）：
@@ -78,7 +80,7 @@ SDK 还提供 `PreviewAsync`、`StartBatchAsync`（逐张独立返回结果）�
 | `DemoApprovalGateway.cs` | SDK 发起、重提、待办和状态刷新 | 201 |
 | `DemoHmacSignature.cs` | 原始字节 HMAC 验签 | 62 |
 | `DemoHookModels.cs` | 四类钩子的请求与响应 JSON | 363 |
-| `DemoBusinessHttpHost.cs` | 本机业务 HTTP 后端与回调入口 | 439 |
+| `DemoBusinessHttpHost.cs` | 本机业务 HTTP 后端与回调入口 | 443 |
 | `DemoOrganizationSeed.cs` | 演示组织和应用绑定准备 | 190 |
 
 调用端检查程序现用假审批服务和真实回环 HTTP 验证这些对接路径。完整 17 个演示场景仍需要流程管理的兼容 BPMN 导入、委托和打印接口，再做一键流程发布及场景串测。

@@ -295,11 +295,12 @@ export async function setManagedFlowEnabled(flow: ManagedFlow, enabled: boolean,
 /**
  * 读取当前管理范围内的不可变发布版本摘要。
  * @param code 流程编码。
+ * @param signal 面板关闭或切换流程时的取消标记。
  * @returns 按版本号排列的安全摘要。
  */
-export async function listManagedFlowVersions(code: string): Promise<ManagedFlowVersion[]> {
+export async function listManagedFlowVersions(code: string, signal?: AbortSignal): Promise<ManagedFlowVersion[]> {
   const value = await getJson<unknown>(`${path}/${encodeURIComponent(code)}/versions`,
-    { headers: await headers(), cache: 'no-store' })
+    { headers: await headers(), signal, cache: 'no-store' })
   if (!Array.isArray(value) || !value.every(item => record(item) && typeof item.id === 'string'
     && typeof item.version === 'number' && Number.isSafeInteger(item.version)
     && typeof item.publishedAt === 'string' && typeof item.isCurrent === 'boolean')) {

@@ -4,6 +4,7 @@ import { createManagedFlow, exportManagedFlow, getManagedFlow, importManagedFlow
   listManagedFlowVersions, previewManagedImport, publishManagedFlow, restoreManagedFlowVersion,
   saveManagedFlow, setManagedFlowEnabled } from '../src/api/admin-flow-management.ts'
 import { createEmptyFlow } from '../src/designer/workbench/workbench-model.ts'
+import { restorableVersions, validRestoreReason } from '../src/model/flow-version.ts'
 
 /**
  * 用假 HTTP 服务核对流程管理员会话、修订前提和文件传输契约。
@@ -118,6 +119,18 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
     const versions = await listManagedFlowVersions('FLOW_A')
     check('版本历史只读取不可变摘要并标出当前发布版',
       versions.length === 2 && versions[0]?.isCurrent === true && versions[1]?.version === 1)
+    const allVersions = [
+      { id: 'version-1', version: 1, isCurrent: false },
+      { id: 'version-3', version: 3, isCurrent: true },
+      { id: 'version-2', version: 2, isCurrent: false },
+    ]
+    const oldVersions = restorableVersions(allVersions)
+    check('历史恢复入口只提供旧发布版且倒序排列，不修改原摘要',
+      oldVersions.map(item => item.id).join(',') === 'version-2,version-1'
+      && allVersions.map(item => item.id).join(',') === 'version-1,version-3,version-2')
+    check('恢复原因须为去空白后二至二百字',
+      !validRestoreReason(' ') && !validRestoreReason('a')
+      && validRestoreReason(' 旧版规则 ') && !validRestoreReason('x'.repeat(201)))
     const restored = await restoreManagedFlowVersion(published, 1, '恢复旧版内容')
     check('恢复旧版需要草稿和发布版双重 CAS 且不直接切换发布指针',
       restored.draftRevision === 4 && restored.publishedVersionId === 'version-2'

@@ -7,6 +7,8 @@ import { fetchCenterFile } from '../../api/center-files.ts'
 import { visibleCenterActions } from '../../model/center.ts'
 import type { CenterAction, CenterAttachment, CenterDetail } from '../../model/center.ts'
 import type { CenterActionInput } from '../../api/center-adapter.ts'
+import { loadCenterOpinions } from '../../api/center-opinions.ts'
+import type { CenterOpinion } from '../../api/center-opinions.ts'
 
 /**
  * 审批详情已授权数据与查询状态。
@@ -82,6 +84,18 @@ const selectedAction = ref<CenterAction | ''>('')
  */
 const opinion = ref('')
 /**
+ * 当前人员可选择的已保存意见。
+ */
+const commonOpinions = ref<CenterOpinion[]>([])
+/**
+ * 常用意见读取错误不会阻止手动填写和审批。
+ */
+const commonOpinionError = ref('')
+/**
+ * 同一详情只读取一次常用意见。
+ */
+let commonOpinionsLoaded = false
+/**
  * 可选目标人员的内部 ID。
  */
 const targetPersonId = ref('')
@@ -145,6 +159,25 @@ const commandByAction: Readonly<Record<CenterAction, string>> = {
 
 watch(actionTasks, tasks => { taskId.value = tasks[0]?.taskId ?? ''; selectedAction.value = '' })
 watch(taskId, () => { selectedAction.value = '' })
+watch(selectedAction, action => {
+  if (!action || commonOpinionsLoaded) return
+  commonOpinionsLoaded = true
+  void loadCenterOpinions().then(items => { commonOpinions.value = items }).catch(cause => {
+    commonOpinionError.value = cause instanceof Error ? cause.message : '常用意见读取失败。'
+  })
+})
+
+/**
+ * 只把已保存的意见填入编辑框，由审批人继续确认提交。
+ * @param event 选择事件。
+ * @returns 意见栏更新完成。
+ */
+function chooseCommonOpinion(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  const selected = commonOpinions.value.find(item => item.id === select.value)
+  if (selected) opinion.value = selected.content
+  select.value = ''
+}
 
 /**
  * 校验可选字段 JSON 后发出已选任务命令。
@@ -273,7 +306,7 @@ onBeforeUnmount(closePreview)
         </div>
         <aside class="center-detail-side"><section class="center-card"><h3>审批信息</h3><dl class="center-meta"><dt>发起人</dt><dd>{{ detail.item.initiatorName }}</dd><dt>来源系统</dt><dd>{{ detail.item.sourceName }}</dd><dt>业务单号</dt><dd>{{ detail.item.businessKey }}</dd><dt>当前环节</dt><dd>{{ detail.item.currentStep }}</dd><dt>发起时间</dt><dd>{{ detail.item.createdAt }}</dd></dl></section><section class="center-card"><h3>当前进度</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }}</p></li></ol><p v-else class="center-blank">暂无进度记录。</p></section></aside>
       </div>
-      <form v-if="actionTasks.length" class="center-action-bar" @submit.prevent="submitAction"><p>可用操作由服务端按当前任务确认，提交时会再次校验。</p><label v-if="actionTasks.length > 1">办理任务<select v-model="taskId"><option v-for="task in actionTasks" :key="task.taskId" :value="task.taskId">{{ task.nodeName }} · {{ task.taskId }}</option></select></label><div><button v-for="action in actions" :key="action" class="btn" :class="{ 'btn-primary': selectedAction === action }" type="button" :disabled="busy" @click="selectedAction = action">{{ actionLabels[action] }}</button></div><template v-if="selectedAction"><label>审批意见<textarea v-model="opinion" rows="3" placeholder="根据节点规则填写意见"></textarea></label><label v-if="['transfer', 'addSign', 'consult', 'copy'].includes(selectedAction)">目标人员 ID<input v-model="targetPersonId" placeholder="审批服务内部人员 ID"></label><label v-if="selectedAction === 'return'">目标节点 ID<input v-model="targetNodeId" placeholder="退回目标节点"></label><label v-if="['reply', 'removeSign', 'undoApproval'].includes(selectedAction)">关联 ID<input v-model="relatedId" placeholder="征询或加签关联 ID"></label><label v-if="['return', 'addSign'].includes(selectedAction)">操作模式<input v-model="mode" placeholder="例如 before、after 或 parallel"></label><label>审批人字段（可选 JSON 对象）<textarea v-model="fieldValuesText" rows="2" placeholder="例如：{&quot;reviewNote&quot;:&quot;已核对&quot;}"></textarea></label><p v-if="localError || actionError" role="alert" class="center-login-error">{{ localError || actionError }}</p><button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '提交中…' : `确认${actionLabels[selectedAction]}` }}</button></template></form>
+      <form v-if="actionTasks.length" class="center-action-bar" @submit.prevent="submitAction"><p>可用操作由服务端按当前任务确认，提交时会再次校验。</p><label v-if="actionTasks.length > 1">办理任务<select v-model="taskId"><option v-for="task in actionTasks" :key="task.taskId" :value="task.taskId">{{ task.nodeName }} · {{ task.taskId }}</option></select></label><div><button v-for="action in actions" :key="action" class="btn" :class="{ 'btn-primary': selectedAction === action }" type="button" :disabled="busy" @click="selectedAction = action">{{ actionLabels[action] }}</button></div><template v-if="selectedAction"><label v-if="commonOpinions.length">常用意见<select aria-label="选择常用意见填入审批意见" @change="chooseCommonOpinion"><option value="">选择常用意见</option><option v-for="item in commonOpinions" :key="item.id" :value="item.id">{{ item.content }}</option></select></label><p v-if="commonOpinionError" role="status">{{ commonOpinionError }}</p><label>审批意见<textarea v-model="opinion" rows="3" placeholder="根据节点规则填写意见"></textarea></label><label v-if="['transfer', 'addSign', 'consult', 'copy'].includes(selectedAction)">目标人员 ID<input v-model="targetPersonId" placeholder="审批服务内部人员 ID"></label><label v-if="selectedAction === 'return'">目标节点 ID<input v-model="targetNodeId" placeholder="退回目标节点"></label><label v-if="['reply', 'removeSign', 'undoApproval'].includes(selectedAction)">关联 ID<input v-model="relatedId" placeholder="征询或加签关联 ID"></label><label v-if="['return', 'addSign'].includes(selectedAction)">操作模式<input v-model="mode" placeholder="例如 before、after 或 parallel"></label><label>审批人字段（可选 JSON 对象）<textarea v-model="fieldValuesText" rows="2" placeholder="例如：{&quot;reviewNote&quot;:&quot;已核对&quot;}"></textarea></label><p v-if="localError || actionError" role="alert" class="center-login-error">{{ localError || actionError }}</p><button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '提交中…' : `确认${actionLabels[selectedAction]}` }}</button></template></form>
     </template>
     <div v-else class="center-card center-detail-empty">
       <UiEmptyState v-if="state === 'loading'" title="正在读取审批详情" description="请稍候。" icon="refresh" />

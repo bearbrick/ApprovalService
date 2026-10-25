@@ -101,6 +101,13 @@
 .center-settings-feedback { display: flex; gap: 12px; align-items: center; padding: 20px; }
 .center-settings-saved, .center-settings > p[role='alert'] { margin: 12px 22px 18px; }
 .center-settings-saved { color: #168051; }
+.center-opinions-body { padding: 18px 22px 22px; }
+.center-opinions-list { display: grid; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+.center-opinions-list li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.center-opinions-list li > div, .center-opinions form > div { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.center-opinions form { display: grid; gap: 10px; }
+.center-opinions form label { display: grid; gap: 6px; }
+.center-opinions form textarea { width: 100%; resize: vertical; }
 .center-login { max-width: 440px; margin: 38px auto; padding: 28px; }
 .center-login h2 { font-size: 20px; }
 .center-login > p { margin: 12px 0 20px; color: var(--muted); }

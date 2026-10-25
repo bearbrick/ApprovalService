@@ -22,6 +22,32 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PersonId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "CreatedAtUtc");
+
+                    b.ToTable("CenterOpinions", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
                 {
                     b.Property<string>("InstanceId")

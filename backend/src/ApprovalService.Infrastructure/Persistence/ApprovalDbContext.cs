@@ -5,6 +5,7 @@ using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Organization;
@@ -87,6 +88,11 @@ public class ApprovalDbContext : DbContext
     /// 审批中心按人员和审批单保存的已读活动游标。
     /// </summary>
     public DbSet<CenterReadCursorEntity> CenterReadCursors => Set<CenterReadCursorEntity>();
+
+    /// <summary>
+    /// 审批人个人保存的常用意见。
+    /// </summary>
+    public DbSet<CenterOpinionEntity> CenterOpinions => Set<CenterOpinionEntity>();
 
     /// <summary>
     /// 事务待发队列。
@@ -422,6 +428,8 @@ public class ApprovalDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(item => item.PersonId);
         });
+
+        CenterOpinionModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>
         {

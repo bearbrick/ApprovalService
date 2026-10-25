@@ -102,6 +102,7 @@ internal static class Program
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
+        await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);
         await FlowManagementIdentityChecks.RunAsync(Check);
         await FlowManagementMigrationIntegrationChecks.RunAsync(Check);

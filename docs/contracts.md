@@ -74,6 +74,7 @@
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET/PUT /api/v1/admin/apps/{code}/administrators` | 本地 JWT + 当前组织管理员角色 | 读取或替换该应用的内部人员管理员 ID 名单 |
+| `POST /api/v1/admin/apps/{code}/test-callback` | 本地 JWT + 当前组织管理员或该应用管理员 | 带原因排入不关联审批单的签名测试回调 |
 | `POST /api/v1/admin/flows/simulations`、`GET/DELETE /api/v1/admin/flows/simulations/{id}`、`POST /api/v1/admin/flows/simulations/{id}/steps` | 本地 JWT + 当前流程管理权限 | 完整草稿和假输入创建、读取、逐步推进及删除内存模拟会话 |
 | `GET /api/v1/admin/bindings`、`/admin/audit` | 本地 JWT + 当前组织管理员角色 | 读取业务系统绑定及最近 200 条组织/接入应用操作日志的安全摘要 |
 | `GET /api/v1/admin/outbox`、`POST /admin/callbacks/{eventId}/retry` | 本地 JWT + 当前组织管理员角色 | 读取最近 200 条待发项元数据；按原事件 ID 带原因手动重发回调 |
@@ -117,6 +118,8 @@
 `GET /admin/apps/{code}/embed-origins` 返回 `{code, origins}`；`PUT` 接受 `{origins, reason}` 并返回相同结构。`origins` 是完整来源列表，最多 20 项、每项不超过 256 字符，去重后保存；仅允许 HTTPS 网站来源，开发时 HTTP 只允许 `localhost` 或 `127.0.0.1`，不得包含路径、查询、片段、用户信息或通配符。`reason` 须为 2 至 200 字符。保存使用旧值条件更新防止覆盖并发修改，在同一事务记录管理员、原因和不含密钥的前后来源快照。
 
 `GET /admin/apps/{code}/administrators` 返回 `{code, personIds}`，按内部人员 ID 排序；旧应用默认 `[]`。`PUT` 接受 `{expectedPersonIds, personIds, reason}`，两份名单均不得超过 50 人或含重复、空白 ID；目标名单仅接受当前在职的内部人员 ID，原因须为 2 至 200 字符。`expectedPersonIds` 必须等于读取时的旧名单，否则返回 409；写入在串行化事务中复核人员、条件替换并留只含人员 ID 与原因的审计。只有本地组织管理员能维护名单。后续测试回调用例会从可信本地 JWT 取得人员 ID，重新核对应用启用状态及当前在职的名单成员或组织管理员；本接口本身不发送回调。
+
+`POST /admin/apps/{code}/test-callback` 接受 `{reason}`，原因须为 2 至 200 字符；仅当前本地会话中的组织管理员或该应用名单内在职人员可调用，入队事务再次核对权限、应用启用及非空回调地址。成功返回 `{eventId, status:"queued"}`，`eventId` 以 `test-` 开头，每次测试唯一。该接口只保存回调待发项及含操作者和原因的脱敏审计，不创建审批单、任务或业务动作。`integration.test` 正文沿用回调字段：`instanceId` 为与 `eventId` 相同的合成 ID，`serialNo`、`flowCode`、`businessKey` 为空串，`status` 为 `test`，`data` 为 `{}`，测试事件专有 `clientAppCode` 为目标应用编码；`occurredAt` 为排队时间。业务系统只验签确认，不按业务单号更新单据。发送复用 `X-Approval-Signature` 原始正文 HMAC、`X-Request-Id=eventId`、五秒超时、持久重试与发送日志；管理队列摘要可按应用查看该项。旧审批回调不带 `clientAppCode`。
 
 流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,success?,actionResult?}`，人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
 
@@ -229,7 +232,7 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 审批服务调业务系统的都经出站适配层，带 `X-Approval-Signature` 签名，默认 5 秒超时，失败按 1 分钟、5 分钟、30 分钟、2 小时……重试（T-006）。回调和钩子地址默认只能是 HTTPS；仅可信内网部署显式设置 `ApprovalService:Integration:AllowHttpUrls=true` 时接受 HTTP。签名只防篡改，不提供传输保密。出站客户端不跟随 HTTP 重定向，避免把审批数据和签名转发至未登记的地址。
 
-- **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`；人工操作已填写字段另在可选 `fieldValues` 中，绝不覆盖 `data`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`、`instance.returnedToInitiator`、`instance.supplementRequested`，以及 `task.created`、`task.completed`、`task.cancelled`。后两种实例事件表示已退回发起人或正等待发起人补充，`status` 为 `awaitingInitiator`；退回历史审批节点不使用 `instance.returnedToInitiator`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。停用接入应用期间保留待发项且不出站；尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
+- **结果回调（已实现基础发送）**：审批事务把需通知的事件固定成 JSON 快照并写入待发队列；后台任务对接入应用登记的完整回调地址发送 POST，使用 `X-Approval-Signature` 对原始 UTF-8 正文签名，`X-Request-Id` 为稳定 `eventId`。请求体包含 `eventId`、`event`、`instanceId`、`serialNo`、`flowCode`、`businessKey`、`status`、`data`（事件时的审批数据快照）、`occurredAt`；人工操作已填写字段另在可选 `fieldValues` 中，绝不覆盖 `data`。当前映射 `instance.started`、`instance.approved`、`instance.rejected`、`instance.withdrawn`、`instance.terminated`、`instance.cancelled`、`instance.returnedToInitiator`、`instance.supplementRequested`，以及 `task.created`、`task.completed`、`task.cancelled`；接入测试另外使用 `integration.test`。后两种实例事件表示已退回发起人或正等待发起人补充，`status` 为 `awaitingInitiator`；退回历史审批节点不使用 `instance.returnedToInitiator`。只接受 2xx；超时为 5 秒，失败按待发队列规则从 1 分钟、5 分钟、30 分钟、2 小时起重试。每次发送留状态和错误类别日志，不保存正文；管理用例可对原事件重新排队，重发仍使用相同 `eventId` 和正文。停用接入应用期间保留待发项且不出站；尚未登记回调地址时不调用业务系统，事件仍在操作记录中。
   接入应用被停用后，已有待发回调暂停发送并记录 `CLIENT_APP_DISABLED`，仍留在队列等待后续重试；重新启用后可送达同一事件。
 
 撤销同意成功后，原审批任务从已处理恢复为待办，服务发兼容新增的 `task.restored` 回调；该回调独有可选 `taskId`，值为恢复的原任务 ID，`status` 为 `running`。待办订阅方收到它时须刷新原任务/待办列表；撤销期间被取消的下一步任务仍按既有 `task.cancelled` 通知。`task.restored` 与其他回调一样在审批事务中固定 `eventId` 和完整正文，失败重试及手动重发不生成新任务 ID 或事件 ID。审批单详情中恢复为 `pending` 的原任务清空 `opinion` 与 `completedAt`，此前的同意意见和撤销动作仍保留在只追加操作记录里。其他回调不新增 `taskId` 字段。

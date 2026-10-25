@@ -24,7 +24,9 @@
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、三种数据库迁移、`backend/tests/ApprovalService.Backend.Checks/ClientAppAdminChecks.cs`：存量名单默认为空并检查读写权限。
 - `backend/src/ApprovalService.Domain/Integration/ITestCallbackRepository.cs`、`backend/src/ApprovalService.Application/Integration/TestCallbackAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/TestCallbackRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/TestCallbackEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/TestCallbackChecks.cs`：已确认的签名持久测试回调，不建立审批单。
 - `backend/src/ApprovalService.Infrastructure/Integration/CallbackOutboxHandler.cs`、`backend/src/ApprovalService.Infrastructure/Administration/AdminConsoleRepository.cs`：识别无真实审批单的测试回调，按登记应用投递并在管理队列摘要中展示。
-- `client/src/ApprovalService.Client/ApprovalCallback.cs`、`client/tests/ApprovalService.Client.Checks/CallbackChecks.cs`：SDK 解析新增的可选应用编码和 `integration.test` 回调。
+- `client/src/ApprovalService.Client/ApprovalCallback.cs`、`ApprovalCallbackEventCodes.cs`、`client/tests/ApprovalService.Client.Checks/TestCallbackChecks.cs`：SDK 解析新增的可选应用编码和 `integration.test` 回调。
+- `client/samples/ApprovalService.Demo.Integration/DemoBusinessHttpHost.cs`、`client/tests/ApprovalService.Client.Checks/DemoBusinessHttpChecks.cs`、`client/README.md`：示例接收端对测试回调只验签确认，不更新业务原单。
+- `docs/adr/0021-simulation-and-integration-test.md`：同步已确认测试回调协议的落地状态。
 
 ## 共享文件
 
@@ -43,9 +45,10 @@
 - [ ] 每个模板都能发布并在测试模式里走通
 - [x] 测试模式不产生真实回调和提醒（检查覆盖）
 - [x] 接入应用管理员名单由本地组织管理员维护，存量默认为空；可信授权查询覆盖应用启停和人员在职
+- [x] 测试回调由本地组织管理员或本应用管理员带原因排入持久队列，接收端只验签确认
 - [ ] 向导生成的代码能直接编译（检查程序编译一遍）
 - [x] `verify.ps1` 通过（见 AGENTS.md）
-- [x] 已实现部分的 README、模拟契约与设计书同步；测试回调待后续实现时同步
+- [x] 已实现部分的 README、模拟与测试回调契约、设计书同步
 
 ## 不做
 
@@ -53,6 +56,7 @@
 
 ## 交接记录
 
+- 2026-10-25 · Codex · 完成 `integration.test` 一键测试回调后端协议与示例接收端：本地组织管理员或已登记的本应用管理员带原因调用 `POST /api/v1/admin/apps/{code}/test-callback`，应用层和 SQLite 入队事务都重验权限、在职、应用启用及回调地址；返回合成 `test-` 事件 ID 和 `queued`。正文使用合成 `instanceId`、空 `serialNo/flowCode/businessKey`、`status=test`、`data={}` 与测试专有 `clientAppCode`，不建审批单、任务或业务动作。复用持久回调队列、HMAC/请求 ID、重试与逐次发送日志；管理队列摘要可识别无审批单的测试项。示例业务系统对测试事件只验签确认，不更新原单；SDK 新增可选应用编码与测试事件编码副本。真实 HTTP/SQLite/假出站场景覆盖匿名、普通人员、应用管理员、组织管理员、撤权、停用、无回调地址、失败重试、签名、发送日志和示例接收端。完整 `verify.ps1` 通过：后端 1060 项、调用端含真实服务端到端、前端 185 项及生产构建。**仍未完成**：接入向导页面把创建应用、管理员名单和测试回调串成完整操作，以及十模板逐一端到端走通；状态保持进行中。无新增依赖或数据库迁移，也未触碰 T-011 常用意见 agent 文件。
 - 2026-10-25 · Codex · 从整合提交 `da89c33` 开始测试回调独立切片；按 ADR 0021 复用持久回调队列和出站签名。现有待发项没有审批单外键，但处理器和管理摘要依赖真实审批单查询；测试回调将用合成 `test-` 事件/实例 ID、仅测试事件携带可选接入应用编码，出站处理器按此识别，管理摘要对测试项读该编码。不增加数据库迁移、不修改 T-011 工作树。新 Contracts/SDK 副本、服务登记及共享文档改动已在上方预登记。
 - 2026-10-25 · Codex · 完成接入应用管理员名单独立后端切片：`GET/PUT /api/v1/admin/apps/{code}/administrators` 仅供本地组织管理员读取、按旧名单条件替换，PUT 校验最多 50 名当前在职的内部人员、变更原因和并发冲突；在串行化事务中记录仅含人员 ID/原因的审计。新增供后续测试回调调用的 `CanSendTestCallbackAsync`，每次重新核对本地会话、应用启用、人员在职及本应用名单或组织管理员身份。三库增量迁移通过 `backend/tools/add-migration.ps1` 生成，存量名单默认 `[]`；真实 HTTP/SQLite 场景覆盖匿名、普通人员、组织管理员、非法/离职人员、重复、并发、应用隔离、停用与离职。同步 Contracts、契约/架构、后端 README 和设计书第 12 节。完整 `verify.ps1` 第二次运行全部通过：后端检查、SDK 真实服务端到端、前端 183 项及构建；第一次运行在与本切片无关的 `DemoBusinessHttpChecks` 发生一次连接提前关闭，单独 client 检查及完整复验均通过。**仍未完成**：接入向导的 `integration.test` 持久测试回调、应用创建接线及模板逐一端到端走通；状态保持进行中，下一位可直接复用 `ClientAppAdminAppService.CanSendTestCallbackAsync`，不得仅信任前端显示或名单旧快照。
 - 2026-10-25 · Codex · 按用户的 50% 额度停工线在动产品代码前暂停；本分支 `ai/codex/T-022-client-app-admins` 只提交了范围/共享登记 `cff1b14`，工作树无未提交改动。已确认 `ClientAppEntity` 目前没有管理员身份字段，`ClientApps` 的三库 EF 模型可增加默认 `[]` 的内部人员 ID JSON 名单；`PersonEntity.IsActive` 与 `PersonRoleEntity` 可供授权时核对当前在职和组织管理员角色，管理端现有 `OrganizationAdminRequirement` 只接受本地会话。下一位从本分支继续：添加独立的名单仓储和应用服务、管理 GET/PUT 契约及路由；PUT 校验现存且在职人员、比较读取时的名单以防并发覆盖，并与只含人员 ID/原因的审计同事务写入；供后续测试回调使用的授权查询须再核对应用启用、当前在职、本地会话及名单或组织管理员。为 `ClientApps` 默认空名单用官方 `backend/tools/add-migration.ps1` 生成 SQLite、SQL Server、PostgreSQL 增量，不能覆盖已合入的 T-020 管理迁移；补匿名、普通人员、组织管理员、名单成员、停用应用、离职人员及并发冲突场景，最后全量 `verify.ps1`。本轮没有真实 HTTP 测试，T-022 保持进行中。

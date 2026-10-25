@@ -1,4 +1,6 @@
 using System.Text.Json;
+using ApprovalService.Contracts;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Administration;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -16,19 +18,34 @@ public sealed class AdminConsoleRepository(IDbContextFactory<ApprovalDbContext> 
         CancellationToken cancellationToken = default)
     {
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        return await (from item in db.OutboxItems.AsNoTracking()
-                      join instance in db.Instances.AsNoTracking() on item.InstanceId equals instance.Id
-                      orderby item.AvailableAt descending, item.Id descending
-                      select new AdminOutboxRecord
-                      {
-                          EventId = item.EventId,
-                          ClientAppCode = instance.ClientAppCode,
-                          Kind = item.Kind,
-                          Status = item.Status,
-                          Attempts = item.Attempts,
-                          AvailableAt = item.AvailableAt,
-                          ErrorCode = item.LastError,
-                      }).Take(limit).ToArrayAsync(cancellationToken);
+        var records = await (from item in db.OutboxItems.AsNoTracking()
+                             join instance in db.Instances.AsNoTracking() on item.InstanceId equals instance.Id
+                                 into instances
+                             from instance in instances.DefaultIfEmpty()
+                             orderby item.AvailableAt descending, item.Id descending
+                             select new
+                             {
+                                 item.EventId,
+                                 ClientAppCode = instance == null ? null : instance.ClientAppCode,
+                                 item.Kind,
+                                 item.Status,
+                                 item.Attempts,
+                                 item.AvailableAt,
+                                 ErrorCode = item.LastError,
+                                 // 正常审批回调不读取正文，只有合成测试项需提取所属应用。
+                                 TestPayloadJson = item.EventId.StartsWith(CallbackEventCodes.TestEventIdPrefix)
+                                     ? item.PayloadJson : null,
+                             }).Take(limit).ToArrayAsync(cancellationToken);
+        return records.Select(item => new AdminOutboxRecord
+        {
+            EventId = item.EventId,
+            ClientAppCode = item.ClientAppCode ?? ReadTestClientAppCode(item.TestPayloadJson),
+            Kind = item.Kind,
+            Status = item.Status,
+            Attempts = item.Attempts,
+            AvailableAt = item.AvailableAt,
+            ErrorCode = item.ErrorCode,
+        }).ToArray();
     }
 
     /// <inheritdoc />
@@ -99,5 +116,29 @@ public sealed class AdminConsoleRepository(IDbContextFactory<ApprovalDbContext> 
         using var document = JsonDocument.Parse(json);
         return document.RootElement.TryGetProperty("reason", out var reason) &&
             reason.ValueKind == JsonValueKind.String ? reason.GetString() : null;
+    }
+
+    /// <summary>
+    /// 只从合成测试通知中读取应用编码，损坏正文不扩展管理列表可见数据。
+    /// </summary>
+    /// <param name="json">仅测试待发项的持久正文。</param>
+    /// <returns>测试应用编码；无效正文返回空串。</returns>
+    private static string ReadTestClientAppCode(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var notification = JsonSerializer.Deserialize<CallbackNotification>(json, ApprovalJson.Options);
+            return notification?.Event == CallbackEventCodes.IntegrationTest ?
+                notification.ClientAppCode ?? string.Empty : string.Empty;
+        }
+        catch (JsonException)
+        {
+            return string.Empty;
+        }
     }
 }

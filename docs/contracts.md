@@ -58,6 +58,7 @@
 | `GET /metrics` | 本机或部署级 Bearer 密钥 | Prometheus 0.0.4 聚合文本；只含 HTTP 方法、路由模板、状态码和耗时桶，不含业务标识。远程密钥由 `ApprovalService:Metrics:BearerToken` 配置，至少 32 字符；无权返回 403 |
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
+| `GET/POST /api/v1/center/opinions`、`PUT/DELETE /api/v1/center/opinions/{id}` | 读取为人员 JWT；写入仅本地 JWT | 本人常用意见最多 30 条，每条最多 500 字，嵌入会话只读 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
 | `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
@@ -188,6 +189,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 可见详情限发起人、实际代发人、当前本人或代理关系中的待办，以及持久化的历史实际处理人/已送达抄送人。保密流程不因管理员身份或仅有未到达、已取消任务自动开放；本切片不开放额外查看人或管理查询。嵌入会话的应用条件与人员条件共同下推到数据库查询，跨应用详情和其他不可见或不存在的单据统一返回 `NOT_FOUND`。列表与详情分别在一个一致读事务中读取计数、版本、任务和事件。
 
 没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。详情新增 `fieldDefinitions`，与已裁剪 `data` 一一对应，结构同摘要定义；前端用锁定发布版本的名称和已授权子列绘制明细表，不输出原始 JSON。详情还返回 `attachments: [{id,fileName,contentType,size}]`，只从可见附件字段（含明细行）提取 ID，且元数据必须仍关联本审批单；隐藏字段中的文件不列出。文件内容继续用当前人员 JWT 调 `GET /api/v1/files/{id}`，该下载接口独立验权，不把令牌放 URL。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表、详情、字段内容搜索、任务操作与逐项批量同意，`frontend/src/api/center-adapter.ts` 是中心响应副本。未读由后续中心切片实现。本切片不供业务 SDK 调用。
+
+`GET /api/v1/center/opinions` 返回当前 JWT 人员的个人常用意见数组，每项 `{id,content,createdAtUtc}`，按创建时间和 ID 稳定排序；本地与嵌入会话均可读取。`POST /api/v1/center/opinions` 和 `PUT /api/v1/center/opinions/{id}` 请求 `{content}`，返回保存后的单项；`DELETE /api/v1/center/opinions/{id}` 成功返回 204。三种写请求仅允许本地人员会话，嵌入会话返回 `FORBIDDEN`；意见只按 JWT 人员 ID 归属，不接受请求中的人员参数。正文去除首尾空白后须为 1～500 字，每人最多 30 条，满额返回 `CONFLICT`；他人意见与不存在统一 `NOT_FOUND`。常用意见仅填入当前审批意见栏，任务提交仍走现有操作接口。
 
 ## 同源审批中心内嵌
 

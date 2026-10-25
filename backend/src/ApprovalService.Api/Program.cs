@@ -130,6 +130,7 @@ app.MapFlowSimulationEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();
+app.MapCenterOpinionEndpoints();
 app.MapCenterEmbedEndpoints();
 
 if (bootstrapCommand)

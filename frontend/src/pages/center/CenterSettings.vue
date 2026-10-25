@@ -4,6 +4,7 @@ import { loadCenterPreferences, notificationCategories, saveCenterPreference } f
 import type { CenterNotificationPreference } from '../../api/center-settings.ts'
 import { ApiError } from '../../api/http-types.ts'
 import UiEmptyState from '../../components/ui/UiEmptyState.vue'
+import CenterCommonOpinions from './CenterCommonOpinions.vue'
 
 /**
  * 当前人员会话失效时由父页面退出登录。
@@ -120,5 +121,6 @@ onBeforeUnmount(() => request?.abort())
       <p v-if="error" role="alert" class="center-login-error">{{ error }}</p><p v-if="saved" role="status" class="center-settings-saved">{{ saved }}</p>
     </template>
   </section>
-  <p class="center-settings-note">常用意见、个人签名和委托设置暂未接入，当前页面只保存提醒偏好。</p>
+  <CenterCommonOpinions @unauthorized="emit('unauthorized')" />
+  <p class="center-settings-note">个人签名和委托设置正在接入。</p>
 </template>

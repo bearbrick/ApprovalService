@@ -4,6 +4,7 @@ import { ApiError } from '../../api/http.ts'
 import { exportManagedFlow, importManagedFlow, listFlowDepartments, listManagedFlows, previewManagedImport,
   setManagedFlowEnabled } from '../../api/admin-flow-management.ts'
 import type { FlowDepartment, FlowImportPreview, ManagedFlow } from '../../api/admin-flow-management.ts'
+import AdminFlowVersions from './AdminFlowVersions.vue'
 import '../../styles/admin-flows.css'
 
 /**
@@ -48,6 +49,10 @@ const statusFlow = ref<ManagedFlow | null>(null)
  * 停启用的管理员原因。
  */
 const statusReason = ref('')
+/**
+ * 当前展开版本历史的流程，面板会再次向服务端读取最新修订和发布指针。
+ */
+const historyFlow = ref<ManagedFlow | null>(null)
 /**
  * 从本机读取但尚未保存的 BPMN 文件。
  */
@@ -132,6 +137,26 @@ function chooseStatus(flow: ManagedFlow): void {
   statusReason.value = ''
   error.value = ''
   message.value = ''
+}
+
+/**
+ * 展开当前流程的不可变版本历史。
+ * @param flow 服务端授权目录中的流程。
+ */
+function showHistory(flow: ManagedFlow): void {
+  historyFlow.value = flow
+  error.value = ''
+  message.value = ''
+}
+
+/**
+ * 恢复成功后更新目录摘要，提醒管理员仍需检查草稿并显式发布。
+ * @param flow 服务端返回的最新草稿修订和原发布指针。
+ */
+function handleRestored(flow: ManagedFlow): void {
+  flows.value = flows.value.map(item => item.code === flow.code ? flow : item)
+  historyFlow.value = null
+  message.value = `已从旧发布版建立 ${flow.code} 的草稿修订 ${flow.draftRevision}；当前发布版未改变，请进入设计器检查后显式发布。`
 }
 
 /**
@@ -256,7 +281,8 @@ onBeforeUnmount(() => request?.abort())
   <section class="admin-flow-manager">
     <div class="admin-panel admin-flow-heading"><div><h2>流程管理</h2><p>只展示当前账号有权管理的流程。草稿可修改；发布版不可变。</p></div><div class="admin-flow-actions"><a class="btn btn-primary" href="#/designer/NEW_FLOW/design">＋ 新建流程</a><a class="btn" href="#/designer/templates">使用模板</a><button class="btn" type="button" :disabled="busy" @click="load">刷新</button></div></div>
     <p v-if="error" class="admin-flow-error" role="alert">{{ error }}</p><p v-if="message" class="admin-flow-success" role="status">{{ message }}</p>
-    <div class="admin-panel admin-flow-list"><label>筛选流程<input v-model="search" type="search" placeholder="名称、编码或分组"></label><div v-if="!visible().length" class="admin-flow-empty">当前范围没有流程。可从空白画布或模板建立草稿。</div><table v-else><thead><tr><th>流程</th><th>分组 / 所属部门</th><th>草稿 / 发布版</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="flow in visible()" :key="flow.code"><td><strong>{{ flow.name }}</strong><small>{{ flow.code }}</small></td><td>{{ flow.group || '未分组' }}<small>{{ departmentName(flow.ownerDepartmentId) }}</small></td><td>修订 {{ flow.draftRevision }}<small>{{ flow.publishedVersion ? `发布 v${flow.publishedVersion}` : '尚未发布' }}</small></td><td><span :class="flow.isEnabled ? 'on' : 'off'">{{ flow.isEnabled ? '可发起' : '已停用' }}</span></td><td class="admin-flow-row-actions"><a :href="`#/designer/${encodeURIComponent(flow.code)}/design`">设计</a><button type="button" :disabled="busy" @click="chooseStatus(flow)">{{ flow.isEnabled ? '停用' : '恢复' }}</button><button type="button" :disabled="busy" @click="download(flow, 'draft')">导出草稿</button><button type="button" :disabled="busy || !flow.publishedVersion" @click="download(flow, 'published')">导出发布版</button></td></tr></tbody></table></div>
+    <div class="admin-panel admin-flow-list"><label>筛选流程<input v-model="search" type="search" placeholder="名称、编码或分组"></label><div v-if="!visible().length" class="admin-flow-empty">当前范围没有流程。可从空白画布或模板建立草稿。</div><table v-else><thead><tr><th>流程</th><th>分组 / 所属部门</th><th>草稿 / 发布版</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="flow in visible()" :key="flow.code"><td><strong>{{ flow.name }}</strong><small>{{ flow.code }}</small></td><td>{{ flow.group || '未分组' }}<small>{{ departmentName(flow.ownerDepartmentId) }}</small></td><td>修订 {{ flow.draftRevision }}<small>{{ flow.publishedVersion ? `发布 v${flow.publishedVersion}` : '尚未发布' }}</small></td><td><span :class="flow.isEnabled ? 'on' : 'off'">{{ flow.isEnabled ? '可发起' : '已停用' }}</span></td><td class="admin-flow-row-actions"><a :href="`#/designer/${encodeURIComponent(flow.code)}/design`">设计</a><button type="button" :disabled="busy" @click="chooseStatus(flow)">{{ flow.isEnabled ? '停用' : '恢复' }}</button><button type="button" :disabled="busy || !flow.publishedVersion" @click="showHistory(flow)">版本历史</button><button type="button" :disabled="busy" @click="download(flow, 'draft')">导出草稿</button><button type="button" :disabled="busy || !flow.publishedVersion" @click="download(flow, 'published')">导出发布版</button></td></tr></tbody></table></div>
+    <AdminFlowVersions v-if="historyFlow" :key="historyFlow.code" :flow="historyFlow" @lost="emit('lost')" @restored="handleRestored" @close="historyFlow = null" />
     <form v-if="statusFlow" class="admin-panel admin-flow-inline-form" @submit.prevent="changeStatus"><h3>{{ statusFlow.isEnabled ? '停用' : '恢复' }} {{ statusFlow.name }}</h3><p>服务端会再次核对当前状态与权限；停用仅阻止新发起。</p><label>变更原因<input v-model="statusReason" minlength="2" maxlength="200" required></label><div><button class="btn btn-primary" type="submit" :disabled="busy">确认{{ statusFlow.isEnabled ? '停用' : '恢复' }}</button><button class="btn" type="button" @click="statusFlow = null">取消</button></div></form>
     <form class="admin-panel admin-flow-import" @submit.prevent="saveImport"><h3>导入兼容 BPMN</h3><p>先在服务端预检文件。导入只保存草稿，发布须另行确认。</p><label>选择本服务导出的 .bpmn 文件<input type="file" accept=".bpmn,.xml,application/xml,text/xml" :disabled="busy" @change="chooseImport"></label><template v-if="preview"><p class="admin-flow-preview"><strong>{{ preview.name }}</strong>（{{ preview.code }}）· {{ preview.nodeCount }} 个节点</p><p v-if="preview.hasCodeConflict" class="admin-flow-error">同编码流程已存在。默认拒绝；仅有管理权限时可显式覆盖当前草稿。</p><label v-if="preview.hasCodeConflict && preview.canOverwrite"><input v-model="overwrite" type="checkbox"> 覆盖 {{ preview.code }} 的草稿修订 {{ preview.existingDraftRevision }}</label><p v-if="preview.hasCodeConflict && !preview.canOverwrite" class="admin-flow-error">当前账号无权覆盖该流程。</p><ul v-if="preview.publishIssues.length"><li v-for="(issue, index) in preview.publishIssues" :key="index">{{ issue.message }}<small v-if="issue.elementId"> · {{ issue.elementId }}</small></li></ul><div class="admin-flow-import-fields"><label>分组<input v-model="importGroup" maxlength="128"></label><label>所属部门<select v-model="importOwnerDepartmentId"><option value="">组织级（仅组织管理员）</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><label>运行期管理员内部 ID<input v-model="importAdministratorId" maxlength="64"></label><label>导入原因<input v-model="importReason" minlength="2" maxlength="200" required></label></div><button class="btn btn-primary" type="submit" :disabled="busy || preview.hasCodeConflict && (!preview.canOverwrite || !overwrite)">保存为草稿</button></template></form>
   </section>

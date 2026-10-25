@@ -30,4 +30,20 @@
 .admin-flow-import-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .admin-flow-preview { padding: 10px 12px; border: 1px solid var(--line); border-radius: 4px; background: #f8fafd; }
 .admin-flow-import ul { margin: 0; padding-left: 22px; color: #9a3542; font-size: 12px; }
+.admin-flow-versions { display: grid; gap: 14px; }
+.admin-flow-version-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.admin-flow-version-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-flow-version-heading h3 { font-size: 16px; }
+.admin-flow-version-heading p, .admin-flow-version-form p { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.admin-flow-version-current { margin: 0; color: var(--muted); font-size: 13px; }
+.admin-flow-version-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.admin-flow-version-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.admin-flow-version-list strong, .admin-flow-version-list small { display: block; }
+.admin-flow-version-list small { margin-top: 3px; color: var(--muted); font-size: 12px; }
+.admin-flow-version-form { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 4px; background: #f8fafd; }
+.admin-flow-version-form h4 { font-size: 15px; }
+.admin-flow-version-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; }
+.admin-flow-version-form input { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); }
+.admin-flow-version-form > div { display: flex; flex-wrap: wrap; gap: 8px; }
 @media (max-width: 720px) { .admin-flow-heading { align-items: start; flex-direction: column; } .admin-flow-import-fields { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .admin-flow-version-heading, .admin-flow-version-list li { align-items: start; flex-direction: column; } }

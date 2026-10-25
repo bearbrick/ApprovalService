@@ -14,6 +14,10 @@ export interface CenterActionInput {
    */
   opinion?: string
   /**
+   * 本次明确选用的本人手写签名资产 ID。
+   */
+  signatureFileId?: string
+  /**
    * 可选目标人员 ID。
    */
   targetPersonId?: string

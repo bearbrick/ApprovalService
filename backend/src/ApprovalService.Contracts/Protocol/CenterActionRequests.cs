@@ -19,6 +19,13 @@ public sealed class CenterTaskActionRequest
         get; set;
     }
     /// <summary>
+    /// 本次明确选用的本人不可变签名资产 ID；省略表示本次不使用签名。
+    /// </summary>
+    public string? SignatureFileId
+    {
+        get; set;
+    }
+    /// <summary>
     /// 转交、加签、抄送或征询的目标人员 ID。
     /// </summary>
     public string? TargetPersonId

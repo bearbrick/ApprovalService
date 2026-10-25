@@ -119,6 +119,13 @@ public sealed class OperationInput
         get; set;
     }
     /// <summary>
+    /// 本次明确选用且已由应用层核对归属的不可变签名资产 ID。
+    /// </summary>
+    public string? SignatureFileId
+    {
+        get; set;
+    }
+    /// <summary>
     /// 管理员干预的原因。
     /// </summary>
     public string? Reason
@@ -284,6 +291,13 @@ public sealed class OperationAudit
     /// 审批意见。
     /// </summary>
     public string? Opinion
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 本次操作冻结的签名资产 ID；资产内容不可变。
+    /// </summary>
+    public string? SignatureFileId
     {
         get; set;
     }

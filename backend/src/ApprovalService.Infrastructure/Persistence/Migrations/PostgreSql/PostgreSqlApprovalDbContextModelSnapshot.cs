@@ -42,6 +42,39 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("CenterReadCursors", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.SignatureAssetEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsPersonal")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PersonId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<byte[]>("PngBytes")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "IsPersonal", "UploadedAt");
+
+                    b.ToTable("SignatureAssets", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.Property<string>("Id")

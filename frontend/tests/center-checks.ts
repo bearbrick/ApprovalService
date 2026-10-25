@@ -4,6 +4,7 @@ import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-
 import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
 import { fetchCenterFile } from '../src/api/center-files.ts'
+import { fetchCenterSignature, latestCenterSignature, uploadCenterSignature } from '../src/api/center-signatures.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
@@ -66,6 +67,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   const originalFetch = globalThis.fetch
   const requests: { path: string, authorization: string, method: string, body: string }[] = []
   let allowActions = false
+  let requireSignature = false
   let serverUnread = true
   let failPreference = false
   const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
@@ -82,6 +84,13 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       const path = String(input)
       requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '',
         method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
+      if (path.startsWith('/api/v1/center/signatures/')) {
+        if (path.endsWith('/me')) return new Response(JSON.stringify({ id: 'personal-1', sha256: 'a'.repeat(64), isPersonal: true, uploadedAt: '2026-10-25T00:00:00Z' }), { status: 200 })
+        return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { 'Content-Type': 'image/png' } })
+      }
+      if (path.startsWith('/api/v1/center/signatures?')) {
+        return new Response(JSON.stringify({ id: 'single-1', sha256: 'b'.repeat(64), isPersonal: path.includes('personal=true'), uploadedAt: '2026-10-25T00:00:00Z' }), { status: 200 })
+      }
       if (path.endsWith('/files/file-visible')) {
         return new Response(new Blob(['PDF'], { type: 'application/pdf' }), { status: 200,
           headers: { 'Content-Type': 'application/pdf' } })
@@ -121,7 +130,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
               { fieldKey: 'secret', columnSpan: 1, detailColumnWidths: {} },
             ] }] },
             attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
-            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }],
+            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, signatureRequired: requireSignature, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }],
             events: [{ eventId: 'event-2', sequence: 2, kind: 'commentAdded', nodeId: 'approval', actorId: 'other', occurredAt: '2026-10-19T11:00:00Z', opinion: null }], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, isUnread: serverUnread,
             canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
@@ -181,6 +190,12 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.at(-2)?.body.includes('"action":"approve"') === true
       && requests.at(-1)?.body.includes('"taskIds":["task-1"]') === true
       && batch[0]?.succeeded === true && batch[0]?.instanceId === 'instance-1')
+    requireSignature = true
+    const requiredDetail = await centerAdapter.loadDetail('instance-1', controller.signal)
+    await centerAdapter.executeAction('task-1', { action: 'approve', signatureFileId: 'personal-1' })
+    check('节点必签规则映射到操作表单且明确选用 ID 进入本次请求',
+      requiredDetail.actionTasks?.[0]?.signatureRequired === true
+      && requests.at(-1)?.body.includes('"signatureFileId":"personal-1"') === true)
     const preferences = await loadCenterPreferences()
     const savedPreference = await saveCenterPreference({ ...preferences[0]!, emailEnabled: false })
     const persisted = await loadCenterPreferences()
@@ -193,6 +208,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.slice(-4).every(request => request.authorization === 'Bearer test-token')
       && requests.at(-3)?.method === 'PUT' && requests.at(-3)?.body === '{"emailEnabled":false,"inAppEnabled":true}'
       && requests.at(-2)?.method === 'GET')
+    const personalSignature = await latestCenterSignature()
+    const singleSignature = await uploadCenterSignature(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }), false)
+    const image = await fetchCenterSignature(singleSignature.id, 'instance-1')
+    check('手写签名只用人员 JWT 上传并按审批单验权取图，令牌不进 URL',
+      personalSignature?.id === 'personal-1' && singleSignature.id === 'single-1' && image.type === 'image/png'
+      && requests.slice(-3).every(request => request.authorization === 'Bearer test-token')
+      && requests.at(-2)?.method === 'POST' && requests.at(-2)?.path.endsWith('personal=false') === true
+      && requests.at(-1)?.path === '/api/v1/center/signatures/single-1?instanceId=instance-1')
+    let oversizedRejected = false
+    try { await uploadCenterSignature(new Blob([new Uint8Array(2 * 1024 * 1024 + 1)], { type: 'image/png' }), false) } catch { oversizedRejected = true }
+    check('浏览器在发请求前拒绝超过 2 MiB 的签名 PNG', oversizedRejected &&
+      requests.at(-1)?.path === '/api/v1/center/signatures/single-1?instanceId=instance-1')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()

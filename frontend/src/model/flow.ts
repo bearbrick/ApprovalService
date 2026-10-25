@@ -304,6 +304,10 @@ export interface FlowApprovalSettings {
    */
   commentRequired: boolean;
   /**
+   * 成功推进时必须明确选择本人手写签名，旧版本默认关闭。
+   */
+  signatureRequired?: boolean;
+  /**
    * 抄送节点是否需要确认已阅。
    */
   readReceiptRequired: boolean;

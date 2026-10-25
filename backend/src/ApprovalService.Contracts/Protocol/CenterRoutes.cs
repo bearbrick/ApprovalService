@@ -41,6 +41,18 @@ public static class CenterRoutes
     /// 逐项独立办理当前登录人员的批量同意任务。
     /// </summary>
     public const string BatchApprove = "/api/v1/center/tasks/batch-approve";
+    /// <summary>
+    /// 本人创建一次不可变 PNG 签名资产。
+    /// </summary>
+    public const string Signatures = "/api/v1/center/signatures";
+    /// <summary>
+    /// 本地会话读取最近上传的个人签名元数据。
+    /// </summary>
+    public const string PersonalSignature = Signatures + "/me";
+    /// <summary>
+    /// 读取本人或已授权审批单上使用的签名 PNG。
+    /// </summary>
+    public const string SignatureById = Signatures + "/{id}";
 }
 
 /// <summary>

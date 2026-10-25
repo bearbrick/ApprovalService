@@ -18,6 +18,7 @@ internal static class OperationChecks
     public static void Run(Action<string, bool> check)
     {
         CheckDecisions(check);
+        CheckSignatures(check);
         CheckDelegation(check);
         CheckSimpleOperations(check);
         CheckSigners(check);
@@ -83,6 +84,39 @@ internal static class OperationChecks
                 item.Audit?.Opinion == "不符合要求"));
         check("失败命令没有改写输入状态", started.State.Tasks.Single().Status == EngineTaskStatuses.Pending &&
             started.State.Operations.HasHumanDecision == false);
+    }
+
+    /// <summary>
+    /// 节点必签仅限制成功推进，签名引用随事件审计冻结。
+    /// </summary>
+    /// <param name="check">记录检查结果。</param>
+    private static void CheckSignatures(Action<string, bool> check)
+    {
+        var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+        graph.Nodes[1].Approval = new FlowApprovalSettings { SignatureRequired = true };
+        var context = Context(graph);
+        var started = Start(context);
+        var task = started.State.Tasks.Single();
+        check("必签节点不提供批量同意入口", !TaskActionAvailability.GetAllowedActions(
+            started.State, graph, task.Id, task.AssigneeId).Contains(OperationKinds.BulkApprove));
+        check("必签节点拒绝未明确选择签名的同意", Throws(ErrorCodes.ValidationFailed, () =>
+            EngineRuntime.Execute(started.State,
+                Command(EngineCommandKinds.Approve, "unsigned", task.Id, task.AssigneeId), context)));
+        var rejected = EngineRuntime.Execute(started.State,
+            Command(EngineCommandKinds.Reject, "rejected-without-signature", task.Id, task.AssigneeId), context);
+        check("必签规则不强制拒绝动作签名", rejected.State.Status == EngineInstanceStatuses.Rejected);
+        var signed = Command(EngineCommandKinds.Approve, "signed", task.Id, task.AssigneeId);
+        signed.Operation!.SignatureFileId = "signature-1";
+        var approved = EngineRuntime.Execute(started.State, signed, context);
+        check("同意事件冻结本次明确选用的签名资产", approved.Events.Any(item =>
+            item.Kind == "taskCompleted" && item.Audit?.SignatureFileId == "signature-1"));
+        var optionalGraph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval);
+        var optionalContext = Context(optionalGraph);
+        var optionalStart = Start(optionalContext);
+        var optionalTask = optionalStart.State.Tasks.Single();
+        check("旧流程节点默认无需签名仍能同意", EngineRuntime.Execute(optionalStart.State,
+            Command(EngineCommandKinds.Approve, "optional", optionalTask.Id, optionalTask.AssigneeId),
+            optionalContext).State.Status == EngineInstanceStatuses.Approved);
     }
 
     /// <summary>

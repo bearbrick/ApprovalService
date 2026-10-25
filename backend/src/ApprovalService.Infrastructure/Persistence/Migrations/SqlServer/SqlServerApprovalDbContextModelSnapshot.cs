@@ -245,6 +245,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
 
+                    b.Property<string>("AdministratorPersonIdsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

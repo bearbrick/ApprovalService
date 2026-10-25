@@ -240,6 +240,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("AdministratorPersonIdsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

@@ -99,6 +99,7 @@ internal static class Program
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await CenterQueryChecks.RunAsync(backendRoot, Check);
+        await CenterOpinionChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);

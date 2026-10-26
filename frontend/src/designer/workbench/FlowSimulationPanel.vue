@@ -89,6 +89,35 @@ function nodeLabel(id: string): string {
 }
 
 /**
+ * 把引擎终态显示成审批管理员可直接理解的中文。
+ * @param status 引擎状态编码。
+ * @returns 中文状态或原编码。
+ */
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    running: '运行中', approved: '已通过', rejected: '已拒绝', faulted: '模拟失败',
+    awaitingInitiator: '等待发起人', cancelled: '已取消', terminated: '已终止', withdrawn: '已撤回',
+  }
+  return labels[status] ?? status
+}
+
+/**
+ * 将常见引擎事件翻译为测试时间线文案，扩展事件仍保留编码。
+ * @param kind 事件编码。
+ * @returns 可读的事件名称。
+ */
+function eventLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    instanceStarted: '模拟已开始', nodeEntered: '进入节点', taskCreated: '创建假任务',
+    taskActivated: '假任务已激活', taskCompleted: '假任务已完成', taskCancelled: '假任务已取消',
+    gatewaySplit: '分支已展开', gatewayJoined: '分支已汇合',
+    instanceApproved: '流程已通过', instanceRejected: '流程已拒绝',
+    actionPending: '等待自动动作', subprocessPending: '等待子流程',
+  }
+  return labels[kind] ?? kind
+}
+
+/**
  * 从当前输入启动一场独立内存模拟。
  * @returns 创建操作完成。
  */
@@ -212,9 +241,9 @@ async function close(): Promise<void> {
       <div class="simulation-actions"><span v-if="!registered" class="empty-hint">请先保存流程草稿，登记编码后再试跑。</span><button type="button" class="btn btn-primary" :disabled="busy || !registered" @click="start">{{ busy ? '正在创建…' : '开始试跑当前草稿' }}</button></div>
     </div>
     <div v-else class="simulation-running">
-      <div class="session-toolbar"><div><strong>状态：{{ session.status }}</strong><small>流程 {{ session.flowCode }} · 闲置到期 {{ new Date(session.expiresAt).toLocaleString() }}</small></div><div><button type="button" class="btn" :disabled="busy" @click="refresh">刷新</button><button type="button" class="btn" :disabled="busy" @click="close">结束模拟</button></div></div>
+      <div class="session-toolbar"><div><strong>状态：{{ statusLabel(session.status) }}</strong><small>流程 {{ session.flowCode }} · 闲置到期 {{ new Date(session.expiresAt).toLocaleString('zh-CN') }}</small></div><div><button type="button" class="btn" :disabled="busy" @click="refresh">刷新</button><button type="button" class="btn" :disabled="busy" @click="close">结束模拟</button></div></div>
       <div class="simulation-columns"><section><h3>当前假任务 <span>{{ pendingTasks.length }}</span></h3><p v-if="!pendingTasks.length" class="empty-hint">当前没有待处理的人工任务。</p><label v-if="pendingTasks.length">假审批意见<textarea v-model="opinionText" maxlength="1000" rows="2" placeholder="节点要求意见时必填；可清空测试校验" /></label><article v-for="task in pendingTasks" :key="task.id" class="simulation-card"><strong>{{ nodeLabel(task.nodeId) }}</strong><small>假处理人：{{ task.assigneeId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="decide(task, false)">模拟完成</button><button type="button" class="btn" :disabled="busy" @click="decide(task, true)">模拟拒绝</button></div></article></section><section><h3>等待假外部结果 <span>{{ session.waits.length }}</span></h3><p v-if="!session.waits.length" class="empty-hint">当前没有自动动作或子流程等待。</p><label v-if="session.waits.some(wait => wait.kind === 'action')">自动动作假结果 JSON<textarea v-model="actionResultText" spellcheck="false" rows="3" /></label><article v-for="wait in session.waits" :key="wait.tokenId" class="simulation-card"><strong>{{ nodeLabel(wait.nodeId) }}</strong><small>{{ wait.kind === 'subprocess' ? '子流程' : '自动动作' }} · 令牌 {{ wait.tokenId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="resolveWait(wait, true)">假成功</button><button type="button" class="btn" :disabled="busy" @click="resolveWait(wait, false)">假失败</button></div></article></section></div>
-      <section class="simulation-events"><h3>模拟事件</h3><p v-if="!recentEvents.length" class="empty-hint">引擎尚未产生事件。</p><ol v-else><li v-for="(event, index) in recentEvents" :key="index"><strong>{{ event.kind }}</strong><span>{{ event.nodeId ? nodeLabel(event.nodeId) : '流程' }}</span></li></ol></section>
+      <section class="simulation-events"><h3>模拟事件</h3><p v-if="!recentEvents.length" class="empty-hint">引擎尚未产生事件。</p><ol v-else><li v-for="(event, index) in recentEvents" :key="index"><strong>{{ eventLabel(event.kind) }}</strong><span>{{ event.nodeId ? nodeLabel(event.nodeId) : '流程' }}</span></li></ol></section>
     </div>
     <p v-if="error" class="simulation-error" role="alert">{{ error }}</p><p v-if="notice" class="simulation-notice" role="status">{{ notice }}</p>
   </section>

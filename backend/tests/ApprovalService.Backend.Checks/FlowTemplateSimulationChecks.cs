@@ -55,17 +55,31 @@ internal static class FlowTemplateSimulationChecks
 
                 // 使用实际返回的任务和令牌逐步推进；静态样例若落入回路，步骤上限会暴露问题。
                 var steps = 0;
+                var qualityInspections = 0;
+                var sawRework = false;
                 while (response.Status == EngineInstanceStatuses.Running && steps++ < 100)
                 {
                     var task = response.Tasks.FirstOrDefault(item => item.Status == EngineTaskStatuses.Pending);
                     if (task is not null)
                     {
+                        sawRework |= definition.Code == "QUALITY_EXCEPTION" && task.NodeId == "rework";
+                        JsonElement? fieldValues = null;
+                        if (definition.Code == "QUALITY_EXCEPTION" && task.NodeId == "inspection")
+                        {
+                            qualityInspections++;
+                            fieldValues = JsonSerializer.SerializeToElement(new
+                            {
+                                reworkDecision = qualityInspections == 1 ? "yes" : "no",
+                            });
+                        }
+
                         response = await service.StepAsync(response.Id, new FlowSimulationStepRequest
                         {
                             Kind = task.CompletionKind,
                             TaskId = task.Id,
                             ActorId = task.AssigneeId,
                             Opinion = "测试模式模拟同意",
+                            FieldValues = fieldValues,
                         }, "admin", true);
                         continue;
                     }
@@ -87,7 +101,8 @@ internal static class FlowTemplateSimulationChecks
 
                 check($"模板 {definition.Code} 可用假数据走完同一模拟引擎", response.Status ==
                     EngineInstanceStatuses.Approved && response.Events.Any(item => item.Kind == "instanceApproved") &&
-                    steps <= 100);
+                    steps <= 100 && (definition.Code != "QUALITY_EXCEPTION" ||
+                        qualityInspections >= 2 && sawRework));
             }
             catch (Exception error)
             {

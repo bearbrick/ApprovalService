@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { buildCondition } from '../src/designer/workbench/condition-model.ts'
 import { flowReturnModes } from '../src/model/flow.ts'
 import { fieldReferences, sampleSubmission } from '../src/designer/data/data-model.ts'
@@ -42,7 +43,7 @@ export function runWorkbenchChecks(check: (name: string, value: boolean) => void
   const expectedFixture = flowTemplates.map(template => ({ definition: template.definition,
     data: sampleSubmission(template.definition.data) }))
   check('十模板后端模拟夹具与设计器正式定义和提交样例完全一致',
-    JSON.stringify(JSON.parse(readFileSync(fixturePath, 'utf8'))) === JSON.stringify(expectedFixture))
+    JSON.stringify(JSON.parse(readFileSync(fileURLToPath(fixturePath), 'utf8'))) === JSON.stringify(expectedFixture))
   check('七类新增通用模板只定义审批图与业务字段，不带业务单据或外部动作', simpleFlowTemplates.length === 7 && simpleFlowTemplates.every(template =>
     template.definition.data.fields.length > 0 && template.definition.canvas.nodes.length > 0 &&
     template.definition.canvas.nodes.every(node => node.type !== 'automatic')))

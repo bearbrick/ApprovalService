@@ -129,6 +129,7 @@ app.MapClientAppAdminEndpoints();
 app.MapTestCallbackEndpoints();
 app.MapReportingEndpoints();
 app.MapFlowManagementEndpoints();
+app.MapAdminInterventionEndpoints();
 app.MapFlowSimulationEndpoints();
 app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();

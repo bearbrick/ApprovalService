@@ -73,6 +73,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ITestCallbackRepository, TestCallbackRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<IFlowManagementRepository, FlowManagementRepository>();
+        services.AddScoped<IAdminInterventionRepository, AdminInterventionRepository>();
         services.AddSingleton<IFlowSimulationSessionStore, MemoryFlowSimulationSessionStore>();
         services.AddScoped<IFlowTransferRepository, FlowTransferRepository>();
         services.AddScoped<IFlowVersionRepository, FlowVersionRepository>();

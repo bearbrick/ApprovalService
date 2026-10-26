@@ -107,6 +107,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 发布前测试模式由本地组织管理员或该流程管理员通过 `POST /api/v1/admin/flows/simulations` 提交完整草稿、假数据、假发起人及各人工节点假处理人。创建人用 `GET/DELETE /api/v1/admin/flows/simulations/{id}` 读取或删除，并以 `POST /api/v1/admin/flows/simulations/{id}/steps` 逐项模拟人工处理及显式自动动作、子流程假结果。会话在内存中闲置 30 分钟过期，进程重启即丢失；不写审批单、不发真实通知、钩子或回调。
 
+后续网关在每条可能推进流程的命令上按当前业务数据与成功提交的审批人字段重新求值；测试模式同样允许人工步骤传可选 `fieldValues`。发起时尚未填写的审批人字段不提前决定路径；实际到达网关仍缺值会拒绝推进，退回重提时不沿用被清空的旧值。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：

@@ -1,7 +1,7 @@
 # T-015 打印审批单
 
-状态：待认领
-负责人：—
+状态：进行中
+负责人：Codex 2026-10-26
 里程碑：M3
 依赖：T-010、T-011
 设计书：§print
@@ -39,4 +39,4 @@
 
 ## 交接记录
 
-<!-- 按时间倒序追加：日期 · 谁 · 做了什么 / 卡在哪里 / 留给下一位的话 -->
+2026-10-26 · Codex：用户已明确同意引入本机缓存 PDFsharp 6.2.4（MIT，NuGet 包 4.4 MiB）和 ZXing.Net 0.16.11（Apache-2.0，NuGet 包 10 MiB）；不下载未缓存包。以集成分支 67191ee 为基线，T-011 已集成核心查询、权限及签名。登记共享改动：Contracts 打印接口、Application/Infrastructure 服务登记、Api/Program.cs、检查程序 Program.cs、Directory.Packages.props、docs/contracts.md、docs/architecture.md、docs/adr/README.md 及设计书 §print；各处仅追加打印接线。采用 PDFsharp 手工排版，先验证中文嵌入和跨页，详情打印复用中心权限裁剪。

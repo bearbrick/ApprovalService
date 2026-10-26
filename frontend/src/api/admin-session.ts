@@ -1,7 +1,8 @@
-import { getJson, requestJson } from './http.ts'
+import { ApiError, getJson, requestJson } from './http.ts'
+import { canRestoreTokens, isEmbedEntry, readTabSession, writeTabSession } from './tab-session.ts'
 
 /**
- * 本地身份接口返回的短期令牌；只放在当前页面内存。
+ * 本地身份接口返回的短期令牌；普通登录可在当前标签页刷新后恢复。
  */
 export interface AdminTokens {
   /**
@@ -31,7 +32,7 @@ export interface AdminTokens {
 }
 
 /**
- * 当前页面内存中的管理员登录资料。
+ * 当前标签页中的管理员登录资料，不包含密码。
  */
 export interface AdminSession {
   /**
@@ -49,9 +50,33 @@ export interface AdminSession {
 }
 
 /**
- * 当前页面内存中的会话，刷新页面即清除。
+ * 管理会话专用的标签页缓存键。
  */
-let current: AdminSession | null = null
+const storageKey = 'approval.admin.session.v1'
+
+/**
+ * 已恢复的本地会话；嵌入入口不能继承管理身份。
+ */
+let current: AdminSession | null = isEmbedEntry() ? null : readTabSession(storageKey, isStoredSession)
+
+/**
+ * 同一页面只允许一个续期请求消费当前刷新令牌。
+ */
+let refreshing: Promise<string> | null = null
+
+/**
+ * 核对标签页缓存的身份、范围和有效期；缓存不作为后端授权依据。
+ * @param value 缓存的候选值。
+ * @returns 是否可以恢复本地会话。
+ */
+function isStoredSession(value: unknown): value is AdminSession {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const data = value as AdminSession
+  return typeof data.employeeNumber === 'string' && data.employeeNumber.length > 0
+    && ['admin', 'reports', 'flows', 'app-test'].includes(data.scope) && isTokens(data.tokens)
+    && !data.tokens.mustChangePassword
+    && canRestoreTokens(data.tokens.accessExpiresAt, data.tokens.refreshExpiresAt)
+}
 
 /**
  * 只接受身份接口完整的令牌结构。
@@ -83,9 +108,10 @@ export async function loginAdmin(employeeNumber: string, password: string,
   try {
     if (!tokens.mustChangePassword && scope === 'admin') await verifyAdminSession()
     if (!tokens.mustChangePassword && scope === 'flows') await verifyFlowManagerSession()
+    writeTabSession(storageKey, tokens.mustChangePassword ? null : current)
     return current
   } catch (error) {
-    current = null
+    logoutAdmin()
     throw error
   }
 }
@@ -105,7 +131,7 @@ export async function changeAdminPassword(currentPassword: string, newPassword: 
     method: 'POST', body: { currentPassword, newPassword },
     headers: { Authorization: `Bearer ${current.tokens.accessToken}` }, cache: 'no-store',
   })
-  current = null
+  logoutAdmin()
   return loginAdmin(employeeNumber, newPassword, scope)
 }
 
@@ -121,15 +147,19 @@ export function canReadAdminSection(session: AdminSession | null, section: strin
 }
 
 /**
- * 读取当前页面会话。
+ * 读取当前标签页已恢复或新建立的会话。
  * @returns 会话或空值。
  */
 export function adminSession(): AdminSession | null { return current }
 
 /**
- * 注销并清除所有内存令牌。
+ * 注销并清除当前管理会话的内存与标签页缓存。
  */
-export function logoutAdmin(): void { current = null }
+export function logoutAdmin(): void {
+  current = null
+  refreshing = null
+  writeTabSession(storageKey, null)
+}
 
 /**
  * 必要时轮换短期令牌，并限制报表会话不能调用其他管理接口。
@@ -141,16 +171,43 @@ export async function adminAccessToken(requiredScope: 'admin' | 'reports' | 'flo
   if (current.scope === 'reports' && requiredScope !== 'reports') throw new Error('此会话仅可查看报表。')
   if (current.scope === 'flows' && requiredScope !== 'flows') throw new Error('此会话仅可管理流程。')
   if (current.scope === 'app-test' && requiredScope !== 'app-test') throw new Error('此会话仅可测试已授权应用的回调。')
-  if (Date.parse(current.tokens.accessExpiresAt) > Date.now() + 30_000) return current.tokens.accessToken
-  const tokens = await requestJson<unknown>('/api/v1/identity/refresh', {
-    method: 'POST', body: { refreshToken: current.tokens.refreshToken }, cache: 'no-store',
-  })
-  if (!isTokens(tokens) || tokens.mustChangePassword || tokens.personId !== current.tokens.personId) {
-    current = null
-    throw new Error('登录续期失败，请重新登录。')
+  if (!canRestoreTokens(current.tokens.accessExpiresAt, current.tokens.refreshExpiresAt)) {
+    logoutAdmin()
+    throw new Error('登录已过期，请重新登录。')
   }
-  current = { ...current, tokens }
-  return tokens.accessToken
+  if (Date.parse(current.tokens.accessExpiresAt) > Date.now() + 30_000) return current.tokens.accessToken
+  if (!refreshing) {
+    const operation = rotateAdminSession(current).finally(() => {
+      if (refreshing === operation) refreshing = null
+    })
+    refreshing = operation
+  }
+  return refreshing
+}
+
+/**
+ * 原子替换同一管理会话的轮换结果，退出或换人后的迟到响应作废。
+ * @param session 发起续期时的会话。
+ * @returns 已续期的访问令牌。
+ */
+async function rotateAdminSession(session: AdminSession): Promise<string> {
+  try {
+    const tokens = await requestJson<unknown>('/api/v1/identity/refresh', {
+      method: 'POST', body: { refreshToken: session.tokens.refreshToken }, cache: 'no-store',
+    })
+    if (current !== session) throw new Error('登录状态已改变，请重新进入页面。')
+    if (!isTokens(tokens) || tokens.mustChangePassword || tokens.personId !== session.tokens.personId
+      || !canRestoreTokens(tokens.accessExpiresAt, tokens.refreshExpiresAt)) {
+      logoutAdmin()
+      throw new Error('登录续期失败，请重新登录。')
+    }
+    current = { ...session, tokens }
+    writeTabSession(storageKey, current)
+    return tokens.accessToken
+  } catch (error) {
+    if (current === session && error instanceof ApiError && [400, 401, 403].includes(error.status)) logoutAdmin()
+    throw error
+  }
 }
 
 /**

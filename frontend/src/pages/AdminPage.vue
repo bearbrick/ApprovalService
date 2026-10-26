@@ -63,7 +63,7 @@ const error = ref('')
  */
 let request: AbortController | null = null
 /**
- * 当前仅保存在页面内存中的登录会话。
+ * 当前标签页恢复或新建立的登录会话。
  */
 const session = ref<AdminSession | null>(adminSession())
 /**

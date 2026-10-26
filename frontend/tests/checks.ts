@@ -9,6 +9,7 @@ import { NAV_ITEMS, parseRoute, resolveRoute } from '../src/model/routes.ts'
 import { flowFieldTypes, flowNodeTypes, flowSchemaVersion } from '../src/model/flow.ts'
 import { ADMIN_TABS, DESIGNER_TABS, SECTION_ITEMS } from '../src/model/navigation.ts'
 import { runHttpChecks } from './http-checks.ts'
+import { runSessionChecks } from './session-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runCenterChecks } from './center-checks.ts'
 import { runAdminChecks } from './admin-checks.ts'
@@ -113,6 +114,7 @@ runMobileChecks(check)
 runWorkbenchChecks(check)
 await runSimulationChecks(check)
 await runHttpChecks(check)
+await runSessionChecks(check)
 await runUiChecks(check)
 await runCanvasChecks(check)
 checkSource()

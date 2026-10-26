@@ -93,3 +93,4 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-072](T-072-session-refresh.md) | 刷新页面恢复本地登录会话 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
 | [T-073](T-073-compact-designer.md) | 压缩流程设计工作区顶部 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
 | [T-074](T-074-compact-fields.md) | 紧凑审批字段编辑器 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
+| [T-075](T-075-designer-full-width.md) | 设计器后续页签铺满内容宽度 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |

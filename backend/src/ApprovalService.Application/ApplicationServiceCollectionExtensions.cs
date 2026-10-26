@@ -39,6 +39,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CenterActionAppService>();
         services.AddScoped<SignatureAppService>();
         services.AddScoped<CenterOpinionAppService>();
+        services.AddScoped<CenterDelegationAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
         services.AddScoped<BusinessHookAppService>();
         services.AddScoped<BusinessAssigneeAppService>();

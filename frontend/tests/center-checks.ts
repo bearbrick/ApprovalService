@@ -1,5 +1,5 @@
 import { canSelectBatchApprove, eligibleBatchIds, filterCenterItems, visibleCenterActions } from '../src/model/center.ts'
-import type { CenterFilters, CenterItem } from '../src/model/center.ts'
+import type { CenterFilters, CenterItem, CenterProgressGraph } from '../src/model/center.ts'
 import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-adapter.ts'
 import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
@@ -29,6 +29,17 @@ function item(overrides: Partial<CenterItem> = {}): CenterItem {
     urgent: false, unread: false, allowsBatchApprove: true, allowedActions: ['approve'],
     summary: [{ key: 'supplier', label: '供应商', value: '华东材料' }], ...overrides,
   }
+}
+
+/**
+ * 从生成的 BPMN DI 中读取实际连线折点，以几何结果检查路线。
+ * @param graph 场景的安全进度图。
+ * @returns 每条连线的坐标列表。
+ */
+function progressRoutes(graph: CenterProgressGraph): number[][][] {
+  return [...centerProgressXml(graph).matchAll(/<bpmndi:BPMNEdge[^>]*>(.*?)<\/bpmndi:BPMNEdge>/g)]
+    .map(edge => [...(edge[1] ?? '').matchAll(/<di:waypoint x="([^"]+)" y="([^"]+)"/g)]
+      .map(point => [Number(point[1]), Number(point[2])]))
 }
 
 /**
@@ -68,6 +79,38 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     readCenterProgress({ nodes: progress.nodes, edges: [{ id: 'hidden', sourceId: 'start', targetId: 'future' }] }).nodes.length === 0 &&
     readCenterRelatedTargets([{ action: 'reply', id: 'mine', label: '待回复征询' }]).length === 1 &&
     readCenterRelatedTargets([{ action: 'reply', id: {}, label: '坏目标' }]).length === 0)
+  const branchGraph: CenterProgressGraph = { nodes: [
+    { id: 'split', type: 'parallelGateway', name: '分支', x: 0, y: 0, isActive: false },
+    { id: 'upper', type: 'approval', name: '上支', x: 200, y: -140, isActive: true },
+    { id: 'lower', type: 'approval', name: '下支', x: 200, y: 140, isActive: false },
+    { id: 'join', type: 'parallelGateway', name: '汇合', x: 400, y: 0, isActive: false },
+  ], edges: [
+    { id: 'a', sourceId: 'split', targetId: 'upper' }, { id: 'b', sourceId: 'split', targetId: 'lower' },
+    { id: 'c', sourceId: 'upper', targetId: 'join' }, { id: 'd', sourceId: 'lower', targetId: 'join' },
+  ] }
+  const branches = progressRoutes(branchGraph)
+  check('BPMN 分支从网关上下端口分别展开并在汇合上下端口接入',
+    JSON.stringify(branches) === JSON.stringify([
+      [[0, -25], [0, -140], [150, -140]], [[0, 25], [0, 140], [150, 140]],
+      [[250, -140], [400, -140], [400, -25]], [[250, 140], [400, 140], [400, 25]],
+    ]))
+  const loops = progressRoutes({ ...branchGraph, edges: [
+    { id: 'back', sourceId: 'join', targetId: 'split' },
+    { id: 'self', sourceId: 'upper', targetId: 'upper' },
+  ] })
+  check('BPMN 回路位于全部节点下方的不同通道，自环进出口不同且不折返重叠',
+    loops.length === 2 && loops.every(points => points.length === 6 && (points[2]?.[1] ?? 0) > 180 &&
+      points[0]?.[0] !== points.at(-1)?.[0]) && loops[0]?.[2]?.[1] !== loops[1]?.[2]?.[1])
+  check('BPMN 顺序直线去掉重复点及多余折点',
+    JSON.stringify(progressRoutes(progress)) === JSON.stringify([[[18, 0], [130, 0]]]))
+  const vertical = progressRoutes({ ...branchGraph, edges: [{ id: 'down', sourceId: 'upper', targetId: 'lower' }] })
+  check('BPMN 同列顺序节点使用直接垂直线并停在节点边界',
+    JSON.stringify(vertical) === JSON.stringify([[[200, -100], [200, 100]]]))
+  check('BPMN 所有分支与回路连线都是无零长度线段的正交路径',
+    [...branches, ...loops, ...vertical].every(points => points.every((point, index) => {
+      const previous = points[index - 1]
+      return !previous || ((point[0] === previous[0]) !== (point[1] === previous[1]))
+    })))
   let cleanedHash = ''
   const pending = consumeEmbedToken('#/center/approvals/instance-1?embedToken=one-time&view=compact', hash => { cleanedHash = hash })
   check('一次性令牌从片段和历史条目先清除，再交给交换接口',

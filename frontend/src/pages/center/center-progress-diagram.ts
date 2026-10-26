@@ -79,16 +79,48 @@ export function centerProgressXml(graph: CenterProgressGraph): string {
     const from = positions.get(edge.sourceId)
     const to = positions.get(edge.targetId)
     if (!source || !target || !from || !to) return ''
-    const sx = from.x + shape(source.type).width / 2
-    const tx = to.x - shape(target.type).width / 2
-    const horizontal = tx >= sx + 18
-    const waypoints = horizontal
-      ? [{ x: sx, y: from.y }, { x: (sx + tx) / 2, y: from.y },
-        { x: (sx + tx) / 2, y: to.y }, { x: tx, y: to.y }]
-      : [{ x: from.x, y: from.y + shape(source.type).height / 2 },
-        { x: from.x, y: Math.max(from.y, to.y) + 80 },
-        { x: to.x, y: Math.max(from.y, to.y) + 80 },
-        { x: to.x, y: to.y + shape(target.type).height / 2 }]
+    const sourceShape = shape(source.type)
+    const targetShape = shape(target.type)
+    const sx = from.x + sourceShape.width / 2
+    const tx = to.x - targetShape.width / 2
+    const direction = to.y >= from.y ? 1 : -1
+    const split = graph.edges.filter(candidate => candidate.sourceId === source.id).length > 1
+    const join = graph.edges.filter(candidate => candidate.targetId === target.id).length > 1
+    let waypoints: { x: number; y: number }[]
+    if (tx >= sx + 24) {
+      // 分支从上下端口展开，汇合从上下端口接入，避免多条线共用中间竖线。
+      if (split && from.y !== to.y) {
+        waypoints = [{ x: from.x, y: from.y + direction * sourceShape.height / 2 },
+          { x: from.x, y: to.y }, { x: tx, y: to.y }]
+      } else if (join && from.y !== to.y) {
+        waypoints = [{ x: sx, y: from.y }, { x: to.x, y: from.y },
+          { x: to.x, y: to.y - direction * targetShape.height / 2 }]
+      } else {
+        waypoints = [{ x: sx, y: from.y }, { x: (sx + tx) / 2, y: from.y },
+          { x: (sx + tx) / 2, y: to.y }, { x: tx, y: to.y }]
+      }
+    } else if (from.x === to.x && Math.abs(to.y - from.y) > (sourceShape.height + targetShape.height) / 2 + 24) {
+      // 同列正常上下流转不绕远路。
+      waypoints = [{ x: from.x, y: from.y + direction * sourceShape.height / 2 },
+        { x: to.x, y: to.y - direction * targetShape.height / 2 }]
+    } else {
+      // 回路使用安全子图外侧的独立通道；自环也使用不同的进出口。
+      const bottom = Math.max(...graph.nodes.map(node => (positions.get(node.id)?.y ?? 0) + shape(node.type).height / 2))
+      const lane = bottom + 60 + index * 24
+      const exit = sx + 30 + index * 12
+      const entry = tx - 30 - index * 12
+      waypoints = [{ x: sx, y: from.y }, { x: exit, y: from.y },
+        { x: exit, y: lane }, { x: entry, y: lane }, { x: entry, y: to.y }, { x: tx, y: to.y }]
+    }
+    // 消除零长度线段和同向中间点，让顺序路径只留下必要折点。
+    waypoints = waypoints.filter((point, position, points) => position === 0 ||
+      point.x !== points[position - 1]?.x || point.y !== points[position - 1]?.y)
+    waypoints = waypoints.filter((point, position, points) => {
+      const previous = points[position - 1]
+      const next = points[position + 1]
+      return !previous || !next || !((previous.x === point.x && point.x === next.x) ||
+        (previous.y === point.y && point.y === next.y))
+    })
     return `<bpmndi:BPMNEdge id="Edge_${index + 1}" bpmnElement="Flow_${index + 1}">${waypoints.map(point =>
       `<di:waypoint x="${point.x}" y="${point.y}" />`).join('')}</bpmndi:BPMNEdge>`
   }).join('')

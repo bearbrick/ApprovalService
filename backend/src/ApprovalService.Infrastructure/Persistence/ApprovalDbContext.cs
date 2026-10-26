@@ -16,7 +16,7 @@ namespace ApprovalService.Infrastructure.Persistence;
 /// <summary>
 /// 审批运行库的统一模型；三种数据库使用同一实体配置、各自生成迁移。
 /// </summary>
-public class ApprovalDbContext : DbContext
+public partial class ApprovalDbContext : DbContext
 {
     /// <summary>
     /// 供检查程序或直接创建上下文的调用方使用。
@@ -98,11 +98,6 @@ public class ApprovalDbContext : DbContext
     /// 审批人个人保存的常用意见。
     /// </summary>
     public DbSet<CenterOpinionEntity> CenterOpinions => Set<CenterOpinionEntity>();
-
-    /// <summary>
-    /// 审批人的个人委托规则。
-    /// </summary>
-    public DbSet<DelegationRuleEntity> DelegationRules => Set<DelegationRuleEntity>();
 
     /// <summary>
     /// 事务待发队列。

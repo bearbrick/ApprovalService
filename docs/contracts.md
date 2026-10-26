@@ -70,6 +70,7 @@
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
 | `GET /api/v1/notifications/preferences`、`PUT /api/v1/notifications/preferences/{category}` | 人员 JWT | 读取或修改本人的邮件、站内提醒开关 |
+| `GET/PUT /api/v1/admin/work-calendar` | 本地 JWT + 当前组织管理员角色 | 读取和按预期修订替换每日工作时段与逐日节假日、调休；时区只读 |
 | `GET/PUT /api/v1/admin/notifications/daily-digest` | 本地 JWT + 当前组织管理员角色 | 读取或设置每日待办汇总的当地发送时刻 |
 | `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
@@ -354,3 +355,11 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - 方法不对（405）时错误码用 `NOT_FOUND`，不另设错误码。
 - 健康检查返回纯文本（`live`、`ready`），不是 JSON。
 - 调用方传的 `X-Request-Id` 最长 64 个字符，只允许字母数字和 `- _ . :`。
+
+## 在线工作日历
+
+`GET /api/v1/admin/work-calendar` 返回 `{revision,timeZoneId,workingStart,workingEnd,overrides}`；`overrides` 为 `{date,isWorkingDay}[]`，日期严格 `yyyy-MM-dd` 且唯一，日期类型必须显式为布尔值。`workingStart`、`workingEnd` 严格 `HH:mm`，结束晚于开始，不支持跨夜。未列出的日期按周一至周五工作。
+
+`PUT` 接受 `{expectedRevision,workingStart,workingEnd,overrides,reason}`，整体替换时段与日期覆盖，成功返回新修订的完整日历；`reason` 为 2–200 字且无控制字符。过期修订返回 409，校验失败返回 400；更新与包含真实管理员、前后值及原因的审计在同一事务提交。两个首次保存同样以唯一全局键裁决，失败方不追加审计。两种方法均只接受当前在职本地组织管理员 JWT；匿名 401，普通人员、嵌入人员或 API Key 不获得管理权限。
+
+空库返回修订零并沿用部署配置。首次保存后时段与日期覆盖以数据库为准，空覆盖列表不会重新加载部署节假日。时区只读且始终沿用部署配置，PUT 不提供时区字段。每次运行命令读取一份完整日历用于新激活任务的期限及提前一工作小时提醒；已存在任务期限与已排提醒不重算，排队任务实际激活时使用当时的新日历。每日汇总仍使用启动时固定的部署时区，不受在线工作时段、节假日变化影响。

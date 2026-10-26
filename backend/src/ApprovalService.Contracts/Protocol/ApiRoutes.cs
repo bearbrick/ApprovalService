@@ -6,6 +6,11 @@ namespace ApprovalService.Contracts.Protocol;
 public static class ApiRoutes
 {
     /// <summary>
+    /// 本地组织管理员工作日历配置。
+    /// </summary>
+    public const string AdminWorkCalendar = "/api/v1/admin/work-calendar";
+
+    /// <summary>
     /// 开放接口的前缀。
     /// </summary>
     public const string OpenApiPrefix = "/api/v1";

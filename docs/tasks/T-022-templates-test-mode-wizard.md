@@ -20,6 +20,8 @@
 - `frontend/src/designer/workbench/simple-templates.ts`、`workbench-model.ts`、`frontend/tests/workbench-checks.ts`：内置可复制的十类流程模板及静态发布预检。
 - `frontend/src/designer/workbench/integration-snippet.ts`、`frontend/src/pages/DesignerPage.vue`、对应前端检查：生成、展示、复制不嵌入 API Key 的 C# SDK 调用代码。
 - `backend/src/ApprovalService.Application/Administration/FlowSimulation*.cs`、`backend/src/ApprovalService.Api/Endpoints/FlowSimulationEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowSimulationChecks.cs`：已确认的内存模拟会话。
+- `frontend/src/api/flow-simulation.ts`、`frontend/src/designer/workbench/FlowSimulationPanel.vue`、`frontend/src/designer/workbench/simulation-model.ts`、`frontend/tests/simulation-checks.ts`：用现有流程管理员会话在设计器试跑当前草稿和假数据，显示待办、外部等待与事件，不保存真实业务记录。
+- `frontend/README.md`：同步测试模式页面的实际能力与限制。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`IClientAppAdminRepository.cs`、`backend/src/ApprovalService.Application/Integration/ClientAppAdminAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppAdminRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/ClientAppAdminEndpoints.cs`：已确认的按应用管理员人员 ID 名单与授权查询；本切片不发送测试回调。
 - `backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、三种数据库迁移、`backend/tests/ApprovalService.Backend.Checks/ClientAppAdminChecks.cs`：存量名单默认为空并检查读写权限。
 - `backend/src/ApprovalService.Domain/Integration/ITestCallbackRepository.cs`、`backend/src/ApprovalService.Application/Integration/TestCallbackAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/TestCallbackRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/TestCallbackEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/TestCallbackChecks.cs`：已确认的签名持久测试回调，不建立审批单。
@@ -36,6 +38,7 @@
 - `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`：新增测试模式契约。
 - `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`：只追加服务、端点和检查登记。
 - `docs/contracts.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`、`docs/adr/README.md`：同步已确认的跨部分测试协议。
+- `frontend/src/pages/DesignerPage.vue`、`frontend/tests/checks.ts`：仅登记测试模式面板及对应检查；保持设计器主文件低于 500 行。
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、新增名单请求/响应契约、`backend/src/ApprovalService.Api/Program.cs`、应用与基础设施 DI 登记、后端检查入口：追加应用管理员名单接口和服务。
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`CallbackEventCodes.cs`、`CallbackNotification.cs`、新增测试回调请求/响应契约：追加测试回调接口与事件。
 - `backend/src/ApprovalService.Api/Program.cs`、应用与基础设施 DI 登记、后端检查入口、`docs/contracts.md`、`docs/architecture.md`：追加测试回调服务与契约，和已确认协议同步。
@@ -44,6 +47,7 @@
 
 - [ ] 每个模板都能发布并在测试模式里走通
 - [x] 测试模式不产生真实回调和提醒（检查覆盖）
+- [x] 设计器可用当前草稿与假输入逐步试跑，并展示待办、等待和事件
 - [x] 接入应用管理员名单由本地组织管理员维护，存量默认为空；可信授权查询覆盖应用启停和人员在职
 - [x] 测试回调由本地组织管理员或本应用管理员带原因排入持久队列，接收端只验签确认
 - [ ] 向导生成的代码能直接编译（检查程序编译一遍）
@@ -56,6 +60,7 @@
 
 ## 交接记录
 
+- 2026-10-26 · Codex · 补齐设计器“流程规则”页的真实测试模式入口：复用已授权的流程管理员 JWT 与现有内存模拟 API，当前完整草稿、可编辑假数据和逐节点假处理人创建会话；逐项模拟人工完成/拒绝、自动动作与子流程结果，查看待办、等待令牌和最近事件，结束时删会话。JSON 样例复用已有审批字段样例生成器；独立前端检查覆盖输入校验、人员去重和完整 HTTP 往返。完整 `verify.ps1` 通过：后端 1071、调用端 96、前端 191 项及生产构建；尚未逐一用十模板经真实 HTTP 走完，验收项仍未勾选。未触碰真实实例/回调接口。下一步整合分支合入并复验，外置 Chrome 可用时检查视觉和交互。
 - 2026-10-25 · Codex · 完成 `integration.test` 一键测试回调后端协议与示例接收端：本地组织管理员或已登记的本应用管理员带原因调用 `POST /api/v1/admin/apps/{code}/test-callback`，应用层和 SQLite 入队事务都重验权限、在职、应用启用及回调地址；返回合成 `test-` 事件 ID 和 `queued`。正文使用合成 `instanceId`、空 `serialNo/flowCode/businessKey`、`status=test`、`data={}` 与测试专有 `clientAppCode`，不建审批单、任务或业务动作。复用持久回调队列、HMAC/请求 ID、重试与逐次发送日志；管理队列摘要可识别无审批单的测试项。示例业务系统对测试事件只验签确认，不更新原单；SDK 新增可选应用编码与测试事件编码副本。真实 HTTP/SQLite/假出站场景覆盖匿名、普通人员、应用管理员、组织管理员、撤权、停用、无回调地址、失败重试、签名、发送日志和示例接收端。完整 `verify.ps1` 通过：后端 1060 项、调用端含真实服务端到端、前端 185 项及生产构建。**仍未完成**：接入向导页面把创建应用、管理员名单和测试回调串成完整操作，以及十模板逐一端到端走通；状态保持进行中。无新增依赖或数据库迁移，也未触碰 T-011 常用意见 agent 文件。
 - 2026-10-25 · Codex · 从整合提交 `da89c33` 开始测试回调独立切片；按 ADR 0021 复用持久回调队列和出站签名。现有待发项没有审批单外键，但处理器和管理摘要依赖真实审批单查询；测试回调将用合成 `test-` 事件/实例 ID、仅测试事件携带可选接入应用编码，出站处理器按此识别，管理摘要对测试项读该编码。不增加数据库迁移、不修改 T-011 工作树。新 Contracts/SDK 副本、服务登记及共享文档改动已在上方预登记。
 - 2026-10-25 · Codex · 完成接入应用管理员名单独立后端切片：`GET/PUT /api/v1/admin/apps/{code}/administrators` 仅供本地组织管理员读取、按旧名单条件替换，PUT 校验最多 50 名当前在职的内部人员、变更原因和并发冲突；在串行化事务中记录仅含人员 ID/原因的审计。新增供后续测试回调调用的 `CanSendTestCallbackAsync`，每次重新核对本地会话、应用启用、人员在职及本应用名单或组织管理员身份。三库增量迁移通过 `backend/tools/add-migration.ps1` 生成，存量名单默认 `[]`；真实 HTTP/SQLite 场景覆盖匿名、普通人员、组织管理员、非法/离职人员、重复、并发、应用隔离、停用与离职。同步 Contracts、契约/架构、后端 README 和设计书第 12 节。完整 `verify.ps1` 第二次运行全部通过：后端检查、SDK 真实服务端到端、前端 183 项及构建；第一次运行在与本切片无关的 `DemoBusinessHttpChecks` 发生一次连接提前关闭，单独 client 检查及完整复验均通过。**仍未完成**：接入向导的 `integration.test` 持久测试回调、应用创建接线及模板逐一端到端走通；状态保持进行中，下一位可直接复用 `ClientAppAdminAppService.CanSendTestCallbackAsync`，不得仅信任前端显示或名单旧快照。

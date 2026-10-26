@@ -15,6 +15,7 @@
 可以新建、修改的文件：
 
 - 流程模板库：请假、加班、出差、费用报销、付款、采购、用印、合同、物品领用、质量异常（只有流程和审批数据定义）
+- `frontend/src/designer/workbench/samples/quality-exception.json`：返工回路后同一质检员须每次重新审批并填写最新处置结论。
 - 测试模式：用假数据模拟发起，扮演每个审批人走完整条流程，不发真实提醒、不调业务接口
 - 接入向导：建接入应用 → 生成 API Key 和签名密钥 → 选流程 → 生成 C# 调用代码 → 一键发测试回调
 - `frontend/src/designer/workbench/simple-templates.ts`、`workbench-model.ts`、`frontend/tests/workbench-checks.ts`：内置可复制的十类流程模板及静态发布预检。

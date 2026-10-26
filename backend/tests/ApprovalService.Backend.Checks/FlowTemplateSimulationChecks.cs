@@ -32,62 +32,82 @@ internal static class FlowTemplateSimulationChecks
         var sessions = new TemplateSessionStore();
         var service = new FlowSimulationAppService(new FlowManagementAppService(repository, TimeProvider.System),
             sessions, TimeProvider.System);
+        var failures = new List<string>();
         foreach (var fixture in fixtures)
         {
             var definition = fixture.Definition;
-            var compiled = FlowCompiler.Compile(definition);
-            check($"模板 {definition.Code} 可通过正式发布编译", compiled.Graph is not null && compiled.Issues.Count == 0);
-            var assignees = definition.Canvas.Nodes.Where(node => node.Type is FlowNodeTypes.Approval or
-                FlowNodeTypes.Handling or FlowNodeTypes.Cc).ToDictionary(node => node.Id,
-                node => new List<string> { "fake-" + node.Id }, StringComparer.Ordinal);
-            var response = await service.CreateAsync(new FlowSimulationCreateRequest
+            FlowSimulationResponse? response = null;
+            try
             {
-                Definition = definition,
-                Data = fixture.Data,
-                InitiatorId = "fake-initiator",
-                FakeAssignees = assignees,
-            }, "admin", true);
-
-            // 使用实际返回的任务和令牌逐步推进；静态样例若落入回路，步骤上限会暴露问题。
-            var steps = 0;
-            while (response.Status == EngineInstanceStatuses.Running && steps++ < 100)
-            {
-                var task = response.Tasks.FirstOrDefault(item => item.Status == EngineTaskStatuses.Pending);
-                if (task is not null)
+                var compiled = FlowCompiler.Compile(definition);
+                check($"模板 {definition.Code} 可通过正式发布编译", compiled.Graph is not null &&
+                    compiled.Issues.Count == 0);
+                var assignees = definition.Canvas.Nodes.Where(node => node.Type is FlowNodeTypes.Approval or
+                    FlowNodeTypes.Handling or FlowNodeTypes.Cc).ToDictionary(node => node.Id,
+                    node => new List<string> { "fake-" + node.Id }, StringComparer.Ordinal);
+                response = await service.CreateAsync(new FlowSimulationCreateRequest
                 {
+                    Definition = definition,
+                    Data = fixture.Data,
+                    InitiatorId = "fake-initiator",
+                    FakeAssignees = assignees,
+                }, "admin", true);
+
+                // 使用实际返回的任务和令牌逐步推进；静态样例若落入回路，步骤上限会暴露问题。
+                var steps = 0;
+                while (response.Status == EngineInstanceStatuses.Running && steps++ < 100)
+                {
+                    var task = response.Tasks.FirstOrDefault(item => item.Status == EngineTaskStatuses.Pending);
+                    if (task is not null)
+                    {
+                        response = await service.StepAsync(response.Id, new FlowSimulationStepRequest
+                        {
+                            Kind = task.CompletionKind,
+                            TaskId = task.Id,
+                            ActorId = task.AssigneeId,
+                            Opinion = "测试模式模拟同意",
+                        }, "admin", true);
+                        continue;
+                    }
+
+                    var wait = response.Waits.FirstOrDefault();
+                    if (wait is null)
+                    {
+                        break;
+                    }
+
                     response = await service.StepAsync(response.Id, new FlowSimulationStepRequest
                     {
-                        Kind = task.CompletionKind,
-                        TaskId = task.Id,
-                        ActorId = task.AssigneeId,
-                        Opinion = "测试模式模拟同意",
+                        Kind = wait.Kind == "subprocess" ? EngineCommandKinds.SubprocessCompleted :
+                            EngineCommandKinds.ActionSucceeded,
+                        TokenId = wait.TokenId,
+                        Success = true,
                     }, "admin", true);
-                    continue;
                 }
 
-                var wait = response.Waits.FirstOrDefault();
-                if (wait is null)
-                {
-                    break;
-                }
-
-                response = await service.StepAsync(response.Id, new FlowSimulationStepRequest
-                {
-                    Kind = wait.Kind == "subprocess" ? EngineCommandKinds.SubprocessCompleted :
-                        EngineCommandKinds.ActionSucceeded,
-                    TokenId = wait.TokenId,
-                    Success = true,
-                }, "admin", true);
+                check($"模板 {definition.Code} 可用假数据走完同一模拟引擎", response.Status ==
+                    EngineInstanceStatuses.Approved && response.Events.Any(item => item.Kind == "instanceApproved") &&
+                    steps <= 100);
             }
-
-            check($"模板 {definition.Code} 可用假数据走完同一模拟引擎", response.Status ==
-                EngineInstanceStatuses.Approved && response.Events.Any(item => item.Kind == "instanceApproved") &&
-                steps <= 100);
-            await service.DeleteAsync(response.Id, "admin", true);
+            catch (Exception error)
+            {
+                failures.Add($"{definition.Code}: {error.GetType().Name}: {error.Message}");
+            }
+            finally
+            {
+                if (response is not null)
+                {
+                    await service.DeleteAsync(response.Id, "admin", true);
+                }
+            }
         }
 
         check("十模板模拟结束后没有写持久流程或留下内存会话", repository.Writes == 0 &&
             sessions.Count == 0);
+        if (failures.Count > 0)
+        {
+            throw new InvalidOperationException("十模板验收失败：" + string.Join("；", failures));
+        }
     }
 
     /// <summary>

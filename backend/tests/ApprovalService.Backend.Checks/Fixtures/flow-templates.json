@@ -816,7 +816,7 @@
               "rejectBehavior": "immediate",
               "missingAssigneeBehavior": "block",
               "selfApprovalBehavior": "skip",
-              "duplicateAssigneeBehavior": "adjacentOnce",
+              "duplicateAssigneeBehavior": "everyTime",
               "inactiveAssigneeBehavior": "manager",
               "allowedActions": [
                 "approve",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { ApiError } from '../../api/http.ts'
 import type { FlowDefinition } from '../../model/flow.ts'
 import { deleteFlowSimulation, getFlowSimulation, startFlowSimulation, stepFlowSimulation } from '../../api/flow-simulation.ts'
 import type { SimulationSession, SimulationTask, SimulationWait } from '../../api/flow-simulation.ts'
@@ -165,7 +166,12 @@ async function refresh(): Promise<void> {
   busy.value = true
   error.value = ''
   try { session.value = await getFlowSimulation(session.value.id) } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '模拟会话读取失败。'
+    if (cause instanceof ApiError && cause.status === 404) {
+      session.value = null
+      notice.value = '模拟会话已过期，请更新假输入后重新开始。'
+    } else {
+      error.value = cause instanceof Error ? cause.message : '模拟会话读取失败。'
+    }
   } finally { busy.value = false }
 }
 
@@ -178,9 +184,11 @@ async function close(): Promise<void> {
   busy.value = true
   error.value = ''
   try { await deleteFlowSimulation(session.value.id) } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '结束模拟失败，请稍后重试。'
-    busy.value = false
-    return
+    if (!(cause instanceof ApiError && cause.status === 404)) {
+      error.value = cause instanceof Error ? cause.message : '结束模拟失败，请稍后重试。'
+      busy.value = false
+      return
+    }
   }
   session.value = null
   nodeNames.value = {}

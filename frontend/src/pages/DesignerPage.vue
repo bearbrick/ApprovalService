@@ -16,6 +16,7 @@ import EdgeInspector from '../designer/workbench/EdgeInspector.vue'
 import FlowRulesPanel from '../designer/workbench/FlowRulesPanel.vue'
 import FlowSimulationPanel from '../designer/workbench/FlowSimulationPanel.vue'
 import FlowPrintPanel from '../designer/workbench/FlowPrintPanel.vue'
+import UiDialog from '../components/ui/UiDialog.vue'
 import { checkPublication } from '../designer/workbench/publication-check.ts'
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, findEdge, findNode, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../designer/workbench/workbench-model.ts'
@@ -77,6 +78,10 @@ const metadataDirty = computed(() => !!managed.value && (
  * 保存或发布时必须填写的审计原因。
  */
 const reason = ref('')
+/**
+ * 将低频编辑的流程归属信息放在对话框中，释放设计空间。
+ */
+const metadataOpen = ref(false)
 /**
  * 新流程的分组；已有流程沿用服务端元数据。
  */
@@ -418,7 +423,19 @@ async function copyIntegrationSnippet(): Promise<void> {
 
 <template>
   <div class="designer-page">
-    <header class="designer-header"><div class="designer-breadcrumb"><a href="#/admin/flows">流程管理</a><span>/</span><span>{{ flowCode ? draft.name : '流程模板' }}</span></div><div class="designer-title"><div><span class="eyebrow">统一自由画布</span><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p>{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div><div v-if="flowCode && authorized" class="designer-actions"><button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button><button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button></div></div><div v-if="flowCode && authorized" class="publish-form"><label>审计原因<input v-model="reason" maxlength="200" placeholder="保存或发布时必填" /></label><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" /></label><label>所属部门<select v-model="ownerDepartmentId"><option value="">组织级（仅组织管理员）</option><option v-if="ownerDepartmentId && !departments.some(item => item.id === ownerDepartmentId)" :value="ownerDepartmentId">原所属部门</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><span v-if="departmentError" role="alert">{{ departmentError }} <button type="button" class="btn" @click="loadDepartments(flowCode)">重试</button></span></div></header>
+    <header class="designer-header">
+      <div class="designer-heading"><a class="designer-back" href="#/admin/flows" aria-label="返回流程管理" title="返回流程管理">←</a><div class="designer-identity"><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p role="status">{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div></div>
+      <div v-if="flowCode && authorized" class="designer-actions">
+        <button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button>
+        <button type="button" class="btn" :disabled="busy" @click="metadataOpen = true">流程设置</button>
+        <input v-model="reason" class="designer-reason" aria-label="审计原因" maxlength="200" placeholder="保存 / 发布原因" :disabled="busy" />
+        <button type="button" class="btn" :disabled="busy" @click="saveDraft">保存草稿</button><button type="button" class="btn" :disabled="busy" @click="validatePublish">发布预检</button><button type="button" class="btn btn-primary" :disabled="busy || !managed" @click="publish">发布版本</button>
+      </div>
+    </header>
+    <UiDialog :open="metadataOpen" title="流程设置" @close="metadataOpen = false">
+      <div class="publish-form"><p>分组和所属部门的修改将在保存草稿后生效。</p><label>流程分组<input v-model="group" maxlength="100" placeholder="可选" :disabled="busy" /></label><label>所属部门<select v-model="ownerDepartmentId" :disabled="busy"><option value="">组织级（仅组织管理员）</option><option v-if="ownerDepartmentId && !departments.some(item => item.id === ownerDepartmentId)" :value="ownerDepartmentId">原所属部门</option><option v-for="department in departments" :key="department.id" :value="department.id">{{ department.name }}</option></select></label><p v-if="departmentError" role="alert">{{ departmentError }} <button type="button" class="btn" @click="loadDepartments(flowCode)">重试</button></p></div>
+      <template #footer><button type="button" class="btn btn-primary" @click="metadataOpen = false">完成</button></template>
+    </UiDialog>
     <template v-if="!flowCode"><div class="template-intro"><h2>从模板开始</h2><p>十类常用审批模板可直接复制修改；采购、报销和质量异常示例还展示金额分支、会签、返工与并行汇合。</p></div><div class="template-grid"><a v-for="template in flowTemplates" :key="template.code" class="template-card" :href="`#/designer/${template.code}/design`"><span>流程模板</span><h3>{{ template.name }}</h3><p>{{ template.description }}</p><small>{{ template.definition.canvas.nodes.length }} 个节点 · {{ template.definition.data.fields.length }} 个字段 →</small></a><a class="template-card blank" href="#/designer/NEW_FLOW/design"><span>空白流程</span><h3>从自由画布开始</h3><p>开始和结束节点已经放好，可在同一画布继续加入任意审批路线。</p><small>创建新流程 →</small></a></div></template>
     <div v-else-if="!authorized" class="designer-content"><p role="alert">请先以流程管理员身份登录，再读取或编辑流程。</p><a href="#/admin/flows">前往流程管理登录</a></div>
     <div v-else-if="loadError" class="designer-content" role="alert"><p>{{ loadError }}</p><button type="button" class="btn" @click="loadManaged(flowCode)">重新读取</button><a href="#/admin/flows">返回流程管理</a></div>
@@ -445,53 +462,4 @@ async function copyIntegrationSnippet(): Promise<void> {
   </div>
 </template>
 
-<style scoped>
-.designer-page { min-height: calc(100vh - 56px); background: #f7f9fd; }
-.designer-header { padding: 20px 28px 23px; border-bottom: 1px solid var(--line); background: #fff; }
-.designer-breadcrumb { display: flex; gap: 10px; color: var(--muted); font-size: 12px; }
-.designer-breadcrumb a { color: inherit; }
-.designer-title { display: flex; align-items: end; justify-content: space-between; gap: 22px; margin-top: 17px; }
-.designer-title h1 { margin: 3px 0; font-size: 24px; line-height: 1.3; }
-.designer-title p { color: var(--muted); }
-.eyebrow { color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: .1em; }
-.designer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.publish-form { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; }
-.publish-form label { display: grid; gap: 4px; color: var(--muted); font-size: 12px; }
-.publish-form input, .publish-form select { min-width: 190px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
-.designer-tabs { display: flex; gap: 24px; padding: 0 28px; min-height: 54px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; }
-.designer-tabs a { display: inline-flex; align-items: center; white-space: nowrap; border-bottom: 3px solid transparent; color: var(--muted); }
-.designer-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 700; }
-.designer-content { padding: 24px 28px; }
-.design-workspace { min-width: 0; padding: 18px; }
-.design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 158px minmax(0, 1fr) 340px; }
-.inspector-empty { text-align: center; padding: 90px 22px; color: var(--muted); }
-.inspector-empty span { font-size: 42px; color: #8fa8ce; }
-.inspector-empty h2 { margin: 8px 0; color: var(--ink); font-size: 16px; }
-.publish-issues { margin: 18px 18px 0; padding: 14px 18px; border: 1px solid #edc2c6; border-radius: 5px; background: #fff7f7; }
-.publish-issues-head { display: flex; justify-content: space-between; gap: 10px; color: #96323c; }
-.publish-issues-head span { font-size: 12px; }
-.publish-issues ul { display: grid; gap: 5px; margin: 10px 0 0; padding-left: 20px; }
-.publish-issues button { padding: 0; border: 0; background: none; color: #96323c; text-align: left; cursor: pointer; }
-.publish-issues small { margin-left: 6px; color: var(--muted); }
-.template-intro { padding: 28px 28px 12px; }
-.template-intro h2 { font-size: 19px; }
-.template-intro p { margin-top: 7px; color: var(--muted); }
-.template-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 12px 28px 28px; }
-.template-card { display: grid; align-content: space-between; min-height: 180px; padding: 20px; border: 1px solid var(--line); border-radius: 7px; background: #fff; color: var(--ink); }
-.template-card:hover { border-color: var(--blue); box-shadow: 0 8px 24px #1b4e9620; }
-.template-card span { color: var(--blue); font-size: 11px; font-weight: 700; }
-.template-card h3 { font-size: 18px; }
-.template-card p { color: var(--muted); }
-.template-card small { color: var(--blue); }
-.template-card.blank { border-style: dashed; }
-.template-switch, .version-panel { max-width: 960px; margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
-.template-switch h2, .version-panel h2 { font-size: 16px; }
-.template-switch p, .version-panel p { margin: 9px 0 15px; color: var(--muted); }
-.template-switch .btn { margin: 0 8px 8px 0; }
-.integration-example pre { max-height: 360px; margin-top: 14px; padding: 16px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; background: #f7f9fd; color: var(--ink); font: 12px/1.6 Consolas, monospace; }
-.version-panel span { color: var(--blue); font-size: 11px; font-weight: 700; }
-@media (max-width: 1150px) { .template-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 120px minmax(0, 1fr) 280px; } }
-@media (max-width: 920px) { .designer-title { align-items: start; flex-direction: column; } }
-@media (max-width: 720px) { .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 74px minmax(0, 1fr); grid-template-rows: minmax(320px, 1fr) 240px; } .design-workspace :deep(.flow-canvas-inspector) { display: block; grid-column: 1 / -1; grid-row: 2; border-left: 0; border-top: 1px solid var(--line); } }
-@media (max-width: 620px) { .designer-header { padding: 18px; } .designer-tabs { padding: 0 18px; gap: 18px; } .designer-content { padding: 16px; } .design-workspace { padding: 12px; } .template-grid { grid-template-columns: 1fr; padding: 12px 18px; } .template-intro { padding: 22px 18px 8px; } }
-</style>
+<style scoped src="../styles/designer-workspace.css"></style>

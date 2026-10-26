@@ -1,3 +1,6 @@
+import { calendarValidation, readWorkCalendar, validCalendarDate } from '../src/model/work-calendar.ts'
+import { loadWorkCalendar, saveWorkCalendar } from '../src/api/work-calendar.ts'
+import { loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { ADMIN_VIEWS, adminCellText, filterAdminRows, resolveAdminView } from '../src/model/admin.ts'
 import type { AdminRow } from '../src/model/admin.ts'
 import { ADMIN_TABS } from '../src/model/navigation.ts'
@@ -10,6 +13,19 @@ import { adminTodayQuery, auditViewData, bindingsViewData, clientAppsViewData, d
  * @returns 场景执行完成。
  */
 export async function runAdminChecks(check: (name: string, value: boolean) => void): Promise<void> {
+  check('工作日历严格验证真实日期与闰日', validCalendarDate('2028-02-29')
+    && !validCalendarDate('2026-02-29') && !validCalendarDate('0000-01-01'))
+  check('工作日历拒绝跨夜时段及重复覆盖日期',
+    !!calendarValidation('18:00', '09:00', [])
+    && !!calendarValidation('09:00', '18:00', [{ date: '2026-10-01', isWorkingDay: false },
+      { date: '2026-10-01', isWorkingDay: true }])
+    && calendarValidation('09:00', '18:00', [{ date: '2026-10-24', isWorkingDay: true }]) === '')
+  check('工作日历完整响应保留修订和只读时区', readWorkCalendar({ revision: 2,
+    timeZoneId: 'Asia/Shanghai', workingStart: '09:00', workingEnd: '18:00', overrides: [] }).revision === 2)
+  let invalidCalendar = false
+  try { readWorkCalendar({ revision: 2, timeZoneId: 'Asia/Shanghai', overrides: [] }) }
+  catch { invalidCalendar = true }
+  check('工作日历不把不完整响应当成可保存表单', invalidCalendar)
   check('管理后台所有既有一级入口都有正式页面定义',
     ['overview', 'flows', 'runtime'].every(section => !!resolveAdminView(section, '')))
   check('组织、应用、出站、统计和系统管理的全部页签都有页面定义',
@@ -73,4 +89,47 @@ export async function runAdminChecks(check: (name: string, value: boolean) => vo
   let unavailable = false
   try { await adminAdapter.loadView('system/storage', new AbortController().signal) } catch (error) { unavailable = error instanceof AdminAdapterUnavailableError }
   check('未接入的管理页面明确拒绝，不返回虚构统计或密钥', unavailable)
+  await runCalendarHttpChecks(check)
+}
+
+/**
+ * 验证日历适配器提交旧修订、原因和真实 JWT，不提交只读时区。
+ * @param check 场景记录器。
+ * @returns 检查完成。
+ */
+async function runCalendarHttpChecks(check: (name: string, value: boolean) => void): Promise<void> {
+  const original = globalThis.fetch
+  const requests: Array<{ path: string; method: string; body: string; authorization: string }> = []
+  const calendar = { revision: 5, timeZoneId: 'Asia/Shanghai', workingStart: '09:00', workingEnd: '18:00', overrides: [] }
+  /**
+   * 记录受保护的 HTTP 调用并返回固定日历。
+   * @param input 请求地址。
+   * @param init 请求选项。
+   * @returns 模拟服务端响应。
+   */
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const path = String(input)
+    requests.push({ path, method: init?.method ?? 'GET', body: String(init?.body ?? ''),
+      authorization: new Headers(init?.headers).get('Authorization') ?? '' })
+    const body = path.endsWith('/identity/login') ? { personId: 'admin', accessToken: 'calendar-token',
+      accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
+      : path.endsWith('/admin/session') ? { personId: 'admin' }
+        : { ...calendar, revision: init?.method === 'PUT' ? 6 : 5 }
+    return new Response(JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
+  }
+  try {
+    await loginAdmin('admin', 'password', 'admin')
+    const loaded = await loadWorkCalendar()
+    const saved = await saveWorkCalendar(loaded, '调整工作时段')
+    const calls = requests.filter(item => item.path === '/api/v1/admin/work-calendar')
+    const body = JSON.parse(calls[1]?.body ?? '{}')
+    check('日历适配器读写真实管理路径，携带 JWT、旧修订和原因且不提交时区',
+      calls.length === 2 && calls[0]?.method === 'GET' && calls[1]?.method === 'PUT'
+      && calls.every(item => item.authorization === 'Bearer calendar-token')
+      && body.expectedRevision === 5 && body.reason === '调整工作时段' && !('timeZoneId' in body)
+      && loaded.revision === 5 && saved.revision === 6)
+  } finally {
+    logoutAdmin()
+    globalThis.fetch = original
+  }
 }

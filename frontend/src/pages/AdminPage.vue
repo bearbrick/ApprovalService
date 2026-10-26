@@ -14,11 +14,14 @@ import AdminTable from './admin/AdminTable.vue'
 import AdminIntervention from './admin/AdminIntervention.vue'
 import AdminOrganizationImport from './admin/AdminOrganizationImport.vue'
 import AdminEmbedOriginsEditor from './admin/AdminEmbedOriginsEditor.vue'
+import AdminDocumentSettingsEditor from './admin/AdminDocumentSettingsEditor.vue'
 import AdminBindingEditor from './admin/AdminBindingEditor.vue'
 import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
 import AdminClientAppEditor from './admin/AdminClientAppEditor.vue'
+import AdminIntegrationWizard from './admin/AdminIntegrationWizard.vue'
 import AdminAccountEditor from './admin/AdminAccountEditor.vue'
 import AdminPasswordEditor from './admin/AdminPasswordEditor.vue'
+import AdminSystemBranding from './admin/AdminSystemBranding.vue'
 import AdminReports from './admin/AdminReports.vue'
 import AdminFlows from './admin/AdminFlows.vue'
 import '../styles/admin.css'
@@ -94,6 +97,10 @@ const importOpen = ref(false)
  */
 const originsOpen = ref(false)
 /**
+ * 业务原单钩子和子页面来源设置面板的展开状态。
+ */
+const documentOpen = ref(false)
+/**
  * 手工业务系统绑定编辑面板的展开状态。
  */
 const bindingOpen = ref(false)
@@ -110,6 +117,10 @@ const retryOpen = ref(false)
  */
 const appEditorMode = ref<'create' | 'rotate' | 'status' | null>(null)
 /**
+ * 组织管理员接入向导的展开状态。
+ */
+const wizardOpen = ref(false)
+/**
  * 当前队列列表可供选择的回调事件 ID。
  */
 const callbackEventIds = computed(() => [...new Set((data.value?.rows ?? [])
@@ -125,7 +136,7 @@ const appOptions = computed(() => (data.value?.rows ?? []).map(row => ({
  */
 const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['导入组织']
   : view.value?.key === 'org/people' ? ['导入人员', '账号管理']
-    : view.value?.key === 'apps/list' ? ['新建应用', '配置嵌入来源', '轮换密钥', '启停应用']
+    : view.value?.key === 'apps/list' ? ['接入向导', '新建应用', '配置嵌入来源', '配置业务原单', '轮换密钥', '启停应用']
       : view.value?.key === 'apps/bindings' ? ['新增绑定']
         : view.value?.key === 'outbound/queue' ? ['重新投递'] : [])
 
@@ -135,7 +146,9 @@ const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['
  */
 function handleAction(name: string): void {
   if (!enabledActions.value.includes(name)) return
-  if (name === '配置嵌入来源') originsOpen.value = true
+  if (name === '接入向导') wizardOpen.value = true
+  else if (name === '配置嵌入来源') originsOpen.value = true
+  else if (name === '配置业务原单') documentOpen.value = true
   else if (name === '新建应用') appEditorMode.value = 'create'
   else if (name === '轮换密钥') appEditorMode.value = 'rotate'
   else if (name === '启停应用') appEditorMode.value = 'status'
@@ -155,7 +168,8 @@ async function submitLogin(): Promise<void> {
   signInError.value = ''
   try {
     const result = await loginAdmin(employeeNumber.value.trim(), password.value,
-      view.value?.section === 'reports' ? 'reports' : view.value?.section === 'flows' ? 'flows' : 'admin')
+      view.value?.key === 'apps/test' ? 'app-test' : view.value?.section === 'reports' ? 'reports'
+        : view.value?.section === 'flows' ? 'flows' : 'admin')
     session.value = result
     if (result.tokens.mustChangePassword) currentPassword.value = password.value
     else void load()
@@ -177,7 +191,8 @@ async function submitPasswordChange(): Promise<void> {
   signInError.value = ''
   try {
     session.value = await changeAdminPassword(currentPassword.value, newPassword.value,
-      view.value?.section === 'reports' ? 'reports' : view.value?.section === 'flows' ? 'flows' : 'admin')
+      view.value?.key === 'apps/test' ? 'app-test' : view.value?.section === 'reports' ? 'reports'
+        : view.value?.section === 'flows' ? 'flows' : 'admin')
     currentPassword.value = ''
     newPassword.value = ''
     void load()
@@ -225,6 +240,7 @@ async function load(): Promise<void> {
   error.value = ''
   if (!session.value || session.value.tokens.mustChangePassword) { state.value = 'unavailable'; return }
   if (!view.value) { state.value = 'error'; error.value = '管理页面不存在。'; return }
+  if (view.value.key === 'apps/test') { state.value = 'ready'; return }
   if (!canReadAdminSection(session.value, view.value.section)) {
     state.value = 'error'
     error.value = '此会话仅允许查看统计报表。请退出后使用组织管理员身份登录。'
@@ -250,23 +266,25 @@ async function load(): Promise<void> {
   }
 }
 
-watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; accountOpen.value = false; retryOpen.value = false; appEditorMode.value = null; void load() }, { immediate: true })
+watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; documentOpen.value = false; bindingOpen.value = false; accountOpen.value = false; retryOpen.value = false; wizardOpen.value = false; appEditorMode.value = null; void load() }, { immediate: true })
 onBeforeUnmount(() => request?.abort())
 </script>
 
 <template>
-  <header class="page-header admin-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>管理后台</span><template v-if="view && view.section !== 'overview'"><span>/</span><span>{{ view.title }}</span></template></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ view?.title ?? '管理后台' }}</h1><span class="badge">{{ session && !session.tokens.mustChangePassword ? (session.scope === 'reports' ? '报表会话' : session.scope === 'flows' ? '流程管理会话' : '管理员已登录') : '需要登录' }}</span><button v-if="session && !session.tokens.mustChangePassword" class="btn" type="button" @click="signOut">退出登录</button></div><p>{{ view?.description ?? '查看管理模块。' }}</p></header>
+  <header class="page-header admin-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>管理后台</span><template v-if="view && view.section !== 'overview'"><span>/</span><span>{{ view.title }}</span></template></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ view?.title ?? '管理后台' }}</h1><span class="badge">{{ session && !session.tokens.mustChangePassword ? (session.scope === 'reports' ? '报表会话' : session.scope === 'flows' ? '流程管理会话' : session.scope === 'app-test' ? '应用测试会话' : '管理员已登录') : '需要登录' }}</span><button v-if="session && !session.tokens.mustChangePassword" class="btn" type="button" @click="signOut">退出登录</button></div><p>{{ view?.description ?? '查看管理模块。' }}</p></header>
   <div class="page-body admin-page-body">
-    <section v-if="!session" class="admin-panel admin-login-card"><h2>{{ view?.section === 'reports' ? '报表登录' : view?.section === 'flows' ? '流程管理登录' : '管理员登录' }}</h2><p>{{ view?.section === 'reports' ? '组织管理员和直接负责部门的负责人可登录查看授权范围内的统计。' : view?.section === 'flows' ? '组织管理员与本部门流程管理员可登录；服务端只返回有权管理的流程。' : '请使用本地组织管理员账号登录，管理权限由服务端实时核对。' }}</p><form @submit.prevent="submitLogin"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><button class="btn btn-primary" type="submit" :disabled="signingIn">{{ signingIn ? '正在登录…' : '登录' }}</button></form></section>
+    <section v-if="!session" class="admin-panel admin-login-card"><h2>{{ view?.key === 'apps/test' ? '应用测试登录' : view?.section === 'reports' ? '报表登录' : view?.section === 'flows' ? '流程管理登录' : '管理员登录' }}</h2><p>{{ view?.key === 'apps/test' ? '请使用本地人员账号登录。发送测试时，服务端会核对当前人员是否管理该应用。' : view?.section === 'reports' ? '组织管理员和直接负责部门的负责人可登录查看授权范围内的统计。' : view?.section === 'flows' ? '组织管理员与本部门流程管理员可登录；服务端只返回有权管理的流程。' : '请使用本地组织管理员账号登录，管理权限由服务端实时核对。' }}</p><p v-if="view?.section === 'apps' && view.key !== 'apps/test'"><a href="#/admin/apps/test">应用管理员：前往受限的测试回调入口</a></p><form @submit.prevent="submitLogin"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><button class="btn btn-primary" type="submit" :disabled="signingIn">{{ signingIn ? '正在登录…' : '登录' }}</button></form></section>
     <section v-else-if="session.tokens.mustChangePassword" class="admin-panel admin-login-card"><h2>首次登录请修改密码</h2><p>临时密码只能用于改密，完成后才可进入管理后台。</p><form @submit.prevent="submitPasswordChange"><label>当前密码<input v-model="currentPassword" type="password" autocomplete="current-password" required></label><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><p v-if="signInError" class="admin-login-error" role="alert">{{ signInError }}</p><div class="admin-login-actions"><button class="btn btn-primary" type="submit" :disabled="signingIn">保存新密码</button><button class="btn" type="button" @click="signOut">退出</button></div></form></section>
     <template v-else>
-    <nav v-if="tabs.length" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
+    <nav v-if="tabs.length && session.scope !== 'app-test'" class="admin-tabs" aria-label="管理二级页签"><a v-for="tab in tabs" :key="tab.key" :href="tab.hash" :aria-current="route.tab === tab.key ? 'page' : undefined">{{ tab.title }}</a></nav>
     <template v-if="view">
-      <section v-if="!canReadAdminSection(session, view.section)" class="admin-panel"><UiEmptyState title="当前会话不能进入此管理模块" description="请退出后用具有相应管理权限的本地账号登录。" icon="alert"><template #action><button class="btn btn-primary" type="button" @click="signOut">退出并重新登录</button></template></UiEmptyState></section>
+      <section v-if="view.key !== 'apps/test' && !canReadAdminSection(session, view.section)" class="admin-panel"><UiEmptyState title="当前会话不能进入此管理模块" description="请退出后用具有相应管理权限的本地账号登录。" icon="alert"><template #action><button class="btn btn-primary" type="button" @click="signOut">退出并重新登录</button></template></UiEmptyState></section>
+      <AdminIntegrationWizard v-else-if="view.key === 'apps/test' && (session.scope === 'app-test' || session.scope === 'admin')" restricted @close="signOut" />
+      <section v-else-if="view.key === 'apps/test'" class="admin-panel"><UiEmptyState title="当前会话不能测试应用回调" description="请退出后使用本地应用管理员或组织管理员账号登录。" icon="alert" /></section>
       <AdminReports v-else-if="view.section === 'reports'" :tab="view.tab" @lost="signOut" />
       <AdminFlows v-else-if="view.section === 'flows'" @lost="signOut" />
       <AdminOverview v-else-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
-      <template v-else><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
+      <template v-else><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminDocumentSettingsEditor v-if="documentOpen && appOptions.length" :apps="appOptions" @close="documentOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminIntegrationWizard v-if="wizardOpen" :restricted="false" @close="wizardOpen = false" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminSystemBranding v-else-if="view.key === 'system/info' && state === 'ready'" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>
     <p class="workspace-note">审批服务只管理流程与审批记录；业务单据由来源业务系统维护。</p>

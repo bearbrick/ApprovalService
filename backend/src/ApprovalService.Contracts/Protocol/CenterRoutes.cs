@@ -26,6 +26,10 @@ public static class CenterRoutes
     /// </summary>
     public const string Instance = Instances + "/{id}";
     /// <summary>
+    /// 按当前查看人获取短时一次性只读业务原单地址。
+    /// </summary>
+    public const string DocumentUrl = Instances + "/{id}/document-url";
+    /// <summary>
     /// 当前登录人员显式确认已显示的一张审批详情。
     /// </summary>
     public const string MarkRead = Instances + "/{id}/read";
@@ -38,6 +42,30 @@ public static class CenterRoutes
     /// </summary>
     public const string Opinion = Opinions + "/{id}";
     /// <summary>
+    /// 本人委托规则列表和新增入口。
+    /// </summary>
+    public const string Delegations = "/api/v1/center/delegations";
+    /// <summary>
+    /// 删除本人一项委托规则。
+    /// </summary>
+    public const string Delegation = Delegations + "/{id}";
+    /// <summary>
+    /// 按有效规则逐项将已有待办转给代理人。
+    /// </summary>
+    public const string DelegateTasks = Delegations + "/tasks";
+    /// <summary>
+    /// 组织管理员维护指定人员的委托规则。
+    /// </summary>
+    public const string AdminDelegations = "/api/v1/admin/delegations/{principalId}";
+    /// <summary>
+    /// 组织管理员逐项转移指定人员已有待办。
+    /// </summary>
+    public const string AdminDelegateTasks = AdminDelegations + "/tasks";
+    /// <summary>
+    /// 组织管理员删除指定人员的一项委托规则。
+    /// </summary>
+    public const string AdminDelegation = AdminDelegations + "/{id}";
+    /// <summary>
     /// 使用当前登录人员身份办理一项人工任务。
     /// </summary>
     public const string TaskActions = "/api/v1/center/tasks/{taskId}/actions";
@@ -49,6 +77,18 @@ public static class CenterRoutes
     /// 逐项独立办理当前登录人员的批量同意任务。
     /// </summary>
     public const string BatchApprove = "/api/v1/center/tasks/batch-approve";
+    /// <summary>
+    /// 本人创建一次不可变 PNG 签名资产。
+    /// </summary>
+    public const string Signatures = "/api/v1/center/signatures";
+    /// <summary>
+    /// 本地会话读取最近上传的个人签名元数据。
+    /// </summary>
+    public const string PersonalSignature = Signatures + "/me";
+    /// <summary>
+    /// 读取本人或已授权审批单上使用的签名 PNG。
+    /// </summary>
+    public const string SignatureById = Signatures + "/{id}";
 }
 
 /// <summary>

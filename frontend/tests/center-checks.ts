@@ -4,9 +4,13 @@ import { centerAdapter, CenterAdapterUnavailableError } from '../src/api/center-
 import { exchangeCenterEmbed, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, registeredParentOrigin } from '../src/api/center-embed.ts'
 import { fetchCenterFile } from '../src/api/center-files.ts'
+import { fetchCenterSignature, latestCenterSignature, uploadCenterSignature } from '../src/api/center-signatures.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
+import { fetchCenterDocumentAddress } from '../src/api/center-document.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import { createCenterOpinion, deleteCenterOpinion, loadCenterOpinions, updateCenterOpinion } from '../src/api/center-opinions.ts'
+import { createCenterDelegation, delegateCenterTasks, deleteCenterDelegation, loadCenterDelegations } from '../src/api/center-delegations.ts'
+import type { CenterDelegation } from '../src/api/center-delegations.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -67,10 +71,12 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   const originalFetch = globalThis.fetch
   const requests: { path: string, authorization: string, method: string, body: string }[] = []
   let allowActions = false
+  let requireSignature = false
   let serverUnread = true
   let failPreference = false
   const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
   const savedOpinions: { id: string, content: string, createdAtUtc: string }[] = []
+  const savedDelegations: CenterDelegation[] = []
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
@@ -84,6 +90,13 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       const path = String(input)
       requests.push({ path, authorization: new Headers(init?.headers).get('Authorization') ?? '',
         method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? init.body : '' })
+      if (path.startsWith('/api/v1/center/signatures/')) {
+        if (path.endsWith('/me')) return new Response(JSON.stringify({ id: 'personal-1', sha256: 'a'.repeat(64), isPersonal: true, uploadedAt: '2026-10-25T00:00:00Z' }), { status: 200 })
+        return new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { 'Content-Type': 'image/png' } })
+      }
+      if (path.startsWith('/api/v1/center/signatures?')) {
+        return new Response(JSON.stringify({ id: 'single-1', sha256: 'b'.repeat(64), isPersonal: path.includes('personal=true'), uploadedAt: '2026-10-25T00:00:00Z' }), { status: 200 })
+      }
       if (path.endsWith('/files/file-visible')) {
         return new Response(new Blob(['PDF'], { type: 'application/pdf' }), { status: 200,
           headers: { 'Content-Type': 'application/pdf' } })
@@ -91,6 +104,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       if (path.endsWith('/center/instances/instance-1/read')) {
         serverUnread = false
         return new Response(null, { status: 204 })
+      }
+      if (path.endsWith('/center/instances/instance-1/document-url')) {
+        return new Response(JSON.stringify({ url: 'https://documents.example.com/read?once=demo',
+          expiresAt: '2099-01-01T00:00:00Z' }), { status: 200 })
       }
       if (path.startsWith('/api/v1/notifications/preferences')) {
         if (path !== '/api/v1/notifications/preferences') {
@@ -126,6 +143,27 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         savedOpinions.push(item)
         return new Response(JSON.stringify(item), { status: 200 })
       }
+      if (path.startsWith('/api/v1/center/delegations')) {
+        const method = init?.method ?? 'GET'
+        if (method === 'GET') return new Response(JSON.stringify(savedDelegations), { status: 200 })
+        if (new Headers(init?.headers).get('Authorization') === 'Bearer embed-token') {
+          return new Response(JSON.stringify({ code: 'FORBIDDEN', message: '嵌入会话只能读取。' }), { status: 403 })
+        }
+        if (path.endsWith('/tasks')) {
+          const payload = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { taskIds: string[] }
+          return new Response(JSON.stringify(payload.taskIds.map(taskId => ({ taskId,
+            succeeded: taskId === 'task-1', code: taskId === 'task-1' ? null : 'NOT_FOUND',
+            message: taskId === 'task-1' ? null : '任务不存在。' }))), { status: 200 })
+        }
+        if (method === 'DELETE') {
+          savedDelegations.splice(savedDelegations.findIndex(item => item.id === path.split('/').at(-1)), 1)
+          return new Response(null, { status: 204 })
+        }
+        const payload = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as CenterDelegation
+        const saved = { ...payload, id: 'delegation-1', principalPersonId: 'person-1' }
+        savedDelegations.push(saved)
+        return new Response(JSON.stringify(saved), { status: 200 })
+      }
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
         : path.endsWith('/embed-tokens/exchange')
@@ -145,7 +183,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
               { fieldKey: 'secret', columnSpan: 1, detailColumnWidths: {} },
             ] }] },
             attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
-            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }],
+            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, signatureRequired: requireSignature, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] },
+              { id: 'task-queued', nodeId: 'approval', nodeName: '后续审批', assigneeId: 'person-1', status: 'queued', completedAt: null, opinion: null, allowedActions: [] }],
             events: [{ eventId: 'event-2', sequence: 2, kind: 'commentAdded', nodeId: 'approval', actorId: 'other', occurredAt: '2026-10-19T11:00:00Z', opinion: null }], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, isUnread: serverUnread,
             canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
@@ -176,6 +215,15 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && JSON.stringify(detail.layout).includes('"qty":100')
       && !JSON.stringify(detail.layout).includes('secret') && !JSON.stringify(detail.layout).includes('cost'))
     check('旧服务缺少详情排版时安全回退自动排版', centerDetailLayout(undefined, detail.fields).mode === 'auto')
+    const embeddedLayout = centerDetailLayout({ mode: 'embed', embedPageCode: 'purchase-readonly' }, detail.fields)
+    check('嵌入排版只接收发布页面编码且旧结构继续回退普通详情',
+      embeddedLayout.mode === 'embed' && embeddedLayout.embedPageCode === 'purchase-readonly' &&
+      centerDetailLayout({ mode: 'embed', embedPageCode: '' }, detail.fields).mode === 'auto')
+    const original = await fetchCenterDocumentAddress('instance-1')
+    check('业务原单临时地址仅由当前人员 JWT 的无缓存写请求取得',
+      original.url === 'https://documents.example.com/read?once=demo' &&
+      requests.at(-1)?.path === '/api/v1/center/instances/instance-1/document-url' &&
+      requests.at(-1)?.method === 'POST' && requests.at(-1)?.authorization === 'Bearer test-token')
     const fieldSearch = await centerAdapter.loadList('todo', controller.signal, '行票据')
     check('审批列表把字段内容搜索交给 JWT 服务端且保留授权结果',
       fieldSearch.length === 1 && requests.at(-1)?.path.includes('search=%E8%A1%8C%E7%A5%A8') === true &&
@@ -198,6 +246,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     check('中心只映射服务端许可，并保留可批量同意的实际任务 ID',
       permittedList[0]?.allowsBatchApprove === true && permittedList[0]?.bulkTaskIds?.[0] === 'task-1'
       && permittedDetail.actionTasks?.[0]?.actions.join(',') === 'approve,supplement')
+    check('委托设置可列出本人待办及排队任务，转委托仍由写接口重验',
+      permittedDetail.delegationTasks?.map(task => task.taskId).join(',') === 'task-1,task-queued')
     await centerAdapter.executeAction('task-1', { action: 'approve', opinion: '同意' })
     const batch = await centerAdapter.batchApprove(['task-1'], '同意')
     check('中心写请求携带当前人员 JWT 和任务 ID，批量返回逐项结果',
@@ -205,6 +255,12 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.at(-2)?.body.includes('"action":"approve"') === true
       && requests.at(-1)?.body.includes('"taskIds":["task-1"]') === true
       && batch[0]?.succeeded === true && batch[0]?.instanceId === 'instance-1')
+    requireSignature = true
+    const requiredDetail = await centerAdapter.loadDetail('instance-1', controller.signal)
+    await centerAdapter.executeAction('task-1', { action: 'approve', signatureFileId: 'personal-1' })
+    check('节点必签规则映射到操作表单且明确选用 ID 进入本次请求',
+      requiredDetail.actionTasks?.[0]?.signatureRequired === true
+      && requests.at(-1)?.body.includes('"signatureFileId":"personal-1"') === true)
     const preferences = await loadCenterPreferences()
     const savedPreference = await saveCenterPreference({ ...preferences[0]!, emailEnabled: false })
     const persisted = await loadCenterPreferences()
@@ -217,6 +273,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.slice(-4).every(request => request.authorization === 'Bearer test-token')
       && requests.at(-3)?.method === 'PUT' && requests.at(-3)?.body === '{"emailEnabled":false,"inAppEnabled":true}'
       && requests.at(-2)?.method === 'GET')
+    const personalSignature = await latestCenterSignature()
+    const singleSignature = await uploadCenterSignature(new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }), false)
+    const image = await fetchCenterSignature(singleSignature.id, 'instance-1')
+    check('手写签名只用人员 JWT 上传并按审批单验权取图，令牌不进 URL',
+      personalSignature?.id === 'personal-1' && singleSignature.id === 'single-1' && image.type === 'image/png'
+      && requests.slice(-3).every(request => request.authorization === 'Bearer test-token')
+      && requests.at(-2)?.method === 'POST' && requests.at(-2)?.path.endsWith('personal=false') === true
+      && requests.at(-1)?.path === '/api/v1/center/signatures/single-1?instanceId=instance-1')
+    let oversizedRejected = false
+    try { await uploadCenterSignature(new Blob([new Uint8Array(2 * 1024 * 1024 + 1)], { type: 'image/png' }), false) } catch { oversizedRejected = true }
+    check('浏览器在发请求前拒绝超过 2 MiB 的签名 PNG', oversizedRejected &&
+      requests.at(-1)?.path === '/api/v1/center/signatures/single-1?instanceId=instance-1')
     const createdOpinion = await createCenterOpinion('已核对')
     const opinions = await loadCenterOpinions()
     const updatedOpinion = await updateCenterOpinion(createdOpinion.id, '请修改')
@@ -226,6 +294,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       opinions.length === 1 && opinions[0]?.content === '已核对' && updatedOpinion.content === '请修改'
       && afterOpinionDelete.length === 0 && requests.slice(-5).every(request => request.authorization === 'Bearer test-token')
       && requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,PUT,DELETE,GET')
+    const createdDelegation = await createCenterDelegation({ delegatePersonId: 'person-2',
+      startsAtUtc: '2026-10-26T00:00:00Z', endsAtUtc: '2026-10-27T00:00:00Z', flowCodes: ['PURCHASE'] })
+    const delegations = await loadCenterDelegations()
+    const transfers = await delegateCenterTasks(['task-1', 'missing-task'])
+    await deleteCenterDelegation(createdDelegation.id)
+    const afterDelegationDelete = await loadCenterDelegations()
+    check('委托设置使用本人 JWT 持久读写，已有任务逐项返回且删除不伪造保存',
+      delegations.length === 1 && delegations[0]?.flowCodes[0] === 'PURCHASE' &&
+      transfers.length === 2 && transfers[0]?.succeeded === true &&
+      transfers[1]?.succeeded === false && afterDelegationDelete.length === 0 &&
+      requests.slice(-5).every(request => request.authorization === 'Bearer test-token') &&
+      requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,POST,DELETE,GET')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()

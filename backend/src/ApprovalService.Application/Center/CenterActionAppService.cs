@@ -23,11 +23,12 @@ namespace ApprovalService.Application.Center;
 /// <param name="contextBuilder">最新组织和矩阵的引擎上下文。</param>
 /// <param name="runtime">唯一引擎命令入口。</param>
 /// <param name="hooks">同意前业务校验钩子。</param>
+/// <param name="signatures">本次签名资产本人归属校验。</param>
 /// <param name="timeProvider">固定本次操作时间。</param>
 public sealed class CenterActionAppService(IApprovalOpenQueryRepository tasks,
     ICenterQueryRepository center, IOrganizationRepository organizations, IClientAppRepository apps,
     OpenStartContextBuilder contextBuilder, IApprovalRuntimeAppService runtime,
-    BusinessHookAppService hooks, TimeProvider timeProvider)
+    BusinessHookAppService hooks, SignatureAppService signatures, TimeProvider timeProvider)
 {
     /// <summary>
     /// 人工任务可提交的命令白名单；实例级和管理员命令不在这里办理。
@@ -92,6 +93,10 @@ public sealed class CenterActionAppService(IApprovalOpenQueryRepository tasks,
         }
         var fields = await CenterActionFieldValidator.ValidateAsync(definition, node, input.Action,
             input.FieldValues, organizations, cancellationToken);
+        if (input.SignatureFileId is not null)
+        {
+            await signatures.EnsureOwnedAsync(scope, input.SignatureFileId, cancellationToken);
+        }
         var now = timeProvider.GetUtcNow();
         var context = await contextBuilder.BuildContinuationAsync(record.Instance, definition, graph,
             now, cancellationToken);
@@ -124,6 +129,7 @@ public sealed class CenterActionAppService(IApprovalOpenQueryRepository tasks,
                 {
                     ActorId = scope.PersonId,
                     Opinion = input.Opinion,
+                    SignatureFileId = input.SignatureFileId,
                     TargetUserId = targetId,
                     TargetNodeId = input.TargetNodeId,
                     RelatedId = input.RelatedId,

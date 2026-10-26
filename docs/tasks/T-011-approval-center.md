@@ -18,6 +18,8 @@
 - `backend/src/ApprovalService.Domain/Center/`、`Application/Center/`、`Infrastructure/Center/`：中心查询模型与授权仓储
 - `backend/src/ApprovalService.Api/Endpoints/Center/`、`Contracts/Protocol/Center*.cs`：JWT 中心路由和向后兼容响应
 - `backend/tests/ApprovalService.Backend.Checks/Center*.cs`：真实 SQLite/JWT/HTTP 检查
+- `backend/tests/ApprovalService.Backend.Checks/FrontendHostingChecks.cs`：更新 HTML CSP 场景，验证原单子页面来源按应用隔离。
+- `backend/tests/ApprovalService.Backend.Checks/CenterOpinionMigrationIntegrationChecks.cs`：旧库升级夹具改用旧结构 SQL 插入，避免当前模型新增列写入旧表。
 - `backend/README.md`、`docs/contracts.md`、`docs/architecture.md`、设计书 §center/§api：实际接口行为同步
 - `frontend/src/pages/center/`：待我处理、我已处理、抄送我的、我发起的（只看进度）；详情（按排版显示业务数据，或嵌入业务系统的原单；意见栏；时间线加流程图高亮；操作按钮）
 - `frontend/src/pages/CenterPage.vue`、`frontend/src/api/center-adapter.ts`、`frontend/src/api/center-session.ts`、`frontend/src/model/center.ts`、`frontend/tests/center-checks.ts`、`frontend/src/styles/center.css`：登录会话、中心接口映射、真实列表与详情、场景检查及页面样式
@@ -29,6 +31,10 @@
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
+- `docs/adr/0022-original-business-document-embed.md`：已确认的业务原单临时地址钩子与 iframe 安全协议。
+- `backend/src/ApprovalService.Domain/Integration/`、`Application/Integration/`、`Infrastructure/Integration/`：原单钩子配置、人员外部绑定与签名调用。
+- `backend/src/ApprovalService.Api/Hosting/`、`Endpoints/Administration/`：原单 iframe 来源 CSP 与应用管理配置。
+- `frontend/src/pages/admin/`、`frontend/src/api/admin-adapter.ts`：原单钩子与来源管理。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/Migrations/`：接入应用允许嵌入来源的存储与三库迁移
 - `backend/src/ApprovalService.Engine/Commands/TaskActionAvailability.cs`、`backend/src/ApprovalService.Application/Center/`、`backend/src/ApprovalService.Api/Endpoints/Center/`、`backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`backend/tests/ApprovalService.Backend.Checks/Center*.cs`：纯引擎任务许可、JWT 中心写用例与路由、场景检查
 - 内嵌模式：用嵌入令牌打开，审批完用 postMessage 通知外面
@@ -44,6 +50,11 @@
 - `backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`docs/contracts.md`：新增中心查询及任务操作协议
 - `docs/architecture.md`：同步查询层安全边界
 - `docs/adr/README.md`：登记已采纳的内嵌与中心操作协议
+- `docs/adr/README.md`：登记原单嵌入提议 ADR 0022；本次只追加索引一行。
+- `backend/src/ApprovalService.Contracts/Protocol/BusinessHookModels.cs`、`CenterRoutes.cs`、`ApiRoutes.cs`：追加兼容的第五钩子与管理/中心接口。
+- `backend/src/ApprovalService.Api/Program.cs`、`ApplicationServiceCollectionExtensions.cs`、`InfrastructureServiceCollectionExtensions.cs`：登记原单读取服务与路由。
+- `backend/src/ApprovalService.Domain/Integration/IClientAppRepository.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppRepository.cs`：原单配置更新。
+- `frontend/src/pages/AdminPage.vue`：原单配置入口。
 
 ## 验收标准
 
@@ -60,6 +71,19 @@
 - 打印（T-015）
 
 ## 交接记录
+
+- 2026-10-26 · Codex · 已采纳 ADR 0022 并完成只读业务原单嵌入切片：新增应用级第五签名钩子及独立 HTTPS 子页面来源管理、当前 JWT 人员授权和唯一外部绑定核对、只发送可见普通字段与明细叶子路径、响应 URL/来源/五分钟期限验证、HTML `frame-src` 与前端受限 iframe/普通详情回退。三库迁移从已含委托迁移的集成基线用仓库官方 EF 脚本生成，每库只为 `ClientApps` 增加 `DocumentUrl`、`AllowedDocumentOriginsJson`；后续又合入最新引擎修复 `3f0f7b6`。真实 SQLite 场景检查覆盖无权、隐藏列、错来源、HTTP、超期、空 URL 和重复绑定，CSP 场景验证普通/专属入口。全量 `verify.ps1` 通过：后端 1120、调用端 96、前端 200 项；未做外置 Chrome 视觉复核。一次性令牌消费、实际查看人绑定、原单只读与字段裁剪是业务系统服务端的协议责任，本服务只能验证签名和返回地址；现有示例业务宿主仅提供 HTTP 钩子，HTTPS 原单页面示例应另开任务补充。未合并/推送主分支，无新增依赖或真实密钥。总 T-011 仍进行中。
+- 2026-10-26 · Codex · 用户已确认 ADR 0022 全部边界，原单嵌入切片解除 R13 阻塞并恢复进行中。第五签名钩子、独立 HTTPS 原单来源、可见字段路径、业务端的一次性/只读/身份约束和安全回退均按已采纳 ADR 实施。共享文件及跨管理模块范围已在上面登记；三库迁移将待并行委托迁移进入集成基线后生成，避免快照冲突。
+- 2026-10-26 · Codex · 原单嵌入切片按 R13 阻塞，其他已完成中心能力不受影响。用户已同意“签名钩子返回不超过五分钟的一次性只读 HTTPS 地址、按登记来源限制 iframe、失败回退普通详情”，但 ADR 0010 只定义四类钩子，当前发起时 `detailUrl` 不带查看人/过期/一次性，`allowedEmbedOrigins` 约束父页面而非原单子页面，中心投影把 `embed` 回退自动排版且 HTML CSP 未限制 `frame-src`。还必须决定隐藏字段如何由业务原单执行权限，审批服务不能从 URL 验证页面只读或一次性。已在提议 ADR 0022 写出第五钩子、独立 HTTPS 来源名单、请求/响应字段、业务端责任和旧应用回退；待用户确认“需确认的边界”后恢复。此次没有产品代码、依赖或不兼容契约变更，也未合并/推送主分支。与并行委托切片共用 T-011 文件，整合时请保留两边交接并在协议确认后把状态恢复进行中。
+- 2026-10-26 · Codex · 委托规则与运行时接线完成并合入最新签名集成基线 `de49527`：本人本地 JWT 和组织管理员可维护 UTC 左闭右开、流程范围委托；串行化事务拒绝同一委托人的重叠规则，三种数据库迁移从已含签名的快照由官方 EF 脚本重生，每库只加 `DelegationRules`。运行时按锁定流程和固定时间加载有效规则，新任务一层自动代理并写入 `DelegatedForId`；既有待办由本人或组织管理员选择逐项经统一引擎转委托，管理员须填写原因，事件记录真实 `ActorId`。删除只影响未来任务。设置页可保存规则、搜索前 20 张匹配待办、勾选在手或排队任务并显示逐项结果；受保护管理 API 可代设和代转。保留常用意见、签名、委托三个设置入口，`ApprovalDbContext` 的委托 DbSet 拆成 partial 遵守 500 行限制。完整 `verify.ps1` 通过：后端 1107、调用端 96、前端 198 项，生产构建通过；本机发起/审批/待办 P95 为 24.6/32.8/6.2 ms。未做外置 Chrome 视觉验收；原单嵌入地址仍由后续切片实现，总任务保持进行中。
+- 2026-10-26 · Codex · 继续委托接线前登记：本切片在独立分支增加委托规则的三库持久化、本人 JWT 读写、运行时委托快照和已有待办逐项转委托；共享文件仅追加 Contracts 中心路由与响应、Api/Program.cs、Application/Infrastructure 注册、ApprovalDbContext 与工具生成的三库迁移、后端检查 Program.cs，并同步 contracts、architecture、README 与设计书 §center/§api。现有任务转委托的管理员执行必须由本地组织管理员授权，再以真实操作者 ID 留痕，不接受请求体自称管理员；无新增依赖。
+- 2026-10-25 · Codex · 委托规则稳定切片完成：新增领域规则实体与验证器，严格要求 UTC 起止、不同人员、有效区间、非重复流程范围；同一委托人按时间及流程交集拒绝重叠，半开区间端点相接允许。新增 9 项纯规则场景并接入检查程序，`dotnet build` 零警告、`delegation-rules` 九项和 `docs` 注释检查通过。只使用本机 NuGet 缓存还原；未生成迁移、未跑完整 HTTP/全量验证，因为 T-011 签名切片占用迁移和运行时验证窗口。后续须用最新集成模型生成三库迁移，持久保存时在同一事务重新检查范围交集；把有效规则注入发起和续办引擎上下文；补本人 JWT 与组织管理员管理入口、既有待办逐项操作/审计及前端设置。现有 `delegateExisting` 引擎命令只认可任务人/原审批人；管理员代转必须经应用层核实后把授权标志传入引擎，并在事件审计中保留真实管理员 `ActorId`，不可伪装成委托人。状态保持进行中。
+- 2026-10-25 · Codex · 委托规则切片预登记：新增 `backend/src/ApprovalService.Domain/Center/DelegationRuleEntity.cs`、`DelegationRules.cs` 和 `backend/tests/ApprovalService.Backend.Checks/DelegationRulesChecks.cs`，先校验 UTC 左闭右开时间、本人/代理人和流程范围互不重叠。共享文件仅在 `backend/tests/ApprovalService.Backend.Checks/Program.cs` 追加规则检查调用。此切片不生成迁移，不修改签名任务正在使用的持久模型或验证窗口；后续另行接持久仓储、三库迁移、JWT 设置、引擎上下文注入与既有任务逐项转办。现有纯引擎已有一层代理和 `delegateExisting` 命令，但该命令目前只允许任务本人/原审批人执行，管理员代为转办需要在应用服务层先解决可信授权及审计后再接线。
+- 2026-10-26 · Codex · 将手写签名切片合入 `f92d9c2` 集成基线：同时保留个人常用意见和签名的注册、设置入口与详情选择；旧签名迁移先撤下，再以已含应用管理员和常用意见的三库快照为基线运行仓库 EF 工具生成 `CenterSignatureAssetsIntegrated`，每库仅新增 `SignatureAssets`。为满足 500 行限制，签名实体映射拆入独立文件。全量 `verify.ps1` 通过：后端 1089、调用端 96、前端 190 项，生产构建通过。未用外置 Chrome 做页面视觉复核；委托分支也将修改 `CenterSettings.vue`，后续集成须同时保留常用意见、签名、委托三个组件。T-011 总任务仍进行中，无新依赖或真实密钥。
+
+- 2026-10-25 · Codex · 手写签名切片完成并在独立分支 `ai/codex/T-011-signatures` 验证：本人独立不可变 PNG 资产限制 2 MiB，核对 PNG 分块 CRC、受限 zlib 像素流和尺寸；嵌入会话只能上传单次资产，跨人员选用/读取被拒；操作必须明确传 `signatureFileId`，统一引擎按发布节点默认关闭的 `signatureRequired` 规则仅限制同意/办理完成/确认已阅，必签任务不提供批量同意，任务和只追加事件冻结资产 ID。桌面与手机详情提供手写画布和明确选择，设计器提供节点开关；独立 `SignatureSettings.vue` 已完成，但为避开并行常用意见分支的 `CenterSettings.vue` 修改，整合时需在设置页追加导入和渲染。三库迁移均用仓库 EF 脚本生成；真实 SQLite/JWT/HTTP 场景验证上传、个人/嵌入权限、伪 PNG/超限、审批事件和图片授权。全量 `verify.ps1` 通过：后端 1062 项、前端 188 项，调用端及端到端检查、生产构建通过。未用浏览器视觉复核；个人设置接线及与常用意见分支的三库迁移快照冲突由主代理在整合时处理，须重新核对三库快照并跑全量验证。无新依赖、无真实密钥。T-011 总任务仍进行中。
+
+- 2026-10-25 · Codex · 手写签名切片预登记：用户已确认本人独立 PNG 最大 2 MiB、每次操作明确选择并冻结审计、节点成功推进可要求签名且默认关闭、嵌入会话只能上传单次签名。为完整实现需扩展任务范围至 Contracts/Flows 的节点规则、Engine/Commands 的统一校验与审计、Application/Runtime 与 Infrastructure/Persistence 的任务投影、独立签名实体/仓储及三库迁移、Api/Program.cs 和前端设计器节点设置。共享文件包括 Contracts/Protocol/CenterRoutes.cs、CenterActionRequests.cs、CenterResponses.cs、ApplicationServiceCollectionExtensions.cs、InfrastructureServiceCollectionExtensions.cs、ApprovalDbContext.cs、Api/Program.cs、检查 Program.cs、docs/contracts.md、docs/architecture.md、frontend/src/model/flow.ts；签名资产与常用意见分支在三库迁移和 CenterSettings.vue 处存在整合冲突，独立提交后由主代理合并生成最终迁移。无新增第三方依赖。
 
 - 2026-10-25 · Codex · 常用意见切片完成：新增本人 JWT 的 GET/POST/PUT/DELETE，正文 1～500 字、每人最多 30 条；嵌入会话可读而不可写，其他人员的意见统一按不存在处理。SQLite、SQL Server、PostgreSQL 迁移由项目脚本生成；真实 SQLite/JWT/HTTP 检查覆盖匿名/API Key 拒绝、人员隔离、嵌入只读、长度与条数限制、修改删除。设置页可维护意见，详情页选择仅填入意见栏，提交继续走既有任务操作。同步契约、架构、前后端 README 与设计书 §center/§api。完整 `verify.ps1` 通过：后端 1039 项、前端 185 项，调用端及端到端检查通过；未使用浏览器做视觉复核。因 T-022 同期独立生成三库迁移，集成时必须在最新基线重生成本迁移与三库快照，不能直接选一份快照覆盖另一份。任务其余签名、委托及原单嵌入仍由后续切片处理，状态保持进行中。
 - 2026-10-25 · Codex · 本段预登记常用意见：用户已确认本人 JWT 持久 CRUD、每人至多 30 条、每条至多 500 字，嵌入会话只读，办理仍使用现有任务操作接口。新增中心领域实体/仓储、应用服务、路由与真实场景检查，前端设置页管理并在详情意见栏选择。共享改动包括 Contracts/Protocol/CenterRoutes.cs 与新增 CenterOpinion 模型、Api/Program.cs、Application/Infrastructure 注册、Persistence/ApprovalDbContext.cs 与三库工具生成迁移、检查 Program.cs、docs/contracts.md、docs/architecture.md、设计书 §center/§api；无新增依赖。T-022 正同步生成三库迁移，本分支独立，集成时须在最新基线重新生成。

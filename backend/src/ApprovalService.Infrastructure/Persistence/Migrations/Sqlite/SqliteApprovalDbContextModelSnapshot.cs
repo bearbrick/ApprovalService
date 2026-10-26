@@ -17,6 +17,37 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
+            modelBuilder.Entity("ApprovalService.Domain.Administration.SystemBrandingEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("LogoBytes")
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("LogoContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LogoSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemBranding", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
                 {
                     b.Property<string>("Id")
@@ -61,6 +92,72 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasIndex("PersonId");
 
                     b.ToTable("CenterReadCursors", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Center.DelegationRuleEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DelegateId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FlowCodesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrincipalId", "StartsAtUtc", "EndsAtUtc");
+
+                    b.ToTable("DelegationRules", (string)null);
+                });
+
+            modelBuilder.Entity("ApprovalService.Domain.Center.SignatureAssetEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsPersonal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PersonId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("PngBytes")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "IsPersonal", "UploadedAt");
+
+                    b.ToTable("SignatureAssets", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
@@ -272,6 +369,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasColumnType("TEXT")
                         .HasDefaultValue("[]");
 
+                    b.Property<string>("AllowedDocumentOriginsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -304,6 +407,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DocumentUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 

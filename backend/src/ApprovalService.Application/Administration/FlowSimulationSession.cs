@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Execution;
@@ -33,6 +34,19 @@ public sealed class FlowSimulationSession
     /// 本次模拟的执行图副本。
     /// </summary>
     public FlowExecutionGraph Graph { get; set; } = new();
+
+    /// <summary>
+    /// 发起时锁定的假审批字段定义。
+    /// </summary>
+    public FlowDataDefinition DataDefinition { get; set; } = new();
+
+    /// <summary>
+    /// 仅保存在内存中的假业务数据。
+    /// </summary>
+    public JsonElement Data
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 只含假人员的审批人快照。

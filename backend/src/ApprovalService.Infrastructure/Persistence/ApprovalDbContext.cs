@@ -5,6 +5,7 @@ using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Notifications;
@@ -16,7 +17,7 @@ namespace ApprovalService.Infrastructure.Persistence;
 /// <summary>
 /// 审批运行库的统一模型；三种数据库使用同一实体配置、各自生成迁移。
 /// </summary>
-public class ApprovalDbContext : DbContext
+public partial class ApprovalDbContext : DbContext
 {
     /// <summary>
     /// 供检查程序或直接创建上下文的调用方使用。
@@ -88,6 +89,11 @@ public class ApprovalDbContext : DbContext
     /// 审批中心按人员和审批单保存的已读活动游标。
     /// </summary>
     public DbSet<CenterReadCursorEntity> CenterReadCursors => Set<CenterReadCursorEntity>();
+
+    /// <summary>
+    /// 本人上传的不可变 PNG 签名资产。
+    /// </summary>
+    public DbSet<SignatureAssetEntity> SignatureAssets => Set<SignatureAssetEntity>();
 
     /// <summary>
     /// 审批人个人保存的常用意见。
@@ -221,6 +227,7 @@ public class ApprovalDbContext : DbContext
         if (ChangeTracker.Entries<FlowVersionEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<FlowManagementAuditEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<SignatureAssetEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<InstanceParticipantEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
             throw new InvalidOperationException("已发布版本、管理审计、操作记录和历史参与人只能追加，不能修改或删除。");
@@ -237,6 +244,7 @@ public class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        SystemBrandingModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<SerialNumberCounterEntity>(entity =>
         {
             entity.ToTable("SerialNumberCounters");
@@ -282,12 +290,14 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.AuthGeneration).HasDefaultValue(1L).IsRequired();
             entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
             entity.Property(item => item.AllowedEmbedOriginsJson).HasDefaultValue("[]").IsRequired();
+            entity.Property(item => item.AllowedDocumentOriginsJson).HasDefaultValue("[]").IsRequired();
             entity.Property(item => item.AdministratorPersonIdsJson).HasDefaultValue("[]").IsRequired();
             entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
             entity.Property(item => item.DataUrl).HasMaxLength(2048);
             entity.Property(item => item.ValidationUrl).HasMaxLength(2048);
             entity.Property(item => item.AssigneeUrl).HasMaxLength(2048);
             entity.Property(item => item.ActionUrl).HasMaxLength(2048);
+            entity.Property(item => item.DocumentUrl).HasMaxLength(2048);
             entity.HasIndex(item => item.ApiKeyHash).IsUnique();
         });
 
@@ -430,7 +440,9 @@ public class ApprovalDbContext : DbContext
             entity.HasIndex(item => item.PersonId);
         });
 
+        SignatureAssetModelConfiguration.Configure(modelBuilder);
         CenterOpinionModelConfiguration.Configure(modelBuilder);
+        DelegationRuleModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>
         {

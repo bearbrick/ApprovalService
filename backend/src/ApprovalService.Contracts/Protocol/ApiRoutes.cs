@@ -76,6 +76,16 @@ public static class ApiRoutes
     public const string AdminSession = OpenApiPrefix + "/admin/session";
 
     /// <summary>
+    /// 组织管理员读取或修改打印页眉的单位名称。
+    /// </summary>
+    public const string AdminSystemBranding = OpenApiPrefix + "/admin/system-info";
+
+    /// <summary>
+    /// 组织管理员读取、上传或移除打印页眉的 Logo。
+    /// </summary>
+    public const string AdminSystemLogo = AdminSystemBranding + "/logo";
+
+    /// <summary>
     /// 组织管理员读取部门、人员和所属关系。
     /// </summary>
     public const string AdminDirectory = OpenApiPrefix + "/admin/org/directory";
@@ -144,6 +154,10 @@ public static class ApiRoutes
     /// 管理员读取或修改指定接入应用允许嵌入审批中心的网站来源。
     /// </summary>
     public const string AdminAppEmbedOrigins = AdminClientApps + "/{code}/embed-origins";
+    /// <summary>
+    /// 管理员配置某应用的只读原单钩子和 HTTPS 子页面来源。
+    /// </summary>
+    public const string AdminAppDocumentSettings = AdminClientApps + "/{code}/document-settings";
 
     /// <summary>
     /// 组织管理员维护接入应用管理员的内部人员 ID 名单。

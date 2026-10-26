@@ -168,6 +168,18 @@ public sealed class CenterQueryRepository(IDbContextFactory<ApprovalDbContext> f
     }
 
     /// <inheritdoc />
+    public async Task<string?> ResolveUniqueExternalPersonIdAsync(string clientAppCode, string personId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        var ids = await db.ExternalPersonBindings.AsNoTracking().Where(item =>
+            item.ClientAppCode == clientAppCode && item.PersonId == personId)
+            .OrderBy(item => item.ExternalUserId).Select(item => item.ExternalUserId)
+            .Take(2).ToArrayAsync(cancellationToken);
+        return ids.Length == 1 ? ids[0] : null;
+    }
+
+    /// <inheritdoc />
     public async Task<long?> MarkReadAsync(CenterScope scope, string instanceId, long seenThroughSequence,
         CancellationToken cancellationToken = default)
     {

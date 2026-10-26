@@ -121,6 +121,14 @@ public sealed class FlowApprovalSettings
     }
 
     /// <summary>
+    /// 成功推进本节点时是否必须明确选择本人手写签名，默认关闭。
+    /// </summary>
+    public bool SignatureRequired
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 抄送节点是否需要确认已阅。
     /// </summary>
     public bool ReadReceiptRequired

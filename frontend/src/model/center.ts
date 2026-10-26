@@ -179,9 +179,13 @@ export interface CenterDetailColumn {
  */
 export interface CenterDetailLayout {
   /**
-   * 自动排版或自定义排版。
+   * 自动排版、自定义排版或业务原单嵌入。
    */
-  mode: 'auto' | 'custom'
+  mode: 'auto' | 'custom' | 'embed'
+  /**
+   * 发布版本上的业务页面编码，仅嵌入方式具有。
+   */
+  embedPageCode?: string
   /**
    * 仅含当前人员可见字段的排版分组。
    */
@@ -275,6 +279,10 @@ export interface CenterTimelineEntry {
    */
   opinion: string
   /**
+   * 本次审计冻结的手写签名资产 ID。
+   */
+  signatureFileId?: string | null
+  /**
    * 是否为当前节点。
    */
   current: boolean
@@ -296,6 +304,10 @@ export interface CenterActionTask {
    * 服务端当前许可的操作。
    */
   actions: readonly CenterAction[]
+  /**
+   * 成功办理时服务端发布规则是否要求本次手写签名。
+   */
+  signatureRequired?: boolean
 }
 
 /**
@@ -314,6 +326,10 @@ export interface CenterDetail {
    * 每项当前可办理任务及该任务的服务端许可。
    */
   actionTasks?: readonly CenterActionTask[]
+  /**
+   * 当前人员原指派且尚未处理的任务，仍需在转委托写入口重验。
+   */
+  delegationTasks?: readonly { taskId: string, nodeName: string }[]
   /**
    * 由服务端授权后返回的业务字段快照。
    */

@@ -5,6 +5,8 @@ import type { CenterNotificationPreference } from '../../api/center-settings.ts'
 import { ApiError } from '../../api/http-types.ts'
 import UiEmptyState from '../../components/ui/UiEmptyState.vue'
 import CenterCommonOpinions from './CenterCommonOpinions.vue'
+import SignatureSettings from './SignatureSettings.vue'
+import CenterDelegations from './CenterDelegations.vue'
 
 /**
  * 当前人员会话失效时由父页面退出登录。
@@ -122,5 +124,6 @@ onBeforeUnmount(() => request?.abort())
     </template>
   </section>
   <CenterCommonOpinions @unauthorized="emit('unauthorized')" />
-  <p class="center-settings-note">个人签名和委托设置正在接入。</p>
+  <SignatureSettings />
+  <CenterDelegations @unauthorized="emit('unauthorized')" />
 </template>

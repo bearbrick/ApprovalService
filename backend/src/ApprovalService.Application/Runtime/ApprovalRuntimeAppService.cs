@@ -4,6 +4,7 @@ using ApprovalService.Application.Notifications;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Center;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
 using ApprovalService.Domain.Shared;
@@ -20,10 +21,12 @@ namespace ApprovalService.Application.Runtime;
 /// <param name="businessAssignees">实际节点到达前的业务取人服务。</param>
 /// <param name="taskDeadlines">工作日历期限策略；直接构造时使用默认日历。</param>
 /// <param name="organization">用于核对通知收件人的可信组织主数据。</param>
+/// <param name="delegations">仅从持久规则加载当前流程的有效委托。</param>
 public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository,
     BusinessAssigneeAppService? businessAssignees = null,
     TaskDeadlinePolicy? taskDeadlines = null,
-    IOrganizationRepository? organization = null) : IApprovalRuntimeAppService
+    IOrganizationRepository? organization = null,
+    IDelegationRuleRepository? delegations = null) : IApprovalRuntimeAppService
 {
     /// <summary>
     /// 将任务启动时刻转换成发布节点的工作日历期限。
@@ -122,6 +125,20 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         // 每张审批单始终使用发起时锁定版本的执行图，调用方不能替换它。
         input.Context.Graph = JsonSerializer.Deserialize<FlowExecutionGraph>(flowVersion.GraphJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布的执行图为空。");
+        input.Context.Operations.FlowCode = instance.FlowCode;
+        if (delegations is not null)
+        {
+            // 使用运行时锁定的流程编码和操作时间，不接受调用方自填委托快照。
+            input.Context.Operations.Delegations = (await delegations.ListActiveAsync(instance.FlowCode,
+                input.Context.OccurredAt, cancellationToken)).Select(item => new OperationDelegation
+                {
+                    PrincipalId = item.PrincipalId,
+                    DelegateId = item.DelegateId,
+                    StartsAt = item.StartsAtUtc,
+                    EndsAt = item.EndsAtUtc,
+                    FlowCodes = item.FlowCodes,
+                }).ToList();
+        }
         if (input.UpdatedApprovalDataJson is not null || input.UpdatedRoutingInputsJson is not null)
         {
             if (command.Kind is not (ApprovalService.Engine.Commands.OperationKinds.Resubmit or
@@ -135,6 +152,26 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             // 数据只在引擎命令成功后随同状态、事件和回调快照进入同一事务。
             instance.ApprovalDataJson = input.UpdatedApprovalDataJson;
             instance.RoutingInputsJson = input.UpdatedRoutingInputsJson;
+        }
+
+        if (input.Context.AssigneeSnapshot is { } routing)
+        {
+            var definition = JsonSerializer.Deserialize<FlowDefinition>(flowVersion.DefinitionJson,
+                ApprovalJson.Options) ?? throw new InvalidOperationException("已发布流程定义为空。");
+            using var dataDocument = JsonDocument.Parse(instance.ApprovalDataJson);
+            var initiator = routing.People.FirstOrDefault(person => person.Id == instance.InitiatorId);
+            var expressionContext = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["initiator.department"] = routing.InitiatingDepartmentId,
+                ["initiator.level"] = initiator?.GradeRank,
+            };
+            // 本次填写仅在成功推进时参与网关判断；引擎仍负责校验并原子保存它。
+            var pendingValues = command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or
+                EngineCommandKinds.Acknowledge ? command.Operation?.FieldValues : null;
+            var currentValues = command.Kind == OperationKinds.Resubmit ? null :
+                current?.Operations.CurrentApproverFieldValues;
+            input.Context.Conditions = FlowConditionEvaluator.Evaluate(definition.Data, input.Context.Graph,
+                dataDocument.RootElement, currentValues, pendingValues, expressionContext);
         }
 
         EngineResult result;
@@ -201,10 +238,14 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             InstanceId = instance.Id,
             NodeId = task.NodeId,
             AssigneeId = task.AssigneeId,
+            DelegatedForId = task.DelegatorId,
             Status = task.Status,
             Opinion = command.TaskId == task.Id && task.Status != EngineTaskStatuses.Pending &&
                 previousStatuses.TryGetValue(task.Id, out var previous) && previous == EngineTaskStatuses.Pending
                     ? command.Operation?.Opinion : null,
+            SignatureFileId = command.TaskId == task.Id && task.Status != EngineTaskStatuses.Pending &&
+                previousStatuses.TryGetValue(task.Id, out var signaturePrevious) &&
+                signaturePrevious == EngineTaskStatuses.Pending ? command.Operation?.SignatureFileId : null,
             CompletedAt = task.Status != EngineTaskStatuses.Pending &&
                 (!previousStatuses.TryGetValue(task.Id, out var previousStatus) || previousStatus == EngineTaskStatuses.Pending)
                     ? input.Context.OccurredAt

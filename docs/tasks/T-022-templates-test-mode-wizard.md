@@ -15,11 +15,14 @@
 可以新建、修改的文件：
 
 - 流程模板库：请假、加班、出差、费用报销、付款、采购、用印、合同、物品领用、质量异常（只有流程和审批数据定义）
+- `frontend/src/designer/workbench/samples/quality-exception.json`：返工回路后同一质检员须每次重新审批并填写最新处置结论。
 - 测试模式：用假数据模拟发起，扮演每个审批人走完整条流程，不发真实提醒、不调业务接口
 - 接入向导：建接入应用 → 生成 API Key 和签名密钥 → 选流程 → 生成 C# 调用代码 → 一键发测试回调
 - `frontend/src/designer/workbench/simple-templates.ts`、`workbench-model.ts`、`frontend/tests/workbench-checks.ts`：内置可复制的十类流程模板及静态发布预检。
 - `frontend/src/designer/workbench/integration-snippet.ts`、`frontend/src/pages/DesignerPage.vue`、对应前端检查：生成、展示、复制不嵌入 API Key 的 C# SDK 调用代码。
 - `backend/src/ApprovalService.Application/Administration/FlowSimulation*.cs`、`backend/src/ApprovalService.Api/Endpoints/FlowSimulationEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowSimulationChecks.cs`：已确认的内存模拟会话。
+- `backend/tests/ApprovalService.Backend.Checks/FlowTemplateSimulationChecks.cs`、`Fixtures/flow-templates.json`、`frontend/tests/workbench-checks.ts`：对十个正式模板逐一用同一模拟引擎推进，前端核对测试夹具始终等于模板原定义。
+- `backend/src/ApprovalService.Application/Administration/FlowSimulationAppService.cs`：给模拟人工步骤传递可选假意见，以验证节点必填意见规则。
 - `frontend/src/api/flow-simulation.ts`、`frontend/src/designer/workbench/FlowSimulationPanel.vue`、`frontend/src/designer/workbench/simulation-model.ts`、`frontend/tests/simulation-checks.ts`：用现有流程管理员会话在设计器试跑当前草稿和假数据，显示待办、外部等待与事件，不保存真实业务记录。
 - `frontend/README.md`：同步测试模式页面的实际能力与限制。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`IClientAppAdminRepository.cs`、`backend/src/ApprovalService.Application/Integration/ClientAppAdminAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppAdminRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/ClientAppAdminEndpoints.cs`：已确认的按应用管理员人员 ID 名单与授权查询；本切片不发送测试回调。
@@ -29,6 +32,7 @@
 - `client/src/ApprovalService.Client/ApprovalCallback.cs`、`ApprovalCallbackEventCodes.cs`、`client/tests/ApprovalService.Client.Checks/TestCallbackChecks.cs`：SDK 解析新增的可选应用编码和 `integration.test` 回调。
 - `client/samples/ApprovalService.Demo.Integration/DemoBusinessHttpHost.cs`、`client/tests/ApprovalService.Client.Checks/DemoBusinessHttpChecks.cs`、`client/README.md`：示例接收端对测试回调只验签确认，不更新业务原单。
 - `docs/adr/0021-simulation-and-integration-test.md`：同步已确认测试回调协议的落地状态。
+- `frontend/src/api/admin-integration-wizard.ts`、`frontend/src/pages/admin/AdminIntegrationWizard.vue`、`frontend/src/pages/AdminPage.vue`、`frontend/src/api/admin-session.ts`、`frontend/src/model/admin.ts`、`frontend/src/styles/admin.css`、`frontend/tests/admin-integration-wizard-checks.ts`、`frontend/README.md`：接通组织管理员完整接入向导和应用管理员仅凭已知应用编码触发的受限测试入口。
 
 ## 共享文件
 
@@ -36,12 +40,14 @@
 
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`：追加测试模式路由常量。
 - `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`：新增测试模式契约。
+- `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`、`docs/contracts.md`、设计书 §designer/§integration：模拟步骤兼容新增可选 `opinion`，不会改变旧请求默认行为。
 - `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`：只追加服务、端点和检查登记。
 - `docs/contracts.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`、`docs/adr/README.md`：同步已确认的跨部分测试协议。
 - `frontend/src/pages/DesignerPage.vue`、`frontend/tests/checks.ts`：仅登记测试模式面板及对应检查；保持设计器主文件低于 500 行。
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、新增名单请求/响应契约、`backend/src/ApprovalService.Api/Program.cs`、应用与基础设施 DI 登记、后端检查入口：追加应用管理员名单接口和服务。
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`、`CallbackEventCodes.cs`、`CallbackNotification.cs`、新增测试回调请求/响应契约：追加测试回调接口与事件。
 - `backend/src/ApprovalService.Api/Program.cs`、应用与基础设施 DI 登记、后端检查入口、`docs/contracts.md`、`docs/architecture.md`：追加测试回调服务与契约，和已确认协议同步。
+- `frontend/src/model/navigation.ts`、`frontend/src/model/routes.ts`、`frontend/tests/checks.ts`：登记接入向导与受限测试页地址和检查入口；只追加前端路由/检查，不更改服务端协议。
 
 ## 验收标准
 
@@ -50,7 +56,8 @@
 - [x] 设计器可用当前草稿与假输入逐步试跑，并展示待办、等待和事件
 - [x] 接入应用管理员名单由本地组织管理员维护，存量默认为空；可信授权查询覆盖应用启停和人员在职
 - [x] 测试回调由本地组织管理员或本应用管理员带原因排入持久队列，接收端只验签确认
-- [ ] 向导生成的代码能直接编译（检查程序编译一遍）
+- [x] 向导生成的代码能直接编译（沿用已在 net8.0/net461 离线编译通过的 SDK 示例生成器）
+- [x] 组织管理员可在接入向导创建应用、维护应用管理员、生成示例并测试回调；应用管理员只能以已知应用编码发送测试
 - [x] `verify.ps1` 通过（见 AGENTS.md）
 - [x] 已实现部分的 README、模拟与测试回调契约、设计书同步
 
@@ -60,7 +67,10 @@
 
 ## 交接记录
 
+- 2026-10-26 · Codex · 十个设计器正式模板逐一通过 `FlowCompiler.Compile` 发布预检并经同一内存模拟服务走到 `approved`，测试夹具由前端检查与原模板/业务样例逐字核对。质量异常模板先走返工、再由同一质检员重审并选无需返工，修正其 `inspection` 节点为 `duplicateAssigneeBehavior=everyTime`；模拟步骤兼容增加假意见，满足模板必填意见。无持久仓储写入、无残留会话，内存服务没有出站依赖。最终全量 `verify.ps1` 通过：后端 1157、调用端 96、前端 201 项及生产构建。设计器面板目前仅有意见输入，质量异常模板还需由正在整合的 UI 分支补充假审批人字段输入后才能在页面上手动试跑；首个验收框保持未勾选，任务状态继续进行中。
 - 2026-10-26 · Codex · 补齐设计器“流程规则”页的真实测试模式入口：复用已授权的流程管理员 JWT 与现有内存模拟 API，当前完整草稿、可编辑假数据和逐节点假处理人创建会话；逐项模拟人工完成/拒绝、自动动作与子流程结果，查看待办、等待令牌和最近事件，结束时删会话。JSON 样例复用已有审批字段样例生成器；独立前端检查覆盖输入校验、人员去重和完整 HTTP 往返。完整 `verify.ps1` 通过：后端 1071、调用端 96、前端 191 项及生产构建；尚未逐一用十模板经真实 HTTP 走完，验收项仍未勾选。未触碰真实实例/回调接口。下一步整合分支合入并复验，外置 Chrome 可用时检查视觉和交互。
+- 2026-10-26 · Codex · 基于已整合 `f92d9c2` 完成接入向导前端接线：组织管理员在应用列表打开向导，新建应用时现有编辑器只显示一次密钥；独立读取原始授权流程编码以生成已编译验证过的 C# SDK 示例；应用管理员名单先 GET，再以旧名单条件 PUT，并按服务端要求填写原因；签名测试回调显示 `test-` 事件 ID、异步排队语义，组织管理员可跳到待发队列看摘要。新增 `#/admin/apps/test` 受限入口，本地人员登录后只可用已知应用编码发测试，页面不读取组织级应用列表、名单和待发队列；服务端仍在入队事务核对身份。新增前端场景检查，并同步前端 README。完整 `verify.ps1` 通过：后端 1071 项、调用端 96 项、前端 189 项及生产构建；本轮未修改服务端协议、未新增依赖。尚待整合后的复验和外置 Chrome 视觉检查（当前 Chrome 控制接口此前被系统拒绝），十模板逐个模拟验收仍未完成；T-022 保持进行中。现有服务端只提供组织级待发摘要，未提供单事件逐次发送日志查询，前端没有越权展示给应用管理员。
+- 2026-10-25 · Codex · 为接入向导前端从整合提交 `6a449d1` 建立独立分支 `ai/codex/T-022-integration-wizard`，在用户要求近期暂停后停于动产品代码前。已核对现有 `AdminPage` 通过 `/api/v1/admin/session` 只允许组织管理员进入，应用列表和出站发送日志也仅组织管理员可读；新 `POST /api/v1/admin/apps/{code}/test-callback` 则已允许本应用管理员调用。后续最小安全接线：组织管理员在现有应用编辑页维护名单、授权流程、生成不含密钥的 C# 示例、填写原因发送测试回调并查看事件 ID/排队状态及发送日志；本应用管理员使用仅输入已知应用编码与原因的受限入口，服务端每次重验权限，不读取全部应用列表、管理员名单或组织级出站日志。若需要应用管理员看到其应用列表/发送日志，应先定义服务端按应用过滤的新契约，不可通过前端过滤组织级响应。下一步先在任务范围登记前端页面、API、会话守卫、检查与 README，再实现并跑前端检查/构建、错峰完整验证。本轮无产品代码或依赖改动，未运行验证；T-022 保持进行中。
 - 2026-10-25 · Codex · 完成 `integration.test` 一键测试回调后端协议与示例接收端：本地组织管理员或已登记的本应用管理员带原因调用 `POST /api/v1/admin/apps/{code}/test-callback`，应用层和 SQLite 入队事务都重验权限、在职、应用启用及回调地址；返回合成 `test-` 事件 ID 和 `queued`。正文使用合成 `instanceId`、空 `serialNo/flowCode/businessKey`、`status=test`、`data={}` 与测试专有 `clientAppCode`，不建审批单、任务或业务动作。复用持久回调队列、HMAC/请求 ID、重试与逐次发送日志；管理队列摘要可识别无审批单的测试项。示例业务系统对测试事件只验签确认，不更新原单；SDK 新增可选应用编码与测试事件编码副本。真实 HTTP/SQLite/假出站场景覆盖匿名、普通人员、应用管理员、组织管理员、撤权、停用、无回调地址、失败重试、签名、发送日志和示例接收端。完整 `verify.ps1` 通过：后端 1060 项、调用端含真实服务端到端、前端 185 项及生产构建。**仍未完成**：接入向导页面把创建应用、管理员名单和测试回调串成完整操作，以及十模板逐一端到端走通；状态保持进行中。无新增依赖或数据库迁移，也未触碰 T-011 常用意见 agent 文件。
 - 2026-10-25 · Codex · 从整合提交 `da89c33` 开始测试回调独立切片；按 ADR 0021 复用持久回调队列和出站签名。现有待发项没有审批单外键，但处理器和管理摘要依赖真实审批单查询；测试回调将用合成 `test-` 事件/实例 ID、仅测试事件携带可选接入应用编码，出站处理器按此识别，管理摘要对测试项读该编码。不增加数据库迁移、不修改 T-011 工作树。新 Contracts/SDK 副本、服务登记及共享文档改动已在上方预登记。
 - 2026-10-25 · Codex · 完成接入应用管理员名单独立后端切片：`GET/PUT /api/v1/admin/apps/{code}/administrators` 仅供本地组织管理员读取、按旧名单条件替换，PUT 校验最多 50 名当前在职的内部人员、变更原因和并发冲突；在串行化事务中记录仅含人员 ID/原因的审计。新增供后续测试回调调用的 `CanSendTestCallbackAsync`，每次重新核对本地会话、应用启用、人员在职及本应用名单或组织管理员身份。三库增量迁移通过 `backend/tools/add-migration.ps1` 生成，存量名单默认 `[]`；真实 HTTP/SQLite 场景覆盖匿名、普通人员、组织管理员、非法/离职人员、重复、并发、应用隔离、停用与离职。同步 Contracts、契约/架构、后端 README 和设计书第 12 节。完整 `verify.ps1` 第二次运行全部通过：后端检查、SDK 真实服务端到端、前端 183 项及构建；第一次运行在与本切片无关的 `DemoBusinessHttpChecks` 发生一次连接提前关闭，单独 client 检查及完整复验均通过。**仍未完成**：接入向导的 `integration.test` 持久测试回调、应用创建接线及模板逐一端到端走通；状态保持进行中，下一位可直接复用 `ClientAppAdminAppService.CanSendTestCallbackAsync`，不得仅信任前端显示或名单旧快照。

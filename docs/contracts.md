@@ -17,7 +17,7 @@
 | `X-Request-Id` | 请求、响应 | 调用方生成的请求 ID，原样返回并记进日志；没传或不合规（超过 64 个字符，或含字母数字和 `- _ . :` 以外的字符）时服务生成一个 32 位的 |
 | `X-Trace-Id` | 响应 | 本次请求的链路 ID，和错误体里的 `traceId` 相同，反馈问题时提供 |
 | `X-Approval-Signature` | 回调与钩子请求、钩子响应 | `sha256=` 加上用接入应用的签名密钥对原始 UTF-8 正文做 HMAC-SHA256 的十六进制小写；钩子双方都验签 |
-| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源 |
+| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源；`frame-src` 仅含已启用应用登记的 HTTPS 原单来源，专属入口只含当前应用来源 |
 
 ## 错误格式
 
@@ -59,8 +59,12 @@
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
 | `GET/POST /api/v1/center/opinions`、`PUT/DELETE /api/v1/center/opinions/{id}` | 读取为人员 JWT；写入仅本地 JWT | 本人常用意见最多 30 条，每条最多 500 字，嵌入会话只读 |
+| `GET/POST /api/v1/center/delegations`、`DELETE /api/v1/center/delegations/{id}`、`POST /api/v1/center/delegations/tasks` | 本地人员 JWT | 本人委托规则及已有待办逐项转委托；嵌入会话不可修改 |
+| `GET/POST /api/v1/admin/delegations/{principalId}`、`DELETE /api/v1/admin/delegations/{principalId}/{id}`、`POST /api/v1/admin/delegations/{principalId}/tasks` | 本地组织管理员 JWT | 代指定人员维护委托；已有任务转移必须填写原因并记真实管理员身份 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
+| `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 人员 JWT | 上传本人手写 PNG、查询个人签名及按本人或审批单授权取图；嵌入 JWT 只能上传单次签名 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
+| `POST /api/v1/center/instances/{id}/document-url` | 本地或嵌入 JWT | 当前人员已授权详情的短时一次性只读业务原单地址；`Cache-Control: no-store` |
 | `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
@@ -72,8 +76,10 @@
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
 | `POST /api/v1/admin/actions/retry` | 本地 JWT + 原动作所属流程的当前流程管理员 | 人工重排达到自动上限的原业务动作 |
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
+| `GET/PUT /api/v1/admin/system-info`、`GET/POST/DELETE /api/v1/admin/system-info/logo` | 本地 JWT + 当前组织管理员角色 | 查看或修改打印页眉的单位名称与 Logo |
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
+| `GET/PUT /api/v1/admin/apps/{code}/document-settings` | 本地 JWT + 当前组织管理员角色 | 读取或设置第五个 `documentUrl` 签名钩子及独立 `allowedDocumentOrigins` HTTPS 来源，修改需原因并脱敏审计 |
 | `GET/PUT /api/v1/admin/apps/{code}/administrators` | 本地 JWT + 当前组织管理员角色 | 读取或替换该应用的内部人员管理员 ID 名单 |
 | `POST /api/v1/admin/apps/{code}/test-callback` | 本地 JWT + 当前组织管理员或该应用管理员 | 带原因排入不关联审批单的签名测试回调 |
 | `POST /api/v1/admin/flows/simulations`、`GET/DELETE /api/v1/admin/flows/simulations/{id}`、`POST /api/v1/admin/flows/simulations/{id}/steps` | 本地 JWT + 当前流程管理权限 | 完整草稿和假输入创建、读取、逐步推进及删除内存模拟会话 |
@@ -122,11 +128,15 @@
 
 `POST /admin/apps/{code}/test-callback` 接受 `{reason}`，原因须为 2 至 200 字符；仅当前本地会话中的组织管理员或该应用名单内在职人员可调用，入队事务再次核对权限、应用启用及非空回调地址。成功返回 `{eventId, status:"queued"}`，`eventId` 以 `test-` 开头，每次测试唯一。该接口只保存回调待发项及含操作者和原因的脱敏审计，不创建审批单、任务或业务动作。`integration.test` 正文沿用回调字段：`instanceId` 为与 `eventId` 相同的合成 ID，`serialNo`、`flowCode`、`businessKey` 为空串，`status` 为 `test`，`data` 为 `{}`，测试事件专有 `clientAppCode` 为目标应用编码；`occurredAt` 为排队时间。业务系统只验签确认，不按业务单号更新单据。发送复用 `X-Approval-Signature` 原始正文 HMAC、`X-Request-Id=eventId`、五秒超时、持久重试与发送日志；管理队列摘要可按应用查看该项。旧审批回调不带 `clientAppCode`。
 
-流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,success?,actionResult?}`，人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
+流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,opinion?,fieldValues?,success?,actionResult?}`。`opinion` 是可选的假人工意见；配置了必填意见的节点仍由统一引擎校验，旧请求省略时保持原行为。`fieldValues` 只供假人工任务填写当前节点可编辑的审批人字段，成功推进后成为该模拟会话的当前值。人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
+
+条件网关按到达时可用的业务数据和已成功提交的审批人字段求值；成功任务本次填写值参与随后网关，拒绝或失败的命令不改变当前值。尚未填写的审批人字段在发起时不预先选择路径，到达网关仍缺值则返回可纠正的条件错误。退回后重提按既定清空语义不沿用旧审批人字段，补充恢复则保留。
 
 `POST /admin/apps` 接受 `{code, name, allowedFlowCodes, canViewAllTasks, callbackUrl?, dataUrl?, validationUrl?, assigneeUrl?, actionUrl?, reason}`。应用编码只含 ASCII 字母、数字、`-`、`_`，最长 128 字符；名称最长 256 字符，出站地址必须满足部署的 HTTPS/显式内网 HTTP 策略。`PUT /admin/apps/{code}/enabled` 接受 `{enabled, reason}` 并返回 204；`POST /admin/apps/{code}/rotate-secrets` 接受 `{reason}`。三种管理操作的原因均须为 2 至 200 字符，实际变更与不含凭据的管理员审计在同一事务提交。创建和轮换只在本次响应返回 `{code, apiKey, signingSecret}`；后续列表和日志均不能再次读取明文。轮换或实际启停使旧嵌入会话永久失效，停用时旧 API Key 不可调用；重新启用不会恢复旧嵌入会话。
 
 `GET /admin/bindings` 返回绑定数组，每项只含 `clientAppCode, kind, externalId, internalId, targetName, method`；目标名称来自当前可信组织主数据，不含电话、邮箱。管理员写入继续使用 `POST /admin/org/bindings`：传 `kind, externalId, internalId, clientAppCode`，人员绑定可由管理员指定内部人员，服务端记录操作者并在换绑时作废旧身份令牌。`GET /admin/audit` 返回最近 200 条组织、接入应用及回调重发变更摘要，字段为 `occurredAt, actorId, action, target, reason`；不返回完整前后快照、联系方式或密钥。其他管理日志待相应写入功能接线。
+
+打印页眉品牌信息的 `GET /admin/system-info` 返回 `{companyName, logoSha256, revision}`，空库为名称空串、摘要空值和修订 0。`PUT` 请求 `{companyName, expectedRevision, reason}`，名称去首尾空白后须为 1–60 字且不能含控制字符。`POST /admin/system-info/logo` 请求 `{contentBase64, expectedRevision, reason}`，只接受完整的 8 位 RGB/RGBA 非隔行 PNG，最多 1 MiB，图片最长边不超过 4096 像素；`DELETE` 请求 `{expectedRevision, reason}`。原因均须为 2–200 字且不能含控制字符。全部写请求在同一事务推进修订并记录操作者、原因、名称和 Logo SHA-256，审计不包含图片正文；过期修订返回 `CONFLICT`。`GET /admin/system-info/logo` 返回带 `nosniff`、`no-store` 和限制性内容安全策略的 PNG，未上传为 404。所有接口仅接受本地组织管理员 JWT；打印功能以后从同一持久设置读取，不使用前端静态图片。
 
 `GET /admin/outbox` 返回最近 200 条待发项摘要，每项为 `eventId, clientAppCode, kind, status, attempts, availableAt, errorCode`，不返回业务正文、回调地址或密钥。`POST /admin/callbacks/{eventId}/retry` 接受 `{reason}`，原因须为 2 至 200 字符；只有回调事件可重排。它保留原事件 ID 和正文、重置待发时间及错误摘要，并在同一事务记录本地管理员和原因。正在有效租约中发送的回调返回冲突。重发记录也进入 `/admin/audit`。
 
@@ -183,9 +193,11 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 `GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式尚未接入，回退自动排版，不返回嵌入页面编码或地址。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。图布局仍待接入。
 
+发布图的办理节点若以设计动作 `allowedActions: ["submit"]` 表示“办理提交”，服务端将它解释为运行命令 `handle` 的许可；详情只返回可执行的 `handle`，写接口也只接受该运行命令。这个兼容解释仅适用于 `handling` 节点，不改变其他节点的权限或发布图内容。
+
 `POST /api/v1/center/instances/{id}/read` 请求 `{seenThroughSequence}`（非负整数，为本次详情时间线实际显示的最大事件序号；没有事件为零），成功返回 204。仅详情已显示的当前人员主动调用；服务端在同一事务重新核对该人员的参与关系、保密范围与嵌入应用，再把（人员、审批单）的持久游标单调推进到不超过当前最大事件序号的已显示序号。因此 GET 详情后新发生的活动不会被误标已读。无权与不存在统一 404。列表和详情 GET 不写游标；游标未保存成功时页面仍展示详情并提示可刷新重试。他人之后产生的新可见审计活动使 `isUnread=true`，本人动作与私人意见草稿不触发未读；完整原始事件和游标均不返回给前端。
 
-`POST /api/v1/center/tasks/{id}/actions` 请求 `{action, opinion?, targetPersonId?, targetNodeId?, relatedId?, mode?, mentionedPersonIds?, fieldValues?}`，任务 ID 含斜杠时需将整个 ID 编码；人员参数使用审批服务内部 ID。响应 `{taskId, instanceId, detail}`，详情再次执行人员与应用授权。`action` 只允许人工任务命令，当前人、节点许可、意见及字段规则由服务端重新校验，变更经过统一引擎写入事件与任务状态。`fieldValues` 只接受当前节点显式可编辑的顶层审批人字段；人员、部门值须为现存内部 ID，必填仅在成功推进时强制；明细和附件字段目前没有安全提交协议，明确拒绝。节点同意前的业务校验钩子仍会运行，中心登录人员作为审批服务内部人员 ID 传给钩子的 `actor`。无权或失效任务不会因列表先前显示过按钮而获准。
+`POST /api/v1/center/tasks/{id}/actions` 请求 `{action, opinion?, signatureFileId?, targetPersonId?, targetNodeId?, relatedId?, mode?, mentionedPersonIds?, fieldValues?}`，任务 ID 含斜杠时需将整个 ID 编码；人员参数使用审批服务内部 ID。响应 `{taskId, instanceId, detail}`，详情再次执行人员与应用授权。`action` 只允许人工任务命令，当前人、节点许可、意见及字段规则由服务端重新校验，变更经过统一引擎写入事件与任务状态。`fieldValues` 只接受当前节点显式可编辑的顶层审批人字段；人员、部门值须为现存内部 ID，必填仅在成功推进时强制；明细和附件字段目前没有安全提交协议，明确拒绝。节点同意前的业务校验钩子仍会运行，中心登录人员作为审批服务内部人员 ID 传给钩子的 `actor`。无权或失效任务不会因列表先前显示过按钮而获准。
 
 `POST /api/v1/center/tasks/batch-approve` 请求 `{taskIds:[...], opinion?}`，1～100 项且 ID 不能重复，只接受明确拥有 `bulkApprove` 许可的同意任务。每项独立调用统一引擎，响应 `{items:[{taskId, succeeded, instanceId?, code?, message?}]}` 与输入同序；业务校验失败不回滚已成功项。两种写接口都只从已验证 JWT 获取操作人和嵌入应用范围，接收 `X-Request-Id` 作为幂等 ID；批量为各项追加稳定序号。浏览器从新服务响应更新许可，不根据旧按钮状态推断权限。
 
@@ -193,7 +205,14 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 没有显式节点上下文的详情，按该查看人当前 pending 任务节点的隐藏字段并集裁剪；无当前待办的历史/抄送参与者采用发布图全部节点的隐藏集合，隐藏优先。发起人与实际代发人可以读取其提交的已定义快照字段。详情新增 `fieldDefinitions`，与已裁剪 `data` 一一对应，结构同摘要定义；前端用锁定发布版本的名称和已授权子列绘制明细表，不输出原始 JSON。详情还返回 `attachments: [{id,fileName,contentType,size}]`，只从可见附件字段（含明细行）提取 ID，且元数据必须仍关联本审批单；隐藏字段中的文件不列出。文件内容继续用当前人员 JWT 调 `GET /api/v1/files/{id}`，该下载接口独立验权，不把令牌放 URL。此保守读取策略不增加业务数据修改能力；桌面前端已以本地登录 JWT 接入四列表、详情、字段内容搜索、任务操作与逐项批量同意，`frontend/src/api/center-adapter.ts` 是中心响应副本。未读由后续中心切片实现。本切片不供业务 SDK 调用。
 
+### 本人手写签名
+
+`POST /api/v1/center/signatures?personal=false|true` 接受 `Content-Type: image/png` 的原始正文，最多 2 MiB。服务端校验 PNG 完整分块、CRC、zlib 像素流、4096×4096 最大尺寸及 8 位 RGB/RGBA 非隔行编码后保存为不可变资产，返回 `{id,sha256,isPersonal,uploadedAt}`。`personal=true` 仅限本地 JWT；嵌入 JWT 只能创建 `personal=false` 的单次资产。`GET /api/v1/center/signatures/me` 仅本地 JWT 可读，返回最近的个人签名元数据或 `null`，不代表自动选用。`GET /api/v1/center/signatures/{id}` 返回本人个人资产 PNG；带 `?instanceId=...` 时先按当前人员及嵌入应用范围授权该审批单，再核对签名确实存在于该单任务或事件审计中。任何签名内容均须在 `Authorization` 头携带 JWT，不把令牌放在图片 URL。
+
+任务操作请求向后兼容新增可选 `signatureFileId`，只允许选用当前 JWT 人员本人上传的不可变资产；省略表示本次明确不使用签名，个人签名不会被默认引用。发布节点 `approval.signatureRequired` 默认为 `false`；为 `true` 时，同意、办理完成和确认已阅必须选用签名，拒绝等不成功推进的操作不强制。此类任务不提供批量同意。任务详情新增 `signatureRequired` 和已完成任务的 `signatureFileId?`；事件时间线新增本次审计冻结的 `signatureFileId?`。旧流程与旧响应保持默认无签名语义，审批中心不修改业务数据。
 `GET /api/v1/center/opinions` 返回当前 JWT 人员的个人常用意见数组，每项 `{id,content,createdAtUtc}`，按创建时间和 ID 稳定排序；本地与嵌入会话均可读取。`POST /api/v1/center/opinions` 和 `PUT /api/v1/center/opinions/{id}` 请求 `{content}`，返回保存后的单项；`DELETE /api/v1/center/opinions/{id}` 成功返回 204。三种写请求仅允许本地人员会话，嵌入会话返回 `FORBIDDEN`；意见只按 JWT 人员 ID 归属，不接受请求中的人员参数。正文去除首尾空白后须为 1～500 字，每人最多 30 条，满额返回 `CONFLICT`；他人意见与不存在统一 `NOT_FOUND`。常用意见仅填入当前审批意见栏，任务提交仍走现有操作接口。
+
+委托设置 `GET/POST /api/v1/center/delegations` 按本人 JWT 读写；管理员使用 `/api/v1/admin/delegations/{principalId}` 为指定内部人员维护。新增请求 `{delegatePersonId,startsAtUtc,endsAtUtc,flowCodes}`，`flowCodes` 空数组表示全部流程；响应追加 `id,principalPersonId`。时段必须是 UTC 左闭右开，端点相接允许；同一委托人时间和流程范围均相交返回 `CONFLICT`。本人或管理员删除规则返回 204，删除只影响未来任务，既有任务不反向收回。`POST /api/v1/center/delegations/tasks` 请求 `{taskIds}`；管理员对应入口请求 `{taskIds,reason}` 且原因必填；最多一百个不同任务 ID，按输入顺序返回 `[{taskId,succeeded,code?,message?}]`，逐项独立提交。只转移尚未处理且属于该委托人的原任务，按当前服务端时间及锁定流程版本重新检查规则。管理员必须由本地组织角色授权，审计记录真实操作人和原因。嵌入会话只能读取本人规则，不能写入。
 
 ## 同源审批中心内嵌
 
@@ -245,6 +264,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
 
 四类钩子按已采纳的 [ADR 0010](adr/0010-outbound-hook-protocol.md) 使用各应用分别登记的完整 URL、POST 小驼峰 JSON，默认 5 秒超时；可选校验地址未配置时跳过，必需的取数、取人和动作地址未配置时返回可纠正错误或保留待发项。审批服务用 `X-Approval-Signature` 对原始 UTF-8 请求体签名，业务系统须以同一密钥对原始响应字节签名并原样回显 `X-Request-Id`；审批服务在解析 JSON 前恒定时间验签并核对请求 ID。非 2xx、超时、网络故障、无效签名、请求 ID 或 JSON 均返回 `BUSINESS_HOOK_FAILED`；钩子明确拒绝返回 `VALIDATION_FAILED` 和业务原因。取数请求 `{flowCode,businessKey,requestId}`，响应 `{data:{…},title?,detailUrl?}` 且 `data` 必须为对象；校验请求 `{phase:"start"/"approve",flowCode,businessKey,instanceId?,taskId?,actor,data}`，响应 `{allowed,reason?}`，拒绝时 `reason` 必填。取人请求 `{flowCode,businessKey,nodeId,sourceValue?,initiator,data}`、响应 `{userIds:[…]}`；动作请求 `{eventId,actionCode,instanceId,flowCode,businessKey,data}`、响应 `{success,message?,result?}`。取数和校验在审批写事务前同步调用；取人于目标节点前取得；业务动作经提交后持久待发队列执行。取人只在纯引擎实际到达目标节点时调用，返回人员仅按当前接入应用已有绑定解析；失败不落部分审批状态。自动节点在事务内固定 `actionPending` 待发项，提交后由后台调用；业务响应 `success:false` 或网络故障保留事件并退避重试，`success:true` 后用原 `eventId` 幂等提交引擎结果，业务端也须据此去重。
+
+第五个可选原单钩子按已采纳的 [ADR 0022](adr/0022-original-business-document-embed.md) 使用相同双向签名、请求 ID 回显和 5 秒超时。只在当前 JWT 人员有权读取详情、发布排版为 `embed` 且在该应用具有唯一外部人员绑定时调用。请求 `{requestId,instanceId,flowCode,businessKey,embedPageCode,viewerExternalId,visibleFieldPaths,readOnly:true}`；路径只包含已授权普通字段和 `明细字段.子字段` 叶子路径，明细父表路径不授予全部列。响应 `{url,expiresAt}`；`url` 须是 2048 字符内、无用户信息、来源精确匹配本应用 `allowedDocumentOrigins` 的绝对 HTTPS 地址，`expiresAt` 须在服务端当前时间之后且不超过五分钟。业务系统负责地址一次性消费、查看人绑定、按字段路径裁剪和禁止写操作，不能满足时须拒绝签发。地址不入库、不入回调或普通日志；旧应用默认没有原单钩子，中心回退已授权普通详情，不复用发起时的 `detailUrl`。
 
 动作响应的可选 `result` 不改审批数据。成功时 `actionCompleted` 事件独立保存 `actionResult`，引擎状态按原动作 `eventId` 保存结果；后续审批终态回调在可选 `actionResults` 对象中按该 `eventId` 带出结果，`data` 仍是业务审批数据快照。无结果时省略 `actionResults`，重发回调使用首次入队时固定的正文。
 

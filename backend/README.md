@@ -37,7 +37,9 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤，详情排版按锁定版本及可见字段裁剪 |
 | `GET/POST /api/v1/center/opinions`、`PUT/DELETE /center/opinions/{id}` | 本人常用意见，嵌入会话仅可读取 |
+| `GET/POST /api/v1/center/delegations`、`DELETE /center/delegations/{id}`、`POST /center/delegations/tasks` | 本人委托规则与已有任务逐项转委托；管理员可用对应 `/api/v1/admin/delegations/{principalId}` 路由代管 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 登录人员对当前任务提交引擎命令，批量同意逐项独立处理 |
+| `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 本人手写 PNG 资产上传、个人签名元数据与验权图片读取 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
 | `POST /api/v1/instances` | 传审批数据快照发起；已在途同号返回原审批单，需 API Key |
@@ -63,9 +65,15 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 个人常用意见由 `CenterOpinionAppService` 按已验证 JWT 的人员 ID 保存；本地会话可新增、修改和删除（每人至多 30 条、每条至多 500 字），嵌入会话仅可读取。意见选择只填入审批栏，办理仍调用既有任务操作接口。三库使用同一实体配置和各自的 EF 迁移。
 
+委托规则由 `CenterDelegationAppService` 和 `DelegationRuleRepository` 按本人或组织管理员的本地 JWT 保存，三库迁移共用模型。规则按 UTC 左闭右开时段和流程范围拒绝交叠；运行时在执行前从库加载当前有效规则，新到任务只委托一层。本人或管理员选中的在手任务逐项经统一引擎转委托，管理员必须填写原因并用真实操作人留痕。删除规则只影响今后到达的任务。
+
 `CenterQueryAppService` 提供当前人员的待办、已办、抄送和发起/代发列表及只读详情，分页与总数基于同一授权查询。只接受 JWT，本地会话跨应用按参与关系读取，嵌入会话再限定所属应用；API Key 不能替代登录。当前原审批人与代理人均可查看 pending 任务；历史实际处理和已送达抄送复用持久参与者投影。无关管理员、未来/取消任务不能直接取得保密详情，不可见与不存在统一 404。
 
 详情任务的 `allowedActions` 由纯引擎从当前运行状态和锁定发布图按登录人员计算，列表另给可批量同意的实际任务 ID。`CenterActionAppService` 在写入前再次检查查询授权、状态、节点许可、组织目标和审批人字段；同意前照常调用所属应用的校验钩子，最终走 `IApprovalRuntimeAppService` 的统一命令入口。批量同意逐项返回成功或业务错误，已成功任务不因另一项失败而回滚；中心不修改业务数据快照。
+
+办理节点在设计图中使用 `allowedActions: ["submit"]` 时，引擎和审批中心统一将其映射到实际 `handle` 命令；映射只在办理节点生效，已发布图无需迁移。
+
+手写签名独立保存为不可变 PNG 资产，上传最大 2 MiB，并验证完整 PNG 分块、CRC 与有界解码内容；嵌入会话只能创建单次签名，不可修改个人签名。个人资产不自动用于审批，每次任务操作需显式提供本人签名资产 ID，服务端重新核对归属并把该 ID 冻结在任务及事件审计中。节点可配置成功推进必签，默认关闭；必签任务不能批量同意。签名图片读取按本人或审批单参与人授权，详细协议见契约文档。
 
 列表支持流程、状态、发起时间和标题/审批编号/业务单号/可见字段内容搜索，加急优先。字段内容搜索分批扫描已授权单据，按与详情相同的节点隐藏规则裁剪顶层及明细字段，再计算命中数与分页；隐藏字段、未定义键不参与匹配。摘要与详情递归过滤隐藏字段及明细列；详情不暴露运行状态、原始事件载荷和暂存意见。个人未读标记以（人员、审批单）持久游标计算，列表 GET 不写状态，显式 POST 已读先复核同一参与关系、保密和嵌入应用权限；本人动作及私人草稿不让单据重新未读。桌面前端已通过本地工号密码和短期 JWT 接入真实列表、详情及人工任务写入口，令牌只在页面内存保存并在到期前轮换；首次登录先改密。中心查询返回真实人员、来源、当前人工环节，以及与已授权数据逐项匹配的锁定发布版本字段名称和明细列；隐藏字段的名称同样不返回。附件元数据只从已授权的顶层及明细附件字段提取，并核对文件仍关联当前审批单；内容下载走现有独立验权接口。完整参数与返回结构见契约文档。
 
@@ -99,6 +107,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 发布前测试模式由本地组织管理员或该流程管理员通过 `POST /api/v1/admin/flows/simulations` 提交完整草稿、假数据、假发起人及各人工节点假处理人。创建人用 `GET/DELETE /api/v1/admin/flows/simulations/{id}` 读取或删除，并以 `POST /api/v1/admin/flows/simulations/{id}/steps` 逐项模拟人工处理及显式自动动作、子流程假结果。会话在内存中闲置 30 分钟过期，进程重启即丢失；不写审批单、不发真实通知、钩子或回调。
 
+后续网关在每条可能推进流程的命令上按当前业务数据与成功提交的审批人字段重新求值；测试模式同样允许人工步骤传可选 `fieldValues`。发起时尚未填写的审批人字段不提前决定路径；实际到达网关仍缺值会拒绝推进，退回重提时不沿用被清空的旧值。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：
@@ -129,15 +139,19 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 `GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织、接入应用及回调重发变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
 
+系统信息管理通过 `GET/PUT /api/v1/admin/system-info` 设置打印页眉的单位名称，通过 `GET/POST/DELETE /api/v1/admin/system-info/logo` 管理 PNG Logo。所有路由只接受本地组织管理员 JWT；修改带 2–200 字原因和预期修订，过期修订返回 409。Logo 限 1 MiB，并验证完整 PNG；设置与不含图片字节的审计写在同一数据库事务，三种数据库均有迁移。授权中文打印字体上传仍需单独完成。
+
 `GET /api/v1/admin/outbox` 只投影最近 200 条待发项元数据，不加载发送正文。`POST /api/v1/admin/callbacks/{eventId}/retry` 要求本地组织管理员填写原因，原地重排回调并在同一事务留审计；有效租约中的发送不可重排。已完成的回调也可按原事件 ID 再次投递，接入应用负责去重。
 
-接入应用管理页通过 `POST /api/v1/admin/apps` 登记编码、名称、授权流程、回调与四类钩子地址；`PUT /api/v1/admin/apps/{code}/enabled` 启停，`POST /api/v1/admin/apps/{code}/rotate-secrets` 轮换凭据。每次管理变更要求原因并与脱敏审计同事务提交。创建和轮换响应中的 API Key 与签名密钥只显示一次，列表及日志不提供密钥；轮换或实际启停会使旧嵌入会话失效。
+接入应用管理页通过 `POST /api/v1/admin/apps` 登记编码、名称、授权流程、回调与四类原有钩子地址；`GET/PUT /api/v1/admin/apps/{code}/document-settings` 独立配置第五个只读原单签名钩子及其 HTTPS 子页面来源；`PUT /api/v1/admin/apps/{code}/enabled` 启停，`POST /api/v1/admin/apps/{code}/rotate-secrets` 轮换凭据。每次管理变更要求原因并与脱敏审计同事务提交。创建和轮换响应中的 API Key 与签名密钥只显示一次，列表及日志不提供密钥；轮换或实际启停会使旧嵌入会话失效。
 
 ## 审批中心同源托管
 
 正式部署先构建 `frontend/`，再发布 `ApprovalService.Api`，将 `frontend/dist/` 的内容复制到发布目录的 `wwwroot/`。服务默认从自身内容根目录的 `wwwroot/index.html` 提供页面；也可用环境变量 `ApprovalService__Frontend__DistPath` 指向完整的前端构建目录。生产环境找不到 `index.html` 时启动失败；开发环境未配置构建目录时可单独运行 API。前端文件必须经本服务或等效保留安全头的同源反向代理提供，不可另开放一个不受策略保护的静态入口。
 
 普通页面为 `/`，响应禁止被 iframe 嵌入。接入应用专属入口为 `/embed/{clientAppCode}`，只允许该应用登记的来源嵌入；来源配置不包含路径、查询或通配符，未配置时仅允许同源。业务系统应从后端签发一次性令牌，并把它放在片段里，例如 `/embed/erp#/center/approvals/instance-id?embedToken=...`。片段不会发送到服务器；页面兑换后立即清理。审批中心的接口与资源同源，嵌入上下文接口仅接受该应用的已验证嵌入 JWT。直接访问 `/index.html` 等静态 HTML 仍为禁止嵌入，不能绕过专用入口。
+
+原单 `embed` 排版使用已授权人员 JWT 调 `POST /api/v1/center/instances/{id}/document-url`。服务端按锁定版本、当前字段可见范围和本应用唯一外部人员绑定发出第五个双向签名钩子；只返回有效期不超过五分钟、来源精确命中本应用 `allowedDocumentOrigins` 的 HTTPS 地址，响应不可缓存，也不持久化该地址。业务系统负责一次性消费、本人绑定、隐藏字段裁剪和禁止写操作；钩子或 iframe 失败时前端显示原已授权数据快照。HTML 的 `frame-src` 对专属入口只允许本应用原单来源，普通登录入口使用所有启用应用来源并集；来源配置损坏时拒绝加入 CSP。发起时的 `detailUrl` 不参与此流程。
 
 ## 工作日历基础
 

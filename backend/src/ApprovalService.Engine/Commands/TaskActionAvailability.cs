@@ -60,7 +60,7 @@ public static class TaskActionAvailability
         if ((task.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued or EngineTaskStatuses.Approved) &&
             state.Tasks.Any(item => item.AddedByTaskId == taskId &&
                 item.Status is EngineTaskStatuses.Pending or EngineTaskStatuses.Queued) &&
-            Permits(configured, OperationKinds.RemoveSigner))
+            TaskActionPermission.Permits(configured, node.Type, OperationKinds.RemoveSigner))
         {
             result.Add(OperationKinds.RemoveSigner);
         }
@@ -71,16 +71,18 @@ public static class TaskActionAvailability
             return result;
         }
 
-        if (!string.IsNullOrWhiteSpace(task.CompletionKind) && Permits(configured, task.CompletionKind))
+        if (!string.IsNullOrWhiteSpace(task.CompletionKind) &&
+            TaskActionPermission.Permits(configured, node.Type, task.CompletionKind))
         {
             result.Add(task.CompletionKind);
-            if (task.CompletionKind == EngineCommandKinds.Approve && Permits(configured, OperationKinds.BulkApprove))
+            if (task.CompletionKind == EngineCommandKinds.Approve && node.Approval?.SignatureRequired != true &&
+                TaskActionPermission.Permits(configured, node.Type, OperationKinds.BulkApprove))
             {
                 result.Add(OperationKinds.BulkApprove);
             }
         }
 
-        if (task.CanReject && Permits(configured, EngineCommandKinds.Reject))
+        if (task.CanReject && TaskActionPermission.Permits(configured, node.Type, EngineCommandKinds.Reject))
         {
             result.Add(EngineCommandKinds.Reject);
         }
@@ -89,7 +91,7 @@ public static class TaskActionAvailability
             OperationKinds.Consult, OperationKinds.RequestSupplement, OperationKinds.CopyTo,
             OperationKinds.Comment, OperationKinds.SaveDraft })
         {
-            if (Permits(configured, candidate) &&
+            if (TaskActionPermission.Permits(configured, node.Type, candidate) &&
                 (candidate != OperationKinds.RequestSupplement || state.Operations.Pause is null))
             {
                 result.Add(candidate);
@@ -99,12 +101,4 @@ public static class TaskActionAvailability
         return result;
     }
 
-    /// <summary>
-    /// 沿用命令守卫的节点配置语义：空列表表示不额外限制。
-    /// </summary>
-    /// <param name="configured">发布节点允许操作列表。</param>
-    /// <param name="candidate">待检查命令。</param>
-    /// <returns>节点没有拒绝此命令。</returns>
-    private static bool Permits(IReadOnlyList<string>? configured, string candidate) =>
-        configured is not { Count: > 0 } || configured.Contains(candidate, StringComparer.Ordinal);
 }

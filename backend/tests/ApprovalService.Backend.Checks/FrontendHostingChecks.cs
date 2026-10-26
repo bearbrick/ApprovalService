@@ -56,6 +56,10 @@ internal static class FrontendHostingChecks
                     JsonSerializer.Serialize(new[] { "https://business.example", "https://branch.example:8443" });
                 db.ClientApps.Single(item => item.Code == "two").AllowedEmbedOriginsJson =
                     JsonSerializer.Serialize(new[] { "https://other.example" });
+                db.ClientApps.Single(item => item.Code == "one").AllowedDocumentOriginsJson =
+                    JsonSerializer.Serialize(new[] { "https://documents.example" });
+                db.ClientApps.Single(item => item.Code == "two").AllowedDocumentOriginsJson =
+                    JsonSerializer.Serialize(new[] { "https://documents-two.example" });
                 await db.SaveChangesAsync();
             }
 
@@ -69,9 +73,12 @@ internal static class FrontendHostingChecks
                 home.StatusCode == HttpStatusCode.OK && direct.StatusCode == HttpStatusCode.OK &&
                 extra.StatusCode == HttpStatusCode.OK && asset.StatusCode == HttpStatusCode.OK &&
                 assetHtml.StatusCode == HttpStatusCode.OK && unknown.StatusCode == HttpStatusCode.NotFound &&
-                Csp(home) == "frame-ancestors 'none'" && Csp(direct) == "frame-ancestors 'none'" &&
-                Csp(extra) == "frame-ancestors 'none'" && Csp(asset) == "frame-ancestors 'none'" &&
-                Csp(assetHtml) == "frame-ancestors 'none'" && Csp(unknown) == "frame-ancestors 'none'" &&
+                Csp(home) == "frame-ancestors 'none'; frame-src https://documents-two.example https://documents.example" &&
+                Csp(direct) == Csp(home) &&
+                Csp(extra) == "frame-ancestors 'none'; frame-src 'none'" &&
+                Csp(asset) == "frame-ancestors 'none'; frame-src 'none'" &&
+                Csp(assetHtml) == "frame-ancestors 'none'; frame-src 'none'" &&
+                Csp(unknown) == "frame-ancestors 'none'; frame-src 'none'" &&
                 home.Headers.CacheControl?.NoStore == true && direct.Headers.CacheControl?.NoStore == true);
 
             using var first = await http.GetAsync("/embed/one");
@@ -80,11 +87,11 @@ internal static class FrontendHostingChecks
             using var missing = await http.GetAsync("/embed/missing");
             check("应用专属 HTML 只允许自身登记来源，未知应用始终拒绝内嵌",
                 first.StatusCode == HttpStatusCode.OK && second.StatusCode == HttpStatusCode.OK &&
-                Csp(first) == "frame-ancestors 'self' https://business.example https://branch.example:8443" &&
-                Csp(second) == "frame-ancestors 'self' https://other.example" &&
-                empty.StatusCode == HttpStatusCode.OK && Csp(empty) == "frame-ancestors 'self'" &&
+                Csp(first) == "frame-ancestors 'self' https://business.example https://branch.example:8443; frame-src https://documents.example" &&
+                Csp(second) == "frame-ancestors 'self' https://other.example; frame-src https://documents-two.example" &&
+                empty.StatusCode == HttpStatusCode.OK && Csp(empty) == "frame-ancestors 'self'; frame-src 'none'" &&
                 first.Headers.CacheControl?.NoStore == true && missing.StatusCode == HttpStatusCode.NotFound &&
-                Csp(missing) == "frame-ancestors 'none'");
+                Csp(missing) == "frame-ancestors 'none'; frame-src 'none'");
 
             using var anonymous = await http.GetAsync(CenterRoutes.EmbedContext);
             using var local = await AuthorizedAsync(http, CenterRoutes.EmbedContext, tokens.Local);
@@ -105,13 +112,15 @@ internal static class FrontendHostingChecks
             }
             using var corrupted = await http.GetAsync("/embed/one");
             check("损坏的持久化来源不能注入 CSP 指令",
-                corrupted.StatusCode == HttpStatusCode.BadRequest && Csp(corrupted) == "frame-ancestors 'none'");
+                corrupted.StatusCode == HttpStatusCode.BadRequest &&
+                Csp(corrupted) == "frame-ancestors 'none'; frame-src 'none'");
 
             using var scope = server.Services.CreateScope();
             await scope.ServiceProvider.GetRequiredService<ClientAppAppService>().SetEnabledAsync("two", false);
             using var disabled = await http.GetAsync("/embed/two");
             check("已停用接入应用不能继续提供可嵌入页面",
-                disabled.StatusCode == HttpStatusCode.NotFound && Csp(disabled) == "frame-ancestors 'none'");
+                disabled.StatusCode == HttpStatusCode.NotFound &&
+                Csp(disabled) == "frame-ancestors 'none'; frame-src 'none'");
 
             await using (var production = new ProductionFrontendFactory(backendRoot,
                 Path.Combine(dataDirectory, "production-data"), dist))
@@ -124,9 +133,9 @@ internal static class FrontendHostingChecks
                     publishedHome.StatusCode == HttpStatusCode.OK &&
                     publishedIndex.StatusCode == HttpStatusCode.OK &&
                     publishedAsset.StatusCode == HttpStatusCode.OK &&
-                    Csp(publishedHome) == "frame-ancestors 'none'" &&
-                    Csp(publishedIndex) == "frame-ancestors 'none'" &&
-                    Csp(publishedAsset) == "frame-ancestors 'none'");
+                    Csp(publishedHome) == "frame-ancestors 'none'; frame-src 'none'" &&
+                    Csp(publishedIndex) == "frame-ancestors 'none'; frame-src 'none'" &&
+                    Csp(publishedAsset) == "frame-ancestors 'none'; frame-src 'none'");
             }
 
             await VerifyMissingDistAsync(backendRoot, dataDirectory, check);

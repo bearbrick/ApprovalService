@@ -149,6 +149,11 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
                     // 后续节点命令会重建全部任务投影，已完成任务的意见必须持续保留。
                     task.Opinion = existing.Opinion;
                 }
+                if (stillCompleted && task.SignatureFileId is null && existing.SignatureFileId is not null)
+                {
+                    // 后续节点重建任务投影时保留原操作所冻结的签名引用。
+                    task.SignatureFileId = existing.SignatureFileId;
+                }
                 db.Entry(existing).CurrentValues.SetValues(task);
             }
             else

@@ -58,29 +58,47 @@ internal static class OperationGuard
                         item.Status is EngineTaskStatuses.Queued or EngineTaskStatuses.Approved) ||
                     (command.Kind == OperationKinds.DelegateExisting && item.Status == EngineTaskStatuses.Queued)))
                 ?? throw new EngineException(ErrorCodes.Conflict, "任务不存在或已处理。");
-            if (input.ActorId != task.AssigneeId && input.ActorId != task.DelegatorId)
+            var administratorDelegation = command.Kind == OperationKinds.DelegateExisting && input.IsAdministrator;
+            if (!administratorDelegation && input.ActorId != task.AssigneeId && input.ActorId != task.DelegatorId)
             {
                 throw new EngineException(ErrorCodes.Forbidden, "当前人员不能处理该任务。");
             }
 
+            if (administratorDelegation && string.IsNullOrWhiteSpace(input.Reason))
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "管理员转委托已有任务必须填写原因。");
+            }
+
             var node = context.Graph.Nodes.Single(item => item.Id == task.NodeId);
             var allowed = node.Approval?.AllowedActions;
-            if (command.Kind != OperationKinds.DelegateExisting && allowed is { Count: > 0 } &&
-                !allowed.Contains(command.Kind, StringComparer.Ordinal))
+            if (command.Kind != OperationKinds.DelegateExisting &&
+                !TaskActionPermission.Permits(allowed, node.Type, command.Kind))
             {
                 throw new EngineException(ErrorCodes.Conflict, "当前节点不允许此操作。");
             }
 
-            if (input.IsBulkApproval && allowed is { Count: > 0 } &&
-                !allowed.Contains(OperationKinds.BulkApprove, StringComparer.Ordinal))
+            if (input.IsBulkApproval &&
+                !TaskActionPermission.Permits(allowed, node.Type, OperationKinds.BulkApprove))
             {
                 throw new EngineException(ErrorCodes.Conflict, "当前节点不允许批量同意。");
+            }
+
+            if (input.IsBulkApproval && node.Approval?.SignatureRequired == true)
+            {
+                throw new EngineException(ErrorCodes.Conflict, "此节点需逐项明确选择手写签名，不能批量同意。");
             }
 
             if (node.Approval?.CommentRequired == true && IsDecision(command.Kind) &&
                 string.IsNullOrWhiteSpace(input.Opinion))
             {
                 throw new EngineException(ErrorCodes.ValidationFailed, "当前节点必须填写审批意见。");
+            }
+
+            if (node.Approval?.SignatureRequired == true &&
+                command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or EngineCommandKinds.Acknowledge &&
+                string.IsNullOrWhiteSpace(input.SignatureFileId))
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "当前节点成功办理时必须明确选择手写签名。");
             }
 
             return new EngineTask { Id = task.Id, AssigneeId = task.AssigneeId, DelegatorId = task.DelegatorId };
@@ -188,6 +206,7 @@ internal static class OperationGuard
                 ActorId = input.ActorId,
                 OnBehalfOfId = input.ActorId == task?.AssigneeId ? task.DelegatorId : null,
                 Opinion = input.Opinion,
+                SignatureFileId = input.SignatureFileId,
                 Reason = input.Reason,
                 TargetUserId = input.TargetUserId ??
                     (command.Kind == OperationKinds.ReassignInactive ? item.TargetCode : null),

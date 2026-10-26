@@ -1,0 +1,2450 @@
+[
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "PURCHASE_REQUEST",
+      "name": "采购申请审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "部门负责人审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "split",
+            "type": "exclusiveGateway",
+            "name": "按金额分支",
+            "x": 530,
+            "y": 220,
+            "gatewayPairId": "amount",
+            "gatewayDirection": "split",
+            "fieldPermissions": []
+          },
+          {
+            "id": "finance",
+            "type": "approval",
+            "name": "财务复核",
+            "x": 750,
+            "y": 110,
+            "assignee": {
+              "source": "role",
+              "value": "FINANCE_REVIEWER"
+            },
+            "approval": {
+              "mode": "all",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "approvedBudget",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "contract",
+            "type": "subprocess",
+            "name": "合同审批",
+            "x": 970,
+            "y": 110,
+            "subprocess": {
+              "flowCode": "CONTRACT_REVIEW",
+              "waitForCompletion": true,
+              "dataMappings": {
+                "contractTitle": "title",
+                "contractAmount": "totalAmount"
+              }
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "join",
+            "type": "exclusiveGateway",
+            "name": "金额分支汇合",
+            "x": 1180,
+            "y": 220,
+            "gatewayPairId": "amount",
+            "gatewayDirection": "join",
+            "fieldPermissions": []
+          },
+          {
+            "id": "buyer",
+            "type": "handling",
+            "name": "采购员办理",
+            "x": 1400,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "PURCHASING"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "submit"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "orderNumber",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "order",
+            "type": "automatic",
+            "name": "生成采购订单",
+            "x": 1620,
+            "y": 220,
+            "automation": {
+              "actionCode": "createPurchaseOrder"
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 1840,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "p01",
+            "sourceId": "start",
+            "targetId": "manager"
+          },
+          {
+            "id": "p02",
+            "sourceId": "manager",
+            "targetId": "split"
+          },
+          {
+            "id": "p03",
+            "sourceId": "split",
+            "targetId": "finance",
+            "priority": 1,
+            "condition": "${totalAmount} >= 50000"
+          },
+          {
+            "id": "p04",
+            "sourceId": "split",
+            "targetId": "join",
+            "priority": 2,
+            "isDefault": true
+          },
+          {
+            "id": "p05",
+            "sourceId": "finance",
+            "targetId": "contract"
+          },
+          {
+            "id": "p06",
+            "sourceId": "contract",
+            "targetId": "join"
+          },
+          {
+            "id": "p07",
+            "sourceId": "join",
+            "targetId": "buyer"
+          },
+          {
+            "id": "p08",
+            "sourceId": "buyer",
+            "targetId": "order"
+          },
+          {
+            "id": "p09",
+            "sourceId": "order",
+            "targetId": "end"
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "title",
+            "name": "采购主题",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "requester",
+            "name": "申请人",
+            "type": "person",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "department",
+            "name": "申请部门",
+            "type": "department",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "baseAmount",
+            "name": "未税金额",
+            "type": "money",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "taxAmount",
+            "name": "税额",
+            "type": "money",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "totalAmount",
+            "name": "采购总额",
+            "type": "money",
+            "formula": "${baseAmount} + ${taxAmount}",
+            "children": [],
+            "approverInput": false,
+            "required": false
+          },
+          {
+            "key": "items",
+            "name": "采购明细",
+            "type": "detailTable",
+            "children": [
+              {
+                "key": "itemName",
+                "name": "物料名称",
+                "type": "text",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              },
+              {
+                "key": "quantity",
+                "name": "数量",
+                "type": "number",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              },
+              {
+                "key": "unitPrice",
+                "name": "单价",
+                "type": "money",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              }
+            ],
+            "approverInput": false,
+            "required": false
+          },
+          {
+            "key": "approvedBudget",
+            "name": "核定预算",
+            "type": "money",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          },
+          {
+            "key": "orderNumber",
+            "name": "采购订单号",
+            "type": "text",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          }
+        ],
+        "summaryFields": [
+          "title",
+          "department",
+          "totalAmount"
+        ]
+      },
+      "detailLayout": {
+        "mode": "custom",
+        "groups": [
+          {
+            "title": "申请信息",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "title"
+              },
+              {
+                "fieldKey": "requester"
+              },
+              {
+                "fieldKey": "department"
+              },
+              {
+                "fieldKey": "totalAmount"
+              }
+            ]
+          },
+          {
+            "title": "采购明细",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "items"
+              },
+              {
+                "fieldKey": "approvedBudget"
+              },
+              {
+                "fieldKey": "orderNumber"
+              }
+            ]
+          }
+        ]
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "title",
+          "requester",
+          "department",
+          "items",
+          "totalAmount",
+          "approvedBudget",
+          "orderNumber"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": true
+      },
+      "allowedClientApps": [
+        "DEMO_WINUI"
+      ],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "title": "示例文本",
+      "requester": "EMP001",
+      "department": "DEP001",
+      "baseAmount": 100,
+      "taxAmount": 100,
+      "items": [
+        {
+          "itemName": "示例文本",
+          "quantity": 1,
+          "unitPrice": 100
+        }
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "EXPENSE",
+      "name": "费用报销审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 260,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 290,
+            "y": 260,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "split",
+            "type": "inclusiveGateway",
+            "name": "按金额与类别复核",
+            "x": 520,
+            "y": 260,
+            "gatewayPairId": "reviews",
+            "gatewayDirection": "split",
+            "fieldPermissions": []
+          },
+          {
+            "id": "finance",
+            "type": "approval",
+            "name": "财务审核票据",
+            "x": 750,
+            "y": 100,
+            "assignee": {
+              "source": "role",
+              "value": "FINANCE_REVIEWER"
+            },
+            "approval": {
+              "mode": "all",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "verifiedAmount",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "travel",
+            "type": "approval",
+            "name": "差旅合规复核",
+            "x": 750,
+            "y": 400,
+            "assignee": {
+              "source": "role",
+              "value": "TRAVEL_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "join",
+            "type": "inclusiveGateway",
+            "name": "复核汇合",
+            "x": 1010,
+            "y": 260,
+            "gatewayPairId": "reviews",
+            "gatewayDirection": "join",
+            "fieldPermissions": []
+          },
+          {
+            "id": "payment",
+            "type": "handling",
+            "name": "出纳办理付款",
+            "x": 1250,
+            "y": 260,
+            "assignee": {
+              "source": "role",
+              "value": "CASHIER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "submit"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "paymentReference",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 1480,
+            "y": 260,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "e01",
+            "sourceId": "start",
+            "targetId": "manager"
+          },
+          {
+            "id": "e02",
+            "sourceId": "manager",
+            "targetId": "split"
+          },
+          {
+            "id": "e03",
+            "sourceId": "split",
+            "targetId": "finance",
+            "priority": 1,
+            "condition": "${claimAmount} >= 3000"
+          },
+          {
+            "id": "e04",
+            "sourceId": "split",
+            "targetId": "travel",
+            "priority": 2,
+            "condition": "${category} == \"travel\""
+          },
+          {
+            "id": "e05",
+            "sourceId": "split",
+            "targetId": "join",
+            "priority": 3,
+            "isDefault": true
+          },
+          {
+            "id": "e06",
+            "sourceId": "finance",
+            "targetId": "join"
+          },
+          {
+            "id": "e07",
+            "sourceId": "travel",
+            "targetId": "join"
+          },
+          {
+            "id": "e08",
+            "sourceId": "join",
+            "targetId": "payment"
+          },
+          {
+            "id": "e09",
+            "sourceId": "payment",
+            "targetId": "end"
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "title",
+            "name": "报销事由",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "category",
+            "name": "费用类别",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "claimAmount",
+            "name": "申请金额",
+            "type": "money",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "receipt",
+            "name": "票据附件",
+            "type": "attachment",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "lines",
+            "name": "费用明细",
+            "type": "detailTable",
+            "children": [
+              {
+                "key": "date",
+                "name": "消费日期",
+                "type": "date",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              },
+              {
+                "key": "description",
+                "name": "说明",
+                "type": "text",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              },
+              {
+                "key": "amount",
+                "name": "金额",
+                "type": "money",
+                "children": [],
+                "approverInput": false,
+                "required": false
+              }
+            ],
+            "approverInput": false,
+            "required": false
+          },
+          {
+            "key": "verifiedAmount",
+            "name": "核定金额",
+            "type": "money",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          },
+          {
+            "key": "paymentReference",
+            "name": "付款流水号",
+            "type": "text",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          }
+        ],
+        "summaryFields": [
+          "title",
+          "category",
+          "claimAmount"
+        ]
+      },
+      "detailLayout": {
+        "mode": "custom",
+        "groups": [
+          {
+            "title": "报销信息",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "title"
+              },
+              {
+                "fieldKey": "category"
+              },
+              {
+                "fieldKey": "claimAmount"
+              },
+              {
+                "fieldKey": "receipt"
+              }
+            ]
+          },
+          {
+            "title": "费用与核定",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "lines"
+              },
+              {
+                "fieldKey": "verifiedAmount"
+              },
+              {
+                "fieldKey": "paymentReference"
+              }
+            ]
+          }
+        ]
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "title",
+          "category",
+          "claimAmount",
+          "receipt",
+          "lines",
+          "verifiedAmount",
+          "paymentReference"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": true,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [
+        "DEMO_WINUI"
+      ],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "title": "示例文本",
+      "category": "示例文本",
+      "claimAmount": 100,
+      "receipt": [
+        "FILE_ID"
+      ],
+      "lines": [
+        {
+          "date": "2026-01-01",
+          "description": "示例文本",
+          "amount": 100
+        }
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "QUALITY_EXCEPTION",
+      "name": "质量异常处理",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统上报异常",
+            "x": 80,
+            "y": 250,
+            "fieldPermissions": []
+          },
+          {
+            "id": "inspection",
+            "type": "approval",
+            "name": "质检员确认",
+            "x": 300,
+            "y": 250,
+            "assignee": {
+              "source": "role",
+              "value": "INSPECTOR"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "everyTime",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "reworkDecision",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "reworkSplit",
+            "type": "exclusiveGateway",
+            "name": "是否返工",
+            "x": 530,
+            "y": 250,
+            "gatewayDirection": "split",
+            "fieldPermissions": []
+          },
+          {
+            "id": "rework",
+            "type": "handling",
+            "name": "生产返工",
+            "x": 740,
+            "y": 90,
+            "assignee": {
+              "source": "role",
+              "value": "PRODUCTION_OPERATOR"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "submit"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": [
+              {
+                "fieldKey": "repairSummary",
+                "access": "editable"
+              }
+            ]
+          },
+          {
+            "id": "reviewSplit",
+            "type": "parallelGateway",
+            "name": "双经理会审",
+            "x": 760,
+            "y": 380,
+            "gatewayPairId": "reviews",
+            "gatewayDirection": "split",
+            "fieldPermissions": []
+          },
+          {
+            "id": "qualityManager",
+            "type": "approval",
+            "name": "质量经理审批",
+            "x": 980,
+            "y": 280,
+            "assignee": {
+              "source": "role",
+              "value": "QUALITY_MANAGER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "productionManager",
+            "type": "approval",
+            "name": "生产经理审批",
+            "x": 980,
+            "y": 480,
+            "assignee": {
+              "source": "role",
+              "value": "PRODUCTION_MANAGER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject"
+              ],
+              "commentRequired": false,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewJoin",
+            "type": "parallelGateway",
+            "name": "会审汇合",
+            "x": 1220,
+            "y": 380,
+            "gatewayPairId": "reviews",
+            "gatewayDirection": "join",
+            "fieldPermissions": []
+          },
+          {
+            "id": "notify",
+            "type": "automatic",
+            "name": "通知业务系统关闭异常",
+            "x": 1440,
+            "y": 380,
+            "automation": {
+              "actionCode": "closeQualityException"
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "cc",
+            "type": "cc",
+            "name": "抄送质量负责人",
+            "x": 1660,
+            "y": 380,
+            "assignee": {
+              "source": "role",
+              "value": "QUALITY_OWNER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [],
+              "commentRequired": false,
+              "readReceiptRequired": true
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 1880,
+            "y": 380,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "q01",
+            "sourceId": "start",
+            "targetId": "inspection"
+          },
+          {
+            "id": "q02",
+            "sourceId": "inspection",
+            "targetId": "reworkSplit"
+          },
+          {
+            "id": "q03",
+            "sourceId": "reworkSplit",
+            "targetId": "rework",
+            "priority": 1,
+            "condition": "${reworkDecision} == \"yes\""
+          },
+          {
+            "id": "q04",
+            "sourceId": "rework",
+            "targetId": "inspection"
+          },
+          {
+            "id": "q05",
+            "sourceId": "reworkSplit",
+            "targetId": "reviewSplit",
+            "priority": 2,
+            "isDefault": true
+          },
+          {
+            "id": "q06",
+            "sourceId": "reviewSplit",
+            "targetId": "qualityManager"
+          },
+          {
+            "id": "q07",
+            "sourceId": "reviewSplit",
+            "targetId": "productionManager"
+          },
+          {
+            "id": "q08",
+            "sourceId": "qualityManager",
+            "targetId": "reviewJoin"
+          },
+          {
+            "id": "q09",
+            "sourceId": "productionManager",
+            "targetId": "reviewJoin"
+          },
+          {
+            "id": "q10",
+            "sourceId": "reviewJoin",
+            "targetId": "notify"
+          },
+          {
+            "id": "q11",
+            "sourceId": "notify",
+            "targetId": "cc"
+          },
+          {
+            "id": "q12",
+            "sourceId": "cc",
+            "targetId": "end"
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "title",
+            "name": "异常标题",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "lotNumber",
+            "name": "批次号",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "defectDescription",
+            "name": "异常描述",
+            "type": "text",
+            "required": true,
+            "children": [],
+            "approverInput": false
+          },
+          {
+            "key": "reworkDecision",
+            "name": "是否需要返工",
+            "type": "text",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          },
+          {
+            "key": "repairSummary",
+            "name": "返工说明",
+            "type": "text",
+            "approverInput": true,
+            "children": [],
+            "required": false
+          },
+          {
+            "key": "evidence",
+            "name": "现场照片",
+            "type": "attachment",
+            "children": [],
+            "approverInput": false,
+            "required": false
+          }
+        ],
+        "summaryFields": [
+          "title",
+          "lotNumber",
+          "reworkDecision"
+        ]
+      },
+      "detailLayout": {
+        "mode": "custom",
+        "groups": [
+          {
+            "title": "异常信息",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "title"
+              },
+              {
+                "fieldKey": "lotNumber"
+              },
+              {
+                "fieldKey": "defectDescription"
+              },
+              {
+                "fieldKey": "evidence"
+              }
+            ]
+          },
+          {
+            "title": "处置结论",
+            "columns": 2,
+            "items": [
+              {
+                "fieldKey": "reworkDecision"
+              },
+              {
+                "fieldKey": "repairSummary"
+              }
+            ]
+          }
+        ]
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "title",
+          "lotNumber",
+          "defectDescription",
+          "evidence",
+          "reworkDecision",
+          "repairSummary"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [
+        "QUALITY_SYSTEM"
+      ],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "title": "示例文本",
+      "lotNumber": "示例文本",
+      "defectDescription": "示例文本",
+      "evidence": [
+        "FILE_ID"
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "LEAVE_REQUEST",
+      "name": "请假审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "人事复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "HR_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "leaveType",
+            "name": "请假类型",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "startDate",
+            "name": "开始日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "endDate",
+            "name": "结束日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "days",
+            "name": "请假天数",
+            "type": "number",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "reason",
+            "name": "请假原因",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "leaveType",
+          "startDate",
+          "endDate"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "leaveType",
+          "startDate",
+          "endDate",
+          "days",
+          "reason"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "leaveType": "示例文本",
+      "startDate": "2026-01-01",
+      "endDate": "2026-01-01",
+      "days": 1,
+      "reason": "示例文本"
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "OVERTIME_REQUEST",
+      "name": "加班审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "人事复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "HR_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "workDate",
+            "name": "加班日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "hours",
+            "name": "预计小时",
+            "type": "number",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "reason",
+            "name": "加班事由",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "workDate",
+          "hours",
+          "reason"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "workDate",
+          "hours",
+          "reason"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "workDate": "2026-01-01",
+      "hours": 1,
+      "reason": "示例文本"
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "BUSINESS_TRIP",
+      "name": "出差审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "财务复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "FINANCE_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "destination",
+            "name": "目的地",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "departureDate",
+            "name": "出发日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "returnDate",
+            "name": "返回日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "budget",
+            "name": "费用预算",
+            "type": "money",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "destination",
+          "departureDate",
+          "returnDate"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "destination",
+          "departureDate",
+          "returnDate",
+          "budget"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "destination": "示例文本",
+      "departureDate": "2026-01-01",
+      "returnDate": "2026-01-01",
+      "budget": 100
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "PAYMENT_REQUEST",
+      "name": "付款审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "财务复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "FINANCE_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "payee",
+            "name": "收款方",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "amount",
+            "name": "付款金额",
+            "type": "money",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "purpose",
+            "name": "付款用途",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "evidence",
+            "name": "付款依据",
+            "type": "attachment",
+            "required": false,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "payee",
+          "amount",
+          "purpose"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "payee",
+          "amount",
+          "purpose",
+          "evidence"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "payee": "示例文本",
+      "amount": 100,
+      "purpose": "示例文本",
+      "evidence": [
+        "FILE_ID"
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "SEAL_USE",
+      "name": "用印审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "行政复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "ADMIN_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "documentTitle",
+            "name": "文件名称",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "sealType",
+            "name": "印章种类",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "useDate",
+            "name": "用印日期",
+            "type": "date",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "document",
+            "name": "用印文件",
+            "type": "attachment",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "documentTitle",
+          "sealType",
+          "useDate"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "documentTitle",
+          "sealType",
+          "useDate",
+          "document"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "documentTitle": "示例文本",
+      "sealType": "示例文本",
+      "useDate": "2026-01-01",
+      "document": [
+        "FILE_ID"
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "CONTRACT_REVIEW",
+      "name": "合同审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "法务复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "LEGAL_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "counterparty",
+            "name": "合同相对方",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "contractAmount",
+            "name": "合同金额",
+            "type": "money",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "effectiveDate",
+            "name": "生效日期",
+            "type": "date",
+            "required": false,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "contractFile",
+            "name": "合同文件",
+            "type": "attachment",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "counterparty",
+          "contractAmount",
+          "effectiveDate"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "counterparty",
+          "contractAmount",
+          "effectiveDate",
+          "contractFile"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "counterparty": "示例文本",
+      "contractAmount": 100,
+      "effectiveDate": "2026-01-01",
+      "contractFile": [
+        "FILE_ID"
+      ]
+    }
+  },
+  {
+    "definition": {
+      "schemaVersion": 1,
+      "code": "ITEM_REQUISITION",
+      "name": "物品领用审批",
+      "canvas": {
+        "nodes": [
+          {
+            "id": "start",
+            "type": "start",
+            "name": "业务系统发起",
+            "x": 80,
+            "y": 220,
+            "fieldPermissions": []
+          },
+          {
+            "id": "manager",
+            "type": "approval",
+            "name": "直属主管审批",
+            "x": 300,
+            "y": 220,
+            "assignee": {
+              "source": "manager"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "reviewer",
+            "type": "approval",
+            "name": "库管复核",
+            "x": 520,
+            "y": 220,
+            "assignee": {
+              "source": "role",
+              "value": "WAREHOUSE_REVIEWER"
+            },
+            "approval": {
+              "mode": "sequential",
+              "voteWeights": {},
+              "rejectBehavior": "immediate",
+              "missingAssigneeBehavior": "block",
+              "selfApprovalBehavior": "skip",
+              "duplicateAssigneeBehavior": "adjacentOnce",
+              "inactiveAssigneeBehavior": "manager",
+              "allowedActions": [
+                "approve",
+                "reject",
+                "return"
+              ],
+              "commentRequired": true,
+              "readReceiptRequired": false
+            },
+            "fieldPermissions": []
+          },
+          {
+            "id": "end",
+            "type": "end",
+            "name": "结束",
+            "x": 740,
+            "y": 220,
+            "fieldPermissions": []
+          }
+        ],
+        "edges": [
+          {
+            "id": "start-manager",
+            "sourceId": "start",
+            "targetId": "manager",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "manager-reviewer",
+            "sourceId": "manager",
+            "targetId": "reviewer",
+            "priority": 0,
+            "isDefault": false
+          },
+          {
+            "id": "reviewer-end",
+            "sourceId": "reviewer",
+            "targetId": "end",
+            "priority": 0,
+            "isDefault": false
+          }
+        ]
+      },
+      "data": {
+        "fields": [
+          {
+            "key": "itemName",
+            "name": "物品名称",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "quantity",
+            "name": "领用数量",
+            "type": "number",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          },
+          {
+            "key": "reason",
+            "name": "领用原因",
+            "type": "text",
+            "required": true,
+            "approverInput": false,
+            "businessUpdateAllowed": false,
+            "children": []
+          }
+        ],
+        "summaryFields": [
+          "itemName",
+          "quantity",
+          "reason"
+        ]
+      },
+      "detailLayout": {
+        "mode": "auto",
+        "groups": []
+      },
+      "printSettings": {
+        "orientation": "portrait",
+        "fieldKeys": [
+          "itemName",
+          "quantity",
+          "reason"
+        ],
+        "showComments": true,
+        "showSignatures": true,
+        "includeReceiptPages": false,
+        "showLogo": true,
+        "showQrCode": true,
+        "showWatermark": false
+      },
+      "allowedClientApps": [],
+      "allowedInitiatorDepartments": [],
+      "allowedInitiatorRoles": [],
+      "withdrawBeforeFirstDecision": false,
+      "returnMode": "restart",
+      "isConfidential": false
+    },
+    "data": {
+      "itemName": "示例文本",
+      "quantity": 1,
+      "reason": "示例文本"
+    }
+  }
+]

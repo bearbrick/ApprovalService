@@ -99,9 +99,11 @@ internal static class CenterProjection
                 DelegatedForId = task.DelegatedForId,
                 Status = task.Status,
                 Opinion = task.Opinion,
+                SignatureFileId = task.SignatureFileId,
                 DueAt = task.DueAt,
                 CompletedAt = task.CompletedAt,
                 AllowedActions = TaskActionAvailability.GetAllowedActions(state, graph, task.Id, personId),
+                SignatureRequired = graph.Nodes.SingleOrDefault(node => node.Id == task.NodeId)?.Approval?.SignatureRequired == true,
             }).ToArray(),
             // 暂存意见仍是个人草稿，不能进入其他参与者可见的时间线。
             Events = record.Events.Where(item => item.Kind != "opinionDraftSaved").Select(ProjectEvent).ToArray(),
@@ -119,6 +121,10 @@ internal static class CenterProjection
     private static CenterDetailLayoutResponse DescribeLayout(FlowDetailLayout layout, JsonElement visible,
         IReadOnlyList<CenterFieldDefinitionResponse> fields)
     {
+        if (layout.Mode == "embed" && !string.IsNullOrWhiteSpace(layout.EmbedPageCode))
+        {
+            return new CenterDetailLayoutResponse { Mode = "embed", EmbedPageCode = layout.EmbedPageCode };
+        }
         if (layout.Mode != "custom")
         {
             return new CenterDetailLayoutResponse();
@@ -314,6 +320,7 @@ internal static class CenterProjection
             ActorId = payload.Audit?.ActorId,
             OnBehalfOfId = payload.Audit?.OnBehalfOfId,
             Opinion = payload.Audit?.Opinion,
+            SignatureFileId = payload.Audit?.SignatureFileId,
             OccurredAt = item.OccurredAt,
         };
     }

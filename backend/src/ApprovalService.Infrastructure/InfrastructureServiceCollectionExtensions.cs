@@ -65,6 +65,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddApprovalPersistence(configuration);
         services.AddHostedService<DailyBackupWorker>();
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
+        services.AddScoped<ISystemBrandingRepository, SystemBrandingRepository>();
         services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
@@ -80,7 +81,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IActionRetryRepository, ActionRetryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
         services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
+        services.AddScoped<ISignatureAssetRepository, SignatureAssetRepository>();
         services.AddScoped<ICenterOpinionRepository, CenterOpinionRepository>();
+        services.AddScoped<IDelegationRuleRepository, DelegationRuleRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
         services.AddSingleton(new IntegrationTransportPolicy
         {

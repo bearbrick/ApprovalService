@@ -1,10 +1,14 @@
 using System.Text.Json;
+using ApprovalService.Application.Administration;
 using ApprovalService.Application.Notifications;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Execution;
+using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Options;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +39,11 @@ internal static class NotificationRulesChecks
         var graph = EngineScenarioChecks.Chain(FlowNodeTypes.Approval, FlowNodeTypes.Approval);
         graph.Nodes.Single(node => node.Id == "n1").Approval = new FlowApprovalSettings { DueMinutes = 60 };
         graph.Nodes.Single(node => node.Id == "n2").Approval = new FlowApprovalSettings { DueMinutes = 60 };
+        graph.Nodes.Single(node => node.Id == "n1").Assignee = new FlowAssignee
+        {
+            Source = FlowAssigneeSources.Member,
+            Value = "user-n1,user-next",
+        };
         var firstTask = new EngineTask { Id = "first", NodeId = "n1" };
         var configuredDue = NotificationCalendarSettings.Create(configured).Calculate(graph, firstTask,
             new DateTimeOffset(2026, 10, 22, 9, 30, 0, TimeSpan.Zero));
@@ -77,8 +86,22 @@ internal static class NotificationRulesChecks
                 await db.SaveChangesAsync();
             }
 
-            var service = new ApprovalRuntimeAppService(new ApprovalRuntimeRepository(factory));
+            var calendarService = new WorkCalendarAppService(new WorkCalendarRepository(factory),
+                new WorkCalendarDefaults(new WorkCalendarResponse
+                {
+                    TimeZoneId = "Asia/Shanghai",
+                    WorkingStart = "09:00",
+                    WorkingEnd = "18:00",
+                }));
+            var oldCalendar = await calendarService.GetAsync();
+            var service = new ApprovalRuntimeAppService(new ApprovalRuntimeRepository(factory),
+                calendarProvider: calendarService);
             var startContext = EngineScenarioChecks.Context(graph);
+            startContext.AssigneeSnapshot = new AssigneeSnapshot
+            {
+                InitiatorId = "requester",
+                People = [new() { Id = "requester" }, new() { Id = "user-n1" }, new() { Id = "user-next" }],
+            };
             startContext.OccurredAt = new DateTimeOffset(2026, 10, 15, 9, 30, 0, TimeSpan.Zero);
             var started = await service.ExecuteAsync(new RuntimeCommandInput
             {
@@ -96,13 +119,15 @@ internal static class NotificationRulesChecks
                     ClientAppCode = "demo",
                 },
             });
-            var firstId = started.State.Tasks.Single().Id;
+            var firstId = started.State.Tasks.Single(task => task.Status == EngineTaskStatuses.Pending).Id;
+            var queuedId = started.State.Tasks.Single(task => task.Status == EngineTaskStatuses.Queued).Id;
             var firstDue = new DateTimeOffset(2026, 10, 16, 9, 30, 0, TimeSpan.FromHours(8));
             await using (var db = await factory.CreateDbContextAsync())
             {
                 check("新待办按实际开始时间将工作分钟期限与审批状态原子写入 SQLite",
                     await db.ApprovalTasks.Where(task => task.Id == firstId)
                         .Select(task => task.DueAt).SingleAsync() == firstDue);
+                check("排队任务尚未开始计时", (await db.ApprovalTasks.SingleAsync(task => task.Id == queuedId)).DueAt is null);
                 var reminders = await db.OutboxItems.AsNoTracking()
                     .Where(item => item.Kind == DeadlineReminderPlanner.OutboxKind).ToArrayAsync();
                 check("新待办的提前一个工作小时与超时提醒随审批事务固定排期",
@@ -114,6 +139,29 @@ internal static class NotificationRulesChecks
                     }));
             }
 
+            await calendarService.SaveAsync(new UpdateWorkCalendarRequest
+            {
+                ExpectedRevision = 0,
+                WorkingStart = "10:00",
+                WorkingEnd = "12:00",
+                Reason = "调整节假日安排",
+                Overrides = [new() { Date = "2026-10-16", IsWorkingDay = false },
+                    new() { Date = "2026-10-17", IsWorkingDay = true }],
+            }, "calendar-admin");
+            var newCalendar = await calendarService.GetAsync();
+            var probe = new DateTimeOffset(2026, 10, 16, 7, 0, 0, TimeSpan.Zero);
+            check("在线保存不修改已取得的日历快照，新读取同时采用新时段和逐日覆盖",
+                oldCalendar.Calculate(graph, firstTask, probe) == probe.AddHours(1) &&
+                newCalendar.Calculate(graph, firstTask, probe) ==
+                    new DateTimeOffset(2026, 10, 17, 11, 0, 0, TimeSpan.FromHours(8)));
+            await using (var db = await factory.CreateDbContextAsync())
+            {
+                check("在线修改日历不重算已有待办期限和已经排定的提醒",
+                    (await db.ApprovalTasks.SingleAsync(task => task.Id == firstId)).DueAt == firstDue &&
+                    (await db.OutboxItems.Where(item => item.Kind == DeadlineReminderPlanner.OutboxKind)
+                        .ToArrayAsync()).All(item =>
+                        JsonSerializer.Deserialize<DeadlineReminderPayload>(item.PayloadJson)!.DueAt == firstDue));
+            }
             var nextContext = EngineScenarioChecks.Context(graph);
             nextContext.OccurredAt = new DateTimeOffset(2026, 10, 16, 7, 0, 0, TimeSpan.Zero);
             var advanced = await service.ExecuteAsync(new RuntimeCommandInput
@@ -126,9 +174,15 @@ internal static class NotificationRulesChecks
             {
                 var projections = await db.ApprovalTasks.AsNoTracking()
                     .Where(task => task.InstanceId == "instance").ToDictionaryAsync(task => task.Id);
-                check("前一任务的期限不随下一节点推进重算，下一待办从实际激活时刻起算",
-                    projections[firstId].DueAt == firstDue &&
-                    projections[secondId].DueAt == new DateTimeOffset(2026, 10, 16, 16, 0, 0, TimeSpan.FromHours(8)));
+                check("前一任务期限不重算，同一服务的下一命令按新日历计算排队激活任务",
+                    secondId == queuedId && projections[firstId].DueAt == firstDue &&
+                    projections[secondId].DueAt == new DateTimeOffset(2026, 10, 17, 11, 0, 0, TimeSpan.FromHours(8)));
+                var newReminders = (await db.OutboxItems.Where(item => item.Kind == DeadlineReminderPlanner.OutboxKind)
+                    .ToArrayAsync()).Select(item => JsonSerializer.Deserialize<DeadlineReminderPayload>(item.PayloadJson)!)
+                    .Where(item => item.TaskId == secondId).ToArray();
+                check("新任务的提前提醒和期限使用同一新日历快照",
+                    newReminders.Single(item => item.ReminderKind == DeadlineReminderPlanner.BeforeDue).ScheduledAt ==
+                        new DateTimeOffset(2026, 10, 17, 10, 0, 0, TimeSpan.FromHours(8)));
                 check("下一任务独立产生两条提醒而不重复安排旧任务",
                     await db.OutboxItems.CountAsync(item => item.Kind == DeadlineReminderPlanner.OutboxKind) == 4);
             }

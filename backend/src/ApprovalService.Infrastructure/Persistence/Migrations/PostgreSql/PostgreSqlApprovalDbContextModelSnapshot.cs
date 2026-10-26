@@ -53,6 +53,35 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                     b.ToTable("SystemBranding", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Administration.WorkCalendarEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("OverridesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("WorkingEnd")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.Property<string>("WorkingStart")
+                        .IsRequired()
+                        .HasMaxLength(5)
+                        .HasColumnType("character varying(5)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WorkCalendar", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
                 {
                     b.Property<string>("Id")

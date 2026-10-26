@@ -22,11 +22,13 @@ namespace ApprovalService.Application.Runtime;
 /// <param name="taskDeadlines">工作日历期限策略；直接构造时使用默认日历。</param>
 /// <param name="organization">用于核对通知收件人的可信组织主数据。</param>
 /// <param name="delegations">仅从持久规则加载当前流程的有效委托。</param>
+/// <param name="calendarProvider">每次命令读取一次的在线工作日历。</param>
 public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository repository,
     BusinessAssigneeAppService? businessAssignees = null,
     TaskDeadlinePolicy? taskDeadlines = null,
     IOrganizationRepository? organization = null,
-    IDelegationRuleRepository? delegations = null) : IApprovalRuntimeAppService
+    IDelegationRuleRepository? delegations = null,
+    ITaskDeadlinePolicyProvider? calendarProvider = null) : IApprovalRuntimeAppService
 {
     /// <summary>
     /// 将任务启动时刻转换成发布节点的工作日历期限。
@@ -233,6 +235,8 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             instance.EndedAt ??= input.Context.OccurredAt;
         }
 
+        // 期限与提前提醒共享同一快照；不缓存到服务实例，下一命令可看到新修订。
+        var commandCalendar = calendarProvider is null ? deadlinePolicy : await calendarProvider.GetAsync(cancellationToken);
         var previousStatuses = current?.Tasks.ToDictionary(task => task.Id, task => task.Status) ??
             new Dictionary<string, string>(StringComparer.Ordinal);
         var previousTasks = snapshot?.Tasks.ToDictionary(task => task.Id) ??
@@ -255,7 +259,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
                 (!previousStatuses.TryGetValue(task.Id, out var previousStatus) || previousStatus == EngineTaskStatuses.Pending)
                     ? input.Context.OccurredAt
                     : null,
-            DueAt = GetDueAt(task, input.Context.Graph, input.Context.OccurredAt, previousStatuses, previousTasks),
+            DueAt = GetDueAt(task, input.Context.Graph, input.Context.OccurredAt, previousStatuses, previousTasks, commandCalendar),
         }).ToArray();
         var events = BuildEvents(instance.Id, command.RequestId, result.Events, snapshot?.LastEvent);
         var outbox = result.Events.Select(item =>
@@ -280,7 +284,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             };
         }).ToList();
         // 延迟提醒与状态、任务、事件在同一事务固定；进程重启也不会漏排期。
-        outbox.AddRange(new DeadlineReminderPlanner(deadlinePolicy).Plan(instance.Id, tasks,
+        outbox.AddRange(new DeadlineReminderPlanner(commandCalendar).Plan(instance.Id, tasks,
             previousStatuses, input.Context.OccurredAt));
         var participants = BuildParticipants(instance.Id, result.Events);
         if (organization is not null)
@@ -374,10 +378,11 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
     /// <param name="occurredAt">本次命令时间。</param>
     /// <param name="previousStatuses">命令前的任务状态。</param>
     /// <param name="previousTasks">已持久化的任务投影。</param>
+    /// <param name="commandCalendar">本次命令唯一日历快照。</param>
     /// <returns>到期时刻或空值。</returns>
     private DateTimeOffset? GetDueAt(EngineTask task, FlowExecutionGraph graph, DateTimeOffset occurredAt,
         IReadOnlyDictionary<string, string> previousStatuses,
-        IReadOnlyDictionary<string, ApprovalTaskEntity> previousTasks)
+        IReadOnlyDictionary<string, ApprovalTaskEntity> previousTasks, TaskDeadlinePolicy commandCalendar)
     {
         var prior = previousTasks.TryGetValue(task.Id, out var persisted) ? persisted.DueAt : null;
         if (task.Status != EngineTaskStatuses.Pending ||
@@ -388,7 +393,7 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
         }
 
         // 依次审批中排队任务尚未开始；只有实际成为待办才计算时限。
-        return deadlinePolicy.Calculate(graph, task, occurredAt);
+        return commandCalendar.Calculate(graph, task, occurredAt);
     }
 
     /// <summary>

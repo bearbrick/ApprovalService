@@ -59,6 +59,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
         services.AddScoped<SystemBrandingAppService>();
+        services.AddScoped<WorkCalendarAppService>();
+        services.AddScoped<ITaskDeadlinePolicyProvider>(provider => provider.GetRequiredService<WorkCalendarAppService>());
         services.AddScoped<RoleManagementAppService>();
         services.AddScoped<AdminDocumentSettingsAppService>();
         services.AddScoped<ReportingQueryAppService>();

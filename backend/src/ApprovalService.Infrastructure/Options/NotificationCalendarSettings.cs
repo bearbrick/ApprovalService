@@ -1,5 +1,7 @@
 using System.Globalization;
+using ApprovalService.Application.Administration;
 using ApprovalService.Application.Notifications;
+using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Notifications.Calendar;
 using Microsoft.Extensions.Configuration;
 
@@ -15,7 +17,14 @@ public static class NotificationCalendarSettings
     /// </summary>
     /// <param name="configuration">应用配置。</param>
     /// <returns>不可变的期限计算策略。</returns>
-    public static TaskDeadlinePolicy Create(IConfiguration configuration)
+    public static TaskDeadlinePolicy Create(IConfiguration configuration) => WorkCalendarAppService.CreatePolicy(Read(configuration));
+
+    /// <summary>
+    /// 读取并验证完整的部署日历，供空库回退和只读时区使用。
+    /// </summary>
+    /// <param name="configuration">应用配置。</param>
+    /// <returns>修订零的部署日历。</returns>
+    public static WorkCalendarResponse Read(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         var section = configuration.GetSection("ApprovalService:Notifications:Calendar");
@@ -54,7 +63,16 @@ public static class NotificationCalendarSettings
             overrides.Add(new WorkCalendarDayOverride(date, isWorkingDay));
         }
 
-        return new TaskDeadlinePolicy(new WorkCalendarRules(overrides), timeZone,
-            new WorkCalendarWorkingHours(start, end));
+        return new WorkCalendarResponse
+        {
+            TimeZoneId = timeZone.Id,
+            WorkingStart = start.ToString("HH:mm", CultureInfo.InvariantCulture),
+            WorkingEnd = end.ToString("HH:mm", CultureInfo.InvariantCulture),
+            Overrides = overrides.Select(item => new WorkCalendarOverride
+            {
+                Date = item.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                IsWorkingDay = item.IsWorkingDay,
+            }).OrderBy(item => item.Date, StringComparer.Ordinal).ToList(),
+        };
     }
 }

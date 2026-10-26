@@ -99,6 +99,8 @@ builder.Services.AddAuthorization(options => options.AddPolicy(OrganizationAdmin
 builder.Services.AddScoped<IAuthorizationHandler, OrganizationAdminAuthorizationHandler>();
 
 var app = builder.Build();
+// 在所有配置源生效后验证日历，拒绝无效部署时段或时区。
+_ = app.Services.GetRequiredService<ApprovalService.Application.Administration.WorkCalendarDefaults>();
 
 // 默认页面安全头包住异常处理；请求 ID 和链路 ID 紧随异常处理，出错响应也带上。
 app.UseFrontendDocumentSecurity();
@@ -124,6 +126,7 @@ app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
 app.MapSystemBrandingEndpoints();
+app.MapWorkCalendarEndpoints();
 app.MapRoleManagementEndpoints();
 app.MapClientAppAdminEndpoints();
 app.MapTestCallbackEndpoints();

@@ -244,7 +244,7 @@ public partial class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        SystemBrandingModelConfiguration.Configure(modelBuilder);
+        AdministrationModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<SerialNumberCounterEntity>(entity =>
         {
             entity.ToTable("SerialNumberCounters");

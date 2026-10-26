@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ApiError } from '../../api/http.ts'
-import type { FlowDefinition } from '../../model/flow.ts'
+import type { FlowDefinition, FlowFieldDefinition } from '../../model/flow.ts'
 import { deleteFlowSimulation, getFlowSimulation, startFlowSimulation, stepFlowSimulation } from '../../api/flow-simulation.ts'
 import type { SimulationSession, SimulationTask, SimulationWait } from '../../api/flow-simulation.ts'
-import { buildSimulationInput, simulationExampleData, simulationManualNodes } from './simulation-model.ts'
+import { buildSimulationInput, parseSimulationFieldValues, simulationEditableFields, simulationExampleData, simulationManualNodes } from './simulation-model.ts'
 
 /**
  * 当前页面内可编辑的完整草稿。
@@ -36,6 +36,14 @@ const peopleText = ref<Record<string, string>>({})
  */
 const actionResultText = ref('{}')
 /**
+ * 可修改的假审批意见；清空可验证节点的必填校验。
+ */
+const opinionText = ref('模拟审批意见')
+/**
+ * 每项假任务的审批人字段 JSON，可在返工重审时填写不同的值。
+ */
+const fieldValuesText = ref<Record<string, string>>({})
+/**
  * 当前服务端内存会话。
  */
 const session = ref<SimulationSession | null>(null)
@@ -43,6 +51,10 @@ const session = ref<SimulationSession | null>(null)
  * 会话创建时的节点名称快照，编辑草稿不会改变正在试跑的解释。
  */
 const nodeNames = ref<Record<string, string>>({})
+/**
+ * 内存会话创建时的草稿快照，防止编辑页面后误展示新的字段权限。
+ */
+const sessionDefinition = ref<FlowDefinition | null>(null)
 /**
  * 请求执行期间防止重复推进。
  */
@@ -85,6 +97,44 @@ function nodeLabel(id: string): string {
 }
 
 /**
+ * 展示当前假任务允许填写的审批人字段。
+ * @param task 当前假任务。
+ * @returns 已锁定草稿中可填写的顶层字段。
+ */
+function editableFields(task: SimulationTask): FlowFieldDefinition[] {
+  return simulationEditableFields(sessionDefinition.value ?? props.definition, task.nodeId)
+}
+
+/**
+ * 把引擎终态显示成审批管理员可直接理解的中文。
+ * @param status 引擎状态编码。
+ * @returns 中文状态或原编码。
+ */
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    running: '运行中', approved: '已通过', rejected: '已拒绝', faulted: '模拟失败',
+    awaitingInitiator: '等待发起人', cancelled: '已取消', terminated: '已终止', withdrawn: '已撤回',
+  }
+  return labels[status] ?? status
+}
+
+/**
+ * 将常见引擎事件翻译为测试时间线文案，扩展事件仍保留编码。
+ * @param kind 事件编码。
+ * @returns 可读的事件名称。
+ */
+function eventLabel(kind: string): string {
+  const labels: Record<string, string> = {
+    instanceStarted: '模拟已开始', nodeEntered: '进入节点', taskCreated: '创建假任务',
+    taskActivated: '假任务已激活', taskCompleted: '假任务已完成', taskCancelled: '假任务已取消',
+    gatewaySplit: '分支已展开', gatewayJoined: '分支已汇合',
+    instanceApproved: '流程已通过', instanceRejected: '流程已拒绝',
+    actionPending: '等待自动动作', subprocessPending: '等待子流程',
+  }
+  return labels[kind] ?? kind
+}
+
+/**
  * 从当前输入启动一场独立内存模拟。
  * @returns 创建操作完成。
  */
@@ -97,6 +147,9 @@ async function start(): Promise<void> {
     busy.value = true
     const result = await startFlowSimulation(input)
     session.value = result
+    // Vue 属性可能是响应式代理，转成纯 JSON 才能保存不可随编辑变化的会话定义。
+    sessionDefinition.value = JSON.parse(JSON.stringify(props.definition)) as FlowDefinition
+    fieldValuesText.value = {}
     nodeNames.value = Object.fromEntries(props.definition.canvas.nodes.map(node => [node.id, node.name]))
     notice.value = '模拟已开始。会话只保存在服务端内存，闲置 30 分钟后过期。'
   } catch (cause) {
@@ -119,6 +172,8 @@ async function decide(task: SimulationTask, reject: boolean): Promise<void> {
   try {
     session.value = await stepFlowSimulation(session.value.id, {
       kind: reject ? 'reject' : task.completionKind, taskId: task.id, actorId: task.assigneeId,
+      opinion: opinionText.value,
+      fieldValues: parseSimulationFieldValues(fieldValuesText.value[task.id] ?? '', editableFields(task)),
     })
     notice.value = reject ? '已模拟拒绝。' : '已完成该假任务。'
   } catch (cause) {
@@ -168,6 +223,7 @@ async function refresh(): Promise<void> {
   try { session.value = await getFlowSimulation(session.value.id) } catch (cause) {
     if (cause instanceof ApiError && cause.status === 404) {
       session.value = null
+      sessionDefinition.value = null
       notice.value = '模拟会话已过期，请更新假输入后重新开始。'
     } else {
       error.value = cause instanceof Error ? cause.message : '模拟会话读取失败。'
@@ -191,6 +247,7 @@ async function close(): Promise<void> {
     }
   }
   session.value = null
+  sessionDefinition.value = null
   nodeNames.value = {}
   notice.value = '模拟已结束；可以修改假数据后再次试跑。'
   busy.value = false
@@ -207,9 +264,9 @@ async function close(): Promise<void> {
       <div class="simulation-actions"><span v-if="!registered" class="empty-hint">请先保存流程草稿，登记编码后再试跑。</span><button type="button" class="btn btn-primary" :disabled="busy || !registered" @click="start">{{ busy ? '正在创建…' : '开始试跑当前草稿' }}</button></div>
     </div>
     <div v-else class="simulation-running">
-      <div class="session-toolbar"><div><strong>状态：{{ session.status }}</strong><small>流程 {{ session.flowCode }} · 闲置到期 {{ new Date(session.expiresAt).toLocaleString() }}</small></div><div><button type="button" class="btn" :disabled="busy" @click="refresh">刷新</button><button type="button" class="btn" :disabled="busy" @click="close">结束模拟</button></div></div>
-      <div class="simulation-columns"><section><h3>当前假任务 <span>{{ pendingTasks.length }}</span></h3><p v-if="!pendingTasks.length" class="empty-hint">当前没有待处理的人工任务。</p><article v-for="task in pendingTasks" :key="task.id" class="simulation-card"><strong>{{ nodeLabel(task.nodeId) }}</strong><small>假处理人：{{ task.assigneeId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="decide(task, false)">模拟完成</button><button type="button" class="btn" :disabled="busy" @click="decide(task, true)">模拟拒绝</button></div></article></section><section><h3>等待假外部结果 <span>{{ session.waits.length }}</span></h3><p v-if="!session.waits.length" class="empty-hint">当前没有自动动作或子流程等待。</p><label v-if="session.waits.some(wait => wait.kind === 'action')">自动动作假结果 JSON<textarea v-model="actionResultText" spellcheck="false" rows="3" /></label><article v-for="wait in session.waits" :key="wait.tokenId" class="simulation-card"><strong>{{ nodeLabel(wait.nodeId) }}</strong><small>{{ wait.kind === 'subprocess' ? '子流程' : '自动动作' }} · 令牌 {{ wait.tokenId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="resolveWait(wait, true)">假成功</button><button type="button" class="btn" :disabled="busy" @click="resolveWait(wait, false)">假失败</button></div></article></section></div>
-      <section class="simulation-events"><h3>模拟事件</h3><p v-if="!recentEvents.length" class="empty-hint">引擎尚未产生事件。</p><ol v-else><li v-for="(event, index) in recentEvents" :key="index"><strong>{{ event.kind }}</strong><span>{{ event.nodeId ? nodeLabel(event.nodeId) : '流程' }}</span></li></ol></section>
+      <div class="session-toolbar"><div><strong>状态：{{ statusLabel(session.status) }}</strong><small>流程 {{ session.flowCode }} · 闲置到期 {{ new Date(session.expiresAt).toLocaleString('zh-CN') }}</small></div><div><button type="button" class="btn" :disabled="busy" @click="refresh">刷新</button><button type="button" class="btn" :disabled="busy" @click="close">结束模拟</button></div></div>
+      <div class="simulation-columns"><section><h3>当前假任务 <span>{{ pendingTasks.length }}</span></h3><p v-if="!pendingTasks.length" class="empty-hint">当前没有待处理的人工任务。</p><label v-if="pendingTasks.length">假审批意见<textarea v-model="opinionText" maxlength="1000" rows="2" placeholder="节点要求意见时必填；可清空测试校验" /></label><article v-for="task in pendingTasks" :key="task.id" class="simulation-card"><strong>{{ nodeLabel(task.nodeId) }}</strong><small>假处理人：{{ task.assigneeId }}</small><label v-if="editableFields(task).length">假审批字段 JSON<small>当前节点可填：{{ editableFields(task).map(field => `${field.name}（${field.key}）`).join('、') }}。按分支条件填写值；返工后可修改重审值。</small><textarea v-model="fieldValuesText[task.id]" spellcheck="false" rows="3" placeholder='{"fieldKey":"value"}' /></label><div><button type="button" class="btn btn-primary" :disabled="busy" @click="decide(task, false)">模拟完成</button><button type="button" class="btn" :disabled="busy" @click="decide(task, true)">模拟拒绝</button></div></article></section><section><h3>等待假外部结果 <span>{{ session.waits.length }}</span></h3><p v-if="!session.waits.length" class="empty-hint">当前没有自动动作或子流程等待。</p><label v-if="session.waits.some(wait => wait.kind === 'action')">自动动作假结果 JSON<textarea v-model="actionResultText" spellcheck="false" rows="3" /></label><article v-for="wait in session.waits" :key="wait.tokenId" class="simulation-card"><strong>{{ nodeLabel(wait.nodeId) }}</strong><small>{{ wait.kind === 'subprocess' ? '子流程' : '自动动作' }} · 令牌 {{ wait.tokenId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="resolveWait(wait, true)">假成功</button><button type="button" class="btn" :disabled="busy" @click="resolveWait(wait, false)">假失败</button></div></article></section></div>
+      <section class="simulation-events"><h3>模拟事件</h3><p v-if="!recentEvents.length" class="empty-hint">引擎尚未产生事件。</p><ol v-else><li v-for="(event, index) in recentEvents" :key="index"><strong>{{ eventLabel(event.kind) }}</strong><span>{{ event.nodeId ? nodeLabel(event.nodeId) : '流程' }}</span></li></ol></section>
     </div>
     <p v-if="error" class="simulation-error" role="alert">{{ error }}</p><p v-if="notice" class="simulation-notice" role="status">{{ notice }}</p>
   </section>

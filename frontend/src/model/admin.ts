@@ -105,7 +105,7 @@ export interface AdminViewData {
  * 已评审的管理入口：列仅用于安全的只读展示，所有写入操作先禁用。
  */
 export const ADMIN_VIEWS: readonly AdminView[] = [
-  { key: 'overview', section: 'overview', tab: '', title: '管理工作台', description: '查看运行关注项与管理入口。', kind: 'overview', columns: [{ key: 'subject', title: '需要关注' }, { key: 'source', title: '来源' }, { key: 'updatedAt', title: '更新时间' }], actions: [] },
+  { key: 'overview', section: 'overview', tab: '', title: '管理工作台', description: '查看今日审批指标与最近的出站关注项。', kind: 'overview', columns: [{ key: 'subject', title: '需要关注' }, { key: 'source', title: '来源' }, { key: 'availableAt', title: '可发送时间' }], actions: [] },
   { key: 'flows', section: 'flows', tab: '', title: '流程与模板', description: '查看流程、版本和发布状态。流程编辑请进入流程设计工作区。', kind: 'table', columns: [{ key: 'name', title: '流程名称' }, { key: 'code', title: '流程编码' }, { key: 'group', title: '分组' }, { key: 'version', title: '当前版本' }, { key: 'status', title: '状态' }], actions: ['新建流程', '导入流程', '停启用'] },
   { key: 'org/departments', section: 'org', tab: 'departments', title: '部门', description: '维护部门层级、负责人和分管关系。', kind: 'table', columns: [{ key: 'name', title: '部门名称' }, { key: 'code', title: '部门编码' }, { key: 'parent', title: '上级部门' }, { key: 'manager', title: '负责人' }, { key: 'source', title: '可信来源' }], actions: ['新增部门', '导入组织'] },
   { key: 'org/people', section: 'org', tab: 'people', title: '人员', description: '查看工号、归属部门、岗位和在职状态；账号操作以服务端实时校验为准。', kind: 'table', columns: [{ key: 'name', title: '姓名' }, { key: 'employeeNo', title: '工号' }, { key: 'departments', title: '所属部门' }, { key: 'position', title: '岗位' }, { key: 'status', title: '状态' }], actions: ['新增人员', '导入人员', '账号管理'] },
@@ -121,7 +121,7 @@ export const ADMIN_VIEWS: readonly AdminView[] = [
   { key: 'reports/flow', section: 'reports', tab: 'flow', title: '流程统计', description: '查看当前管理范围内的真实流程效率与保密匿名数量。', kind: 'table', columns: [{ key: 'flow', title: '流程' }, { key: 'count', title: '发起量' }, { key: 'passRate', title: '通过率' }], actions: [] },
   { key: 'reports/node', section: 'reports', tab: 'node', title: '节点统计', description: '查看当前管理范围内的节点处理时长与超时情况。', kind: 'table', columns: [{ key: 'node', title: '节点' }, { key: 'duration', title: '平均耗时' }, { key: 'overdueRate', title: '超时率' }], actions: [] },
   { key: 'reports/people', section: 'reports', tab: 'people', title: '人员统计', description: '查看当前管理范围内公开流程的人员待办与处理量。', kind: 'table', columns: [{ key: 'person', title: '人员' }, { key: 'backlog', title: '积压待办' }, { key: 'handled', title: '处理量' }], actions: [] },
-  { key: 'system/info', section: 'system', tab: 'info', title: '系统信息', description: '查看单位名称、品牌和服务配置；敏感配置不回显。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'value', title: '当前值' }], actions: ['保存信息'] },
+  { key: 'system/info', section: 'system', tab: 'info', title: '系统信息', description: '维护审批单打印页眉的单位名称与 Logo，所有修改均记录原因。', kind: 'settings', columns: [], actions: [] },
   { key: 'system/notifications', section: 'system', tab: 'notifications', title: '消息配置', description: '查看邮件与站内消息的渠道状态和提醒规则。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '发送测试邮件'] },
   { key: 'system/storage', section: 'system', tab: 'storage', title: '附件与字体', description: '查看附件存储和已授权字体配置，不回显连接密钥。', kind: 'settings', columns: [{ key: 'name', title: '配置项' }, { key: 'status', title: '状态' }], actions: ['保存配置', '上传字体'] },
   { key: 'system/security', section: 'system', tab: 'security', title: '安全设置', description: '修改当前本地管理员密码；登录方式和令牌策略配置待正式管理接口接入。', kind: 'settings', columns: [], actions: [] },

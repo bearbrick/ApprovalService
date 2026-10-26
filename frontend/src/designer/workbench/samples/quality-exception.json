@@ -27,7 +27,8 @@
             "reject",
             "return"
           ],
-          "commentRequired": true
+          "commentRequired": true,
+          "duplicateAssigneeBehavior": "everyTime"
         },
         "fieldPermissions": [
           {

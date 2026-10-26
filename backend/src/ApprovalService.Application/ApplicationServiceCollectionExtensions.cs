@@ -58,6 +58,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<INotificationSettingsAppService, NotificationSettingsAppService>();
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
+        services.AddScoped<SystemBrandingAppService>();
         services.AddScoped<AdminDocumentSettingsAppService>();
         services.AddScoped<ReportingQueryAppService>();
         services.AddScoped<FlowManagementAppService>();

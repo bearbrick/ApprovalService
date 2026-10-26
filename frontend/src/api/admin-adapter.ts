@@ -1,6 +1,6 @@
 import type { AdminViewData } from '../model/admin.ts'
-import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData } from '../model/admin-data.ts'
-import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory, AdminOutbox, AdminPerson } from '../model/admin-data.ts'
+import { adminTodayQuery, auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData, overviewViewData } from '../model/admin-data.ts'
+import type { AdminAudit, AdminBinding, AdminClientApp, AdminDirectory, AdminOutbox, AdminOverviewCounts, AdminPerson } from '../model/admin-data.ts'
 import { ApiError, getJson, requestJson } from './http.ts'
 import { adminAccessToken } from './admin-session.ts'
 
@@ -31,6 +31,31 @@ export interface AdminDataAdapter {
 }
 
 /**
+ * 管理工作台只接受六个非负整数组合，不把格式异常的部分响应当真。
+ * @param value 未知报表响应。
+ * @returns 可安全展示时为真。
+ */
+function isOverviewCounts(value: unknown): value is AdminOverviewCounts {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return ['visibleStartedCount', 'visibleCompletedCount', 'visiblePendingCount', 'visibleOverdueCount',
+    'confidentialStartedCount', 'confidentialCompletedCount']
+    .every(key => Number.isSafeInteger(record[key]) && (record[key] as number) >= 0)
+}
+
+/**
+ * 核对待发队列只包含可展示的安全摘要。
+ * @param value 未知队列响应。
+ * @returns 摘要列表有效时为真。
+ */
+function isAdminOutbox(value: unknown): value is AdminOutbox[] {
+  return Array.isArray(value) && value.every(item => item && typeof item.eventId === 'string'
+    && typeof item.clientAppCode === 'string' && typeof item.kind === 'string'
+    && typeof item.status === 'string' && typeof item.attempts === 'number'
+    && typeof item.availableAt === 'string')
+}
+
+/**
  * 对已落地的管理读取端点发起请求；其它页面不伪造数据。
  */
 export const adminAdapter: AdminDataAdapter = {
@@ -38,12 +63,20 @@ export const adminAdapter: AdminDataAdapter = {
    * @inheritdoc
    */
   async loadView(viewKey: string, signal: AbortSignal): Promise<AdminViewData> {
-    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'outbound/queue'].includes(viewKey)) {
+    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'system/info', 'outbound/queue'].includes(viewKey)) {
       throw new AdminAdapterUnavailableError()
     }
     const token = await adminAccessToken()
     const options = { headers: { Authorization: `Bearer ${token}` }, signal, cache: 'no-store' as RequestCache }
-    if (viewKey === 'overview' || viewKey === 'system/security') {
+    if (viewKey === 'overview') {
+      const [overview, outbox] = await Promise.all([
+        getJson<unknown>('/api/v1/admin/reports/overview' + adminTodayQuery(new Date()), options),
+        getJson<unknown>('/api/v1/admin/outbox', options),
+      ])
+      if (!isOverviewCounts(overview) || !isAdminOutbox(outbox)) throw new Error('管理工作台响应不完整。')
+      return overviewViewData(overview, outbox)
+    }
+    if (viewKey === 'system/security' || viewKey === 'system/info') {
       await getJson<{ personId: string }>('/api/v1/admin/session', options)
       return { rows: [], metrics: [] }
     }

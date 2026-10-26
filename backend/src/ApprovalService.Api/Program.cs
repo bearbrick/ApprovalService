@@ -123,6 +123,7 @@ app.MapNotificationSettingsEndpoints();
 app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
+app.MapSystemBrandingEndpoints();
 app.MapClientAppAdminEndpoints();
 app.MapTestCallbackEndpoints();
 app.MapReportingEndpoints();

@@ -77,6 +77,7 @@
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
 | `POST /api/v1/admin/actions/retry` | 本地 JWT + 原动作所属流程的当前流程管理员 | 人工重排达到自动上限的原业务动作 |
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
+| `GET/PUT /api/v1/admin/system-info`、`GET/POST/DELETE /api/v1/admin/system-info/logo` | 本地 JWT + 当前组织管理员角色 | 查看或修改打印页眉的单位名称与 Logo |
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET/PUT /api/v1/admin/apps/{code}/document-settings` | 本地 JWT + 当前组织管理员角色 | 读取或设置第五个 `documentUrl` 签名钩子及独立 `allowedDocumentOrigins` HTTPS 来源，修改需原因并脱敏审计 |
@@ -128,11 +129,15 @@
 
 `POST /admin/apps/{code}/test-callback` 接受 `{reason}`，原因须为 2 至 200 字符；仅当前本地会话中的组织管理员或该应用名单内在职人员可调用，入队事务再次核对权限、应用启用及非空回调地址。成功返回 `{eventId, status:"queued"}`，`eventId` 以 `test-` 开头，每次测试唯一。该接口只保存回调待发项及含操作者和原因的脱敏审计，不创建审批单、任务或业务动作。`integration.test` 正文沿用回调字段：`instanceId` 为与 `eventId` 相同的合成 ID，`serialNo`、`flowCode`、`businessKey` 为空串，`status` 为 `test`，`data` 为 `{}`，测试事件专有 `clientAppCode` 为目标应用编码；`occurredAt` 为排队时间。业务系统只验签确认，不按业务单号更新单据。发送复用 `X-Approval-Signature` 原始正文 HMAC、`X-Request-Id=eventId`、五秒超时、持久重试与发送日志；管理队列摘要可按应用查看该项。旧审批回调不带 `clientAppCode`。
 
-流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,success?,actionResult?}`，人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
+流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,opinion?,fieldValues?,success?,actionResult?}`。`opinion` 是可选的假人工意见；配置了必填意见的节点仍由统一引擎校验，旧请求省略时保持原行为。`fieldValues` 只供假人工任务填写当前节点可编辑的审批人字段，成功推进后成为该模拟会话的当前值。人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
+
+条件网关按到达时可用的业务数据和已成功提交的审批人字段求值；成功任务本次填写值参与随后网关，拒绝或失败的命令不改变当前值。尚未填写的审批人字段在发起时不预先选择路径，到达网关仍缺值则返回可纠正的条件错误。退回后重提按既定清空语义不沿用旧审批人字段，补充恢复则保留。
 
 `POST /admin/apps` 接受 `{code, name, allowedFlowCodes, canViewAllTasks, callbackUrl?, dataUrl?, validationUrl?, assigneeUrl?, actionUrl?, reason}`。应用编码只含 ASCII 字母、数字、`-`、`_`，最长 128 字符；名称最长 256 字符，出站地址必须满足部署的 HTTPS/显式内网 HTTP 策略。`PUT /admin/apps/{code}/enabled` 接受 `{enabled, reason}` 并返回 204；`POST /admin/apps/{code}/rotate-secrets` 接受 `{reason}`。三种管理操作的原因均须为 2 至 200 字符，实际变更与不含凭据的管理员审计在同一事务提交。创建和轮换只在本次响应返回 `{code, apiKey, signingSecret}`；后续列表和日志均不能再次读取明文。轮换或实际启停使旧嵌入会话永久失效，停用时旧 API Key 不可调用；重新启用不会恢复旧嵌入会话。
 
 `GET /admin/bindings` 返回绑定数组，每项只含 `clientAppCode, kind, externalId, internalId, targetName, method`；目标名称来自当前可信组织主数据，不含电话、邮箱。管理员写入继续使用 `POST /admin/org/bindings`：传 `kind, externalId, internalId, clientAppCode`，人员绑定可由管理员指定内部人员，服务端记录操作者并在换绑时作废旧身份令牌。`GET /admin/audit` 返回最近 200 条组织、接入应用及回调重发变更摘要，字段为 `occurredAt, actorId, action, target, reason`；不返回完整前后快照、联系方式或密钥。其他管理日志待相应写入功能接线。
+
+打印页眉品牌信息的 `GET /admin/system-info` 返回 `{companyName, logoSha256, revision}`，空库为名称空串、摘要空值和修订 0。`PUT` 请求 `{companyName, expectedRevision, reason}`，名称去首尾空白后须为 1–60 字且不能含控制字符。`POST /admin/system-info/logo` 请求 `{contentBase64, expectedRevision, reason}`，只接受完整的 8 位 RGB/RGBA 非隔行 PNG，最多 1 MiB，图片最长边不超过 4096 像素；`DELETE` 请求 `{expectedRevision, reason}`。原因均须为 2–200 字且不能含控制字符。全部写请求在同一事务推进修订并记录操作者、原因、名称和 Logo SHA-256，审计不包含图片正文；过期修订返回 `CONFLICT`。`GET /admin/system-info/logo` 返回带 `nosniff`、`no-store` 和限制性内容安全策略的 PNG，未上传为 404。所有接口仅接受本地组织管理员 JWT；打印功能以后从同一持久设置读取，不使用前端静态图片。
 
 `GET /admin/outbox` 返回最近 200 条待发项摘要，每项为 `eventId, clientAppCode, kind, status, attempts, availableAt, errorCode`，不返回业务正文、回调地址或密钥。`POST /admin/callbacks/{eventId}/retry` 接受 `{reason}`，原因须为 2 至 200 字符；只有回调事件可重排。它保留原事件 ID 和正文、重置待发时间及错误摘要，并在同一事务记录本地管理员和原因。正在有效租约中发送的回调返回冲突。重发记录也进入 `/admin/audit`。
 

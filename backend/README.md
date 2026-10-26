@@ -109,6 +109,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 发布前测试模式由本地组织管理员或该流程管理员通过 `POST /api/v1/admin/flows/simulations` 提交完整草稿、假数据、假发起人及各人工节点假处理人。创建人用 `GET/DELETE /api/v1/admin/flows/simulations/{id}` 读取或删除，并以 `POST /api/v1/admin/flows/simulations/{id}/steps` 逐项模拟人工处理及显式自动动作、子流程假结果。会话在内存中闲置 30 分钟过期，进程重启即丢失；不写审批单、不发真实通知、钩子或回调。
 
+后续网关在每条可能推进流程的命令上按当前业务数据与成功提交的审批人字段重新求值；测试模式同样允许人工步骤传可选 `fieldValues`。发起时尚未填写的审批人字段不提前决定路径；实际到达网关仍缺值会拒绝推进，退回重提时不沿用被清空的旧值。
+
 ## 配置
 
 `appsettings.json` 的 `ApprovalService` 节：
@@ -138,6 +140,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 接入应用管理员名单由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/administrators` 维护。存量应用默认空名单；PUT 提交读取时的旧人员 ID、新人员 ID 与原因，服务端检查当前在职人员、并发旧值，并与不含密钥的审计同事务保存。`POST /api/v1/admin/apps/{code}/test-callback` 要求本地组织管理员或该应用管理员提交原因，重新核对应用、人员和回调地址后只排入 `integration.test` 合成事件；响应返回事件 ID，业务系统只需验签确认。事件不关联审批单，发送复用原有签名、重试及日志。
 
 `GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织、接入应用及回调重发变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
+
+系统信息管理通过 `GET/PUT /api/v1/admin/system-info` 设置打印页眉的单位名称，通过 `GET/POST/DELETE /api/v1/admin/system-info/logo` 管理 PNG Logo。所有路由只接受本地组织管理员 JWT；修改带 2–200 字原因和预期修订，过期修订返回 409。Logo 限 1 MiB，并验证完整 PNG；设置与不含图片字节的审计写在同一数据库事务，三种数据库均有迁移。授权中文打印字体上传仍需单独完成。
 
 `GET /api/v1/admin/outbox` 只投影最近 200 条待发项元数据，不加载发送正文。`POST /api/v1/admin/callbacks/{eventId}/retry` 要求本地组织管理员填写原因，原地重排回调并在同一事务留审计；有效租约中的发送不可重排。已完成的回调也可按原事件 ID 再次投递，接入应用负责去重。
 

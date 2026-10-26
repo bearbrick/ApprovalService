@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ApprovalService.Application.Organization;
+using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
@@ -9,7 +10,6 @@ using ApprovalService.Domain.Shared;
 using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
-using ApprovalService.Engine.Expressions;
 
 namespace ApprovalService.Application.Integration;
 
@@ -221,22 +221,8 @@ public sealed class OpenStartContextBuilder(IOrganizationLookupAppService organi
             ["initiator.department"] = snapshot.InitiatingDepartmentId,
             ["initiator.level"] = initiator.GradeRank,
         };
-        var conditions = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var edge in graph.Edges.Where(item => !item.IsDefault && !string.IsNullOrWhiteSpace(item.Condition)))
-        {
-            try
-            {
-                var evaluated = ApprovalExpression.Evaluate(edge.Condition!, data, expressionContext);
-                conditions[edge.Id] = evaluated is bool selected ? selected :
-                    throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                        $"流程条件 {edge.Id} 的结果必须为真假值。");
-            }
-            catch (ApprovalExpressionException error)
-            {
-                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
-                    $"流程条件 {edge.Id} 计算失败：{error.Message}");
-            }
-        }
+        var conditions = FlowConditionEvaluator.Evaluate(definition.Data, graph, data,
+            context: expressionContext);
 
         return new EngineContext
         {

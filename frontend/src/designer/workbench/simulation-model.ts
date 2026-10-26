@@ -1,4 +1,4 @@
-import type { FlowDefinition, FlowNode } from '../../model/flow.ts'
+import type { FlowDefinition, FlowFieldDefinition, FlowNode } from '../../model/flow.ts'
 import { sampleSubmission } from '../data/data-model.ts'
 
 /**
@@ -30,6 +30,38 @@ export interface SimulationInput {
  */
 export function simulationManualNodes(definition: FlowDefinition): FlowNode[] {
   return definition.canvas.nodes.filter(node => ['approval', 'handling', 'cc'].includes(node.type))
+}
+
+/**
+ * 只列出当前节点显式可编辑的顶层审批人字段。
+ * @param definition 创建内存会话的草稿。
+ * @param nodeId 当前人工节点 ID。
+ * @returns 按审批数据定义排序的可填写字段。
+ */
+export function simulationEditableFields(definition: FlowDefinition, nodeId: string): FlowFieldDefinition[] {
+  const node = definition.canvas.nodes.find(item => item.id === nodeId)
+  const allowed = new Set(node?.fieldPermissions.filter(item => item.access === 'editable').map(item => item.fieldKey) ?? [])
+  return definition.data.fields.filter(field => field.approverInput && allowed.has(field.key))
+}
+
+/**
+ * 在发送模拟命令前校验假填写 JSON，避免误把业务字段送入审批人输入。
+ * @param text 当前任务的假填写文本。
+ * @param fields 当前节点显式可填写的字段。
+ * @returns 空输入不提交字段，否则返回受限字段对象。
+ */
+export function parseSimulationFieldValues(text: string, fields: FlowFieldDefinition[]): Record<string, unknown> | undefined {
+  if (!text.trim()) return undefined
+  let parsed: unknown
+  try { parsed = JSON.parse(text) } catch { throw new Error('假审批字段必须是有效的 JSON 对象。') }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('假审批字段必须是 JSON 对象。')
+  }
+  const allowed = new Set(fields.map(field => field.key))
+  if (Object.keys(parsed).some(key => !allowed.has(key))) {
+    throw new Error('假审批字段包含当前节点不可填写的字段。')
+  }
+  return Object.keys(parsed).length ? parsed as Record<string, unknown> : undefined
 }
 
 /**

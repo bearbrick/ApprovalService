@@ -187,6 +187,77 @@ export interface AdminOutbox {
 }
 
 /**
+ * 管理工作台只读取报表概览已有的安全聚合字段。
+ */
+export interface AdminOverviewCounts {
+  /**
+   * 公开流程今日发起量。
+   */
+  visibleStartedCount: number
+  /**
+   * 公开流程今日完成量。
+   */
+  visibleCompletedCount: number
+  /**
+   * 公开流程当前人工待办量。
+   */
+  visiblePendingCount: number
+  /**
+   * 公开流程今日到期任务中的逾期量。
+   */
+  visibleOverdueCount: number
+  /**
+   * 保密流程今日匿名发起量。
+   */
+  confidentialStartedCount: number
+  /**
+   * 保密流程今日匿名完成量。
+   */
+  confidentialCompletedCount: number
+}
+
+/**
+ * 将浏览器本地今日换算为服务端要求的 UTC 左闭右开区间。
+ * @param now 当前时间，由调用方传入以便检查跨日边界。
+ * @returns 今日的报表查询参数。
+ */
+export function adminTodayQuery(now: Date): string {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const until = new Date(start)
+  until.setDate(until.getDate() + 1)
+  return `?${new URLSearchParams({ fromUtc: start.toISOString(), untilUtc: until.toISOString() })}`
+}
+
+/**
+ * 用已有报表与队列安全摘要生成真实工作台，不把保密人员或事件正文带入页面。
+ * @param report 已授权的今日报表概览。
+ * @param outbox 已授权的最近待发项，后端至多返回二百条。
+ * @returns 今日指标和最近需关注的安全行。
+ */
+export function overviewViewData(report: AdminOverviewCounts, outbox: readonly AdminOutbox[]): AdminViewData {
+  const attention = outbox.filter(item => item.status === 'needsAttention'
+    || item.status === 'pending' && !!item.errorCode).slice(0, 8)
+  return {
+    metrics: [
+      { key: 'startedToday', label: '今日发起', value: String(report.visibleStartedCount + report.confidentialStartedCount) },
+      { key: 'completedToday', label: '今日完成', value: String(report.visibleCompletedCount + report.confidentialCompletedCount) },
+      { key: 'pendingVisible', label: '当前公开待办', value: String(report.visiblePendingCount) },
+      { key: 'overdueVisibleToday', label: '今日公开逾期', value: String(report.visibleOverdueCount) },
+    ],
+    rows: attention.map(item => ({
+      id: item.eventId,
+      cells: {
+        subject: item.status === 'needsAttention' ? '自动动作待流程管理员处理'
+          : item.kind === 'callback' ? '回调投递重试中' : '待发项重试中',
+        source: item.clientAppCode || '—',
+        availableAt: Number.isFinite(Date.parse(item.availableAt))
+          ? new Date(item.availableAt).toLocaleString('zh-CN') : '—',
+      },
+    })),
+  }
+}
+
+/**
  * 把受保护目录响应映射到部门、人员列表已有的安全列。
  * @param viewKey 当前管理页面编码。
  * @param directory 服务端目录。
@@ -285,7 +356,8 @@ export function auditViewData(audit: readonly AdminAudit[]): AdminViewData {
 function auditActionLabel(action: string): string {
   return ({ created: '新增', create: '新增', updated: '修改', update: '修改',
     embedOriginsUpdated: '修改允许嵌入来源', secretsRotated: '轮换密钥',
-    enabledChanged: '启停应用', retried: '手动重发' } as Record<string, string>)[action] ?? action
+    enabledChanged: '启停应用', retried: '手动重发', companyName: '修改单位名称',
+    logoUpload: '上传单位 Logo', logoDelete: '移除单位 Logo' } as Record<string, string>)[action] ?? action
 }
 
 /**
@@ -299,6 +371,7 @@ function auditTargetLabel(target: string): string {
   const kind = target.slice(0, separator)
   const label = ({ person: '人员', department: '部门', membership: '部门归属',
     personBinding: '人员绑定', departmentBinding: '部门绑定', clientApp: '接入应用', callback: '回调',
+    systemBranding: '打印页眉品牌',
     'person-role': '人员角色' } as Record<string, string>)[kind] ?? kind
   return `${label}：${target.slice(separator + 1)}`
 }

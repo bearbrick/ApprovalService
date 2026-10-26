@@ -77,6 +77,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-060](T-060-reporting-projection.md) | 报表小时桶与增量水位规划 | 后端 | M5 | T-058、T-059 已验证稳定快照 | Domain/Reporting、backend/tests |
 | [T-061](T-061-reporting-export.md) | 报表汇总 Excel 导出 | 后端 | M5 | T-058、T-059 已验证稳定快照 | Application/Reporting、Infrastructure/Reporting、Api/Endpoints |
 | [T-062](T-062-reporting-download.md) | 报表页 Excel 下载入口 | 前端 | M5 | T-061 已验证稳定快照 | frontend/src/api、frontend/src/pages/admin |
+| [T-063](T-063-handling-action-alias.md) | 办理节点 submit 与 handle 兼容 | 后端 | M1 | T-002、T-004、T-022 已验证基线 | Engine/Commands、backend/tests |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

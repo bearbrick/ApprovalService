@@ -58,3 +58,4 @@
 | [0019](0019-reporting-query-access.md) | 报表查询范围与保密统计 | 已采纳 |
 | [0020](0020-deployment-and-backup.md) | 单实例部署、受限指标与 SQLite 在线备份 | 已采纳 |
 | [0021](0021-simulation-and-integration-test.md) | 流程模拟与接入测试使用互相隔离的协议 | 已采纳 |
+| [0022](0022-original-business-document-embed.md) | 通过专用签名钩子按查看人获取业务原单临时地址 | 提议 |

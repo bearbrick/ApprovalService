@@ -17,6 +17,7 @@ import { runFlowManagementChecks } from './flow-management-checks.ts'
 import { runReportChecks } from './report-checks.ts'
 import { runMobileChecks } from './mobile-checks.ts'
 import { runWorkbenchChecks } from './workbench-checks.ts'
+import { runSimulationChecks } from './simulation-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
 import { runCanvasChecks } from './canvas-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
@@ -106,6 +107,7 @@ await runFlowManagementChecks(check)
 await runReportChecks(check)
 runMobileChecks(check)
 runWorkbenchChecks(check)
+await runSimulationChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
 await runCanvasChecks(check)

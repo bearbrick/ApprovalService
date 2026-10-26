@@ -95,3 +95,4 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-074](T-074-compact-fields.md) | 紧凑审批字段编辑器 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
 | [T-075](T-075-designer-full-width.md) | 设计器后续页签铺满内容宽度 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
 | [T-076](T-076-designer-icons.md) | 设计器导航与展开图标 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |
+| [T-077](T-077-unified-login.md) | 普通登录会话统一 | 待验收 | Codex 2026-10-26 | T-072、T-050 稳定集成 |

@@ -72,7 +72,7 @@
 
 手写签名使用独立的不可变 `SignatureAssets`：应用层先限制原始 PNG 为 2 MiB，验证分块、CRC 与有界像素流，再按当前 JWT 人员保存原始内容和 SHA-256。个人签名只是可重复明确选择的资产，嵌入会话只能创建单次资产；审批操作先按本人核对资产归属，运行时将选用的资产 ID 冻结在审计事件与任务投影。引擎仅检查发布节点 `signatureRequired` 对成功推进命令的必签规则，不接触图片或数据库；必签任务不提供批量同意。已授权参与者读取历史签名时，应用层先复用审批单人员及嵌入应用授权，再核对事件或任务确实引用该资产，避免通过猜测 ID 访问其他人的个人图片。
 
-`Administration/AdminConsoleAppService` 复用组织和接入应用仓储读取管理列表，API 对每个管理 GET 端点单独应用本地组织管理员策略。目录只映射部门、人员的展示字段，不提供联系方式；接入应用仓储查询只投影编码、名称、授权流程及启停状态，不装载密钥列。管理前端的普通本地令牌在当前标签页 sessionStorage 保存，刷新恢复时校验结构、范围与有效期，退出清除缓存，首次登录改密前不读取管理数据；组织导入仍走现有预检和事务化审计写入。
+`Administration/AdminConsoleAppService` 复用组织和接入应用仓储读取管理列表，API 对每个管理 GET 端点单独应用本地组织管理员策略。目录只映射部门、人员的展示字段，不提供联系方式；接入应用仓储查询只投影编码、名称、授权流程及启停状态，不装载密钥列。管理前端与审批中心、设计器通过 local-session.ts 共享普通身份和单次续期，在当前标签页 sessionStorage 保存；刷新恢复时校验结构、身份类型与有效期，退出同步清除普通身份。前端不按登录入口固定权限范围，各接口继续核对角色和资源授权；403 不注销，首次登录改密前不读取管理数据；组织导入仍走现有预检和事务化审计写入。
 
 流程管理身份基础由 `Domain/Runtime/FlowManagementAccessRules` 统一判断：在职本地组织管理员可管理全部流程；`flow-admin` 角色只覆盖人员直接加入的流程所属部门，无归属流程只由组织管理员管理。`Flow.AdministratorId` 继续作为运行期指定管理员的内部人员 ID，不单独授予编辑权限。`Infrastructure/Administration/FlowAdministratorIdentityReconciler` 由服务器本机一次性命令调用，先预览再按指纹提交；唯一匹配才改写，零匹配和多匹配存入待人工处理表，服务启动时不自动执行。`Administration/FlowManagementAppService` 负责草稿基础校验、发布编译和当前范围筛选，`Persistence/FlowManagementRepository` 在同一事务内复核角色/直属部门与草稿修订、追加不可变版本和安全审计。`Administration/FlowTransferAppService` 通过引擎的 BPMN 编解码器检查本服务兼容文件，预检只读、导入只写草稿；`Persistence/FlowTransferRepository` 在同一事务内复核管理范围后读取草稿或不可变发布版供导出。`Administration/FlowVersionAppService` 展示版本摘要并协调旧版恢复；`Persistence/FlowVersionRepository` 在同一事务里核对权限、草稿与发布指针后只复制旧定义为新草稿修订。
 

@@ -1133,6 +1133,7 @@ await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
 
       <!-- 13 -->
       <section id="api">
+        <p>工作日历管理：本地组织管理员通过 GET/PUT /api/v1/admin/work-calendar 读取或按 expectedRevision 保存工作时段、逐日覆盖和修改原因；返回 revision、只读 timeZoneId、workingStart、workingEnd、overrides。旧修订返回 409，既有任务期限和提醒不重算。</p>
         <h2><span class="n">13</span>接口清单</h2>
         <p>组织角色管理使用 <code>GET/POST /api/v1/admin/roles</code>、<code>GET/PUT /api/v1/admin/roles/{code}</code> 和 <code>GET/PUT /api/v1/admin/roles/{code}/members</code>；仅本地组织管理员可用，修改带预期修订及原因，编码不可改且无删除入口。</p>
         <p>审批中心个人常用意见使用 <code>GET/POST /api/v1/center/opinions</code> 及 <code>PUT/DELETE /api/v1/center/opinions/{id}</code>；只按登录 JWT 人员隔离，本地会话可管理，嵌入会话只读。</p>

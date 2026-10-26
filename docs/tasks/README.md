@@ -85,5 +85,5 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 
 
 新增任务：复制 [_template.md](_template.md)，编号取当前最大值加 1，并在上表追加一行（只追加，不改别的行）。
-| [T-067](T-067-work-calendar-admin.md) | 在线工作日历管理 | 进行中 | Codex 2026-10-26 | T-029 |
+| [T-067](T-067-work-calendar-admin.md) | 在线工作日历管理 | 待验收 | Codex 2026-10-26 | T-029 |
 | [T-066](T-066-role-management.md) | 组织角色管理 | 待验收 | Codex 2026-10-26 | T-007、T-020 管理基础 |

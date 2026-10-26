@@ -34,6 +34,11 @@ internal static class Program
 
         var backendRoot = Fixtures.BackendRoot();
         var repositoryRoot = Directory.GetParent(backendRoot)!.FullName;
+        if (args.FirstOrDefault() == "printing")
+        {
+            await PrintingChecks.RunAsync(backendRoot, Check);
+            return 0;
+        }
         if (args.FirstOrDefault() == "dynamic-conditions")
         {
             await FlowSimulationChecks.RunAsync(Check);
@@ -142,6 +147,7 @@ internal static class Program
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await SystemBrandingChecks.RunAsync(backendRoot, Check);
+        await PrintingChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
         await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);

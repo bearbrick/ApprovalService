@@ -170,3 +170,5 @@
 
 
 角色管理由 `RoleManagementAppService` 使用 Domain 输入规则并委托 `RoleManagementRepository`。仓储在串行化事务中重新核对在职人员、本地账号及持久组织管理员角色，名称和成员共用 `OrganizationRole.Revision` 并发令牌，写入与原因审计原子提交；新增成员仅限在职人员，组织管理员须保留至少一位已开通账号且在职的成员。旧库未建立的内置角色按修订零读取并在首次修改落库。三种提供程序均由官方 EF 工具生成修订字段迁移。
+
+- **管理员运行干预**：AdminInterventionAppService 只接受本地人员 JWT，通过 AdminInterventionRepository 的当前管理范围和保密参与关系读取安全运行元数据。改派、人工节点跳转、终止走统一运行入口；ExpectedInstanceVersion 拒绝旧页面，最终提交事务由 AdminInterventionAccess 复核当前权限和目标在职状态，所有事件及待发项原子保存。固定人员改动只经草稿与新发布版，不改变历史版本（ADR 0024）。

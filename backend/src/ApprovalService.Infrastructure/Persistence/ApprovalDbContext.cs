@@ -90,6 +90,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<CenterReadCursorEntity> CenterReadCursors => Set<CenterReadCursorEntity>();
 
     /// <summary>
+    /// 本人上传的不可变 PNG 签名资产。
+    /// </summary>
+    public DbSet<SignatureAssetEntity> SignatureAssets => Set<SignatureAssetEntity>();
+
+    /// <summary>
     /// 审批人个人保存的常用意见。
     /// </summary>
     public DbSet<CenterOpinionEntity> CenterOpinions => Set<CenterOpinionEntity>();
@@ -221,6 +226,7 @@ public class ApprovalDbContext : DbContext
         if (ChangeTracker.Entries<FlowVersionEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<FlowManagementAuditEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<OperationEventEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
+            ChangeTracker.Entries<SignatureAssetEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted) ||
             ChangeTracker.Entries<InstanceParticipantEntity>().Any(entry => entry.State is EntityState.Modified or EntityState.Deleted))
         {
             throw new InvalidOperationException("已发布版本、管理审计、操作记录和历史参与人只能追加，不能修改或删除。");
@@ -430,6 +436,7 @@ public class ApprovalDbContext : DbContext
             entity.HasIndex(item => item.PersonId);
         });
 
+        SignatureAssetModelConfiguration.Configure(modelBuilder);
         CenterOpinionModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>

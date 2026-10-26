@@ -275,6 +275,10 @@ export interface CenterTimelineEntry {
    */
   opinion: string
   /**
+   * 本次审计冻结的手写签名资产 ID。
+   */
+  signatureFileId?: string | null
+  /**
    * 是否为当前节点。
    */
   current: boolean
@@ -296,6 +300,10 @@ export interface CenterActionTask {
    * 服务端当前许可的操作。
    */
   actions: readonly CenterAction[]
+  /**
+   * 成功办理时服务端发布规则是否要求本次手写签名。
+   */
+  signatureRequired?: boolean
 }
 
 /**

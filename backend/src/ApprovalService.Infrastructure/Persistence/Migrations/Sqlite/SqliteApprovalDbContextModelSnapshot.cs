@@ -63,6 +63,39 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("CenterReadCursors", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.SignatureAssetEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsPersonal")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PersonId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("PngBytes")
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "IsPersonal", "UploadedAt");
+
+                    b.ToTable("SignatureAssets", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.Property<string>("Id")

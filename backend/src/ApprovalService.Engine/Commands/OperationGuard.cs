@@ -77,10 +77,22 @@ internal static class OperationGuard
                 throw new EngineException(ErrorCodes.Conflict, "当前节点不允许批量同意。");
             }
 
+            if (input.IsBulkApproval && node.Approval?.SignatureRequired == true)
+            {
+                throw new EngineException(ErrorCodes.Conflict, "此节点需逐项明确选择手写签名，不能批量同意。");
+            }
+
             if (node.Approval?.CommentRequired == true && IsDecision(command.Kind) &&
                 string.IsNullOrWhiteSpace(input.Opinion))
             {
                 throw new EngineException(ErrorCodes.ValidationFailed, "当前节点必须填写审批意见。");
+            }
+
+            if (node.Approval?.SignatureRequired == true &&
+                command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or EngineCommandKinds.Acknowledge &&
+                string.IsNullOrWhiteSpace(input.SignatureFileId))
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "当前节点成功办理时必须明确选择手写签名。");
             }
 
             return new EngineTask { Id = task.Id, AssigneeId = task.AssigneeId, DelegatorId = task.DelegatorId };
@@ -188,6 +200,7 @@ internal static class OperationGuard
                 ActorId = input.ActorId,
                 OnBehalfOfId = input.ActorId == task?.AssigneeId ? task.DelegatorId : null,
                 Opinion = input.Opinion,
+                SignatureFileId = input.SignatureFileId,
                 Reason = input.Reason,
                 TargetUserId = input.TargetUserId ??
                     (command.Kind == OperationKinds.ReassignInactive ? item.TargetCode : null),

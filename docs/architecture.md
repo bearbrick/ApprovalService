@@ -168,3 +168,5 @@
 - `samples/ApprovalService.Demo.Integration`：示例业务系统的对接类库（net48、net10.0），不依赖界面框架，业务系统照抄它。
 - `samples/ApprovalService.Demo.WinUI`（待建）：示例业务系统的 WinUI 3 界面，只引用对接类库。
 
+
+角色管理由 `RoleManagementAppService` 使用 Domain 输入规则并委托 `RoleManagementRepository`。仓储在串行化事务中重新核对在职人员、本地账号及持久组织管理员角色，名称和成员共用 `OrganizationRole.Revision` 并发令牌，写入与原因审计原子提交；新增成员仅限在职人员，组织管理员须保留至少一位已开通账号且在职的成员。旧库未建立的内置角色按修订零读取并在首次修改落库。三种提供程序均由官方 EF 工具生成修订字段迁移。

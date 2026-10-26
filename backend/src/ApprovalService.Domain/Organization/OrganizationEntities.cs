@@ -152,6 +152,13 @@ public sealed class PersonDepartmentEntity
 public sealed class OrganizationRoleEntity
 {
     /// <summary>
+    /// 名称和成员共同使用的乐观并发修订。
+    /// </summary>
+    public long Revision
+    {
+        get; set;
+    }
+    /// <summary>
     /// 角色编码。
     /// </summary>
     public string Code { get; set; } = string.Empty;

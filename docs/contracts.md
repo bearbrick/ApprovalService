@@ -357,3 +357,15 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - 方法不对（405）时错误码用 `NOT_FOUND`，不另设错误码。
 - 健康检查返回纯文本（`live`、`ready`），不是 JSON。
 - 调用方传的 `X-Request-Id` 最长 64 个字符，只允许字母数字和 `- _ . :`。
+
+## 组织角色管理
+
+仅当前在职、已开通账号的组织管理员本地 JWT 可用，API Key 与嵌入会话不授予权限。每次请求及保存事务重新读取持久角色。
+
+- `GET /api/v1/admin/roles` 返回角色数组；`POST` 接受 `{code,name,reason}`，创建无成员自定义角色，修订为 1。
+- `GET /api/v1/admin/roles/{code}` 与 `GET /api/v1/admin/roles/{code}/members` 返回 `{code,name,revision,isBuiltIn,personIds}`，人员为内部 ID。
+- `PUT /api/v1/admin/roles/{code}` 接受 `{name,expectedRevision,reason}`；`PUT /api/v1/admin/roles/{code}/members` 接受 `{personIds,expectedRevision,reason}` 完整替换成员。两者共用递增修订，不可用旧名称页面覆盖新成员修订。
+
+编码为 1–128 位 ASCII 字母、数字、连字符、下划线或点；创建后固定。名称为 1–256 字，原因 2–200 字，去除首尾空白且拒绝控制字符。成员最多 10000 个不重复有效内部 ID；新增成员必须存在且在职，原有离职成员可保留或显式移除。`organization-admin`、`flow-admin` 为内置角色，老库尚无角色行时返回修订零，第一次修改时落库；所有角色均无删除和改编码接口。成员替换不得使组织管理员中没有已开通本地账号且在职的人员。
+
+成功返回最新完整角色；修订过期、编码重复、最后管理员保护返回 `CONFLICT`（409），未知角色返回 404，无效输入返回 400。修改与操作者、原因、前后角色/成员摘要审计在同一串行化数据库事务提交；失败不留部分成员或审计。权限立即从当前角色读取，旧 JWT 不保留已撤销资格。此为管理接口，不增加业务 SDK 操作。

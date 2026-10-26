@@ -280,6 +280,18 @@ public static class ApiRoutes
     public const string AdminDailyDigest = OpenApiPrefix + "/admin/notifications/daily-digest";
 
     /// <summary>
+    /// 组织角色目录。
+    /// </summary>
+    public const string AdminRoles = OpenApiPrefix + "/admin/roles";
+    /// <summary>
+    /// 单个角色的名称和修订。
+    /// </summary>
+    public const string AdminRoleByCode = AdminRoles + "/{code}";
+    /// <summary>
+    /// 单个角色的成员。
+    /// </summary>
+    public const string AdminRoleMembers = AdminRoleByCode + "/members";
+    /// <summary>
     /// 接入应用签发一次性嵌入令牌。
     /// </summary>
     public const string EmbedTokens = OpenApiPrefix + "/embed-tokens";

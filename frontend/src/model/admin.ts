@@ -105,7 +105,7 @@ export interface AdminViewData {
  * 已评审的管理入口：列仅用于安全的只读展示，所有写入操作先禁用。
  */
 export const ADMIN_VIEWS: readonly AdminView[] = [
-  { key: 'overview', section: 'overview', tab: '', title: '管理工作台', description: '查看运行关注项与管理入口。', kind: 'overview', columns: [{ key: 'subject', title: '需要关注' }, { key: 'source', title: '来源' }, { key: 'updatedAt', title: '更新时间' }], actions: [] },
+  { key: 'overview', section: 'overview', tab: '', title: '管理工作台', description: '查看今日审批指标与最近的出站关注项。', kind: 'overview', columns: [{ key: 'subject', title: '需要关注' }, { key: 'source', title: '来源' }, { key: 'availableAt', title: '可发送时间' }], actions: [] },
   { key: 'flows', section: 'flows', tab: '', title: '流程与模板', description: '查看流程、版本和发布状态。流程编辑请进入流程设计工作区。', kind: 'table', columns: [{ key: 'name', title: '流程名称' }, { key: 'code', title: '流程编码' }, { key: 'group', title: '分组' }, { key: 'version', title: '当前版本' }, { key: 'status', title: '状态' }], actions: ['新建流程', '导入流程', '停启用'] },
   { key: 'org/departments', section: 'org', tab: 'departments', title: '部门', description: '维护部门层级、负责人和分管关系。', kind: 'table', columns: [{ key: 'name', title: '部门名称' }, { key: 'code', title: '部门编码' }, { key: 'parent', title: '上级部门' }, { key: 'manager', title: '负责人' }, { key: 'source', title: '可信来源' }], actions: ['新增部门', '导入组织'] },
   { key: 'org/people', section: 'org', tab: 'people', title: '人员', description: '查看工号、归属部门、岗位和在职状态；账号操作以服务端实时校验为准。', kind: 'table', columns: [{ key: 'name', title: '姓名' }, { key: 'employeeNo', title: '工号' }, { key: 'departments', title: '所属部门' }, { key: 'position', title: '岗位' }, { key: 'status', title: '状态' }], actions: ['新增人员', '导入人员', '账号管理'] },

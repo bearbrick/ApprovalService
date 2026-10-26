@@ -273,7 +273,7 @@ async function close(): Promise<void> {
 </template>
 
 <style scoped>
-.simulation-panel { max-width: 960px; margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.simulation-panel { width: 100%; min-width: 0; margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .simulation-heading, .session-toolbar { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
 .simulation-heading h2 { margin: 4px 0 8px; font-size: 17px; }
 .simulation-heading p, .empty-hint { color: var(--muted); font-size: 13px; }
@@ -282,7 +282,7 @@ async function close(): Promise<void> {
 .simulation-inputs label, .simulation-running label { display: grid; gap: 6px; color: var(--ink); font-size: 13px; font-weight: 600; }
 .simulation-inputs input, .simulation-inputs textarea, .simulation-running textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); font: inherit; }
 .simulation-inputs textarea, .simulation-running textarea { font: 12px/1.5 Consolas, monospace; resize: vertical; }
-.data-field { max-width: 700px; }
+.data-field { min-width: 0; }
 .people-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .people-grid small, .session-toolbar small, .simulation-card small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
 .simulation-actions { display: flex; justify-content: flex-end; }

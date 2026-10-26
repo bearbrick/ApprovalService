@@ -17,7 +17,7 @@
 .designer-tabs { display: flex; flex: none; gap: 24px; padding: 0 20px; min-height: 38px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #fff; font-size: 12px; }
 .designer-tabs a { display: inline-flex; align-items: center; white-space: nowrap; border-bottom: 3px solid transparent; color: var(--muted); }
 .designer-tabs a[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 700; }
-.designer-content { padding: 14px 20px; }
+.designer-content { width: 100%; min-width: 0; padding: 14px 20px; }
 .design-workspace { flex: 1; min-width: 0; min-height: 420px; padding: 10px; }
 .design-workspace :deep(.flow-canvas-editor) { height: 100%; min-height: 0; }
 .design-workspace :deep(.flow-canvas-layout) { grid-template-columns: 158px minmax(0, 1fr) 340px; }
@@ -41,7 +41,7 @@
 .template-card p { color: var(--muted); }
 .template-card small { color: var(--blue); }
 .template-card.blank { border-style: dashed; }
-.template-switch, .version-panel { max-width: 960px; margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.template-switch, .version-panel { width: 100%; min-width: 0; margin-top: 18px; padding: 22px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 .template-switch h2, .version-panel h2 { font-size: 16px; }
 .template-switch p, .version-panel p { margin: 9px 0 15px; color: var(--muted); }
 .template-switch .btn { margin: 0 8px 8px 0; }

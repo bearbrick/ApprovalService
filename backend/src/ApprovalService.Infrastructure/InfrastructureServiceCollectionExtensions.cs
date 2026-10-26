@@ -111,6 +111,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<FirstAdminBootstrapper>();
         services.AddScoped<IIdentityRepository, IdentityRepository>();
         services.AddScoped<IOrganizationRepository, OrganizationRepository>();
+        services.AddScoped<IRoleManagementRepository, RoleManagementRepository>();
         services.AddOptions<FileStorageOptions>()
             .Bind(configuration.GetSection(FileStorageOptions.SectionName))
             .Validate(options => options.Provider is "Local" or "Minio", "附件存储提供者必须是 Local 或 Minio。")

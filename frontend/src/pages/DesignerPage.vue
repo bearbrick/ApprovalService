@@ -17,6 +17,7 @@ import FlowRulesPanel from '../designer/workbench/FlowRulesPanel.vue'
 import FlowSimulationPanel from '../designer/workbench/FlowSimulationPanel.vue'
 import FlowPrintPanel from '../designer/workbench/FlowPrintPanel.vue'
 import UiDialog from '../components/ui/UiDialog.vue'
+import UiIcon from '../components/ui/UiIcon.vue'
 import { checkPublication } from '../designer/workbench/publication-check.ts'
 import { commitDraft, createDraftHistory, editDraft, previewDraft, redoDraft, undoDraft } from '../designer/workbench/draft-history.ts'
 import { copyFlow, createEmptyFlow, findEdge, findNode, flowTemplates, normalizeSample, replaceEdge, replaceNode } from '../designer/workbench/workbench-model.ts'
@@ -424,7 +425,7 @@ async function copyIntegrationSnippet(): Promise<void> {
 <template>
   <div class="designer-page">
     <header class="designer-header">
-      <div class="designer-heading"><a class="designer-back" href="#/admin/flows" aria-label="返回流程管理" title="返回流程管理">←</a><div class="designer-identity"><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p role="status">{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div></div>
+      <div class="designer-heading"><a class="designer-back" href="#/admin/flows" aria-label="返回流程管理" title="返回流程管理"><UiIcon name="arrow" /></a><div class="designer-identity"><h1 id="page-title" tabindex="-1">{{ flowCode ? draft.name : '选择流程模板' }}</h1><p role="status">{{ flowCode ? `${draft.code} · ${status}` : '从常用流程出发，或创建空白自由画布。' }}</p></div></div>
       <div v-if="flowCode && authorized" class="designer-actions">
         <button type="button" class="btn" :disabled="!pastCount || busy" @click="undo">撤销</button><button type="button" class="btn" :disabled="!futureCount || busy" @click="redo">重做</button>
         <button type="button" class="btn" :disabled="busy" @click="metadataOpen = true">流程设置</button>

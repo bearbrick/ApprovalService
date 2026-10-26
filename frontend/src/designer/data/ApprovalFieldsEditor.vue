@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import UiIcon from '../../components/ui/UiIcon.vue'
 import type { FlowDataDefinition, FlowFieldDefinition, FlowFieldType } from '../../model/flow.ts'
 import { copyData, createField, sampleSubmission, validateDataDefinition } from './data-model.ts'
 
@@ -200,8 +201,8 @@ function removeChild(tableIndex: number, childIndex: number): void {
             <td class="field-check"><input type="checkbox" :aria-label="`必传 ${field.name}`" :checked="field.required" @change="updateField(index, 'required', ($event.target as HTMLInputElement).checked)" /></td>
             <td class="field-check"><input type="checkbox" :aria-label="`审批人填写 ${field.name}`" :checked="field.approverInput" :disabled="field.type === 'detailTable' || !!field.formula" @change="updateField(index, 'approverInput', ($event.target as HTMLInputElement).checked)" /></td>
             <td class="field-check"><input type="checkbox" :aria-label="`待办摘要 ${field.name}`" :checked="data.summaryFields.includes(field.key)" :disabled="field.type === 'detailTable'" @change="toggleSummary(field)" /></td>
-            <td><button type="button" class="field-config" :class="{ configured: field.type === 'detailTable' || !!field.formula }" :aria-label="`配置 ${field.name}`" :aria-expanded="expandedIndex === index" @click="expandedIndex = expandedIndex === index ? null : index">{{ field.type === 'detailTable' ? `明细 ${field.children.length} 列` : field.formula ? '已设公式' : '公式' }} <span aria-hidden="true">{{ expandedIndex === index ? '⌃' : '⌄' }}</span></button></td>
-            <td><div class="field-actions"><button class="btn" type="button" :disabled="index === 0" :aria-label="`上移 ${field.name}`" @click="moveField(index, -1)">↑</button><button class="btn" type="button" :disabled="index === data.fields.length - 1" :aria-label="`下移 ${field.name}`" @click="moveField(index, 1)">↓</button><button class="btn field-danger" type="button" :aria-label="`删除 ${field.name}`" @click="removeField(index)">删除</button></div></td>
+            <td><button type="button" class="field-config" :class="{ configured: field.type === 'detailTable' || !!field.formula }" :aria-label="`配置 ${field.name}`" :aria-expanded="expandedIndex === index" @click="expandedIndex = expandedIndex === index ? null : index">{{ field.type === 'detailTable' ? `明细 ${field.children.length} 列` : field.formula ? '已设公式' : '公式' }} <UiIcon name="chevron" class="config-chevron" :class="{ open: expandedIndex === index }" /></button></td>
+            <td><div class="field-actions"><button class="btn" type="button" :disabled="index === 0" :aria-label="`上移 ${field.name}`" @click="moveField(index, -1)"><UiIcon name="chevron" class="move-up" /></button><button class="btn" type="button" :disabled="index === data.fields.length - 1" :aria-label="`下移 ${field.name}`" @click="moveField(index, 1)"><UiIcon name="chevron" class="move-down" /></button><button class="btn field-danger" type="button" :aria-label="`删除 ${field.name}`" @click="removeField(index)">删除</button></div></td>
           </tr>
           <tr v-if="expandedIndex === index" class="field-expansion"><td colspan="9">
             <div v-if="field.type === 'detailTable'" class="children"><div class="children-head"><strong>{{ field.name || '明细表' }} · 明细列</strong><button class="btn" type="button" @click="addChild(index)">＋ 添加列</button></div><p v-if="!field.children.length" class="muted">尚无明细列，请添加。</p><div v-for="(child, childIndex) in field.children" :key="childIndex" class="child-row"><label>key<input :value="child.key" @input="updateChild(index, childIndex, 'key', ($event.target as HTMLInputElement).value)" /></label><label>名称<input :value="child.name" @input="updateChild(index, childIndex, 'name', ($event.target as HTMLInputElement).value)" /></label><label>类型<select :value="child.type" @change="updateChild(index, childIndex, 'type', ($event.target as HTMLSelectElement).value)"><option v-for="type in fieldTypes.filter(item => item.value !== 'detailTable')" :key="type.value" :value="type.value">{{ type.label }}</option></select></label><label class="child-required"><input type="checkbox" :checked="child.required" @change="updateChild(index, childIndex, 'required', ($event.target as HTMLInputElement).checked)" /> 必传</label><button class="btn field-danger" type="button" :aria-label="`删除 ${child.name}`" @click="removeChild(index, childIndex)">删除</button></div></div>
@@ -216,6 +217,7 @@ function removeChild(tableIndex: number, childIndex: number): void {
 </template>
 
 <style scoped>
+.config-chevron, .field-actions .ui-icon { width: 14px; height: 14px; }.config-chevron, .move-down { transform: rotate(90deg); }.config-chevron.open, .move-up { transform: rotate(-90deg); }
 .data-editor { display: grid; gap: 12px; padding: 0 0 16px; }
 .data-toolbar, .children-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .data-toolbar h2 { margin: 0; font-size: 15px; }

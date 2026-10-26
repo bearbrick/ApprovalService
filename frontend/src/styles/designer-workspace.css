@@ -3,6 +3,7 @@
 .designer-header { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; min-height: 66px; padding: 9px 20px; border-bottom: 1px solid var(--line); background: #fff; }
 .designer-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .designer-back { display: grid; flex: none; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); }
+.designer-back .ui-icon { width: 16px; height: 16px; }
 .designer-back:hover { color: var(--blue); background: var(--blue-soft); }
 .designer-identity { min-width: 0; }
 .designer-identity h1 { margin: 0; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }

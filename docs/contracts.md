@@ -357,3 +357,13 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - 方法不对（405）时错误码用 `NOT_FOUND`，不另设错误码。
 - 健康检查返回纯文本（`live`、`ready`），不是 JSON。
 - 调用方传的 `X-Request-Id` 最长 64 个字符，只允许字母数字和 `- _ . :`。
+
+## 审批单打印
+
+`GET /api/v1/instances/{id}/print` 返回 `application/pdf`，响应禁止缓存。人员 JWT 沿用审批中心的参与关系、保密、嵌入应用范围和字段隐藏规则。来源应用可使用 `X-Api-Key` 归档自己的审批单；跨应用与不可见单据统一返回 404。双凭据同时存在时按 API Key 处理，不合并权限；审计打印人记为 `clientApp:{code}`，页脚显示接入应用名称，不冒充人员。应用归档按本单发起人的字段视图生成，人员打印按当前人的视图生成。
+
+每次成功生成并提交审计算一次打印，预览或保存同一已下载文件不重复计数；客户端不得自动重试本接口。生成失败不增加次数；生成期间版本改变返回 `CONFLICT`，不交付过期 PDF。成功事件 `printed` 写入原审批单哈希链，包含实际人员或来源应用及次数。打印不改变审批数据、任务和引擎状态。
+
+本地组织管理员使用 `GET /api/v1/admin/printing/font` 查看 `{configured,fileName?,sha256?,uploadedAt?}`，使用 `POST /api/v1/admin/printing/font?fileName=字体.ttf&licenseConfirmed=true` 上传原始字节。只接受最大 20 MiB 的独立 TrueType 字体；校验表目录、内嵌权限和基本中文字形，不支持 TTC/CFF。字体不提供下载，不随产品分发。字体文件及上传人/时间原子存入部署数据目录的 `printing/font.json`，部署备份须包含该目录。
+
+二维码地址来自可信配置 `ApprovalService:Printing:PublicBaseUrl`，不使用请求 Host；需要二维码但未配置时返回 `CONFLICT`。扫码仍需登录和审批单权限。A4 方向、字段顺序、意见/签名、Logo/二维码/水印及票据页沿用本单锁定版本的 `printSettings`；票据页当前支持 PNG/JPEG，每页四图，其他附件保留清单。票据最多 100 张/80 MiB，文档最多 500 页；超过八列的明细拆成连续列组。

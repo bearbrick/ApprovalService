@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminPrintFont from './AdminPrintFont.vue'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { deleteSystemLogo, loadSystemBranding, loadSystemLogoUrl, saveCompanyName, uploadSystemLogo } from '../../api/system-branding.ts'
 import type { SystemBranding } from '../../api/system-branding.ts'
@@ -141,4 +142,5 @@ void refresh()
     </div>
     <p v-else role="status">{{ message || '正在读取系统信息…' }}</p>
   </section>
+  <AdminPrintFont />
 </template>

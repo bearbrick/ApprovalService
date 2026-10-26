@@ -168,3 +168,7 @@
 - `samples/ApprovalService.Demo.Integration`：示例业务系统的对接类库（net48、net10.0），不依赖界面框架，业务系统照抄它。
 - `samples/ApprovalService.Demo.WinUI`（待建）：示例业务系统的 WinUI 3 界面，只引用对接类库。
 
+
+### 审批单打印
+
+`Application/Printing` 用中心投影生成当前人员可见快照，并使用运行仓储同一乐观并发与哈希链边界追加打印记录。API Key 归档先按来源应用限定审批单，使用发起人字段视图，审计主体明确为应用。PDF 和二维码依赖只在 `Infrastructure/Printing`；渲染器不能直接查数据库或原始业务数据。中文字体通过受保护管理接口上传，`LocalPrintFontStore` 将字体与上传来源原子保存到数据目录，备份须覆盖该目录。此切片不新增数据库实体或迁移。

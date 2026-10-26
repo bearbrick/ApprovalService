@@ -121,6 +121,10 @@ internal static class CenterProjection
     private static CenterDetailLayoutResponse DescribeLayout(FlowDetailLayout layout, JsonElement visible,
         IReadOnlyList<CenterFieldDefinitionResponse> fields)
     {
+        if (layout.Mode == "embed" && !string.IsNullOrWhiteSpace(layout.EmbedPageCode))
+        {
+            return new CenterDetailLayoutResponse { Mode = "embed", EmbedPageCode = layout.EmbedPageCode };
+        }
         if (layout.Mode != "custom")
         {
             return new CenterDetailLayoutResponse();

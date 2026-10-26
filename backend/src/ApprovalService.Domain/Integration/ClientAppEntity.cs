@@ -36,6 +36,11 @@ public sealed class ClientAppEntity
     public string AllowedEmbedOriginsJson { get; set; } = "[]";
 
     /// <summary>
+    /// 允许作为本应用只读原单 iframe 子页面的 HTTPS 来源。
+    /// </summary>
+    public string AllowedDocumentOriginsJson { get; set; } = "[]";
+
+    /// <summary>
     /// 有权管理本应用的内部人员 ID JSON 数组；存量应用默认无人授权。
     /// </summary>
     public string AdministratorPersonIdsJson { get; set; } = "[]";
@@ -94,6 +99,14 @@ public sealed class ClientAppEntity
     /// 自动节点调用业务动作的接口地址。
     /// </summary>
     public string? ActionUrl
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 按当前查看人签发一次性只读原单地址的钩子。
+    /// </summary>
+    public string? DocumentUrl
     {
         get; set;
     }

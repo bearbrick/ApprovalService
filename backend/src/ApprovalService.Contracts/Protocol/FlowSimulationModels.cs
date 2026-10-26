@@ -78,6 +78,14 @@ public sealed class FlowSimulationStepRequest
     }
 
     /// <summary>
+    /// 本次假人工任务要填写的审批人字段；仅成功推进后成为当前值。
+    /// </summary>
+    public JsonElement? FieldValues
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 子流程假结果是否成功。
     /// </summary>
     public bool Success { get; set; } = true;

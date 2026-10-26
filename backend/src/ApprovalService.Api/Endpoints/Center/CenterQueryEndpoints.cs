@@ -21,6 +21,7 @@ internal static class CenterQueryEndpoints
     {
         app.MapGet(CenterRoutes.Instances, ListAsync).RequireAuthorization();
         app.MapGet(CenterRoutes.Instance, FindAsync).RequireAuthorization();
+        app.MapPost(CenterRoutes.DocumentUrl, DocumentUrlAsync).RequireAuthorization();
         app.MapPost(CenterRoutes.MarkRead, MarkReadAsync).RequireAuthorization();
         return app;
     }
@@ -65,6 +66,18 @@ internal static class CenterQueryEndpoints
     /// <returns>已授权详情。</returns>
     private static Task<CenterDetailResponse> FindAsync(HttpContext http, string id, CenterQueryAppService service,
         CancellationToken cancellationToken) => service.FindAsync(Scope(http), id, cancellationToken);
+
+    /// <summary>
+    /// 当前人员仅为已授权审批单请求短时只读原单地址。
+    /// </summary>
+    /// <param name="http">已执行认证的请求。</param>
+    /// <param name="id">审批单 ID。</param>
+    /// <param name="service">业务原单用例。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>不可缓存的一次性地址。</returns>
+    private static Task<CenterDocumentUrlResponse> DocumentUrlAsync(HttpContext http, string id,
+        CenterDocumentAppService service, CancellationToken cancellationToken) =>
+        service.GetAsync(Scope(http), id, cancellationToken);
 
     /// <summary>
     /// 重新核对可信登录范围后标记当前人员已看过的活动。

@@ -87,6 +87,14 @@ internal static class AdminConsoleEndpoints
             CancellationToken cancellationToken) => service.SetEmbedOriginsAsync(code, request,
                 PersonId(http), DateTimeOffset.UtcNow, cancellationToken))
             .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapGet(ApiRoutes.AdminAppDocumentSettings, (string code, AdminDocumentSettingsAppService service,
+            CancellationToken cancellationToken) => service.GetAsync(code, cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
+        app.MapPut(ApiRoutes.AdminAppDocumentSettings, (HttpContext http, string code,
+            UpdateAdminDocumentSettingsRequest request, AdminDocumentSettingsAppService service,
+            CancellationToken cancellationToken) => service.SetAsync(code, request, PersonId(http),
+                DateTimeOffset.UtcNow, cancellationToken))
+            .RequireAuthorization(OrganizationAdminRequirement.PolicyName);
         return app;
     }
 

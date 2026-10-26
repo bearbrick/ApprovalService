@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ApprovalService.Application.Administration;
+using ApprovalService.Contracts;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Runtime;
@@ -135,6 +136,83 @@ internal static class FlowSimulationChecks
         }, "admin", true);
         check("必填附件可用假文件 ID 模拟且不写真实存储", attached.Tasks.Count == 1 &&
             repository.Writes == 0);
+
+        var root = Directory.GetParent(Fixtures.BackendRoot())!.FullName;
+        var qualityPath = Path.Combine(root, "frontend", "src", "designer", "workbench", "samples",
+            "quality-exception.json");
+        var quality = JsonSerializer.Deserialize<FlowDefinition>(await File.ReadAllTextAsync(qualityPath),
+            ApprovalJson.Options) ?? throw new InvalidOperationException("质量异常模板为空。");
+        quality.Code = "SIMULATION";
+        foreach (var node in quality.Canvas.Nodes.Where(node => node.Approval is not null))
+        {
+            // 此场景只验证假字段路由；必填意见在独立的模拟意见场景中验证。
+            node.Approval!.CommentRequired = false;
+        }
+
+        var fakePeople = quality.Canvas.Nodes.Where(node => node.Type is FlowNodeTypes.Approval or
+            FlowNodeTypes.Handling or FlowNodeTypes.Cc).ToDictionary(node => node.Id,
+            node => new List<string> { "fake-" + node.Id }, StringComparer.Ordinal);
+        var qualityStart = await service.CreateAsync(new FlowSimulationCreateRequest
+        {
+            Definition = quality,
+            Data = JsonSerializer.SerializeToElement(new
+            {
+                title = "异常",
+                lotNumber = "LOT-1",
+                defectDescription = "尺寸偏差",
+            }),
+            InitiatorId = "fake-initiator",
+            FakeAssignees = fakePeople,
+        }, "admin", true);
+        check("模拟发起可等待后续质检员填写分支字段", qualityStart.Tasks.Any(task =>
+            task.NodeId == "inspection" && task.Status == EngineTaskStatuses.Pending));
+        var inspectionTask = qualityStart.Tasks.Single(task => task.NodeId == "inspection" &&
+            task.Status == EngineTaskStatuses.Pending);
+        await ExpectAsync(() => service.StepAsync(qualityStart.Id, new FlowSimulationStepRequest
+        {
+            Kind = inspectionTask.CompletionKind,
+            TaskId = inspectionTask.Id,
+            ActorId = inspectionTask.AssigneeId,
+            FieldValues = JsonSerializer.SerializeToElement(new { title = "伪造业务标题" }),
+        }, "admin", true), ErrorCodes.ValidationFailed, "模拟不能借审批人字段覆盖业务数据", check);
+        await ExpectAsync(() => service.StepAsync(qualityStart.Id, new FlowSimulationStepRequest
+        {
+            Kind = inspectionTask.CompletionKind,
+            TaskId = inspectionTask.Id,
+            ActorId = inspectionTask.AssigneeId,
+        }, "admin", true), ErrorCodes.ValidationFailed, "到达网关仍缺质检结论时不走默认路径", check);
+        var qualityState = qualityStart;
+        var qualitySteps = 0;
+        while (qualityState.Status == EngineInstanceStatuses.Running && qualitySteps++ < 25)
+        {
+            var task = qualityState.Tasks.FirstOrDefault(item => item.Status == EngineTaskStatuses.Pending);
+            if (task is not null)
+            {
+                qualityState = await service.StepAsync(qualityState.Id, new FlowSimulationStepRequest
+                {
+                    Kind = task.CompletionKind,
+                    TaskId = task.Id,
+                    ActorId = task.AssigneeId,
+                    FieldValues = task.NodeId == "inspection" ? JsonSerializer.SerializeToElement(new
+                    {
+                        reworkDecision = "no",
+                    }) : null,
+                }, "admin", true);
+                continue;
+            }
+
+            var wait = qualityState.Waits.SingleOrDefault()
+                ?? throw new InvalidOperationException("模拟质量异常没有可推进的假任务或动作。");
+            qualityState = await service.StepAsync(qualityState.Id, new FlowSimulationStepRequest
+            {
+                Kind = EngineCommandKinds.ActionSucceeded,
+                TokenId = wait.TokenId,
+            }, "admin", true);
+        }
+
+        check("模拟质检填写决定后续分支并走完，始终不写持久仓储", qualityState.Status ==
+            EngineInstanceStatuses.Approved && qualitySteps < 25 && repository.Writes == 0);
+        await service.DeleteAsync(qualityState.Id, "admin", true);
     }
 
     /// <summary>

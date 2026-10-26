@@ -154,6 +154,26 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             instance.RoutingInputsJson = input.UpdatedRoutingInputsJson;
         }
 
+        if (input.Context.AssigneeSnapshot is { } routing)
+        {
+            var definition = JsonSerializer.Deserialize<FlowDefinition>(flowVersion.DefinitionJson,
+                ApprovalJson.Options) ?? throw new InvalidOperationException("已发布流程定义为空。");
+            using var dataDocument = JsonDocument.Parse(instance.ApprovalDataJson);
+            var initiator = routing.People.FirstOrDefault(person => person.Id == instance.InitiatorId);
+            var expressionContext = new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["initiator.department"] = routing.InitiatingDepartmentId,
+                ["initiator.level"] = initiator?.GradeRank,
+            };
+            // 本次填写仅在成功推进时参与网关判断；引擎仍负责校验并原子保存它。
+            var pendingValues = command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or
+                EngineCommandKinds.Acknowledge ? command.Operation?.FieldValues : null;
+            var currentValues = command.Kind == OperationKinds.Resubmit ? null :
+                current?.Operations.CurrentApproverFieldValues;
+            input.Context.Conditions = FlowConditionEvaluator.Evaluate(definition.Data, input.Context.Graph,
+                dataDocument.RootElement, currentValues, pendingValues, expressionContext);
+        }
+
         EngineResult result;
         var requestedNodes = new HashSet<string>(StringComparer.Ordinal);
         while (true)

@@ -52,6 +52,6 @@ export async function runAdminChecks(check: (name: string, value: boolean) => vo
     && outboxViewData([{ eventId: 'e1', clientAppCode: 'demo', kind: 'callback', status: 'pending',
       attempts: 2, availableAt: '2026-10-23T00:00:00Z', errorCode: 'TimeoutException' }]).rows[0]?.cells.eventId === 'e1')
   let unavailable = false
-  try { await adminAdapter.loadView('system/info', new AbortController().signal) } catch (error) { unavailable = error instanceof AdminAdapterUnavailableError }
+  try { await adminAdapter.loadView('system/storage', new AbortController().signal) } catch (error) { unavailable = error instanceof AdminAdapterUnavailableError }
   check('未接入的管理页面明确拒绝，不返回虚构统计或密钥', unavailable)
 }

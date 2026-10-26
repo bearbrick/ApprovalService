@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ApprovalService.Application.Integration;
+using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
 using ApprovalService.Domain.Shared;
@@ -7,7 +8,6 @@ using ApprovalService.Engine.Assignees;
 using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Definitions;
 using ApprovalService.Engine.Execution;
-using ApprovalService.Engine.Expressions;
 
 namespace ApprovalService.Application.Administration;
 
@@ -57,7 +57,7 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
         // 测试附件仅校验字段格式；假文件 ID 不查真实存储，也不关联任何审批单。
         var data = OpenApprovalDataPreparer.PrepareWithAttachments(request.Definition.Data, request.Data).Data;
         var snapshot = BuildFakeSnapshot(graph, request.InitiatorId, request.FakeAssignees);
-        var conditions = EvaluateConditions(graph, data);
+        var conditions = FlowConditionEvaluator.Evaluate(request.Definition.Data, graph, data);
         var id = Guid.NewGuid().ToString("N");
         var now = timeProvider.GetUtcNow();
         var context = Context(graph, snapshot, conditions, request.Definition.Code, now);
@@ -82,6 +82,8 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
             OwnerId = actorId,
             FlowCode = request.Definition.Code,
             Graph = graph,
+            DataDefinition = request.Definition.Data,
+            Data = data.Clone(),
             Assignees = snapshot,
             Conditions = conditions,
             State = started.State,
@@ -136,7 +138,11 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
             }
 
             var command = BuildCommand(session, request);
-            var context = Context(session.Graph, session.Assignees, session.Conditions, session.FlowCode, now);
+            var pendingValues = command.Kind is EngineCommandKinds.Approve or EngineCommandKinds.Handle or
+                EngineCommandKinds.Acknowledge ? command.Operation?.FieldValues : null;
+            var conditions = FlowConditionEvaluator.Evaluate(session.DataDefinition, session.Graph,
+                session.Data, session.State.Operations.CurrentApproverFieldValues, pendingValues);
+            var context = Context(session.Graph, session.Assignees, conditions, session.FlowCode, now);
             EngineResult result;
             try
             {
@@ -153,6 +159,7 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
             }
 
             session.State = result.State;
+            session.Conditions = conditions;
             session.Step++;
             AppendEvents(session, result.Events);
             session.ExpiresAt = now + IdleTimeout;
@@ -229,7 +236,13 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
                 throw Validation("假操作人、任务或动作不匹配当前待办。");
             }
 
-            command.Operation = new OperationInput { ActorId = task.AssigneeId, Opinion = request.Opinion };
+            EnsureFakeFields(session, task.NodeId, request.FieldValues);
+            command.Operation = new OperationInput
+            {
+                ActorId = task.AssigneeId,
+                Opinion = request.Opinion,
+                FieldValues = request.FieldValues,
+            };
         }
         else if (request.Kind is EngineCommandKinds.ActionSucceeded or EngineCommandKinds.ActionFailed or
             EngineCommandKinds.SubprocessCompleted)
@@ -246,6 +259,36 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
         }
 
         return command;
+    }
+
+    /// <summary>
+    /// 假填写也只允许当前节点可编辑的审批人字段，不接收业务字段或其他节点的字段。
+    /// </summary>
+    /// <param name="session">锁定的模拟定义。</param>
+    /// <param name="nodeId">当前任务节点。</param>
+    /// <param name="values">本次假填写。</param>
+    private static void EnsureFakeFields(FlowSimulationSession session, string nodeId, JsonElement? values)
+    {
+        if (values is null)
+        {
+            return;
+        }
+
+        if (values.Value.ValueKind != JsonValueKind.Object)
+        {
+            throw Validation("假填写必须是审批人字段对象。");
+        }
+
+        var node = session.Graph.Nodes.Single(item => item.Id == nodeId);
+        foreach (var field in values.Value.EnumerateObject())
+        {
+            if (!session.DataDefinition.Fields.Any(item => item.Key == field.Name && item.ApproverInput) ||
+                !node.FieldPermissions.Any(item => item.FieldKey == field.Name &&
+                    item.Access == FlowFieldAccess.Editable))
+            {
+                throw Validation($"节点 {nodeId} 无权填写字段 {field.Name}。");
+            }
+        }
     }
 
     /// <summary>
@@ -281,32 +324,6 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
         snapshot.People = fakeAssignees.Values.SelectMany(item => item).Append(initiatorId)
             .Distinct(StringComparer.Ordinal).Select(id => new AssigneePerson { Id = id }).ToList();
         return snapshot;
-    }
-
-    /// <summary>
-    /// 按假审批数据一次计算分支条件。
-    /// </summary>
-    /// <param name="graph">模拟图。</param>
-    /// <param name="data">假数据。</param>
-    /// <returns>连线条件真假。</returns>
-    private static Dictionary<string, bool> EvaluateConditions(FlowExecutionGraph graph, JsonElement data)
-    {
-        var result = new Dictionary<string, bool>(StringComparer.Ordinal);
-        foreach (var edge in graph.Edges.Where(item => !item.IsDefault && !string.IsNullOrWhiteSpace(item.Condition)))
-        {
-            try
-            {
-                var value = ApprovalExpression.Evaluate(edge.Condition!, data);
-                result[edge.Id] = value is bool selected ? selected :
-                    throw Validation($"条件 {edge.Id} 的结果必须为真假值。");
-            }
-            catch (ApprovalExpressionException error)
-            {
-                throw Validation($"条件 {edge.Id} 计算失败：{error.Message}");
-            }
-        }
-
-        return result;
     }
 
     /// <summary>

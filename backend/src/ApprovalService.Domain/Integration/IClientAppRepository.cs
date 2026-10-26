@@ -27,6 +27,23 @@ public interface IClientAppRepository
         string actorId, string reason, DateTimeOffset occurredAt, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 原子更新本应用原单钩子及允许来源，并在同一事务写入脱敏审计。
+    /// </summary>
+    /// <param name="code">应用编码。</param>
+    /// <param name="expectedUrl">读取时的钩子地址。</param>
+    /// <param name="expectedOriginsJson">读取时的来源列表。</param>
+    /// <param name="updatedUrl">新的钩子地址。</param>
+    /// <param name="updatedOriginsJson">新的来源列表。</param>
+    /// <param name="actorId">管理员人员 ID。</param>
+    /// <param name="reason">变更原因。</param>
+    /// <param name="occurredAt">操作时间。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>读取时状态仍有效且完成保存时为真。</returns>
+    Task<bool> UpdateDocumentSettingsAsync(string code, string? expectedUrl, string expectedOriginsJson,
+        string? updatedUrl, string updatedOriginsJson, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 按编码读取接入应用。
     /// </summary>
     /// <param name="code">应用编码。</param>

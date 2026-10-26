@@ -17,6 +17,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
  */
 export function centerDetailLayout(wire: unknown, fields: readonly CenterDetailField[]): CenterDetailLayout {
   const automatic: CenterDetailLayout = { mode: 'auto', groups: [] }
+  if (isObject(wire) && wire.mode === 'embed' && typeof wire.embedPageCode === 'string' &&
+    wire.embedPageCode.length > 0) return { mode: 'embed', embedPageCode: wire.embedPageCode, groups: [] }
   if (!isObject(wire) || wire.mode !== 'custom' || !Array.isArray(wire.groups)) return automatic
   const visible = new Map(fields.map(field => [field.key, field]))
   const groups = wire.groups.flatMap(group => {

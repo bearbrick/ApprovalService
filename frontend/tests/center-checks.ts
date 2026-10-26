@@ -6,6 +6,7 @@ import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCent
 import { fetchCenterFile } from '../src/api/center-files.ts'
 import { fetchCenterSignature, latestCenterSignature, uploadCenterSignature } from '../src/api/center-signatures.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
+import { fetchCenterDocumentAddress } from '../src/api/center-document.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import { createCenterOpinion, deleteCenterOpinion, loadCenterOpinions, updateCenterOpinion } from '../src/api/center-opinions.ts'
 import { createCenterDelegation, delegateCenterTasks, deleteCenterDelegation, loadCenterDelegations } from '../src/api/center-delegations.ts'
@@ -103,6 +104,10 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       if (path.endsWith('/center/instances/instance-1/read')) {
         serverUnread = false
         return new Response(null, { status: 204 })
+      }
+      if (path.endsWith('/center/instances/instance-1/document-url')) {
+        return new Response(JSON.stringify({ url: 'https://documents.example.com/read?once=demo',
+          expiresAt: '2099-01-01T00:00:00Z' }), { status: 200 })
       }
       if (path.startsWith('/api/v1/notifications/preferences')) {
         if (path !== '/api/v1/notifications/preferences') {
@@ -210,6 +215,15 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && JSON.stringify(detail.layout).includes('"qty":100')
       && !JSON.stringify(detail.layout).includes('secret') && !JSON.stringify(detail.layout).includes('cost'))
     check('旧服务缺少详情排版时安全回退自动排版', centerDetailLayout(undefined, detail.fields).mode === 'auto')
+    const embeddedLayout = centerDetailLayout({ mode: 'embed', embedPageCode: 'purchase-readonly' }, detail.fields)
+    check('嵌入排版只接收发布页面编码且旧结构继续回退普通详情',
+      embeddedLayout.mode === 'embed' && embeddedLayout.embedPageCode === 'purchase-readonly' &&
+      centerDetailLayout({ mode: 'embed', embedPageCode: '' }, detail.fields).mode === 'auto')
+    const original = await fetchCenterDocumentAddress('instance-1')
+    check('业务原单临时地址仅由当前人员 JWT 的无缓存写请求取得',
+      original.url === 'https://documents.example.com/read?once=demo' &&
+      requests.at(-1)?.path === '/api/v1/center/instances/instance-1/document-url' &&
+      requests.at(-1)?.method === 'POST' && requests.at(-1)?.authorization === 'Bearer test-token')
     const fieldSearch = await centerAdapter.loadList('todo', controller.signal, '行票据')
     check('审批列表把字段内容搜索交给 JWT 服务端且保留授权结果',
       fieldSearch.length === 1 && requests.at(-1)?.path.includes('search=%E8%A1%8C%E7%A5%A8') === true &&

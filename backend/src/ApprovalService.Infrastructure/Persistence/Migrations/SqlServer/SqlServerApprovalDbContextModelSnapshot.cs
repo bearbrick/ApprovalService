@@ -343,6 +343,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasColumnType("nvarchar(max)")
                         .HasDefaultValue("[]");
 
+                    b.Property<string>("AllowedDocumentOriginsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -375,6 +381,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                         .HasColumnType("bit");
 
                     b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<string>("DocumentUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("nvarchar(2048)");
 

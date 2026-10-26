@@ -1,5 +1,4 @@
 using ApprovalService.Domain.Center;
-using ApprovalService.Domain.Integration;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -28,15 +27,13 @@ internal static class CenterOpinionMigrationIntegrationChecks
             await using (var old = new SqliteApprovalDbContext(options))
             {
                 await old.GetService<IMigrator>().MigrateAsync("20261025060636_ClientAppAdministrators");
-                old.ClientApps.Add(new ClientAppEntity
-                {
-                    Code = "legacy-app",
-                    Name = "原接入应用",
-                    ApiKeyHash = new string('a', 64),
-                    SigningSecretCiphertext = "旧密文",
-                    AdministratorPersonIdsJson = "[\"administrator\"]",
-                });
-                await old.SaveChangesAsync();
+                // 旧库尚无现行模型的新列，必须按当时表结构写入升级夹具。
+                await old.Database.ExecuteSqlRawAsync("""
+                    INSERT INTO ClientApps
+                    (Code, Name, ApiKeyHash, SigningSecretCiphertext, AllowedFlowCodesJson,
+                     AllowedEmbedOriginsJson, AdministratorPersonIdsJson, CanViewAllTasks, IsEnabled, AuthGeneration)
+                    VALUES ('legacy-app', '原接入应用', @hash, '旧密文', '[]', '[]', '["administrator"]', 0, 1, 1)
+                    """, new Microsoft.Data.Sqlite.SqliteParameter("@hash", new string('a', 64)));
             }
 
             await using var upgraded = new SqliteApprovalDbContext(options);

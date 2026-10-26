@@ -6,6 +6,7 @@ import UiDialog from '../../components/ui/UiDialog.vue'
 import { fetchCenterFile } from '../../api/center-files.ts'
 import { fetchCenterSignature } from '../../api/center-signatures.ts'
 import SignatureChoice from './SignatureChoice.vue'
+import CenterOriginalDocument from './CenterOriginalDocument.vue'
 import { visibleCenterActions } from '../../model/center.ts'
 import type { CenterAction, CenterAttachment, CenterDetail } from '../../model/center.ts'
 import type { CenterActionInput } from '../../api/center-adapter.ts'
@@ -64,6 +65,11 @@ const emit = defineEmits<{
  * 当前的只读详情页签。
  */
 const tab = ref<'data' | 'progress'>('data')
+/**
+ * 业务原单加载成功时隐藏普通数据字段；失败时立即回退。
+ */
+const originalReady = ref(false)
+watch(() => props.detail?.item.id, () => { originalReady.value = false })
 /**
  * 仅展示服务端明确许可的操作。
  */
@@ -312,6 +318,9 @@ onBeforeUnmount(closePreview)
           <nav class="center-detail-tabs" aria-label="审批详情页签"><button type="button" :aria-current="tab === 'data' ? 'page' : undefined" @click="tab = 'data'">审批数据</button><button type="button" :aria-current="tab === 'progress' ? 'page' : undefined" @click="tab = 'progress'">流程进度</button></nav>
           <section v-if="tab === 'data'" class="center-card">
             <h3>业务数据快照</h3>
+            <CenterOriginalDocument v-if="detail.layout.mode === 'embed'" :key="detail.item.id"
+              :instance-id="detail.item.id" @ready="originalReady = $event" />
+            <div v-if="!originalReady">
             <div v-if="detail.fields.length && detail.layout.mode === 'custom'" class="center-layout-groups">
               <section v-for="(group, groupIndex) in detail.layout.groups" :key="groupIndex" class="center-layout-group">
                 <h4>{{ group.title || `分组 ${groupIndex + 1}` }}</h4>
@@ -336,6 +345,7 @@ onBeforeUnmount(closePreview)
               </div>
             </dl>
             <p v-else class="center-blank">这张审批单没有可展示的业务字段。</p>
+            </div>
           </section>
           <section v-if="tab === 'progress'" class="center-card"><h3>审批经过</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }} <span v-if="entry.occurredAt">· {{ entry.occurredAt }}</span></p><blockquote v-if="entry.opinion">{{ entry.opinion }}</blockquote><button v-if="entry.signatureFileId" class="btn" type="button" @click="openSignature(entry.signatureFileId)">查看手写签名</button></li></ol><p v-else class="center-blank">暂无可展示的流程记录。</p></section>
           <section class="center-card"><h3>附件</h3>

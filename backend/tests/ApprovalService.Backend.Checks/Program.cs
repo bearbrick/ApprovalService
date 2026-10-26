@@ -114,6 +114,7 @@ internal static class Program
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await CenterQueryChecks.RunAsync(backendRoot, Check);
+        await CenterDocumentChecks.RunAsync(backendRoot, Check);
         await CenterSignatureChecks.RunHttpAsync(backendRoot, Check);
         await CenterOpinionChecks.RunAsync(backendRoot, Check);
         await CenterDelegationChecks.RunAsync(backendRoot, Check);

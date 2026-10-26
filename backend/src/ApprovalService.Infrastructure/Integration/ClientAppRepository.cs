@@ -22,6 +22,7 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
             Code = item.Code,
             Name = item.Name,
             AllowedFlowCodesJson = item.AllowedFlowCodesJson,
+            AllowedDocumentOriginsJson = item.AllowedDocumentOriginsJson,
             IsEnabled = item.IsEnabled,
         }).ToArrayAsync(cancellationToken);
     }
@@ -67,6 +68,33 @@ public sealed class ClientAppRepository(IDbContextFactory<ApprovalDbContext> fac
             }),
             OccurredAt = occurredAt,
         });
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> UpdateDocumentSettingsAsync(string code, string? expectedUrl, string expectedOriginsJson,
+        string? updatedUrl, string updatedOriginsJson, string actorId, string reason,
+        DateTimeOffset occurredAt, CancellationToken cancellationToken = default)
+    {
+        await using var db = await factory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var changed = await db.ClientApps.Where(item => item.Code == code && item.DocumentUrl == expectedUrl &&
+            item.AllowedDocumentOriginsJson == expectedOriginsJson)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(item => item.DocumentUrl, updatedUrl)
+                .SetProperty(item => item.AllowedDocumentOriginsJson, updatedOriginsJson), cancellationToken);
+        if (changed != 1)
+        {
+            return false;
+        }
+
+        // 原单地址可能包含部署细节；审计只记录变更类别和原因。
+        RecordAdminChange(db, code, actorId, "documentSettingsUpdated", occurredAt, null,
+            JsonSerializer.Serialize(new
+            {
+                reason
+            }));
         await db.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return true;

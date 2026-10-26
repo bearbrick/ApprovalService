@@ -338,6 +338,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasColumnType("TEXT")
                         .HasDefaultValue("[]");
 
+                    b.Property<string>("AllowedDocumentOriginsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -370,6 +376,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DocumentUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("TEXT");
 

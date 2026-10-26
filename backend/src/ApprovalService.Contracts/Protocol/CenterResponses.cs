@@ -227,6 +227,19 @@ public sealed class CenterDetailResponse
     /// </summary>
     public IReadOnlyList<string> ActiveNodeIds { get; set; } = [];
 
+    /// <summary>
+    /// 当前查看人是发起人且实例仍有人工待办时可尝试催办；提交时重新校验一小时限制。
+    /// </summary>
+    public bool CanRemind
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 仅含已到达和当前节点的锁定版本进度图，不含业务规则和未来分支。
+    /// </summary>
+    public CenterProgressResponse Progress { get; set; } = new();
+
 }
 
 /// <summary>
@@ -365,6 +378,11 @@ public sealed class CenterTaskResponse
     {
         get; set;
     }
+
+    /// <summary>
+    /// 当前人员可用操作的关联征询、加签任务或已到达退回节点。
+    /// </summary>
+    public IReadOnlyList<CenterRelatedTargetResponse> RelatedTargets { get; set; } = [];
 
 }
 

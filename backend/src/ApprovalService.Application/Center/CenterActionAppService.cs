@@ -43,6 +43,50 @@ public sealed class CenterActionAppService(IApprovalOpenQueryRepository tasks,
     ];
 
     /// <summary>
+    /// 发起人在已授权审批单上催办；保持现有引擎限流、事件和通知出站语义。
+    /// </summary>
+    /// <param name="scope">可信人员和嵌入应用范围。</param>
+    /// <param name="instanceId">审批单 ID。</param>
+    /// <param name="requestId">稳定请求 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>催办完成。</returns>
+    public async Task RemindAsync(CenterScope scope, string instanceId, string requestId,
+        CancellationToken cancellationToken = default)
+    {
+        if (scope is null || string.IsNullOrWhiteSpace(scope.PersonId) ||
+            string.IsNullOrWhiteSpace(instanceId) || instanceId.Length > 100 ||
+            string.IsNullOrWhiteSpace(requestId))
+        {
+            throw new UserFriendlyException(ErrorCodes.ValidationFailed, "催办参数或登录身份不正确。");
+        }
+        var record = await center.FindAsync(scope, instanceId, cancellationToken)
+            ?? throw new UserFriendlyException(ErrorCodes.NotFound, "审批单不存在或当前人员无权查看。");
+        if (record.Instance.InitiatorId != scope.PersonId)
+        {
+            throw new UserFriendlyException(ErrorCodes.Forbidden, "只有审批发起人可以催办。");
+        }
+        await runtime.ExecuteAsync(new RuntimeCommandInput
+        {
+            Command = new EngineCommand
+            {
+                Kind = OperationKinds.Remind,
+                InstanceId = record.Instance.Id,
+                RequestId = requestId,
+                Operation = new OperationInput { ActorId = scope.PersonId },
+            },
+            Context = new EngineContext
+            {
+                OccurredAt = timeProvider.GetUtcNow(),
+                Operations = new OperationContext
+                {
+                    InitiatorId = record.Instance.InitiatorId,
+                    FlowCode = record.Instance.FlowCode,
+                },
+            },
+        }, cancellationToken);
+    }
+
+    /// <summary>
     /// 独立执行一项人工命令，服务端再次核对当前状态和人员许可。
     /// </summary>
     /// <param name="scope">认证中间件生成的人员与应用范围。</param>

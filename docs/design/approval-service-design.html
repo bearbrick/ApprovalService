@@ -623,6 +623,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
         <h2><span class="n">6</span>审批中心、手机端与提醒</h2>
         <p class="lead">审批人在哪里方便就在哪里审：电脑上的审批中心、手机网页，或者业务系统里内嵌的审批窗口（第 12 节）；以后还有安卓、iOS App。几个入口用的是同一套接口。</p>
         <h3>审批中心</h3>
+        <p>详情的流程图由现有 BPMN 查看器显示已到达路径并高亮当前节点；未来节点和连线条件不会下发给当前查看人。征询回复、减签和同分支退回的目标只列当前任务可选项，提交时引擎再次核验。“我发起的”详情可催办当前审批人，同一步每小时最多一次；页面操作后按服务端待办总数刷新角标。已授权 PDF 附件在本地 <code>blob:</code> 地址预览，原单 iframe 的网络来源仍仅限应用登记的 HTTPS 来源。</p>
         <ul>
           <li>列表：待我处理、我已处理、抄送我的、我发起的（只看进度）；按流程、时间、状态筛选，按标题、编号、字段内容搜索；加急的排前面，未读的加粗。</li>
           <li>列表里直接显示每个流程的<b>摘要字段</b>（如金额、供应商、事由），不点开也能判断；可以勾选多条批量同意。</li>
@@ -1132,7 +1133,7 @@ await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
         <h2><span class="n">13</span>接口清单</h2>
         <p>审批中心个人常用意见使用 <code>GET/POST /api/v1/center/opinions</code> 及 <code>PUT/DELETE /api/v1/center/opinions/{id}</code>；只按登录 JWT 人员隔离，本地会话可管理，嵌入会话只读。</p>
         <p>审批中心个人委托使用 <code>GET/POST /api/v1/center/delegations</code>、<code>DELETE /api/v1/center/delegations/{id}</code> 与 <code>POST /api/v1/center/delegations/tasks</code>；组织管理员通过 <code>/api/v1/admin/delegations/{principalId}</code> 下的对应接口代管，已有任务逐项返回结果并保留真实操作者审计。</p>
-        <p>审批中心人员查询与任务操作和业务系统开放接口分开：<code>GET /api/v1/center/instances</code>、<code>GET /api/v1/center/instances/{id}</code>、<code>POST /api/v1/center/tasks/{id}/actions</code> 及 <code>POST /api/v1/center/tasks/batch-approve</code> 只接受已验证登录 JWT，不把 API Key 交给网页；详细筛选、逐任务许可、安全投影和逐项批量结果见契约文档。</p>
+        <p>审批中心人员查询与任务操作和业务系统开放接口分开：<code>GET /api/v1/center/instances</code>、<code>GET /api/v1/center/instances/{id}</code>、<code>POST /api/v1/center/instances/{id}/remind</code>、<code>POST /api/v1/center/tasks/{id}/actions</code> 及 <code>POST /api/v1/center/tasks/batch-approve</code> 只接受已验证登录 JWT，不把 API Key 交给网页；详细筛选、逐任务许可、安全投影和逐项批量结果见契约文档。</p>
         <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。代表人员调用的开放接口只接受当前接入应用已绑定的业务用户 ID；工号用于本地登录或管理员确认绑定。</p>
         <h3>审批服务提供的接口</h3>
         <div class="tw">

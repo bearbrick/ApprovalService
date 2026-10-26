@@ -90,24 +90,34 @@ internal static class CenterProjection
             Data = visibleData,
             FieldDefinitions = visibleFields,
             Layout = DescribeLayout(definition.DetailLayout, visibleData, visibleFields),
-            Tasks = record.Tasks.Select(task => new CenterTaskResponse
+            Tasks = record.Tasks.Select(task =>
             {
-                Id = task.Id,
-                NodeId = task.NodeId,
-                NodeName = graph.Nodes.SingleOrDefault(node => node.Id == task.NodeId)?.Name ?? task.NodeId,
-                AssigneeId = task.AssigneeId,
-                DelegatedForId = task.DelegatedForId,
-                Status = task.Status,
-                Opinion = task.Opinion,
-                SignatureFileId = task.SignatureFileId,
-                DueAt = task.DueAt,
-                CompletedAt = task.CompletedAt,
-                AllowedActions = TaskActionAvailability.GetAllowedActions(state, graph, task.Id, personId),
-                SignatureRequired = graph.Nodes.SingleOrDefault(node => node.Id == task.NodeId)?.Approval?.SignatureRequired == true,
+                var allowed = TaskActionAvailability.GetAllowedActions(state, graph, task.Id, personId);
+                var runtimeTask = state.Tasks.SingleOrDefault(item => item.Id == task.Id);
+                return new CenterTaskResponse
+                {
+                    Id = task.Id,
+                    NodeId = task.NodeId,
+                    NodeName = graph.Nodes.SingleOrDefault(node => node.Id == task.NodeId)?.Name ?? task.NodeId,
+                    AssigneeId = task.AssigneeId,
+                    DelegatedForId = task.DelegatedForId,
+                    Status = task.Status,
+                    Opinion = task.Opinion,
+                    SignatureFileId = task.SignatureFileId,
+                    DueAt = task.DueAt,
+                    CompletedAt = task.CompletedAt,
+                    AllowedActions = allowed,
+                    SignatureRequired = graph.Nodes.SingleOrDefault(node => node.Id == task.NodeId)?.Approval?.SignatureRequired == true,
+                    RelatedTargets = runtimeTask is null ? [] : CenterProgressProjection.Targets(state, graph, runtimeTask, personId, allowed),
+                };
             }).ToArray(),
             // 暂存意见仍是个人草稿，不能进入其他参与者可见的时间线。
             Events = record.Events.Where(item => item.Kind != "opinionDraftSaved").Select(ProjectEvent).ToArray(),
             ActiveNodeIds = state.Tokens.Select(token => token.NodeId).Distinct(StringComparer.Ordinal).ToArray(),
+            CanRemind = record.Instance.InitiatorId == personId &&
+                state.Status == EngineInstanceStatuses.Running &&
+                state.Tasks.Any(task => task.Status == EngineTaskStatuses.Pending),
+            Progress = CenterProgressProjection.Progress(record, definition, graph, state),
         };
     }
 

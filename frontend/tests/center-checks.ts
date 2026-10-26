@@ -6,6 +6,9 @@ import { consumeEmbedToken, loadCenterEmbedContext, matchesEmbedTarget, postCent
 import { fetchCenterFile } from '../src/api/center-files.ts'
 import { fetchCenterSignature, latestCenterSignature, uploadCenterSignature } from '../src/api/center-signatures.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
+import { readCenterProgress, readCenterRelatedTargets } from '../src/api/center-progress.ts'
+import { loadCenterTodoCount } from '../src/api/center-count.ts'
+import { centerProgressXml } from '../src/pages/center/center-progress-diagram.ts'
 import { fetchCenterDocumentAddress } from '../src/api/center-document.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import { createCenterOpinion, deleteCenterOpinion, loadCenterOpinions, updateCenterOpinion } from '../src/api/center-opinions.ts'
@@ -53,6 +56,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   check('我发起的仅可展示服务端准许的催办与评论',
     visibleCenterActions(item({ section: 'started', allowedActions: ['approve', 'remind', 'comment'] })).join(',') === 'remind,comment'
     && visibleCenterActions(item({ section: 'cc', allowedActions: ['approve', 'comment'] })).join(',') === 'comment')
+  const progress = readCenterProgress({ nodes: [
+    { id: 'start', type: 'start', name: '开始', x: 0, y: 0, isActive: false },
+    { id: 'current', type: 'approval', name: '当前 <审批>', x: 180, y: 0, isActive: true },
+  ], edges: [{ id: 'line', sourceId: 'start', targetId: 'current' }] })
+  const xml = centerProgressXml(progress)
+  check('只读 BPMN 图仅使用服务端安全进度并编码节点文字',
+    progress.nodes.length === 2 && xml.includes('bpmn:userTask') && xml.includes('当前 &lt;审批&gt;') &&
+    !xml.includes('future-secret-condition') && !xml.includes('当前 <审批>'))
+  check('畸形进度与越界连线不能进入 BPMN 查看器',
+    readCenterProgress({ nodes: progress.nodes, edges: [{ id: 'hidden', sourceId: 'start', targetId: 'future' }] }).nodes.length === 0 &&
+    readCenterRelatedTargets([{ action: 'reply', id: 'mine', label: '待回复征询' }]).length === 1 &&
+    readCenterRelatedTargets([{ action: 'reply', id: {}, label: '坏目标' }]).length === 0)
   let cleanedHash = ''
   const pending = consumeEmbedToken('#/center/approvals/instance-1?embedToken=one-time&view=compact', hash => { cleanedHash = hash })
   check('一次性令牌从片段和历史条目先清除，再交给交换接口',
@@ -105,6 +120,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         serverUnread = false
         return new Response(null, { status: 204 })
       }
+      if (path.endsWith('/center/instances/instance-1/remind')) return new Response(null, { status: 204 })
       if (path.endsWith('/center/instances/instance-1/document-url')) {
         return new Response(JSON.stringify({ url: 'https://documents.example.com/read?once=demo',
           expiresAt: '2099-01-01T00:00:00Z' }), { status: 200 })
@@ -306,6 +322,13 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       transfers[1]?.succeeded === false && afterDelegationDelete.length === 0 &&
       requests.slice(-5).every(request => request.authorization === 'Bearer test-token') &&
       requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,POST,DELETE,GET')
+    await centerAdapter.remind('instance-1')
+    const todoCount = await loadCenterTodoCount(controller.signal)
+    check('催办与待办角标均由当前人员 JWT 接入服务端',
+      todoCount === 1 && requests.at(-2)?.path === '/api/v1/center/instances/instance-1/remind' &&
+      requests.at(-2)?.method === 'POST' && requests.at(-2)?.authorization === 'Bearer test-token' &&
+      requests.at(-1)?.path === '/api/v1/center/instances?section=todo&skip=0&take=1' &&
+      requests.at(-1)?.authorization === 'Bearer test-token')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()

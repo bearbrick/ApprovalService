@@ -68,6 +68,39 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                     b.ToTable("CenterReadCursors", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.DelegationRuleEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("DelegateId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FlowCodesJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrincipalId", "StartsAtUtc", "EndsAtUtc");
+
+                    b.ToTable("DelegationRules", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Center.SignatureAssetEntity", b =>
                 {
                     b.Property<string>("Id")

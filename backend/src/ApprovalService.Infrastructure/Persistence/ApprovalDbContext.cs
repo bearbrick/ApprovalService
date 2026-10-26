@@ -16,7 +16,7 @@ namespace ApprovalService.Infrastructure.Persistence;
 /// <summary>
 /// 审批运行库的统一模型；三种数据库使用同一实体配置、各自生成迁移。
 /// </summary>
-public class ApprovalDbContext : DbContext
+public partial class ApprovalDbContext : DbContext
 {
     /// <summary>
     /// 供检查程序或直接创建上下文的调用方使用。
@@ -438,6 +438,7 @@ public class ApprovalDbContext : DbContext
 
         SignatureAssetModelConfiguration.Configure(modelBuilder);
         CenterOpinionModelConfiguration.Configure(modelBuilder);
+        DelegationRuleModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>
         {

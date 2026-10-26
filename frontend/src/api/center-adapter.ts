@@ -450,9 +450,14 @@ export const centerAdapter: CenterDataAdapter = {
       signatureRequired: task.signatureRequired ?? false,
       actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
     }))
+    // 设置页只列出本人原指派的未办任务；真正转委托许可仍由服务端重算。
+    const delegationTasks = wire.tasks.filter(task => task.assigneeId === personId &&
+      (task.status === 'pending' || task.status === 'queued')).map(task => ({
+      taskId: task.id, nodeName: task.nodeName,
+    }))
     const attachments = wire.attachments ?? []
     const visibleFields = fields(wire.data, wire.fieldDefinitions)
-    return { item: item(wire.instance, section, wire.tasks), actionTasks, fields: visibleFields,
+    return { item: item(wire.instance, section, wire.tasks), actionTasks, delegationTasks, fields: visibleFields,
       readSequence: wire.events.reduce((maximum, event) => Math.max(maximum, event.sequence), 0),
       layout: centerDetailLayout(wire.layout, visibleFields),
       timeline, attachmentNames: attachments.map(file => file.fileName), attachments }

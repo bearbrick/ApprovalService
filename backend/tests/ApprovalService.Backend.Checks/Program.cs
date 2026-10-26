@@ -17,7 +17,7 @@ internal static class Program
     /// <summary>
     /// 运行全部检查。
     /// </summary>
-    /// <param name="args">命令行参数；docs 只检查注释，flow-transfer 只检查流程文件接口，template-simulation 只检查十模板，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
+    /// <param name="args">命令行参数；docs 只检查注释，delegation-rules 只检查委托规则，flow-transfer 只检查流程文件接口，template-simulation 只检查十模板，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
     /// <returns>全部通过时为 0；有失败时抛异常，进程以非零退出。</returns>
     private static async Task<int> Main(string[] args)
     {
@@ -34,6 +34,18 @@ internal static class Program
 
         var backendRoot = Fixtures.BackendRoot();
         var repositoryRoot = Directory.GetParent(backendRoot)!.FullName;
+        if (args.FirstOrDefault() == "delegation-rules")
+        {
+            DelegationRulesChecks.Run(Check);
+            Console.WriteLine($"委托规则检查全部通过：{passed} 项");
+            return 0;
+        }
+        if (args.FirstOrDefault() == "delegation-http")
+        {
+            await CenterDelegationChecks.RunAsync(backendRoot, Check);
+            Console.WriteLine($"委托 HTTP 检查全部通过：{passed} 项");
+            return 0;
+        }
         if (args.FirstOrDefault() == "flow-transfer")
         {
             await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
@@ -87,6 +99,8 @@ internal static class Program
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
         OperationChecks.Run(Check);
+        DelegationRulesChecks.Run(Check);
+        HandlingActionChecks.Run(Check);
         await CenterSignatureChecks.RunAsync(Check);
         OperationChecksBoundaries.Run(Check);
         ApprovalDataChecks.Run(Check);
@@ -109,6 +123,7 @@ internal static class Program
         await CenterQueryChecks.RunAsync(backendRoot, Check);
         await CenterSignatureChecks.RunHttpAsync(backendRoot, Check);
         await CenterOpinionChecks.RunAsync(backendRoot, Check);
+        await CenterDelegationChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);

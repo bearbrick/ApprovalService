@@ -59,6 +59,8 @@
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
 | `GET/POST /api/v1/center/opinions`、`PUT/DELETE /api/v1/center/opinions/{id}` | 读取为人员 JWT；写入仅本地 JWT | 本人常用意见最多 30 条，每条最多 500 字，嵌入会话只读 |
+| `GET/POST /api/v1/center/delegations`、`DELETE /api/v1/center/delegations/{id}`、`POST /api/v1/center/delegations/tasks` | 本地人员 JWT | 本人委托规则及已有待办逐项转委托；嵌入会话不可修改 |
+| `GET/POST /api/v1/admin/delegations/{principalId}`、`DELETE /api/v1/admin/delegations/{principalId}/{id}`、`POST /api/v1/admin/delegations/{principalId}/tasks` | 本地组织管理员 JWT | 代指定人员维护委托；已有任务转移必须填写原因并记真实管理员身份 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 人员 JWT | 上传本人手写 PNG、查询个人签名及按本人或审批单授权取图；嵌入 JWT 只能上传单次签名 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
@@ -184,6 +186,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 `GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式尚未接入，回退自动排版，不返回嵌入页面编码或地址。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。图布局仍待接入。
 
+发布图的办理节点若以设计动作 `allowedActions: ["submit"]` 表示“办理提交”，服务端将它解释为运行命令 `handle` 的许可；详情只返回可执行的 `handle`，写接口也只接受该运行命令。这个兼容解释仅适用于 `handling` 节点，不改变其他节点的权限或发布图内容。
+
 `POST /api/v1/center/instances/{id}/read` 请求 `{seenThroughSequence}`（非负整数，为本次详情时间线实际显示的最大事件序号；没有事件为零），成功返回 204。仅详情已显示的当前人员主动调用；服务端在同一事务重新核对该人员的参与关系、保密范围与嵌入应用，再把（人员、审批单）的持久游标单调推进到不超过当前最大事件序号的已显示序号。因此 GET 详情后新发生的活动不会被误标已读。无权与不存在统一 404。列表和详情 GET 不写游标；游标未保存成功时页面仍展示详情并提示可刷新重试。他人之后产生的新可见审计活动使 `isUnread=true`，本人动作与私人意见草稿不触发未读；完整原始事件和游标均不返回给前端。
 
 `POST /api/v1/center/tasks/{id}/actions` 请求 `{action, opinion?, signatureFileId?, targetPersonId?, targetNodeId?, relatedId?, mode?, mentionedPersonIds?, fieldValues?}`，任务 ID 含斜杠时需将整个 ID 编码；人员参数使用审批服务内部 ID。响应 `{taskId, instanceId, detail}`，详情再次执行人员与应用授权。`action` 只允许人工任务命令，当前人、节点许可、意见及字段规则由服务端重新校验，变更经过统一引擎写入事件与任务状态。`fieldValues` 只接受当前节点显式可编辑的顶层审批人字段；人员、部门值须为现存内部 ID，必填仅在成功推进时强制；明细和附件字段目前没有安全提交协议，明确拒绝。节点同意前的业务校验钩子仍会运行，中心登录人员作为审批服务内部人员 ID 传给钩子的 `actor`。无权或失效任务不会因列表先前显示过按钮而获准。
@@ -200,6 +204,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 任务操作请求向后兼容新增可选 `signatureFileId`，只允许选用当前 JWT 人员本人上传的不可变资产；省略表示本次明确不使用签名，个人签名不会被默认引用。发布节点 `approval.signatureRequired` 默认为 `false`；为 `true` 时，同意、办理完成和确认已阅必须选用签名，拒绝等不成功推进的操作不强制。此类任务不提供批量同意。任务详情新增 `signatureRequired` 和已完成任务的 `signatureFileId?`；事件时间线新增本次审计冻结的 `signatureFileId?`。旧流程与旧响应保持默认无签名语义，审批中心不修改业务数据。
 `GET /api/v1/center/opinions` 返回当前 JWT 人员的个人常用意见数组，每项 `{id,content,createdAtUtc}`，按创建时间和 ID 稳定排序；本地与嵌入会话均可读取。`POST /api/v1/center/opinions` 和 `PUT /api/v1/center/opinions/{id}` 请求 `{content}`，返回保存后的单项；`DELETE /api/v1/center/opinions/{id}` 成功返回 204。三种写请求仅允许本地人员会话，嵌入会话返回 `FORBIDDEN`；意见只按 JWT 人员 ID 归属，不接受请求中的人员参数。正文去除首尾空白后须为 1～500 字，每人最多 30 条，满额返回 `CONFLICT`；他人意见与不存在统一 `NOT_FOUND`。常用意见仅填入当前审批意见栏，任务提交仍走现有操作接口。
+
+委托设置 `GET/POST /api/v1/center/delegations` 按本人 JWT 读写；管理员使用 `/api/v1/admin/delegations/{principalId}` 为指定内部人员维护。新增请求 `{delegatePersonId,startsAtUtc,endsAtUtc,flowCodes}`，`flowCodes` 空数组表示全部流程；响应追加 `id,principalPersonId`。时段必须是 UTC 左闭右开，端点相接允许；同一委托人时间和流程范围均相交返回 `CONFLICT`。本人或管理员删除规则返回 204，删除只影响未来任务，既有任务不反向收回。`POST /api/v1/center/delegations/tasks` 请求 `{taskIds}`；管理员对应入口请求 `{taskIds,reason}` 且原因必填；最多一百个不同任务 ID，按输入顺序返回 `[{taskId,succeeded,code?,message?}]`，逐项独立提交。只转移尚未处理且属于该委托人的原任务，按当前服务端时间及锁定流程版本重新检查规则。管理员必须由本地组织角色授权，审计记录真实操作人和原因。嵌入会话只能读取本人规则，不能写入。
 
 ## 同源审批中心内嵌
 

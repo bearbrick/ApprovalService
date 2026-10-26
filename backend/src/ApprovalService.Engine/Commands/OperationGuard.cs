@@ -65,14 +65,14 @@ internal static class OperationGuard
 
             var node = context.Graph.Nodes.Single(item => item.Id == task.NodeId);
             var allowed = node.Approval?.AllowedActions;
-            if (command.Kind != OperationKinds.DelegateExisting && allowed is { Count: > 0 } &&
-                !allowed.Contains(command.Kind, StringComparer.Ordinal))
+            if (command.Kind != OperationKinds.DelegateExisting &&
+                !TaskActionPermission.Permits(allowed, node.Type, command.Kind))
             {
                 throw new EngineException(ErrorCodes.Conflict, "当前节点不允许此操作。");
             }
 
-            if (input.IsBulkApproval && allowed is { Count: > 0 } &&
-                !allowed.Contains(OperationKinds.BulkApprove, StringComparer.Ordinal))
+            if (input.IsBulkApproval &&
+                !TaskActionPermission.Permits(allowed, node.Type, OperationKinds.BulkApprove))
             {
                 throw new EngineException(ErrorCodes.Conflict, "当前节点不允许批量同意。");
             }

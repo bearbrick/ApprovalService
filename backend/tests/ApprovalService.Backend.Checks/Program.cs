@@ -80,6 +80,7 @@ internal static class Program
         await EventChainConsistencyChecks.RunAsync(Check);
         await JobChecks.RunAsync(Check);
         OperationChecks.Run(Check);
+        HandlingActionChecks.Run(Check);
         await CenterSignatureChecks.RunAsync(Check);
         OperationChecksBoundaries.Run(Check);
         ApprovalDataChecks.Run(Check);

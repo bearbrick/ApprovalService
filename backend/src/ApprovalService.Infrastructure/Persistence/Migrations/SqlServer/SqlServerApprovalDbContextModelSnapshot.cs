@@ -22,6 +22,37 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ApprovalService.Domain.Administration.SystemBrandingEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("CompanyName")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<byte[]>("LogoBytes")
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<string>("LogoContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("LogoSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SystemBranding", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
                 {
                     b.Property<string>("Id")

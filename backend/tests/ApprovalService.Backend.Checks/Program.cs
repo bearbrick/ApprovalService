@@ -118,6 +118,7 @@ internal static class Program
         await CenterDelegationChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
+        await SystemBrandingChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
         await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);

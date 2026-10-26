@@ -97,7 +97,7 @@ public sealed class AdminConsoleRepository(IDbContextFactory<ApprovalDbContext> 
             EntityKind = item.EntityKind,
             EntityId = item.EntityId,
             Kind = item.Kind,
-            Reason = item.EntityKind is "clientApp" or "callback" ? ReadReason(item.AfterJson) : null,
+            Reason = item.EntityKind is "clientApp" or "callback" or "systemBranding" ? ReadReason(item.AfterJson) : null,
         }).ToArray();
     }
 

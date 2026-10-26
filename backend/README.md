@@ -135,6 +135,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 `GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织、接入应用及回调重发变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
 
+系统信息管理通过 `GET/PUT /api/v1/admin/system-info` 设置打印页眉的单位名称，通过 `GET/POST/DELETE /api/v1/admin/system-info/logo` 管理 PNG Logo。所有路由只接受本地组织管理员 JWT；修改带 2–200 字原因和预期修订，过期修订返回 409。Logo 限 1 MiB，并验证完整 PNG；设置与不含图片字节的审计写在同一数据库事务，三种数据库均有迁移。授权中文打印字体上传仍需单独完成。
+
 `GET /api/v1/admin/outbox` 只投影最近 200 条待发项元数据，不加载发送正文。`POST /api/v1/admin/callbacks/{eventId}/retry` 要求本地组织管理员填写原因，原地重排回调并在同一事务留审计；有效租约中的发送不可重排。已完成的回调也可按原事件 ID 再次投递，接入应用负责去重。
 
 接入应用管理页通过 `POST /api/v1/admin/apps` 登记编码、名称、授权流程、回调与四类钩子地址；`PUT /api/v1/admin/apps/{code}/enabled` 启停，`POST /api/v1/admin/apps/{code}/rotate-secrets` 轮换凭据。每次管理变更要求原因并与脱敏审计同事务提交。创建和轮换响应中的 API Key 与签名密钥只显示一次，列表及日志不提供密钥；轮换或实际启停会使旧嵌入会话失效。

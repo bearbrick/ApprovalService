@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     /// <inheritdoc />
-    public partial class CenterSignatureAssets : Migration
+    public partial class CenterSignatureAssetsIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

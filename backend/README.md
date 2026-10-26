@@ -36,6 +36,7 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 | `GET /health/ready` | 数据库可连接时返回 `ready`；不可连接时返回 503 |
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤，详情排版按锁定版本及可见字段裁剪 |
+| `GET/POST /api/v1/center/opinions`、`PUT/DELETE /center/opinions/{id}` | 本人常用意见，嵌入会话仅可读取 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 登录人员对当前任务提交引擎命令，批量同意逐项独立处理 |
 | `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 本人手写 PNG 资产上传、个人签名元数据与验权图片读取 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
@@ -60,6 +61,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 身份访问令牌为 15 分钟 JWT，刷新令牌可轮换且有效 30 天；首次开通账号后只能先改密码。嵌入令牌 5 分钟内只能交换一次，必须先通过接入应用 API Key 验证并找到本应用绑定。可信人员离职、复职或外部人员绑定换人时，在组织事务内单调递增旧、新账号的令牌版本；一次性嵌入令牌也保存签发版本，旧访问、刷新和未兑换令牌不会因状态恢复而复活。接入应用的已授权管理用例调用 `ClientAppAppService.SetEnabledAsync` 或 `RotateSecretsAsync` 时原子递增应用身份代际；签发、兑换、刷新和访问嵌入令牌均核对代际，停用再启用或轮换密钥后旧令牌永久失效，本地会话不受影响。接入应用管理 HTTP 路由要求本地组织管理员权限，不能直接修改数据库启用标记。嵌入会话不能使用组织管理接口，刷新后仍保留应用来源。组织主数据存部门、人员、角色、外部 ID 绑定与每次变更的前后快照；CSV/XLSX 模板可同时导入主数据及外部绑定，预览一次返回可定位的组织问题，正式保存会在事务中按最新主数据重验。组织管理接口要求本地登录 JWT 及当前 `organization-admin` 角色；动作人工重试按审批单所属流程单独授权。首位管理员须在服务器本机交互式运行 `dotnet run --project backend/src/ApprovalService.Api -- bootstrap-admin`：输入内部人员 ID、工号、姓名及两次临时密码；已有在职人员可将工号和姓名留空。命令先应用数据库迁移，再在串行化事务中开通账号和角色；一旦已有管理员角色即拒绝重复执行，不提供匿名 HTTP 初始化入口。
 
 ## 审批中心查询
+
+个人常用意见由 `CenterOpinionAppService` 按已验证 JWT 的人员 ID 保存；本地会话可新增、修改和删除（每人至多 30 条、每条至多 500 字），嵌入会话仅可读取。意见选择只填入审批栏，办理仍调用既有任务操作接口。三库使用同一实体配置和各自的 EF 迁移。
 
 `CenterQueryAppService` 提供当前人员的待办、已办、抄送和发起/代发列表及只读详情，分页与总数基于同一授权查询。只接受 JWT，本地会话跨应用按参与关系读取，嵌入会话再限定所属应用；API Key 不能替代登录。当前原审批人与代理人均可查看 pending 任务；历史实际处理和已送达抄送复用持久参与者投影。无关管理员、未来/取消任务不能直接取得保密详情，不可见与不存在统一 404。
 
@@ -125,7 +128,7 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 接入应用允许嵌入来源由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/embed-origins` 配置。PUT 提交完整来源列表及变更原因；服务端限制 HTTPS 原点、本机开发 HTTP、数量和长度，并在同一数据库事务中记录操作者及不含密钥的前后快照。并发修改返回冲突，管理页须重新读取后再保存。
 
-接入应用管理员名单由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/administrators` 维护。存量应用默认空名单；PUT 提交读取时的旧人员 ID、新人员 ID 与原因，服务端检查当前在职人员、并发旧值，并与不含密钥的审计同事务保存。后续测试回调只可使用当前本地会话、已启用应用，以及当前在职的该应用管理员或组织管理员身份；该回调接口尚未实现。
+接入应用管理员名单由本地组织管理员通过 `GET/PUT /api/v1/admin/apps/{code}/administrators` 维护。存量应用默认空名单；PUT 提交读取时的旧人员 ID、新人员 ID 与原因，服务端检查当前在职人员、并发旧值，并与不含密钥的审计同事务保存。`POST /api/v1/admin/apps/{code}/test-callback` 要求本地组织管理员或该应用管理员提交原因，重新核对应用、人员和回调地址后只排入 `integration.test` 合成事件；响应返回事件 ID，业务系统只需验签确认。事件不关联审批单，发送复用原有签名、重试及日志。
 
 `GET /api/v1/admin/bindings` 读取人员/部门外部 ID 绑定安全摘要；手工绑定沿用 `POST /api/v1/admin/org/bindings`，包含当前管理员身份和事务内审计。`GET /api/v1/admin/audit` 仅投影最近 200 条组织、接入应用及回调重发变更的元数据和显式原因，不返回前后快照。三个接口都逐项应用本地组织管理员权限。
 

@@ -30,6 +30,14 @@ public static class CenterRoutes
     /// </summary>
     public const string MarkRead = Instances + "/{id}/read";
     /// <summary>
+    /// 当前人员的个人常用意见列表与新增入口。
+    /// </summary>
+    public const string Opinions = "/api/v1/center/opinions";
+    /// <summary>
+    /// 当前人员修改或删除一条个人常用意见。
+    /// </summary>
+    public const string Opinion = Opinions + "/{id}";
+    /// <summary>
     /// 使用当前登录人员身份办理一项人工任务。
     /// </summary>
     public const string TaskActions = "/api/v1/center/tasks/{taskId}/actions";

@@ -8,6 +8,11 @@ namespace ApprovalService.Contracts.Protocol;
 public sealed class CallbackNotification
 {
     /// <summary>
+    /// 接入测试事件固定使用的审批状态值。
+    /// </summary>
+    public const string TestStatus = "test";
+
+    /// <summary>
     /// 引擎生成的稳定事件 ID。
     /// </summary>
     public string EventId { get; set; } = string.Empty;
@@ -36,6 +41,14 @@ public sealed class CallbackNotification
     /// 业务单号。
     /// </summary>
     public string BusinessKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 测试回调对应的接入应用编码；真实审批事件省略。
+    /// </summary>
+    public string? ClientAppCode
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 相关任务 ID；目前仅恢复原待办回调携带，其他事件省略。

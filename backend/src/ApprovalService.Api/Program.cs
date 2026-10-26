@@ -124,6 +124,7 @@ app.MapOrganizationEndpoints();
 app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
 app.MapClientAppAdminEndpoints();
+app.MapTestCallbackEndpoints();
 app.MapReportingEndpoints();
 app.MapFlowManagementEndpoints();
 app.MapFlowSimulationEndpoints();
@@ -131,6 +132,7 @@ app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();
 app.MapCenterSignatureEndpoints();
+app.MapCenterOpinionEndpoints();
 app.MapCenterEmbedEndpoints();
 
 if (bootstrapCommand)

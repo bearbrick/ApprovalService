@@ -318,7 +318,11 @@ public sealed class DemoBusinessHttpHost : IDisposable
             case "/callback":
                 {
                     var notification = ApprovalCallbackVerifier.VerifyAndParse(body, signature, signingSecret);
-                    store.ApplyCallback(notification);
+                    // 接入测试只验签确认，不按合成业务单号修改任何业务原单。
+                    if (notification.Event != ApprovalCallbackEventCodes.IntegrationTest)
+                    {
+                        store.ApplyCallback(notification);
+                    }
                     return new DemoHttpResult(200, DemoHookJson.Write(new DemoAcceptedResponse { Accepted = true }));
                 }
             default:

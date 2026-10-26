@@ -37,8 +37,24 @@ public sealed class CallbackOutboxHandler(IDbContextFactory<ApprovalDbContext> f
         }
 
         await using var db = await factory.CreateDbContextAsync(cancellationToken);
-        var appCode = await db.Instances.AsNoTracking().Where(instance => instance.Id == item.InstanceId)
-            .Select(instance => instance.ClientAppCode).SingleAsync(cancellationToken);
+        var isIntegrationTest = notification.Event == CallbackEventCodes.IntegrationTest;
+        if (isIntegrationTest && (!item.EventId.StartsWith(CallbackEventCodes.TestEventIdPrefix,
+            StringComparison.Ordinal) ||
+            notification.InstanceId != notification.EventId ||
+            string.IsNullOrWhiteSpace(notification.ClientAppCode) ||
+            notification.SerialNo.Length != 0 || notification.FlowCode.Length != 0 ||
+            notification.BusinessKey.Length != 0 || notification.Status != CallbackNotification.TestStatus ||
+            notification.Data.ValueKind != JsonValueKind.Object || notification.Data.EnumerateObject().Any() ||
+            notification.TaskId is not null || notification.FieldValues is not null ||
+            notification.ActionResults is not null))
+        {
+            throw new InvalidOperationException("测试回调正文与合成事件约定不一致。");
+        }
+
+        // 测试事件没有审批单，应用编码只能来自已持久化的测试通知正文。
+        var appCode = isIntegrationTest ? notification.ClientAppCode! :
+            await db.Instances.AsNoTracking().Where(instance => instance.Id == item.InstanceId)
+                .Select(instance => instance.ClientAppCode).SingleAsync(cancellationToken);
         var app = await db.ClientApps.AsNoTracking().SingleAsync(client => client.Code == appCode, cancellationToken);
         if (!app.IsEnabled)
         {
@@ -59,6 +75,24 @@ public sealed class CallbackOutboxHandler(IDbContextFactory<ApprovalDbContext> f
 
         if (string.IsNullOrWhiteSpace(app.CallbackUrl))
         {
+            if (isIntegrationTest)
+            {
+                // 测试回调必须真的到达接收端；排队后地址被清除时不能伪报成功。
+                db.OutboundSendLogs.Add(new OutboundSendLogEntity
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    EventId = item.EventId,
+                    ClientAppCode = appCode,
+                    Attempt = item.Attempts,
+                    TargetUrl = string.Empty,
+                    SentAt = timeProvider.GetUtcNow(),
+                    ErrorCode = "CALLBACK_URL_MISSING",
+                });
+                await db.SaveChangesAsync(cancellationToken);
+                throw new UserFriendlyException(ErrorCodes.ValidationFailed,
+                    "接入应用回调地址已移除，测试回调将保留并重试。");
+            }
+
             // 未登记回调地址的应用使用主动查询状态；该事件仍在操作记录中留存。
             return;
         }

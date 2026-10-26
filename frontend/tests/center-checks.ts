@@ -7,6 +7,7 @@ import { fetchCenterFile } from '../src/api/center-files.ts'
 import { fetchCenterSignature, latestCenterSignature, uploadCenterSignature } from '../src/api/center-signatures.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
+import { createCenterOpinion, deleteCenterOpinion, loadCenterOpinions, updateCenterOpinion } from '../src/api/center-opinions.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -71,6 +72,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   let serverUnread = true
   let failPreference = false
   const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
+  const savedOpinions: { id: string, content: string, createdAtUtc: string }[] = []
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
@@ -110,6 +112,28 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         return new Response(JSON.stringify(notificationCategories.map(item => ({ category: item.code,
           emailEnabled: savedPreferences.get(item.code)?.emailEnabled ?? true,
           inAppEnabled: item.code === 'dailyDigest' ? false : savedPreferences.get(item.code)?.inAppEnabled ?? true }))), { status: 200 })
+      }
+      if (path.startsWith('/api/v1/center/opinions')) {
+        const method = init?.method ?? 'GET'
+        if (method === 'GET') return new Response(JSON.stringify(savedOpinions), { status: 200 })
+        if (new Headers(init?.headers).get('Authorization') === 'Bearer embed-token') {
+          return new Response(JSON.stringify({ code: 'FORBIDDEN', message: '嵌入会话只能读取。' }), { status: 403 })
+        }
+        const content = (JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { content?: string }).content ?? ''
+        const id = path.split('/').at(-1) ?? ''
+        if (method === 'DELETE') {
+          const index = savedOpinions.findIndex(item => item.id === id)
+          if (index >= 0) savedOpinions.splice(index, 1)
+          return new Response(null, { status: 204 })
+        }
+        if (method === 'PUT') {
+          const item = savedOpinions.find(entry => entry.id === id)
+          if (item) item.content = content
+          return new Response(JSON.stringify(item), { status: 200 })
+        }
+        const item = { id: `opinion-${savedOpinions.length + 1}`, content, createdAtUtc: '2026-10-25T00:00:00Z' }
+        savedOpinions.push(item)
+        return new Response(JSON.stringify(item), { status: 200 })
       }
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
@@ -220,6 +244,15 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     try { await uploadCenterSignature(new Blob([new Uint8Array(2 * 1024 * 1024 + 1)], { type: 'image/png' }), false) } catch { oversizedRejected = true }
     check('浏览器在发请求前拒绝超过 2 MiB 的签名 PNG', oversizedRejected &&
       requests.at(-1)?.path === '/api/v1/center/signatures/single-1?instanceId=instance-1')
+    const createdOpinion = await createCenterOpinion('已核对')
+    const opinions = await loadCenterOpinions()
+    const updatedOpinion = await updateCenterOpinion(createdOpinion.id, '请修改')
+    await deleteCenterOpinion(createdOpinion.id)
+    const afterOpinionDelete = await loadCenterOpinions()
+    check('常用意见由当前人员 JWT 持久管理，选择内容不直接提交任务',
+      opinions.length === 1 && opinions[0]?.content === '已核对' && updatedOpinion.content === '请修改'
+      && afterOpinionDelete.length === 0 && requests.slice(-5).every(request => request.authorization === 'Bearer test-token')
+      && requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,PUT,DELETE,GET')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()
@@ -228,6 +261,11 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       && requests.at(-2)?.body === '{"token":"one-time"}'
       && requests.at(-1)?.authorization === 'Bearer embed-token'
       && context.clientAppCode === 'ERP')
+    const embeddedOpinions = await loadCenterOpinions()
+    let embeddedWriteRejected = false
+    try { await createCenterOpinion('越权') } catch { embeddedWriteRejected = true }
+    check('嵌入会话可读取常用意见但不能管理', embeddedOpinions.length === 0 && embeddedWriteRejected
+      && requests.slice(-2).every(request => request.authorization === 'Bearer embed-token'))
     const sent: { message: CenterChangeMessage, targetOrigin: string }[] = []
     const sink = { postMessage(message: CenterChangeMessage, targetOrigin: string): void { sent.push({ message, targetOrigin }) } }
     const permitted = postCenterChange(context, 'https://erp.example.com/orders/1', sink, 'instance-1', 'task-1')

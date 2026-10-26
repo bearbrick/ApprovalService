@@ -5,6 +5,7 @@ using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Notifications;
 using ApprovalService.Infrastructure.Organization;
@@ -92,6 +93,11 @@ public class ApprovalDbContext : DbContext
     /// 本人上传的不可变 PNG 签名资产。
     /// </summary>
     public DbSet<SignatureAssetEntity> SignatureAssets => Set<SignatureAssetEntity>();
+
+    /// <summary>
+    /// 审批人个人保存的常用意见。
+    /// </summary>
+    public DbSet<CenterOpinionEntity> CenterOpinions => Set<CenterOpinionEntity>();
 
     /// <summary>
     /// 事务待发队列。
@@ -430,16 +436,8 @@ public class ApprovalDbContext : DbContext
             entity.HasIndex(item => item.PersonId);
         });
 
-        modelBuilder.Entity<SignatureAssetEntity>(entity =>
-        {
-            entity.ToTable("SignatureAssets");
-            entity.HasKey(item => item.Id);
-            entity.Property(item => item.Id).HasMaxLength(64);
-            entity.Property(item => item.PersonId).HasMaxLength(128).IsRequired();
-            entity.Property(item => item.PngBytes).IsRequired();
-            entity.Property(item => item.Sha256).HasMaxLength(64).IsRequired();
-            entity.HasIndex(item => new { item.PersonId, item.IsPersonal, item.UploadedAt });
-        });
+        SignatureAssetModelConfiguration.Configure(modelBuilder);
+        CenterOpinionModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>
         {

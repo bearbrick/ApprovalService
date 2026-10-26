@@ -29,6 +29,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IApprovalRuntimeAppService, ApprovalRuntimeAppService>();
         services.AddScoped<ClientAppAppService>();
         services.AddScoped<ClientAppAdminAppService>();
+        services.AddScoped<TestCallbackAppService>();
         services.AddScoped<FlowCatalogAppService>();
         services.AddScoped<OpenFlowPreviewAppService>();
         services.AddScoped<CallbackDeliveryAppService>();
@@ -37,6 +38,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<CenterQueryAppService>();
         services.AddScoped<CenterActionAppService>();
         services.AddScoped<SignatureAppService>();
+        services.AddScoped<CenterOpinionAppService>();
         services.AddScoped<OpenApprovalStartAppService>();
         services.AddScoped<BusinessHookAppService>();
         services.AddScoped<BusinessAssigneeAppService>();

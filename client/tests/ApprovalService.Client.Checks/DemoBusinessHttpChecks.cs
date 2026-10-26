@@ -93,6 +93,16 @@ internal static class DemoBusinessHttpChecks
                 "demo-callback-bad", secret).ConfigureAwait(false);
             check("已签名但缺字段的回调返回可修正错误且不停止本机服务", malformed.Status == 400);
 
+            const string testCallback = "{\"eventId\":\"test-demo-1\",\"event\":\"integration.test\",\"instanceId\":\"test-demo-1\",\"serialNo\":\"\",\"flowCode\":\"\",\"businessKey\":\"\",\"clientAppCode\":\"demo\",\"status\":\"test\",\"data\":{},\"occurredAt\":\"2026-10-25T00:00:00Z\"}";
+            var testResponse = await SendAsync(http, "callback", testCallback, "test-demo-1", secret)
+                .ConfigureAwait(false);
+            check("示例接收端对测试回调只验签确认且不修改业务原单", testResponse.Status == 200 &&
+                store.FindExpense("EXP-HOOK")?.ApprovalInstanceId == null &&
+                store.FindPurchase("PUR-HOOK")?.ApprovalInstanceId == null);
+            var invalidTest = await SendAsync(http, "callback", testCallback, "test-demo-1", secret,
+                signatureOverride: "sha256=" + new string('0', 64)).ConfigureAwait(false);
+            check("示例接收端拒绝签名错误的测试回调", invalidTest.Status == 401);
+
             const string callback = "{\"eventId\":\"callback-1\",\"event\":\"instance.approved\",\"instanceId\":\"inst-p\",\"serialNo\":\"DEMO-1\",\"flowCode\":\"PURCHASE_REQUEST\",\"businessKey\":\"PUR-HOOK\",\"status\":\"approved\",\"data\":{},\"actionResults\":{\"action-1\":{\"orderNo\":\"PO-PUR-HOOK\"}},\"occurredAt\":\"2026-10-24T08:00:00Z\"}";
             var callbackResponse = await SendAsync(http, "callback", callback, "demo-callback-1", secret).ConfigureAwait(false);
             check("原文验签回调将订单号和审批状态写回业务库", callbackResponse.Status == 200

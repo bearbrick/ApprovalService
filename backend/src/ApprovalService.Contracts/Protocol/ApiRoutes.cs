@@ -151,6 +151,11 @@ public static class ApiRoutes
     public const string AdminAppAdministrators = AdminClientApps + "/{code}/administrators";
 
     /// <summary>
+    /// 有权管理该应用的本地人员排入签名测试回调。
+    /// </summary>
+    public const string AdminAppTestCallback = AdminClientApps + "/{code}/test-callback";
+
+    /// <summary>
     /// 读取或创建有权限的流程草稿。
     /// </summary>
     public const string AdminFlows = OpenApiPrefix + "/admin/flows";

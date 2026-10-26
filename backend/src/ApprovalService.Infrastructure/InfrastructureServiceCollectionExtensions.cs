@@ -69,6 +69,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
         services.AddScoped<IClientAppAdminRepository, ClientAppAdminRepository>();
+        services.AddScoped<ITestCallbackRepository, TestCallbackRepository>();
         services.AddScoped<IFlowCatalogRepository, FlowCatalogRepository>();
         services.AddScoped<IFlowManagementRepository, FlowManagementRepository>();
         services.AddSingleton<IFlowSimulationSessionStore, MemoryFlowSimulationSessionStore>();
@@ -80,6 +81,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
         services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
         services.AddScoped<ISignatureAssetRepository, SignatureAssetRepository>();
+        services.AddScoped<ICenterOpinionRepository, CenterOpinionRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
         services.AddSingleton(new IntegrationTransportPolicy
         {

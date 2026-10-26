@@ -101,12 +101,15 @@ internal static class Program
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await CenterQueryChecks.RunAsync(backendRoot, Check);
         await CenterSignatureChecks.RunHttpAsync(backendRoot, Check);
+        await CenterOpinionChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
+        await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);
         await FlowManagementIdentityChecks.RunAsync(Check);
         await FlowManagementMigrationIntegrationChecks.RunAsync(Check);
+        await CenterOpinionMigrationIntegrationChecks.RunAsync(Check);
         await FlowManagementHttpChecks.RunAsync(backendRoot, Check);
         await FlowSimulationChecks.RunAsync(Check);
         await FlowTransferHttpChecks.RunAsync(backendRoot, Check);

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
 {
     [DbContext(typeof(SqlServerApprovalDbContext))]
-    [Migration("20261025062525_CenterSignatureAssets")]
-    partial class CenterSignatureAssets
+    [Migration("20261026051121_CenterSignatureAssetsIntegrated")]
+    partial class CenterSignatureAssetsIntegrated
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,32 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("PersonId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId", "CreatedAtUtc");
+
+                    b.ToTable("CenterOpinions", (string)null);
+                });
 
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterReadCursorEntity", b =>
                 {

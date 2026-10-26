@@ -9,6 +9,8 @@ import SignatureChoice from './SignatureChoice.vue'
 import { visibleCenterActions } from '../../model/center.ts'
 import type { CenterAction, CenterAttachment, CenterDetail } from '../../model/center.ts'
 import type { CenterActionInput } from '../../api/center-adapter.ts'
+import { loadCenterOpinions } from '../../api/center-opinions.ts'
+import type { CenterOpinion } from '../../api/center-opinions.ts'
 
 /**
  * 审批详情已授权数据与查询状态。
@@ -93,6 +95,18 @@ const signatureFileId = ref('')
 const signatureRequired = computed(() => Boolean(actionTasks.value.find(task => task.taskId === taskId.value)?.signatureRequired &&
   ['approve', 'handle', 'acknowledge'].includes(selectedAction.value)))
 /**
+ * 当前人员可选择的已保存意见。
+ */
+const commonOpinions = ref<CenterOpinion[]>([])
+/**
+ * 常用意见读取错误不会阻止手动填写和审批。
+ */
+const commonOpinionError = ref('')
+/**
+ * 同一详情只读取一次常用意见。
+ */
+let commonOpinionsLoaded = false
+/**
  * 可选目标人员的内部 ID。
  */
 const targetPersonId = ref('')
@@ -156,7 +170,26 @@ const commandByAction: Readonly<Record<CenterAction, string>> = {
 
 watch(actionTasks, tasks => { taskId.value = tasks[0]?.taskId ?? ''; selectedAction.value = '' })
 watch(taskId, () => { selectedAction.value = ''; signatureFileId.value = '' })
-watch(selectedAction, () => { signatureFileId.value = '' })
+watch(selectedAction, action => {
+  signatureFileId.value = ''
+  if (!action || commonOpinionsLoaded) return
+  commonOpinionsLoaded = true
+  void loadCenterOpinions().then(items => { commonOpinions.value = items }).catch(cause => {
+    commonOpinionError.value = cause instanceof Error ? cause.message : '常用意见读取失败。'
+  })
+})
+
+/**
+ * 只把已保存的意见填入编辑框，由审批人继续确认提交。
+ * @param event 选择事件。
+ * @returns 意见栏更新完成。
+ */
+function chooseCommonOpinion(event: Event): void {
+  const select = event.target as HTMLSelectElement
+  const selected = commonOpinions.value.find(item => item.id === select.value)
+  if (selected) opinion.value = selected.content
+  select.value = ''
+}
 
 /**
  * 校验可选字段 JSON 后发出已选任务命令。
@@ -317,6 +350,8 @@ onBeforeUnmount(closePreview)
         <label v-if="actionTasks.length > 1">办理任务<select v-model="taskId"><option v-for="task in actionTasks" :key="task.taskId" :value="task.taskId">{{ task.nodeName }} · {{ task.taskId }}</option></select></label>
         <div><button v-for="action in actions" :key="action" class="btn" :class="{ 'btn-primary': selectedAction === action }" type="button" :disabled="busy" @click="selectedAction = action">{{ actionLabels[action] }}</button></div>
         <template v-if="selectedAction">
+          <label v-if="commonOpinions.length">常用意见<select aria-label="选择常用意见填入审批意见" @change="chooseCommonOpinion"><option value="">选择常用意见</option><option v-for="item in commonOpinions" :key="item.id" :value="item.id">{{ item.content }}</option></select></label>
+          <p v-if="commonOpinionError" role="status">{{ commonOpinionError }}</p>
           <label>审批意见<textarea v-model="opinion" rows="3" placeholder="根据节点规则填写意见"></textarea></label>
           <SignatureChoice v-if="['approve', 'handle', 'acknowledge', 'reject', 'return'].includes(selectedAction)" v-model="signatureFileId" :required="signatureRequired" />
           <label v-if="['transfer', 'addSign', 'consult', 'copy'].includes(selectedAction)">目标人员 ID<input v-model="targetPersonId" placeholder="审批服务内部人员 ID"></label>

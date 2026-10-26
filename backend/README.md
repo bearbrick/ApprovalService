@@ -206,6 +206,13 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 服务启动时校验这三项：`Provider` 只接受表中的三个值，`Directory` 不能留空，使用 SQL Server 或 PostgreSQL 时必须提供非空的 `ConnectionString`。配置错误会让服务启动失败，诊断会指出配置键，不打印连接字符串。`/health/ready` 会检查数据库连通性；数据库不可连接时返回 503。
 
+## 审批单 PDF
+
+打印入口 `GET /api/v1/instances/{id}/print` 支持人员 JWT 与来源应用 API Key，详见契约。`Application/Printing` 复用中心字段裁剪和参与权限，在生成成功后使用运行仓储的乐观版本提交 `printed` 审计。`Infrastructure/Printing` 使用已缓存 PDFsharp 6.2.4 与 ZXing.Net 0.16.11，支持中文子集嵌入、表格分页、签名、票据与页脚。
+
+先由本地组织管理员在系统信息页上传有授权的中文 `.ttf`，再配置 `ApprovalService:Printing:PublicBaseUrl` 为用户可访问的服务根地址（例如 `https://approval.example.com`）。不配公开地址时，必须在流程版本关闭二维码才可生成。字体与上传元数据位于数据目录 `printing/font.json`，备份/恢复时须连同附件保存，不进入发布包。字体更新原子替换，已开始生成的文档使用原字体完整快照。
+
+`dotnet run --project backend/tests/ApprovalService.Backend.Checks -- printing` 单独检查权限及渲染。设置 `APPROVAL_TEST_FONT` 为本机具备授权的中文 TTF 后覆盖真实上传、PDF、多页、API Key 和审计；不设置时明确跳过需要字体的场景。`APPROVAL_PRINT_EVIDENCE` 可指定仓库外样张目录，禁止提交字体或生成样张。
 
 本地组织管理员可在工作日历页在线维护每日工作时段和节假日/调休清单，时区只读沿用部署配置。按修订保存及审计原子提交，冲突须重新读取核对；空库回退部署配置，保存后数据库优先。每次运行命令读取同一日历快照计算新激活任务期限和提前提醒，已有任务期限和已排提醒不重算；排队任务激活时使用新日历。每日汇总仍使用部署时区。
 角色管理提供 `/api/v1/admin/roles` 目录与创建、`/{code}` 名称读取/修改、`/{code}/members` 成员读取/替换。仅本地组织管理员可用；名称和成员共用修订 CAS，原因审计与修改同事务，保留最后一位已开通账号且在职的组织管理员；不提供删除或改编码。

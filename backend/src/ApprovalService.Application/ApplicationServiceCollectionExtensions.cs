@@ -5,6 +5,7 @@ using ApprovalService.Application.Identity;
 using ApprovalService.Application.Integration;
 using ApprovalService.Application.Notifications;
 using ApprovalService.Application.Organization;
+using ApprovalService.Application.Printing;
 using ApprovalService.Application.Reporting;
 using ApprovalService.Application.Runtime;
 using ApprovalService.Application.Services;
@@ -59,6 +60,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
         services.AddScoped<SystemBrandingAppService>();
+        services.AddScoped<PrintFontAppService>();
+        services.AddScoped<ApprovalPrintAppService>();
         services.AddScoped<WorkCalendarAppService>();
         services.AddScoped<ITaskDeadlinePolicyProvider>(provider => provider.GetRequiredService<WorkCalendarAppService>());
         services.AddScoped<RoleManagementAppService>();

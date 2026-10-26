@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ApprovalPrintAction from './ApprovalPrintAction.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import UiEmptyState from '../../components/ui/UiEmptyState.vue'
 import UiIcon from '../../components/ui/UiIcon.vue'
@@ -340,6 +341,7 @@ onBeforeUnmount(closePreview)
   <div class="center-detail">
     <div class="center-detail-top"><a class="center-back" href="#/"><UiIcon name="arrow" />返回审批中心</a><button class="btn" type="button" :disabled="state === 'loading'" @click="emit('reload')"><UiIcon name="refresh" />刷新</button></div>
     <template v-if="detail && state === 'ready'">
+      <ApprovalPrintAction :instance-id="requestedId" />
       <p v-if="readError" role="alert" class="center-login-error">{{ readError }}</p>
       <p v-if="actionNotice" role="status" class="center-action-notice">{{ actionNotice }}</p>
       <header class="center-detail-title"><span class="center-detail-icon"><UiIcon name="center" /></span><div><h2>{{ detail.item.title }} <span v-if="detail.item.urgent" class="center-urgent">加急</span></h2><p>{{ detail.item.flowName }} · {{ detail.item.serialNo }} · {{ detail.item.status }}</p></div></header>

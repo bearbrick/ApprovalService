@@ -39,6 +39,11 @@ internal static class Program
             await AdminInterventionChecks.RunAsync(backendRoot, Check);
             return 0;
         }
+        if (args.FirstOrDefault() == "printing")
+        {
+            await PrintingChecks.RunAsync(backendRoot, Check);
+            return 0;
+        }
         if (args.FirstOrDefault() == "work-calendar")
         {
             await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
@@ -154,6 +159,7 @@ internal static class Program
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await SystemBrandingChecks.RunAsync(backendRoot, Check);
+        await PrintingChecks.RunAsync(backendRoot, Check);
         await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
         await RoleManagementChecks.RunAsync(backendRoot, Check);
         await AdminInterventionChecks.RunAsync(backendRoot, Check);

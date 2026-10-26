@@ -90,4 +90,4 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-069](T-069-admin-intervention.md) | 管理员运行干预协议与页面 | 待验收 | Codex 2026-10-26 | T-020、用户已批准管理协议 |
 | [T-068](T-068-sidebar-stage-badge.md) | 移除工作区过期阶段标记 | 待验收 | Codex 2026-10-26 | T-025 |
 | [T-071](T-071-center-graph-polish.md) | 审批中心 BPMN 进度图精修 | 待验收 | Codex 2026-10-26 | T-011 |
-| [T-072](T-072-session-refresh.md) | 刷新页面恢复本地登录会话 | 进行中 | Codex 2026-10-26 | T-050 稳定集成 |
+| [T-072](T-072-session-refresh.md) | 刷新页面恢复本地登录会话 | 待验收 | Codex 2026-10-26 | T-050 稳定集成 |

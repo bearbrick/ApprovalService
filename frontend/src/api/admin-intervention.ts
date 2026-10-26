@@ -170,4 +170,3 @@ export async function executeIntervention(id: string, input: InterventionCommand
     method: 'POST', body: input, headers: { Authorization: `Bearer ${token}`, 'X-Request-Id': requestId },
   })
 }
-

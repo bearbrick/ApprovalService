@@ -75,4 +75,3 @@ public sealed class AdminInterventionRepository(IDbContextFactory<ApprovalDbCont
         return result;
     }
 }
-

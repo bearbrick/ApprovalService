@@ -169,4 +169,3 @@ public sealed class AdminInterventionAppService(IAdminInterventionRepository rep
     private static bool IsManual(string type) =>
         type is FlowNodeTypes.Approval or FlowNodeTypes.Handling or FlowNodeTypes.Cc;
 }
-

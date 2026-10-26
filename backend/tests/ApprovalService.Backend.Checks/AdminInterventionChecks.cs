@@ -223,4 +223,3 @@ internal static class AdminInterventionChecks
         return await http.SendAsync(request);
     }
 }
-

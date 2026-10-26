@@ -59,5 +59,4 @@
 | [0020](0020-deployment-and-backup.md) | 单实例部署、受限指标与 SQLite 在线备份 | 已采纳 |
 | [0021](0021-simulation-and-integration-test.md) | 流程模拟与接入测试使用互相隔离的协议 | 已采纳 |
 | [0022](0022-original-business-document-embed.md) | 通过专用签名钩子按查看人获取业务原单临时地址 | 已采纳 |
-
 | [0024](0024-admin-runtime-intervention.md) | 管理员运行干预使用本地 JWT 和原子权限复核 | 已采纳 |

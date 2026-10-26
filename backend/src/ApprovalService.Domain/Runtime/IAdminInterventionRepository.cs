@@ -16,4 +16,3 @@ public interface IAdminInterventionRepository
     Task<IReadOnlyList<RuntimeSnapshot>> ReadAsync(string actorId, bool isLocal, string? instanceId,
         CancellationToken cancellationToken = default);
 }
-

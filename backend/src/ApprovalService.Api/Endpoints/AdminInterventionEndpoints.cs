@@ -61,4 +61,3 @@ internal static class AdminInterventionEndpoints
     private static bool IsLocal(HttpContext http) =>
         http.User.FindFirstValue(JwtIdentityTokenService.SessionKindClaim) == "local";
 }
-

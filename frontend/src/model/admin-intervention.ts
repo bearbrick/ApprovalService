@@ -28,4 +28,3 @@ export function buildInterventionCommand(record: InterventionRecord, action: Int
   if (!record.nodes.some(node => node.id === targetNodeId)) throw new Error('请选择锁定版本中的目标人工节点。')
   return { ...command, targetNodeId }
 }
-

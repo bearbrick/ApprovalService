@@ -43,4 +43,3 @@ export function runInterventionChecks(check: (name: string, value: boolean) => v
   check('流程管理会话可进干预页但不扩张组织设置权限',
     canReadAdminSection(flowSession, 'runtime') && !canReadAdminSection(flowSession, 'org'))
 }
-

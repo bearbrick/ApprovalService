@@ -79,6 +79,7 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-062](T-062-reporting-download.md) | 报表页 Excel 下载入口 | 前端 | M5 | T-061 已验证稳定快照 | frontend/src/api、frontend/src/pages/admin |
 | [T-063](T-063-handling-action-alias.md) | 办理节点 submit 与 handle 兼容 | 后端 | M1 | T-002、T-004、T-022 已验证基线 | Engine/Commands、backend/tests |
 | [T-064](T-064-dynamic-condition-evaluation.md) | 后续网关按审批人填写值求条件 | 后端 | M1 | T-004、T-022、T-063 已验证基线 | Application/Runtime、Application/Administration、backend/tests |
+| [T-065](T-065-bpmn-viewport-fit.md) | BPMN 画布居中适配与完整显示 | 前端 | M1 | T-046 已验证稳定快照 | src/designer/canvas |
 
 “主要目录”是相对于对应部分（`frontend/`、`backend/src/`、`client/`）的路径。
 

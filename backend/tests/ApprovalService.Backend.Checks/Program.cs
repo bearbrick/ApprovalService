@@ -17,7 +17,7 @@ internal static class Program
     /// <summary>
     /// 运行全部检查。
     /// </summary>
-    /// <param name="args">命令行参数；docs 只检查注释，dynamic-conditions 只检查动态网关，delegation-rules 只检查委托规则，flow-transfer 只检查流程文件接口，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
+    /// <param name="args">命令行参数；docs 只检查注释，dynamic-conditions 只检查动态网关，delegation-rules 只检查委托规则，flow-transfer 只检查流程文件接口，template-simulation 只检查十模板，seed-sdk-e2e 只在临时库生成 SDK 验证夹具。</param>
     /// <returns>全部通过时为 0；有失败时抛异常，进程以非零退出。</returns>
     private static async Task<int> Main(string[] args)
     {
@@ -57,6 +57,13 @@ internal static class Program
         {
             await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
             Console.WriteLine($"流程文件接口检查全部通过：{passed} 项");
+            return 0;
+        }
+
+        if (args.FirstOrDefault() == "template-simulation")
+        {
+            await FlowTemplateSimulationChecks.RunAsync(repositoryRoot, Check);
+            Console.WriteLine($"十模板模拟检查全部通过：{passed} 项");
             return 0;
         }
 
@@ -136,6 +143,7 @@ internal static class Program
         await CenterOpinionMigrationIntegrationChecks.RunAsync(Check);
         await FlowManagementHttpChecks.RunAsync(backendRoot, Check);
         await FlowSimulationChecks.RunAsync(Check);
+        await FlowTemplateSimulationChecks.RunAsync(repositoryRoot, Check);
         await DynamicConditionChecks.RunAsync(repositoryRoot, Check);
         await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
         await NotificationChecks.RunAsync(Check);

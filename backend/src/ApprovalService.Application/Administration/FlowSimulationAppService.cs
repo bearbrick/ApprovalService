@@ -237,7 +237,12 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
             }
 
             EnsureFakeFields(session, task.NodeId, request.FieldValues);
-            command.Operation = new OperationInput { ActorId = task.AssigneeId, FieldValues = request.FieldValues };
+            command.Operation = new OperationInput
+            {
+                ActorId = task.AssigneeId,
+                Opinion = request.Opinion,
+                FieldValues = request.FieldValues,
+            };
         }
         else if (request.Kind is EngineCommandKinds.ActionSucceeded or EngineCommandKinds.ActionFailed or
             EngineCommandKinds.SubprocessCompleted)

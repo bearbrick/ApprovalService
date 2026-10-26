@@ -128,7 +128,7 @@
 
 `POST /admin/apps/{code}/test-callback` 接受 `{reason}`，原因须为 2 至 200 字符；仅当前本地会话中的组织管理员或该应用名单内在职人员可调用，入队事务再次核对权限、应用启用及非空回调地址。成功返回 `{eventId, status:"queued"}`，`eventId` 以 `test-` 开头，每次测试唯一。该接口只保存回调待发项及含操作者和原因的脱敏审计，不创建审批单、任务或业务动作。`integration.test` 正文沿用回调字段：`instanceId` 为与 `eventId` 相同的合成 ID，`serialNo`、`flowCode`、`businessKey` 为空串，`status` 为 `test`，`data` 为 `{}`，测试事件专有 `clientAppCode` 为目标应用编码；`occurredAt` 为排队时间。业务系统只验签确认，不按业务单号更新单据。发送复用 `X-Approval-Signature` 原始正文 HMAC、`X-Request-Id=eventId`、五秒超时、持久重试与发送日志；管理队列摘要可按应用查看该项。旧审批回调不带 `clientAppCode`。
 
-流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,fieldValues?,success?,actionResult?}`，`fieldValues` 只供假人工任务填写审批人字段，成功推进后成为该模拟会话的当前值；人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
+流程模拟创建请求为 `{definition,data,initiatorId,fakeAssignees}`，其中 `definition.code` 必须是当前本地人员有权管理的已有流程，草稿可以包含尚未保存的修改。`fakeAssignees` 按人工节点 ID 提供假处理人内部 ID 数组。响应含 `id,flowCode,expiresAt,status,tasks,waits,events`；每步请求为 `{kind,taskId?,tokenId?,actorId?,opinion?,fieldValues?,success?,actionResult?}`。`opinion` 是可选的假人工意见；配置了必填意见的节点仍由统一引擎校验，旧请求省略时保持原行为。`fieldValues` 只供假人工任务填写当前节点可编辑的审批人字段，成功推进后成为该模拟会话的当前值。人工命令只允许当前假处理人操作当前任务，自动动作及子流程由调用方显式提供假结果。仅会话创建人能读取、推进和删除，读取也刷新 30 分钟闲置期；进程重启即丢失，不产生审批单、待发项、真实提醒、钩子或回调。
 
 条件网关按到达时可用的业务数据和已成功提交的审批人字段求值；成功任务本次填写值参与随后网关，拒绝或失败的命令不改变当前值。尚未填写的审批人字段在发起时不预先选择路径，到达网关仍缺值则返回可纠正的条件错误。退回后重提按既定清空语义不沿用旧审批人字段，补充恢复则保留。
 

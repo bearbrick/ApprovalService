@@ -15,11 +15,14 @@
 可以新建、修改的文件：
 
 - 流程模板库：请假、加班、出差、费用报销、付款、采购、用印、合同、物品领用、质量异常（只有流程和审批数据定义）
+- `frontend/src/designer/workbench/samples/quality-exception.json`：返工回路后同一质检员须每次重新审批并填写最新处置结论。
 - 测试模式：用假数据模拟发起，扮演每个审批人走完整条流程，不发真实提醒、不调业务接口
 - 接入向导：建接入应用 → 生成 API Key 和签名密钥 → 选流程 → 生成 C# 调用代码 → 一键发测试回调
 - `frontend/src/designer/workbench/simple-templates.ts`、`workbench-model.ts`、`frontend/tests/workbench-checks.ts`：内置可复制的十类流程模板及静态发布预检。
 - `frontend/src/designer/workbench/integration-snippet.ts`、`frontend/src/pages/DesignerPage.vue`、对应前端检查：生成、展示、复制不嵌入 API Key 的 C# SDK 调用代码。
 - `backend/src/ApprovalService.Application/Administration/FlowSimulation*.cs`、`backend/src/ApprovalService.Api/Endpoints/FlowSimulationEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowSimulationChecks.cs`：已确认的内存模拟会话。
+- `backend/tests/ApprovalService.Backend.Checks/FlowTemplateSimulationChecks.cs`、`Fixtures/flow-templates.json`、`frontend/tests/workbench-checks.ts`：对十个正式模板逐一用同一模拟引擎推进，前端核对测试夹具始终等于模板原定义。
+- `backend/src/ApprovalService.Application/Administration/FlowSimulationAppService.cs`：给模拟人工步骤传递可选假意见，以验证节点必填意见规则。
 - `frontend/src/api/flow-simulation.ts`、`frontend/src/designer/workbench/FlowSimulationPanel.vue`、`frontend/src/designer/workbench/simulation-model.ts`、`frontend/tests/simulation-checks.ts`：用现有流程管理员会话在设计器试跑当前草稿和假数据，显示待办、外部等待与事件，不保存真实业务记录。
 - `frontend/README.md`：同步测试模式页面的实际能力与限制。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`IClientAppAdminRepository.cs`、`backend/src/ApprovalService.Application/Integration/ClientAppAdminAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppAdminRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/ClientAppAdminEndpoints.cs`：已确认的按应用管理员人员 ID 名单与授权查询；本切片不发送测试回调。
@@ -37,6 +40,7 @@
 
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`：追加测试模式路由常量。
 - `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`：新增测试模式契约。
+- `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`、`docs/contracts.md`、设计书 §designer/§integration：模拟步骤兼容新增可选 `opinion`，不会改变旧请求默认行为。
 - `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`：只追加服务、端点和检查登记。
 - `docs/contracts.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`、`docs/adr/README.md`：同步已确认的跨部分测试协议。
 - `frontend/src/pages/DesignerPage.vue`、`frontend/tests/checks.ts`：仅登记测试模式面板及对应检查；保持设计器主文件低于 500 行。
@@ -63,6 +67,7 @@
 
 ## 交接记录
 
+- 2026-10-26 · Codex · 十个设计器正式模板逐一通过 `FlowCompiler.Compile` 发布预检并经同一内存模拟服务走到 `approved`，测试夹具由前端检查与原模板/业务样例逐字核对。质量异常模板先走返工、再由同一质检员重审并选无需返工，修正其 `inspection` 节点为 `duplicateAssigneeBehavior=everyTime`；模拟步骤兼容增加假意见，满足模板必填意见。无持久仓储写入、无残留会话，内存服务没有出站依赖。最终全量 `verify.ps1` 通过：后端 1157、调用端 96、前端 201 项及生产构建。设计器面板目前仅有意见输入，质量异常模板还需由正在整合的 UI 分支补充假审批人字段输入后才能在页面上手动试跑；首个验收框保持未勾选，任务状态继续进行中。
 - 2026-10-26 · Codex · 补齐设计器“流程规则”页的真实测试模式入口：复用已授权的流程管理员 JWT 与现有内存模拟 API，当前完整草稿、可编辑假数据和逐节点假处理人创建会话；逐项模拟人工完成/拒绝、自动动作与子流程结果，查看待办、等待令牌和最近事件，结束时删会话。JSON 样例复用已有审批字段样例生成器；独立前端检查覆盖输入校验、人员去重和完整 HTTP 往返。完整 `verify.ps1` 通过：后端 1071、调用端 96、前端 191 项及生产构建；尚未逐一用十模板经真实 HTTP 走完，验收项仍未勾选。未触碰真实实例/回调接口。下一步整合分支合入并复验，外置 Chrome 可用时检查视觉和交互。
 - 2026-10-26 · Codex · 基于已整合 `f92d9c2` 完成接入向导前端接线：组织管理员在应用列表打开向导，新建应用时现有编辑器只显示一次密钥；独立读取原始授权流程编码以生成已编译验证过的 C# SDK 示例；应用管理员名单先 GET，再以旧名单条件 PUT，并按服务端要求填写原因；签名测试回调显示 `test-` 事件 ID、异步排队语义，组织管理员可跳到待发队列看摘要。新增 `#/admin/apps/test` 受限入口，本地人员登录后只可用已知应用编码发测试，页面不读取组织级应用列表、名单和待发队列；服务端仍在入队事务核对身份。新增前端场景检查，并同步前端 README。完整 `verify.ps1` 通过：后端 1071 项、调用端 96 项、前端 189 项及生产构建；本轮未修改服务端协议、未新增依赖。尚待整合后的复验和外置 Chrome 视觉检查（当前 Chrome 控制接口此前被系统拒绝），十模板逐个模拟验收仍未完成；T-022 保持进行中。现有服务端只提供组织级待发摘要，未提供单事件逐次发送日志查询，前端没有越权展示给应用管理员。
 - 2026-10-25 · Codex · 为接入向导前端从整合提交 `6a449d1` 建立独立分支 `ai/codex/T-022-integration-wizard`，在用户要求近期暂停后停于动产品代码前。已核对现有 `AdminPage` 通过 `/api/v1/admin/session` 只允许组织管理员进入，应用列表和出站发送日志也仅组织管理员可读；新 `POST /api/v1/admin/apps/{code}/test-callback` 则已允许本应用管理员调用。后续最小安全接线：组织管理员在现有应用编辑页维护名单、授权流程、生成不含密钥的 C# 示例、填写原因发送测试回调并查看事件 ID/排队状态及发送日志；本应用管理员使用仅输入已知应用编码与原因的受限入口，服务端每次重验权限，不读取全部应用列表、管理员名单或组织级出站日志。若需要应用管理员看到其应用列表/发送日志，应先定义服务端按应用过滤的新契约，不可通过前端过滤组织级响应。下一步先在任务范围登记前端页面、API、会话守卫、检查与 README，再实现并跑前端检查/构建、错峰完整验证。本轮无产品代码或依赖改动，未运行验证；T-022 保持进行中。

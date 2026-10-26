@@ -67,8 +67,9 @@ public sealed class CenterDocumentAppService(ICenterQueryRepository center, ICli
         {
             throw new UserFriendlyException(ErrorCodes.BusinessHookFailed, "业务原单来源配置不正确。");
         }
+        // 明细只列可见叶子路径；若把父表路径一起授权，业务端可能误放行隐藏列。
         var paths = detail.FieldDefinitions.SelectMany(field => field.Children.Count == 0
-            ? [field.Key] : new[] { field.Key }.Concat(field.Children.Select(child => field.Key + "." + child.Key)))
+            ? [field.Key] : field.Children.Select(child => field.Key + "." + child.Key))
             .Distinct(StringComparer.Ordinal).ToArray();
         var requestId = Guid.NewGuid().ToString("N");
         var raw = await hooks.InvokeAsync(app, app.DocumentUrl, new DocumentHookRequest
@@ -91,13 +92,14 @@ public sealed class CenterDocumentAppService(ICenterQueryRepository center, ICli
             throw new UserFriendlyException(ErrorCodes.BusinessHookFailed, "业务原单响应格式不正确。");
         }
         var now = clock.GetUtcNow();
-        if (result is null || result.Url.Length is < 1 or > 2048 ||
-            !Uri.TryCreate(result.Url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
+        var address = result?.Url;
+        if (result is null || string.IsNullOrWhiteSpace(address) || address.Length > 2048 ||
+            !Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps ||
             uri.UserInfo.Length != 0 || result.ExpiresAt <= now || result.ExpiresAt > now.AddMinutes(5) ||
             !origins.Contains(uri.GetLeftPart(UriPartial.Authority), StringComparer.OrdinalIgnoreCase))
         {
             throw new UserFriendlyException(ErrorCodes.BusinessHookFailed, "业务原单地址、来源或有效期不正确。");
         }
-        return new CenterDocumentUrlResponse { Url = result.Url, ExpiresAt = result.ExpiresAt };
+        return new CenterDocumentUrlResponse { Url = address, ExpiresAt = result.ExpiresAt };
     }
 }

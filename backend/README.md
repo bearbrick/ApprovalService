@@ -137,13 +137,15 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 
 `GET /api/v1/admin/outbox` 只投影最近 200 条待发项元数据，不加载发送正文。`POST /api/v1/admin/callbacks/{eventId}/retry` 要求本地组织管理员填写原因，原地重排回调并在同一事务留审计；有效租约中的发送不可重排。已完成的回调也可按原事件 ID 再次投递，接入应用负责去重。
 
-接入应用管理页通过 `POST /api/v1/admin/apps` 登记编码、名称、授权流程、回调与四类钩子地址；`PUT /api/v1/admin/apps/{code}/enabled` 启停，`POST /api/v1/admin/apps/{code}/rotate-secrets` 轮换凭据。每次管理变更要求原因并与脱敏审计同事务提交。创建和轮换响应中的 API Key 与签名密钥只显示一次，列表及日志不提供密钥；轮换或实际启停会使旧嵌入会话失效。
+接入应用管理页通过 `POST /api/v1/admin/apps` 登记编码、名称、授权流程、回调与四类原有钩子地址；`GET/PUT /api/v1/admin/apps/{code}/document-settings` 独立配置第五个只读原单签名钩子及其 HTTPS 子页面来源；`PUT /api/v1/admin/apps/{code}/enabled` 启停，`POST /api/v1/admin/apps/{code}/rotate-secrets` 轮换凭据。每次管理变更要求原因并与脱敏审计同事务提交。创建和轮换响应中的 API Key 与签名密钥只显示一次，列表及日志不提供密钥；轮换或实际启停会使旧嵌入会话失效。
 
 ## 审批中心同源托管
 
 正式部署先构建 `frontend/`，再发布 `ApprovalService.Api`，将 `frontend/dist/` 的内容复制到发布目录的 `wwwroot/`。服务默认从自身内容根目录的 `wwwroot/index.html` 提供页面；也可用环境变量 `ApprovalService__Frontend__DistPath` 指向完整的前端构建目录。生产环境找不到 `index.html` 时启动失败；开发环境未配置构建目录时可单独运行 API。前端文件必须经本服务或等效保留安全头的同源反向代理提供，不可另开放一个不受策略保护的静态入口。
 
 普通页面为 `/`，响应禁止被 iframe 嵌入。接入应用专属入口为 `/embed/{clientAppCode}`，只允许该应用登记的来源嵌入；来源配置不包含路径、查询或通配符，未配置时仅允许同源。业务系统应从后端签发一次性令牌，并把它放在片段里，例如 `/embed/erp#/center/approvals/instance-id?embedToken=...`。片段不会发送到服务器；页面兑换后立即清理。审批中心的接口与资源同源，嵌入上下文接口仅接受该应用的已验证嵌入 JWT。直接访问 `/index.html` 等静态 HTML 仍为禁止嵌入，不能绕过专用入口。
+
+原单 `embed` 排版使用已授权人员 JWT 调 `POST /api/v1/center/instances/{id}/document-url`。服务端按锁定版本、当前字段可见范围和本应用唯一外部人员绑定发出第五个双向签名钩子；只返回有效期不超过五分钟、来源精确命中本应用 `allowedDocumentOrigins` 的 HTTPS 地址，响应不可缓存，也不持久化该地址。业务系统负责一次性消费、本人绑定、隐藏字段裁剪和禁止写操作；钩子或 iframe 失败时前端显示原已授权数据快照。HTML 的 `frame-src` 对专属入口只允许本应用原单来源，普通登录入口使用所有启用应用来源并集；来源配置损坏时拒绝加入 CSP。发起时的 `detailUrl` 不参与此流程。
 
 ## 工作日历基础
 

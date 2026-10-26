@@ -50,7 +50,7 @@ public sealed class AdminDocumentSettingsAppService(IClientAppRepository reposit
         {
             throw new UserFriendlyException(ErrorCodes.Unauthorized, "请先登录。");
         }
-        var reason = input.Reason.Trim();
+        var reason = input.Reason?.Trim() ?? string.Empty;
         if (reason.Length is < 2 or > 200)
         {
             throw new UserFriendlyException(ErrorCodes.ValidationFailed, "请填写 2 到 200 个字符的变更原因。");

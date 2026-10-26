@@ -18,6 +18,8 @@
 - `backend/src/ApprovalService.Domain/Center/`、`Application/Center/`、`Infrastructure/Center/`：中心查询模型与授权仓储
 - `backend/src/ApprovalService.Api/Endpoints/Center/`、`Contracts/Protocol/Center*.cs`：JWT 中心路由和向后兼容响应
 - `backend/tests/ApprovalService.Backend.Checks/Center*.cs`：真实 SQLite/JWT/HTTP 检查
+- `backend/tests/ApprovalService.Backend.Checks/FrontendHostingChecks.cs`：更新 HTML CSP 场景，验证原单子页面来源按应用隔离。
+- `backend/tests/ApprovalService.Backend.Checks/CenterOpinionMigrationIntegrationChecks.cs`：旧库升级夹具改用旧结构 SQL 插入，避免当前模型新增列写入旧表。
 - `backend/README.md`、`docs/contracts.md`、`docs/architecture.md`、设计书 §center/§api：实际接口行为同步
 - `frontend/src/pages/center/`：待我处理、我已处理、抄送我的、我发起的（只看进度）；详情（按排版显示业务数据，或嵌入业务系统的原单；意见栏；时间线加流程图高亮；操作按钮）
 - `frontend/src/pages/CenterPage.vue`、`frontend/src/api/center-adapter.ts`、`frontend/src/api/center-session.ts`、`frontend/src/model/center.ts`、`frontend/tests/center-checks.ts`、`frontend/src/styles/center.css`：登录会话、中心接口映射、真实列表与详情、场景检查及页面样式

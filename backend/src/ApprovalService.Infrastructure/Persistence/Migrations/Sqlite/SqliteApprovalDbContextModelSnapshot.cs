@@ -63,6 +63,39 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.ToTable("CenterReadCursors", (string)null);
                 });
 
+            modelBuilder.Entity("ApprovalService.Domain.Center.DelegationRuleEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DelegateId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FlowCodesJson")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrincipalId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PrincipalId", "StartsAtUtc", "EndsAtUtc");
+
+                    b.ToTable("DelegationRules", (string)null);
+                });
+
             modelBuilder.Entity("ApprovalService.Domain.Files.StoredFileEntity", b =>
                 {
                     b.Property<string>("Id")

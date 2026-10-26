@@ -40,6 +40,12 @@ internal static class Program
             Console.WriteLine($"委托规则检查全部通过：{passed} 项");
             return 0;
         }
+        if (args.FirstOrDefault() == "delegation-http")
+        {
+            await CenterDelegationChecks.RunAsync(backendRoot, Check);
+            Console.WriteLine($"委托 HTTP 检查全部通过：{passed} 项");
+            return 0;
+        }
         if (args.FirstOrDefault() == "flow-transfer")
         {
             await FlowTransferHttpChecks.RunAsync(backendRoot, Check);
@@ -107,6 +113,7 @@ internal static class Program
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await CenterQueryChecks.RunAsync(backendRoot, Check);
         await CenterOpinionChecks.RunAsync(backendRoot, Check);
+        await CenterDelegationChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);

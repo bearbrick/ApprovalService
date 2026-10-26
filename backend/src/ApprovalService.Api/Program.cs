@@ -132,6 +132,7 @@ app.MapFileEndpoints();
 app.MapCenterQueryEndpoints();
 app.MapCenterActionEndpoints();
 app.MapCenterOpinionEndpoints();
+app.MapCenterDelegationEndpoints();
 app.MapCenterEmbedEndpoints();
 
 if (bootstrapCommand)

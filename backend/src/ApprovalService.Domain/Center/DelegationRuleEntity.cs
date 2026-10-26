@@ -40,4 +40,9 @@ public sealed class DelegationRuleEntity
     /// 限定的流程编码；空集合代表全部流程。
     /// </summary>
     public List<string> FlowCodes { get; set; } = [];
+
+    /// <summary>
+    /// 数据库保存的流程范围 JSON，由仓储与领域列表同步。
+    /// </summary>
+    public string FlowCodesJson { get; set; } = "[]";
 }

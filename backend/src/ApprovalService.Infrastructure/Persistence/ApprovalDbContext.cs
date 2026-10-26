@@ -95,6 +95,11 @@ public class ApprovalDbContext : DbContext
     public DbSet<CenterOpinionEntity> CenterOpinions => Set<CenterOpinionEntity>();
 
     /// <summary>
+    /// 审批人的个人委托规则。
+    /// </summary>
+    public DbSet<DelegationRuleEntity> DelegationRules => Set<DelegationRuleEntity>();
+
+    /// <summary>
     /// 事务待发队列。
     /// </summary>
     public DbSet<OutboxItemEntity> OutboxItems => Set<OutboxItemEntity>();
@@ -431,6 +436,7 @@ public class ApprovalDbContext : DbContext
         });
 
         CenterOpinionModelConfiguration.Configure(modelBuilder);
+        DelegationRuleModelConfiguration.Configure(modelBuilder);
 
         modelBuilder.Entity<OutboxItemEntity>(entity =>
         {

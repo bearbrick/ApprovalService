@@ -81,6 +81,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
         services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
         services.AddScoped<ICenterOpinionRepository, CenterOpinionRepository>();
+        services.AddScoped<IDelegationRuleRepository, DelegationRuleRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();
         services.AddSingleton(new IntegrationTransportPolicy
         {

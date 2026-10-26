@@ -37,6 +37,7 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 | `GET /api/v1/info` | 服务信息：名称、版本、接口版本 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}` | 已登录人员的四列表与只读详情；嵌入范围与人员参与关系在数据库同时过滤，详情排版按锁定版本及可见字段裁剪 |
 | `GET/POST /api/v1/center/opinions`、`PUT/DELETE /center/opinions/{id}` | 本人常用意见，嵌入会话仅可读取 |
+| `GET/POST /api/v1/center/delegations`、`DELETE /center/delegations/{id}`、`POST /center/delegations/tasks` | 本人委托规则与已有任务逐项转委托；管理员可用对应 `/api/v1/admin/delegations/{principalId}` 路由代管 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 登录人员对当前任务提交引擎命令，批量同意逐项独立处理 |
 | `GET /api/v1/flows`、`GET /api/v1/flows/{code}/schema` | 已授权的发布流程与审批数据定义，需 API Key |
 | `GET /api/v1/instances/{id}`、`GET /api/v1/instances?flowCode=&businessKey=` | 本接入应用的审批单详情和历史，需 API Key |
@@ -62,6 +63,8 @@ Linux Docker 与 Windows 服务部署、数据目录权限、SQLite 在线备份
 ## 审批中心查询
 
 个人常用意见由 `CenterOpinionAppService` 按已验证 JWT 的人员 ID 保存；本地会话可新增、修改和删除（每人至多 30 条、每条至多 500 字），嵌入会话仅可读取。意见选择只填入审批栏，办理仍调用既有任务操作接口。三库使用同一实体配置和各自的 EF 迁移。
+
+委托规则由 `CenterDelegationAppService` 和 `DelegationRuleRepository` 按本人或组织管理员的本地 JWT 保存，三库迁移共用模型。规则按 UTC 左闭右开时段和流程范围拒绝交叠；运行时在执行前从库加载当前有效规则，新到任务只委托一层。本人或管理员选中的在手任务逐项经统一引擎转委托，管理员必须填写原因并用真实操作人留痕。删除规则只影响今后到达的任务。
 
 `CenterQueryAppService` 提供当前人员的待办、已办、抄送和发起/代发列表及只读详情，分页与总数基于同一授权查询。只接受 JWT，本地会话跨应用按参与关系读取，嵌入会话再限定所属应用；API Key 不能替代登录。当前原审批人与代理人均可查看 pending 任务；历史实际处理和已送达抄送复用持久参与者投影。无关管理员、未来/取消任务不能直接取得保密详情，不可见与不存在统一 404。
 

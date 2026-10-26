@@ -7,6 +7,8 @@ import { fetchCenterFile } from '../src/api/center-files.ts'
 import { centerDetailLayout } from '../src/api/center-layout.ts'
 import { loadCenterPreferences, notificationCategories, saveCenterPreference } from '../src/api/center-settings.ts'
 import { createCenterOpinion, deleteCenterOpinion, loadCenterOpinions, updateCenterOpinion } from '../src/api/center-opinions.ts'
+import { createCenterDelegation, delegateCenterTasks, deleteCenterDelegation, loadCenterDelegations } from '../src/api/center-delegations.ts'
+import type { CenterDelegation } from '../src/api/center-delegations.ts'
 import type { CenterChangeMessage } from '../src/api/center-embed.ts'
 
 /**
@@ -71,6 +73,7 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
   let failPreference = false
   const savedPreferences = new Map<string, { emailEnabled: boolean, inAppEnabled: boolean }>()
   const savedOpinions: { id: string, content: string, createdAtUtc: string }[] = []
+  const savedDelegations: CenterDelegation[] = []
   const summary = {
     id: 'instance-1', serialNo: 'SP-1', flowCode: 'PURCHASE', flowName: '采购审批', businessKey: 'PO-1',
     title: '采购申请', status: 'running', clientAppCode: 'ERP', sourceName: '采购系统', initiatorId: 'person-1', initiatorName: '张三', currentStep: '经理审批', isUrgent: true,
@@ -125,6 +128,27 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
         const item = { id: `opinion-${savedOpinions.length + 1}`, content, createdAtUtc: '2026-10-25T00:00:00Z' }
         savedOpinions.push(item)
         return new Response(JSON.stringify(item), { status: 200 })
+      }
+      if (path.startsWith('/api/v1/center/delegations')) {
+        const method = init?.method ?? 'GET'
+        if (method === 'GET') return new Response(JSON.stringify(savedDelegations), { status: 200 })
+        if (new Headers(init?.headers).get('Authorization') === 'Bearer embed-token') {
+          return new Response(JSON.stringify({ code: 'FORBIDDEN', message: '嵌入会话只能读取。' }), { status: 403 })
+        }
+        if (path.endsWith('/tasks')) {
+          const payload = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as { taskIds: string[] }
+          return new Response(JSON.stringify(payload.taskIds.map(taskId => ({ taskId,
+            succeeded: taskId === 'task-1', code: taskId === 'task-1' ? null : 'NOT_FOUND',
+            message: taskId === 'task-1' ? null : '任务不存在。' }))), { status: 200 })
+        }
+        if (method === 'DELETE') {
+          savedDelegations.splice(savedDelegations.findIndex(item => item.id === path.split('/').at(-1)), 1)
+          return new Response(null, { status: 204 })
+        }
+        const payload = JSON.parse(typeof init?.body === 'string' ? init.body : '{}') as CenterDelegation
+        const saved = { ...payload, id: 'delegation-1', principalPersonId: 'person-1' }
+        savedDelegations.push(saved)
+        return new Response(JSON.stringify(saved), { status: 200 })
       }
       const body = path.endsWith('/identity/login')
         ? { personId: 'person-1', accessToken: 'test-token', accessExpiresAt: '2099-01-01T00:00:00Z', refreshToken: 'refresh', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false }
@@ -226,6 +250,18 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
       opinions.length === 1 && opinions[0]?.content === '已核对' && updatedOpinion.content === '请修改'
       && afterOpinionDelete.length === 0 && requests.slice(-5).every(request => request.authorization === 'Bearer test-token')
       && requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,PUT,DELETE,GET')
+    const createdDelegation = await createCenterDelegation({ delegatePersonId: 'person-2',
+      startsAtUtc: '2026-10-26T00:00:00Z', endsAtUtc: '2026-10-27T00:00:00Z', flowCodes: ['PURCHASE'] })
+    const delegations = await loadCenterDelegations()
+    const transfers = await delegateCenterTasks(['task-1', 'missing-task'])
+    await deleteCenterDelegation(createdDelegation.id)
+    const afterDelegationDelete = await loadCenterDelegations()
+    check('委托设置使用本人 JWT 持久读写，已有任务逐项返回且删除不伪造保存',
+      delegations.length === 1 && delegations[0]?.flowCodes[0] === 'PURCHASE' &&
+      transfers.length === 2 && transfers[0]?.succeeded === true &&
+      transfers[1]?.succeeded === false && afterDelegationDelete.length === 0 &&
+      requests.slice(-5).every(request => request.authorization === 'Bearer test-token') &&
+      requests.slice(-5).map(request => request.method).join(',') === 'POST,GET,POST,DELETE,GET')
     logoutCenter()
     const embedded = await exchangeCenterEmbed('one-time')
     const context = await loadCenterEmbedContext()

@@ -58,9 +58,15 @@ internal static class OperationGuard
                         item.Status is EngineTaskStatuses.Queued or EngineTaskStatuses.Approved) ||
                     (command.Kind == OperationKinds.DelegateExisting && item.Status == EngineTaskStatuses.Queued)))
                 ?? throw new EngineException(ErrorCodes.Conflict, "任务不存在或已处理。");
-            if (input.ActorId != task.AssigneeId && input.ActorId != task.DelegatorId)
+            var administratorDelegation = command.Kind == OperationKinds.DelegateExisting && input.IsAdministrator;
+            if (!administratorDelegation && input.ActorId != task.AssigneeId && input.ActorId != task.DelegatorId)
             {
                 throw new EngineException(ErrorCodes.Forbidden, "当前人员不能处理该任务。");
+            }
+
+            if (administratorDelegation && string.IsNullOrWhiteSpace(input.Reason))
+            {
+                throw new EngineException(ErrorCodes.ValidationFailed, "管理员转委托已有任务必须填写原因。");
             }
 
             var node = context.Graph.Nodes.Single(item => item.Id == task.NodeId);

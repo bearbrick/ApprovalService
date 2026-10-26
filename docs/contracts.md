@@ -59,6 +59,8 @@
 | `GET /api/v1/info` | 无 | 服务信息 |
 | `GET /api/v1/center/instances`、`/center/instances/{id}`，`POST /api/v1/center/instances/{id}/read` | 本地或嵌入 JWT | 当前人员的四类列表、已授权详情和本人已读游标；不接受 API Key 代替人员登录 |
 | `GET/POST /api/v1/center/opinions`、`PUT/DELETE /api/v1/center/opinions/{id}` | 读取为人员 JWT；写入仅本地 JWT | 本人常用意见最多 30 条，每条最多 500 字，嵌入会话只读 |
+| `GET/POST /api/v1/center/delegations`、`DELETE /api/v1/center/delegations/{id}`、`POST /api/v1/center/delegations/tasks` | 本地人员 JWT | 本人委托规则及已有待办逐项转委托；嵌入会话不可修改 |
+| `GET/POST /api/v1/admin/delegations/{principalId}`、`DELETE /api/v1/admin/delegations/{principalId}/{id}`、`POST /api/v1/admin/delegations/{principalId}/tasks` | 本地组织管理员 JWT | 代指定人员维护委托；已有任务转移必须填写原因并记真实管理员身份 |
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 人员 JWT | 上传本人手写 PNG、查询个人签名及按本人或审批单授权取图；嵌入 JWT 只能上传单次签名 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
@@ -202,6 +204,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 任务操作请求向后兼容新增可选 `signatureFileId`，只允许选用当前 JWT 人员本人上传的不可变资产；省略表示本次明确不使用签名，个人签名不会被默认引用。发布节点 `approval.signatureRequired` 默认为 `false`；为 `true` 时，同意、办理完成和确认已阅必须选用签名，拒绝等不成功推进的操作不强制。此类任务不提供批量同意。任务详情新增 `signatureRequired` 和已完成任务的 `signatureFileId?`；事件时间线新增本次审计冻结的 `signatureFileId?`。旧流程与旧响应保持默认无签名语义，审批中心不修改业务数据。
 `GET /api/v1/center/opinions` 返回当前 JWT 人员的个人常用意见数组，每项 `{id,content,createdAtUtc}`，按创建时间和 ID 稳定排序；本地与嵌入会话均可读取。`POST /api/v1/center/opinions` 和 `PUT /api/v1/center/opinions/{id}` 请求 `{content}`，返回保存后的单项；`DELETE /api/v1/center/opinions/{id}` 成功返回 204。三种写请求仅允许本地人员会话，嵌入会话返回 `FORBIDDEN`；意见只按 JWT 人员 ID 归属，不接受请求中的人员参数。正文去除首尾空白后须为 1～500 字，每人最多 30 条，满额返回 `CONFLICT`；他人意见与不存在统一 `NOT_FOUND`。常用意见仅填入当前审批意见栏，任务提交仍走现有操作接口。
+
+委托设置 `GET/POST /api/v1/center/delegations` 按本人 JWT 读写；管理员使用 `/api/v1/admin/delegations/{principalId}` 为指定内部人员维护。新增请求 `{delegatePersonId,startsAtUtc,endsAtUtc,flowCodes}`，`flowCodes` 空数组表示全部流程；响应追加 `id,principalPersonId`。时段必须是 UTC 左闭右开，端点相接允许；同一委托人时间和流程范围均相交返回 `CONFLICT`。本人或管理员删除规则返回 204，删除只影响未来任务，既有任务不反向收回。`POST /api/v1/center/delegations/tasks` 请求 `{taskIds}`；管理员对应入口请求 `{taskIds,reason}` 且原因必填；最多一百个不同任务 ID，按输入顺序返回 `[{taskId,succeeded,code?,message?}]`，逐项独立提交。只转移尚未处理且属于该委托人的原任务，按当前服务端时间及锁定流程版本重新检查规则。管理员必须由本地组织角色授权，审计记录真实操作人和原因。嵌入会话只能读取本人规则，不能写入。
 
 ## 同源审批中心内嵌
 

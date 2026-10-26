@@ -327,6 +327,10 @@ export interface CenterDetail {
    */
   actionTasks?: readonly CenterActionTask[]
   /**
+   * 当前人员原指派且尚未处理的任务，仍需在转委托写入口重验。
+   */
+  delegationTasks?: readonly { taskId: string, nodeName: string }[]
+  /**
    * 由服务端授权后返回的业务字段快照。
    */
   fields: readonly CenterDetailField[]

@@ -42,6 +42,30 @@ public static class CenterRoutes
     /// </summary>
     public const string Opinion = Opinions + "/{id}";
     /// <summary>
+    /// 本人委托规则列表和新增入口。
+    /// </summary>
+    public const string Delegations = "/api/v1/center/delegations";
+    /// <summary>
+    /// 删除本人一项委托规则。
+    /// </summary>
+    public const string Delegation = Delegations + "/{id}";
+    /// <summary>
+    /// 按有效规则逐项将已有待办转给代理人。
+    /// </summary>
+    public const string DelegateTasks = Delegations + "/tasks";
+    /// <summary>
+    /// 组织管理员维护指定人员的委托规则。
+    /// </summary>
+    public const string AdminDelegations = "/api/v1/admin/delegations/{principalId}";
+    /// <summary>
+    /// 组织管理员逐项转移指定人员已有待办。
+    /// </summary>
+    public const string AdminDelegateTasks = AdminDelegations + "/tasks";
+    /// <summary>
+    /// 组织管理员删除指定人员的一项委托规则。
+    /// </summary>
+    public const string AdminDelegation = AdminDelegations + "/{id}";
+    /// <summary>
     /// 使用当前登录人员身份办理一项人工任务。
     /// </summary>
     public const string TaskActions = "/api/v1/center/tasks/{taskId}/actions";

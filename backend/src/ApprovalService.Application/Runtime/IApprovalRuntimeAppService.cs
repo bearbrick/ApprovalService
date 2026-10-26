@@ -55,6 +55,30 @@ public interface IApprovalRuntimeAppService
 public sealed class RuntimeCommandInput
 {
     /// <summary>
+    /// 管理员页面读取的运行修订，空值沿用普通运行行为。
+    /// </summary>
+    public long? ExpectedInstanceVersion
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 已核实的本地干预人员，供最终事务重验权限。
+    /// </summary>
+    public string? InterventionActorId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 最终事务须重验在职状态的接手人员。
+    /// </summary>
+    public string? InterventionTargetId
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 唯一引擎命令。
     /// </summary>
     public EngineCommand Command { get; set; } = new();

@@ -134,6 +134,22 @@ public sealed class RuntimeSnapshot
 public sealed class RuntimeCommit
 {
     /// <summary>
+    /// 已核实的本地干预人员，供最终事务重验权限。
+    /// </summary>
+    public string? InterventionActorId
+    {
+        get; set;
+    }
+
+    /// <summary>
+    /// 最终事务须重验在职状态的接手人员。
+    /// </summary>
+    public string? InterventionTargetId
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 提交后的审批单状态。
     /// </summary>
     public InstanceEntity Instance { get; set; } = new();

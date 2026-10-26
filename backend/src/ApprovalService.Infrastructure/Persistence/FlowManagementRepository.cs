@@ -324,7 +324,7 @@ public sealed class FlowManagementRepository(IDbContextFactory<ApprovalDbContext
     /// <param name="personId">内部人员 ID。</param>
     /// <param name="cancellationToken">取消标记。</param>
     /// <returns>当前身份。</returns>
-    private static async Task<FlowManagerIdentity> ReadIdentityAsync(ApprovalDbContext db, string personId,
+    internal static async Task<FlowManagerIdentity> ReadIdentityAsync(ApprovalDbContext db, string personId,
         CancellationToken cancellationToken)
     {
         var person = await db.People.AsNoTracking().SingleOrDefaultAsync(item => item.Id == personId,

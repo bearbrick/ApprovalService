@@ -1,6 +1,6 @@
 # 0022 通过专用签名钩子按查看人获取业务原单临时地址
 
-状态：提议
+状态：已采纳
 日期：2026-10-26
 关联：T-011
 
@@ -10,7 +10,7 @@
 
 现有 ADR 0010 只定义取数、校验、取人、自动动作四类钩子。发起时可保存的 `detailUrl` 没有当前查看人、单次使用或到期语义，不能直接放入 iframe。ADR 0016 的 `allowedOrigins` 约束业务网站嵌入审批中心的**父页面**，不一定等于业务原单 iframe 的**子页面**来源。当前中心详情把 `embed` 排版回退为自动排版，HTML CSP 只约束 `frame-ancestors`，未约束 `frame-src`。原单还可能显示当前节点无权看到的字段，单纯验证地址无法替业务系统裁剪内容。
 
-## 提议决定（待确认后实现）
+## 决定
 
 1. 每个接入应用新增可选的完整 `documentUrl` 钩子地址，以及独立的 `allowedDocumentOrigins` HTTPS origin 列表。旧应用默认无钩子、空来源列表，继续使用已授权普通详情。组织管理员配置两者并留原因与审计。`allowedEmbedOrigins` 继续只管谁可嵌入审批中心，避免把父页面与子页面信任方向混在同一名单。钩子地址沿用 ADR 0010 的显式内网 HTTP 开关；**返回的原单页面始终只允许 HTTPS**。
 2. 当前 JWT 人员通过已有中心详情授权后，前端才调用 `POST /api/v1/center/instances/{id}/document-url`，不提交人员、应用或业务单号。服务端从同一审批单锁定版本读取 `embedPageCode`、业务单号、所属应用和当前查看人的可见字段路径，并核对该人员在本应用的外部人员绑定；缺少绑定则回退普通详情。服务端向该应用的 `documentUrl` 发送 ADR 0010 双向 HMAC 签名的 `POST`：`{requestId, instanceId, flowCode, businessKey, embedPageCode, viewerExternalId, visibleFieldPaths, readOnly:true}`。`visibleFieldPaths` 包含当前可见的顶层字段及明细列路径；业务页面必须据此裁剪或拒绝签发，不能因为有临时地址显示当前审批节点的隐藏字段。
@@ -18,7 +18,7 @@
 4. 前端只在服务端返回有效地址后插入 iframe，设置 `referrerpolicy="no-referrer"` 和不含表单、弹窗、顶层导航许可的 `sandbox`。审批服务 HTML 的 CSP 增加 `frame-src`：专用 `/embed/{clientAppCode}` 页面只允许当前应用登记的原单来源；普通本地登录入口允许所有启用应用登记来源的并集，但单张审批单仍在服务端逐次精确核对所属应用来源。每次 HTML 请求从受控配置取得当前来源，配置损坏时拒绝该来源。iframe 加载失败、钩子未配置、验签失败、地址不合规、超时或业务系统拒绝时，前端只显示已授权的普通详情和简短提示；不影响审批任务处理。
 5. 本协议不复用发起时持久的 `detailUrl`，也不让业务系统凭浏览器直接提交 API Key。旧流程的 `embed` 模式在应用补齐配置前继续安全回退；普通自动/自定义详情、审批意见、流程图和附件权限不变。
 
-## 需确认的边界
+## 已确认的边界
 
 - 是否同意新增**第五个专用钩子**与独立原单来源名单，而不复用取数钩子及父页面来源名单？
 - 当前审批节点隐藏字段能否由业务系统原单按 `visibleFieldPaths` 真正裁剪；无法裁剪时是否按提议拒绝签发并回退普通详情？
@@ -31,4 +31,4 @@
 
 ## 影响
 
-确认后需扩展接入应用管理契约与三库迁移、中心 JWT 地址接口、ADR 0010 的出站适配复用、前端原单视图与 CSP、真实 HTTP/SQLite/浏览器场景检查；同步 `docs/contracts.md`、前后端 README 和设计书 §center、§integration、§api。新增契约为可选字段和新接口，旧应用默认安全回退；不新增第三方依赖。未经确认不修改产品代码或现行设计书。
+需扩展接入应用管理契约与三库迁移、中心 JWT 地址接口、ADR 0010 的出站适配复用、前端原单视图与 CSP、真实 HTTP/SQLite/浏览器场景检查；同步 `docs/contracts.md`、前后端 README 和设计书 §center、§integration、§api。新增契约为可选字段和新接口，旧应用默认安全回退；不新增第三方依赖。

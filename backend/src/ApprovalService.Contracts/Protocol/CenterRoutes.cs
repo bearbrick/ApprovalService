@@ -26,6 +26,10 @@ public static class CenterRoutes
     /// </summary>
     public const string Instance = Instances + "/{id}";
     /// <summary>
+    /// 按当前查看人获取短时一次性只读业务原单地址。
+    /// </summary>
+    public const string DocumentUrl = Instances + "/{id}/document-url";
+    /// <summary>
     /// 当前登录人员显式确认已显示的一张审批详情。
     /// </summary>
     public const string MarkRead = Instances + "/{id}/read";

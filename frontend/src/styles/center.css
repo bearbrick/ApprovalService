@@ -48,6 +48,8 @@
 .center-detail-tabs button[aria-current] { border-color: var(--blue); color: var(--blue); font-weight: 600; }
 .center-card { overflow: hidden; }
 .center-card h3 { padding: 12px 16px; border-bottom: 1px solid var(--line); background: #fafcff; font-size: 13px; font-weight: 600; }
+.center-original-document { padding: 12px 16px; }
+.center-original-frame { display: block; width: 100%; min-height: 560px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
 .center-data-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 20px; margin: 0; padding: 20px; }
 .center-layout-groups { display: grid; gap: 2px; padding-bottom: 12px; }
 .center-layout-group h4 { margin: 0 20px; padding: 18px 0 0; color: var(--ink); font-size: 13px; }

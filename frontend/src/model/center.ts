@@ -179,9 +179,13 @@ export interface CenterDetailColumn {
  */
 export interface CenterDetailLayout {
   /**
-   * 自动排版或自定义排版。
+   * 自动排版、自定义排版或业务原单嵌入。
    */
-  mode: 'auto' | 'custom'
+  mode: 'auto' | 'custom' | 'embed'
+  /**
+   * 发布版本上的业务页面编码，仅嵌入方式具有。
+   */
+  embedPageCode?: string
   /**
    * 仅含当前人员可见字段的排版分组。
    */

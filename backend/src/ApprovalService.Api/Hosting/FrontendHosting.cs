@@ -23,7 +23,8 @@ internal static class FrontendHosting
             {
                 if (!context.Response.Headers.ContainsKey(HeaderNames.ContentSecurityPolicy))
                 {
-                    context.Response.Headers[HeaderNames.ContentSecurityPolicy] = "frame-ancestors 'none'";
+                    context.Response.Headers[HeaderNames.ContentSecurityPolicy] =
+                        "frame-ancestors 'none'; frame-src 'none'";
                 }
 
                 return Task.CompletedTask;
@@ -55,6 +56,20 @@ internal static class FrontendHosting
             return app;
         }
 
+        app.Use(async (context, next) =>
+        {
+            // 静态文件中间件会直接服务 index.html，因此在其前方单独处理此入口。
+            if (context.Request.Path.Equals("/index.html", StringComparison.OrdinalIgnoreCase))
+            {
+                var sources = await context.RequestServices.GetRequiredService<DocumentOriginAppService>()
+                    .GetForLocalHomeAsync(context.RequestAborted);
+                context.Response.Headers[HeaderNames.ContentSecurityPolicy] =
+                    "frame-ancestors 'none'; " + FrameSources(sources);
+                await Document(context, indexPath).ExecuteAsync(context);
+                return;
+            }
+            await next();
+        });
         app.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(directory),
@@ -67,16 +82,26 @@ internal static class FrontendHosting
                 }
             },
         });
-        app.MapGet(CenterRoutes.Home, (HttpContext http) => Document(http, indexPath))
+        app.MapGet(CenterRoutes.Home, async (HttpContext http, DocumentOriginAppService documents,
+            CancellationToken cancellationToken) =>
+        {
+            var sources = await documents.GetForLocalHomeAsync(cancellationToken);
+            http.Response.Headers[HeaderNames.ContentSecurityPolicy] =
+                "frame-ancestors 'none'; " + FrameSources(sources);
+            return Document(http, indexPath);
+        })
             .ExcludeFromDescription();
         app.MapGet(CenterRoutes.EmbedDocument, async (HttpContext http, string clientAppCode,
-            ClientAppAppService apps, CancellationToken cancellationToken) =>
+            ClientAppAppService apps, DocumentOriginAppService documents,
+            CancellationToken cancellationToken) =>
         {
             var origins = await apps.GetAllowedEmbedOriginsAsync(clientAppCode,
                 app.Environment.IsDevelopment(), cancellationToken);
+            var sources = await documents.GetForAppAsync(clientAppCode, cancellationToken);
             // 只在此专用入口放宽父页面；静态入口和其他应用的配置始终不受影响。
             http.Response.Headers[HeaderNames.ContentSecurityPolicy] =
-                "frame-ancestors 'self'" + (origins.Count == 0 ? string.Empty : " " + string.Join(' ', origins));
+                "frame-ancestors 'self'" + (origins.Count == 0 ? string.Empty : " " + string.Join(' ', origins)) +
+                "; " + FrameSources(sources);
             return Document(http, indexPath);
         }).ExcludeFromDescription();
         return app;
@@ -93,4 +118,12 @@ internal static class FrontendHosting
         http.Response.Headers.CacheControl = "no-store";
         return Results.File(indexPath, "text/html; charset=utf-8");
     }
+
+    /// <summary>
+    /// 只以再次验证过的来源构造子页面策略，空名单完全禁止加载 iframe。
+    /// </summary>
+    /// <param name="sources">已校验的 HTTPS 来源。</param>
+    /// <returns>完整 frame-src 指令。</returns>
+    private static string FrameSources(IReadOnlyList<string> sources) =>
+        "frame-src " + (sources.Count == 0 ? "'none'" : string.Join(' ', sources));
 }

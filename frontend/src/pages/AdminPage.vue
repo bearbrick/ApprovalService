@@ -14,6 +14,7 @@ import AdminTable from './admin/AdminTable.vue'
 import AdminIntervention from './admin/AdminIntervention.vue'
 import AdminOrganizationImport from './admin/AdminOrganizationImport.vue'
 import AdminEmbedOriginsEditor from './admin/AdminEmbedOriginsEditor.vue'
+import AdminDocumentSettingsEditor from './admin/AdminDocumentSettingsEditor.vue'
 import AdminBindingEditor from './admin/AdminBindingEditor.vue'
 import AdminCallbackRetryEditor from './admin/AdminCallbackRetryEditor.vue'
 import AdminClientAppEditor from './admin/AdminClientAppEditor.vue'
@@ -95,6 +96,10 @@ const importOpen = ref(false)
  */
 const originsOpen = ref(false)
 /**
+ * 业务原单钩子和子页面来源设置面板的展开状态。
+ */
+const documentOpen = ref(false)
+/**
  * 手工业务系统绑定编辑面板的展开状态。
  */
 const bindingOpen = ref(false)
@@ -130,7 +135,7 @@ const appOptions = computed(() => (data.value?.rows ?? []).map(row => ({
  */
 const enabledActions = computed(() => view.value?.key === 'org/departments' ? ['导入组织']
   : view.value?.key === 'org/people' ? ['导入人员', '账号管理']
-    : view.value?.key === 'apps/list' ? ['接入向导', '新建应用', '配置嵌入来源', '轮换密钥', '启停应用']
+    : view.value?.key === 'apps/list' ? ['接入向导', '新建应用', '配置嵌入来源', '配置业务原单', '轮换密钥', '启停应用']
       : view.value?.key === 'apps/bindings' ? ['新增绑定']
         : view.value?.key === 'outbound/queue' ? ['重新投递'] : [])
 
@@ -142,6 +147,7 @@ function handleAction(name: string): void {
   if (!enabledActions.value.includes(name)) return
   if (name === '接入向导') wizardOpen.value = true
   else if (name === '配置嵌入来源') originsOpen.value = true
+  else if (name === '配置业务原单') documentOpen.value = true
   else if (name === '新建应用') appEditorMode.value = 'create'
   else if (name === '轮换密钥') appEditorMode.value = 'rotate'
   else if (name === '启停应用') appEditorMode.value = 'status'
@@ -259,7 +265,7 @@ async function load(): Promise<void> {
   }
 }
 
-watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; bindingOpen.value = false; accountOpen.value = false; retryOpen.value = false; wizardOpen.value = false; appEditorMode.value = null; void load() }, { immediate: true })
+watch(() => [props.route.section, props.route.tab], () => { importOpen.value = false; originsOpen.value = false; documentOpen.value = false; bindingOpen.value = false; accountOpen.value = false; retryOpen.value = false; wizardOpen.value = false; appEditorMode.value = null; void load() }, { immediate: true })
 onBeforeUnmount(() => request?.abort())
 </script>
 
@@ -277,7 +283,7 @@ onBeforeUnmount(() => request?.abort())
       <AdminReports v-else-if="view.section === 'reports'" :tab="view.tab" @lost="signOut" />
       <AdminFlows v-else-if="view.section === 'flows'" @lost="signOut" />
       <AdminOverview v-else-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
-      <template v-else><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminIntegrationWizard v-if="wizardOpen" :restricted="false" @close="wizardOpen = false" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
+      <template v-else><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminDocumentSettingsEditor v-if="documentOpen && appOptions.length" :apps="appOptions" @close="documentOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminIntegrationWizard v-if="wizardOpen" :restricted="false" @close="wizardOpen = false" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>
     <section v-else class="admin-panel"><UiEmptyState title="没有找到这个管理页面" description="请从管理导航重新选择。" icon="search" /></section>
     <p class="workspace-note">审批服务只管理流程与审批记录；业务单据由来源业务系统维护。</p>

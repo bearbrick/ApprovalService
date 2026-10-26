@@ -17,7 +17,7 @@
 | `X-Request-Id` | 请求、响应 | 调用方生成的请求 ID，原样返回并记进日志；没传或不合规（超过 64 个字符，或含字母数字和 `- _ . :` 以外的字符）时服务生成一个 32 位的 |
 | `X-Trace-Id` | 响应 | 本次请求的链路 ID，和错误体里的 `traceId` 相同，反馈问题时提供 |
 | `X-Approval-Signature` | 回调与钩子请求、钩子响应 | `sha256=` 加上用接入应用的签名密钥对原始 UTF-8 正文做 HMAC-SHA256 的十六进制小写；钩子双方都验签 |
-| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源 |
+| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源；`frame-src` 仅含已启用应用登记的 HTTPS 原单来源，专属入口只含当前应用来源 |
 
 ## 错误格式
 
@@ -62,6 +62,7 @@
 | `POST /api/v1/center/tasks/{id}/actions`、`/center/tasks/batch-approve` | 本地或嵌入 JWT | 当前人员任务操作、逐项独立的批量同意；同样不接受 API Key 代替人员登录 |
 | `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 人员 JWT | 上传本人手写 PNG、查询个人签名及按本人或审批单授权取图；嵌入 JWT 只能上传单次签名 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
+| `POST /api/v1/center/instances/{id}/document-url` | 本地或嵌入 JWT | 当前人员已授权详情的短时一次性只读业务原单地址；`Cache-Control: no-store` |
 | `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
@@ -75,6 +76,7 @@
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
+| `GET/PUT /api/v1/admin/apps/{code}/document-settings` | 本地 JWT + 当前组织管理员角色 | 读取或设置第五个 `documentUrl` 签名钩子及独立 `allowedDocumentOrigins` HTTPS 来源，修改需原因并脱敏审计 |
 | `GET/PUT /api/v1/admin/apps/{code}/administrators` | 本地 JWT + 当前组织管理员角色 | 读取或替换该应用的内部人员管理员 ID 名单 |
 | `POST /api/v1/admin/apps/{code}/test-callback` | 本地 JWT + 当前组织管理员或该应用管理员 | 带原因排入不关联审批单的签名测试回调 |
 | `POST /api/v1/admin/flows/simulations`、`GET/DELETE /api/v1/admin/flows/simulations/{id}`、`POST /api/v1/admin/flows/simulations/{id}/steps` | 本地 JWT + 当前流程管理权限 | 完整草稿和假输入创建、读取、逐步推进及删除内存模拟会话 |
@@ -251,6 +253,8 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 - **业务动作接口**：自动节点调用，如审批通过后生成采购订单。
 
 四类钩子按已采纳的 [ADR 0010](adr/0010-outbound-hook-protocol.md) 使用各应用分别登记的完整 URL、POST 小驼峰 JSON，默认 5 秒超时；可选校验地址未配置时跳过，必需的取数、取人和动作地址未配置时返回可纠正错误或保留待发项。审批服务用 `X-Approval-Signature` 对原始 UTF-8 请求体签名，业务系统须以同一密钥对原始响应字节签名并原样回显 `X-Request-Id`；审批服务在解析 JSON 前恒定时间验签并核对请求 ID。非 2xx、超时、网络故障、无效签名、请求 ID 或 JSON 均返回 `BUSINESS_HOOK_FAILED`；钩子明确拒绝返回 `VALIDATION_FAILED` 和业务原因。取数请求 `{flowCode,businessKey,requestId}`，响应 `{data:{…},title?,detailUrl?}` 且 `data` 必须为对象；校验请求 `{phase:"start"/"approve",flowCode,businessKey,instanceId?,taskId?,actor,data}`，响应 `{allowed,reason?}`，拒绝时 `reason` 必填。取人请求 `{flowCode,businessKey,nodeId,sourceValue?,initiator,data}`、响应 `{userIds:[…]}`；动作请求 `{eventId,actionCode,instanceId,flowCode,businessKey,data}`、响应 `{success,message?,result?}`。取数和校验在审批写事务前同步调用；取人于目标节点前取得；业务动作经提交后持久待发队列执行。取人只在纯引擎实际到达目标节点时调用，返回人员仅按当前接入应用已有绑定解析；失败不落部分审批状态。自动节点在事务内固定 `actionPending` 待发项，提交后由后台调用；业务响应 `success:false` 或网络故障保留事件并退避重试，`success:true` 后用原 `eventId` 幂等提交引擎结果，业务端也须据此去重。
+
+第五个可选原单钩子按已采纳的 [ADR 0022](adr/0022-original-business-document-embed.md) 使用相同双向签名、请求 ID 回显和 5 秒超时。只在当前 JWT 人员有权读取详情、发布排版为 `embed` 且在该应用具有唯一外部人员绑定时调用。请求 `{requestId,instanceId,flowCode,businessKey,embedPageCode,viewerExternalId,visibleFieldPaths,readOnly:true}`；路径包含已授权顶层字段和 `明细字段.子字段`。响应 `{url,expiresAt}`；`url` 须是 2048 字符内、无用户信息、来源精确匹配本应用 `allowedDocumentOrigins` 的绝对 HTTPS 地址，`expiresAt` 须在服务端当前时间之后且不超过五分钟。业务系统负责地址一次性消费、查看人绑定、按字段路径裁剪和禁止写操作，不能满足时须拒绝签发。地址不入库、不入回调或普通日志；旧应用默认没有原单钩子，中心回退已授权普通详情，不复用发起时的 `detailUrl`。
 
 动作响应的可选 `result` 不改审批数据。成功时 `actionCompleted` 事件独立保存 `actionResult`，引擎状态按原动作 `eventId` 保存结果；后续审批终态回调在可选 `actionResults` 对象中按该 `eventId` 带出结果，`data` 仍是业务审批数据快照。无结果时省略 `actionResults`，重发回调使用首次入队时固定的正文。
 

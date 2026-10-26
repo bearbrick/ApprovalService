@@ -288,12 +288,14 @@ public class ApprovalDbContext : DbContext
             entity.Property(item => item.AuthGeneration).HasDefaultValue(1L).IsRequired();
             entity.Property(item => item.AllowedFlowCodesJson).IsRequired();
             entity.Property(item => item.AllowedEmbedOriginsJson).HasDefaultValue("[]").IsRequired();
+            entity.Property(item => item.AllowedDocumentOriginsJson).HasDefaultValue("[]").IsRequired();
             entity.Property(item => item.AdministratorPersonIdsJson).HasDefaultValue("[]").IsRequired();
             entity.Property(item => item.CallbackUrl).HasMaxLength(2048);
             entity.Property(item => item.DataUrl).HasMaxLength(2048);
             entity.Property(item => item.ValidationUrl).HasMaxLength(2048);
             entity.Property(item => item.AssigneeUrl).HasMaxLength(2048);
             entity.Property(item => item.ActionUrl).HasMaxLength(2048);
+            entity.Property(item => item.DocumentUrl).HasMaxLength(2048);
             entity.HasIndex(item => item.ApiKeyHash).IsUnique();
         });
 

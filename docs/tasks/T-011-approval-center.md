@@ -1,6 +1,6 @@
 # T-011 审批中心（电脑网页）
 
-状态：阻塞
+状态：进行中
 负责人：Codex 2026-10-23
 里程碑：M3
 依赖：T-004、T-005、T-007
@@ -29,7 +29,10 @@
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
-- `docs/adr/0022-original-business-document-embed.md`：待确认的业务原单临时地址钩子与 iframe 安全协议；确认前不改产品代码。
+- `docs/adr/0022-original-business-document-embed.md`：已确认的业务原单临时地址钩子与 iframe 安全协议。
+- `backend/src/ApprovalService.Domain/Integration/`、`Application/Integration/`、`Infrastructure/Integration/`：原单钩子配置、人员外部绑定与签名调用。
+- `backend/src/ApprovalService.Api/Hosting/`、`Endpoints/Administration/`：原单 iframe 来源 CSP 与应用管理配置。
+- `frontend/src/pages/admin/`、`frontend/src/api/admin-adapter.ts`：原单钩子与来源管理。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/Migrations/`：接入应用允许嵌入来源的存储与三库迁移
 - `backend/src/ApprovalService.Engine/Commands/TaskActionAvailability.cs`、`backend/src/ApprovalService.Application/Center/`、`backend/src/ApprovalService.Api/Endpoints/Center/`、`backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`backend/tests/ApprovalService.Backend.Checks/Center*.cs`：纯引擎任务许可、JWT 中心写用例与路由、场景检查
 - 内嵌模式：用嵌入令牌打开，审批完用 postMessage 通知外面
@@ -46,6 +49,10 @@
 - `docs/architecture.md`：同步查询层安全边界
 - `docs/adr/README.md`：登记已采纳的内嵌与中心操作协议
 - `docs/adr/README.md`：登记原单嵌入提议 ADR 0022；本次只追加索引一行。
+- `backend/src/ApprovalService.Contracts/Protocol/BusinessHookModels.cs`、`CenterRoutes.cs`、`ApiRoutes.cs`：追加兼容的第五钩子与管理/中心接口。
+- `backend/src/ApprovalService.Api/Program.cs`、`ApplicationServiceCollectionExtensions.cs`、`InfrastructureServiceCollectionExtensions.cs`：登记原单读取服务与路由。
+- `backend/src/ApprovalService.Domain/Integration/IClientAppRepository.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppRepository.cs`：原单配置更新。
+- `frontend/src/pages/AdminPage.vue`：原单配置入口。
 
 ## 验收标准
 
@@ -63,6 +70,7 @@
 
 ## 交接记录
 
+- 2026-10-26 · Codex · 用户已确认 ADR 0022 全部边界，原单嵌入切片解除 R13 阻塞并恢复进行中。第五签名钩子、独立 HTTPS 原单来源、可见字段路径、业务端的一次性/只读/身份约束和安全回退均按已采纳 ADR 实施。共享文件及跨管理模块范围已在上面登记；三库迁移将待并行委托迁移进入集成基线后生成，避免快照冲突。
 - 2026-10-26 · Codex · 原单嵌入切片按 R13 阻塞，其他已完成中心能力不受影响。用户已同意“签名钩子返回不超过五分钟的一次性只读 HTTPS 地址、按登记来源限制 iframe、失败回退普通详情”，但 ADR 0010 只定义四类钩子，当前发起时 `detailUrl` 不带查看人/过期/一次性，`allowedEmbedOrigins` 约束父页面而非原单子页面，中心投影把 `embed` 回退自动排版且 HTML CSP 未限制 `frame-src`。还必须决定隐藏字段如何由业务原单执行权限，审批服务不能从 URL 验证页面只读或一次性。已在提议 ADR 0022 写出第五钩子、独立 HTTPS 来源名单、请求/响应字段、业务端责任和旧应用回退；待用户确认“需确认的边界”后恢复。此次没有产品代码、依赖或不兼容契约变更，也未合并/推送主分支。与并行委托切片共用 T-011 文件，整合时请保留两边交接并在协议确认后把状态恢复进行中。
 - 2026-10-26 · Codex · 将手写签名切片合入 `f92d9c2` 集成基线：同时保留个人常用意见和签名的注册、设置入口与详情选择；旧签名迁移先撤下，再以已含应用管理员和常用意见的三库快照为基线运行仓库 EF 工具生成 `CenterSignatureAssetsIntegrated`，每库仅新增 `SignatureAssets`。为满足 500 行限制，签名实体映射拆入独立文件。全量 `verify.ps1` 通过：后端 1089、调用端 96、前端 190 项，生产构建通过。未用外置 Chrome 做页面视觉复核；委托分支也将修改 `CenterSettings.vue`，后续集成须同时保留常用意见、签名、委托三个组件。T-011 总任务仍进行中，无新依赖或真实密钥。
 

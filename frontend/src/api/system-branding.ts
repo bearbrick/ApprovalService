@@ -28,11 +28,12 @@ export async function loadSystemBranding(): Promise<SystemBranding> {
   const value = await getJson<SystemBranding>('/api/v1/admin/system-info', {
     headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
   })
+  // 服务端统一 JSON 设置省略 null；空库的 Logo 摘要因此可能不在响应中。
   if (!value || typeof value.companyName !== 'string' || typeof value.revision !== 'number'
-    || (value.logoSha256 !== null && typeof value.logoSha256 !== 'string')) {
+    || (value.logoSha256 !== undefined && value.logoSha256 !== null && typeof value.logoSha256 !== 'string')) {
     throw new Error('系统信息响应不完整。')
   }
-  return value
+  return { ...value, logoSha256: value.logoSha256 ?? null }
 }
 
 /**

@@ -31,6 +31,25 @@ const error = ref('')
  * 异步加载序号，避免旧图覆盖更新后的进度。
  */
 let revision = 0
+/**
+ * 跟随详情面板尺寸变化重新适配完整图。
+ */
+let resizeObserver: ResizeObserver | null = null
+
+/**
+ * 把完整 BPMN 图居中并预留标识和标签所需空间。
+ */
+function fit(): void {
+  if (!viewer || !stage.value || !props.graph.nodes.length) return
+  const canvas = viewer.get('canvas') as {
+    /** 缩放并以指定视口位置居中。 */
+    zoom(value: string | number, center: { x: number; y: number }): number
+  }
+  const center = { x: stage.value.clientWidth / 2, y: stage.value.clientHeight / 2 }
+  if (!center.x || !center.y) return
+  const scale = canvas.zoom('fit-viewport', center)
+  canvas.zoom(scale * .85, center)
+}
 
 /**
  * 使用 bpmn-js 导入安全图，并高亮服务端确认的当前节点。
@@ -38,22 +57,22 @@ let revision = 0
  */
 async function render(): Promise<void> {
   const current = ++revision
-  if (!viewer || !props.graph.nodes.length) return
+  if (!viewer) return
+  if (!props.graph.nodes.length) { viewer.clear(); return }
   error.value = ''
   try {
     await viewer.importXML(centerProgressXml(props.graph))
     if (current !== revision || !viewer) return
     const canvas = viewer.get('canvas') as {
-      /** 缩放到可见区域。 */
-      zoom(value: string): void
       /** 为一个 BPMN 图元添加高亮样式。 */
       addMarker(id: string, marker: string): void
     }
-    canvas.zoom('fit-viewport')
+    fit()
     props.graph.nodes.forEach((node, index) => {
       if (node.isActive) canvas.addMarker(`Node_${index + 1}`, 'approval-current')
     })
   } catch (cause) {
+    if (current !== revision || !viewer) return
     error.value = cause instanceof Error ? cause.message : '流程图暂时无法显示。'
   }
 }
@@ -61,10 +80,12 @@ async function render(): Promise<void> {
 onMounted(() => {
   if (!stage.value) return
   viewer = new BpmnViewer({ container: stage.value })
+  resizeObserver = new ResizeObserver(() => { fit() })
+  resizeObserver.observe(stage.value)
   void render()
 })
 watch(() => props.graph, () => { void render() })
-onBeforeUnmount(() => { revision++; viewer?.destroy(); viewer = null })
+onBeforeUnmount(() => { revision++; resizeObserver?.disconnect(); viewer?.destroy(); viewer = null })
 </script>
 
 <template>

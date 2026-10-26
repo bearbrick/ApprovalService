@@ -58,6 +58,7 @@ internal static class OrganizationModelConfiguration
         modelBuilder.Entity<OrganizationRoleEntity>(entity =>
         {
             entity.ToTable("OrganizationRoles");
+            entity.Property(item => item.Revision).IsConcurrencyToken();
             entity.HasKey(item => item.Code);
             entity.Property(item => item.Code).HasMaxLength(128);
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired();

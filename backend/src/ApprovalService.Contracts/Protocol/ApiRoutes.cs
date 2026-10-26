@@ -6,6 +6,11 @@ namespace ApprovalService.Contracts.Protocol;
 public static class ApiRoutes
 {
     /// <summary>
+    /// 本地组织管理员工作日历配置。
+    /// </summary>
+    public const string AdminWorkCalendar = "/api/v1/admin/work-calendar";
+
+    /// <summary>
     /// 开放接口的前缀。
     /// </summary>
     public const string OpenApiPrefix = "/api/v1";
@@ -279,6 +284,18 @@ public static class ApiRoutes
     /// </summary>
     public const string AdminDailyDigest = OpenApiPrefix + "/admin/notifications/daily-digest";
 
+    /// <summary>
+    /// 组织角色目录。
+    /// </summary>
+    public const string AdminRoles = OpenApiPrefix + "/admin/roles";
+    /// <summary>
+    /// 单个角色的名称和修订。
+    /// </summary>
+    public const string AdminRoleByCode = AdminRoles + "/{code}";
+    /// <summary>
+    /// 单个角色的成员。
+    /// </summary>
+    public const string AdminRoleMembers = AdminRoleByCode + "/members";
     /// <summary>
     /// 接入应用签发一次性嵌入令牌。
     /// </summary>

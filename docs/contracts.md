@@ -71,6 +71,7 @@
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
 | `POST /api/v1/identity/provision`、`/identity/revoke-all` | 本地 JWT + 当前组织管理员角色 | 为在职人员开通账号、作废人员全部令牌 |
 | `GET /api/v1/notifications/preferences`、`PUT /api/v1/notifications/preferences/{category}` | 人员 JWT | 读取或修改本人的邮件、站内提醒开关 |
+| `GET/PUT /api/v1/admin/work-calendar` | 本地 JWT + 当前组织管理员角色 | 读取和按预期修订替换每日工作时段与逐日节假日、调休；时区只读 |
 | `GET/PUT /api/v1/admin/notifications/daily-digest` | 本地 JWT + 当前组织管理员角色 | 读取或设置每日待办汇总的当地发送时刻 |
 | `POST /api/v1/embed-tokens` | `X-Api-Key` | 为已绑定的在职人员签发一次性嵌入令牌 |
 | `POST /api/v1/org/changes`、`/org/bindings` | `X-Api-Key` | 推送组织变更、绑定本应用的外部人员或部门 ID |
@@ -367,3 +368,21 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 本地组织管理员使用 `GET /api/v1/admin/printing/font` 查看 `{configured,fileName?,sha256?,uploadedAt?}`，使用 `POST /api/v1/admin/printing/font?fileName=字体.ttf&licenseConfirmed=true` 上传原始字节。只接受最大 20 MiB 的独立 TrueType 字体；校验表目录、内嵌权限和基本中文字形，不支持 TTC/CFF。字体不提供下载，不随产品分发。字体文件及上传人/时间原子存入部署数据目录的 `printing/font.json`，部署备份须包含该目录。
 
 二维码地址来自可信配置 `ApprovalService:Printing:PublicBaseUrl`，不使用请求 Host；需要二维码但未配置时返回 `CONFLICT`。扫码仍需登录和审批单权限。A4 方向、字段顺序、意见/签名、Logo/二维码/水印及票据页沿用本单锁定版本的 `printSettings`；票据页当前支持 PNG/JPEG，每页四图，其他附件保留清单。票据最多 100 张/80 MiB，文档最多 500 页；超过八列的明细拆成连续列组。
+## 在线工作日历
+
+`GET /api/v1/admin/work-calendar` 返回 `{revision,timeZoneId,workingStart,workingEnd,overrides}`；`overrides` 为 `{date,isWorkingDay}[]`，日期严格 `yyyy-MM-dd` 且唯一，日期类型必须显式为布尔值。`workingStart`、`workingEnd` 严格 `HH:mm`，结束晚于开始，不支持跨夜。未列出的日期按周一至周五工作。
+
+`PUT` 接受 `{expectedRevision,workingStart,workingEnd,overrides,reason}`，整体替换时段与日期覆盖，成功返回新修订的完整日历；`reason` 为 2–200 字且无控制字符。过期修订返回 409，校验失败返回 400；更新与包含真实管理员、前后值及原因的审计在同一事务提交。两个首次保存同样以唯一全局键裁决，失败方不追加审计。两种方法均只接受当前在职本地组织管理员 JWT；匿名 401，普通人员、嵌入人员或 API Key 不获得管理权限。
+
+空库返回修订零并沿用部署配置。首次保存后时段与日期覆盖以数据库为准，空覆盖列表不会重新加载部署节假日。时区只读且始终沿用部署配置，PUT 不提供时区字段。每次运行命令读取一份完整日历用于新激活任务的期限及提前一工作小时提醒；已存在任务期限与已排提醒不重算，排队任务实际激活时使用当时的新日历。每日汇总仍使用启动时固定的部署时区，不受在线工作时段、节假日变化影响。
+## 组织角色管理
+
+仅当前在职、已开通账号的组织管理员本地 JWT 可用，API Key 与嵌入会话不授予权限。每次请求及保存事务重新读取持久角色。
+
+- `GET /api/v1/admin/roles` 返回角色数组；`POST` 接受 `{code,name,reason}`，创建无成员自定义角色，修订为 1。
+- `GET /api/v1/admin/roles/{code}` 与 `GET /api/v1/admin/roles/{code}/members` 返回 `{code,name,revision,isBuiltIn,personIds}`，人员为内部 ID。
+- `PUT /api/v1/admin/roles/{code}` 接受 `{name,expectedRevision,reason}`；`PUT /api/v1/admin/roles/{code}/members` 接受 `{personIds,expectedRevision,reason}` 完整替换成员。两者共用递增修订，不可用旧名称页面覆盖新成员修订。
+
+编码为 1–128 位 ASCII 字母、数字、连字符、下划线或点；创建后固定。名称为 1–256 字，原因 2–200 字，去除首尾空白且拒绝控制字符。成员最多 10000 个不重复有效内部 ID；新增成员必须存在且在职，原有离职成员可保留或显式移除。`organization-admin`、`flow-admin` 为内置角色，老库尚无角色行时返回修订零，第一次修改时落库；所有角色均无删除和改编码接口。成员替换不得使组织管理员中没有已开通本地账号且在职的人员。
+
+成功返回最新完整角色；修订过期、编码重复、最后管理员保护返回 `CONFLICT`（409），未知角色返回 404，无效输入返回 400。修改与操作者、原因、前后角色/成员摘要审计在同一串行化数据库事务提交；失败不留部分成员或审计。权限立即从当前角色读取，旧 JWT 不保留已撤销资格。此为管理接口，不增加业务 SDK 操作。

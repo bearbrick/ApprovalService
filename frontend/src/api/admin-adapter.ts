@@ -63,7 +63,7 @@ export const adminAdapter: AdminDataAdapter = {
    * @inheritdoc
    */
   async loadView(viewKey: string, signal: AbortSignal): Promise<AdminViewData> {
-    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'system/info', 'outbound/queue'].includes(viewKey)) {
+    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'system/info', 'org/calendar', 'outbound/queue'].includes(viewKey)) {
       throw new AdminAdapterUnavailableError()
     }
     const token = await adminAccessToken()
@@ -76,7 +76,7 @@ export const adminAdapter: AdminDataAdapter = {
       if (!isOverviewCounts(overview) || !isAdminOutbox(outbox)) throw new Error('管理工作台响应不完整。')
       return overviewViewData(overview, outbox)
     }
-    if (viewKey === 'system/security' || viewKey === 'system/info') {
+    if (viewKey === 'system/security' || viewKey === 'system/info' || viewKey === 'org/calendar') {
       await getJson<{ personId: string }>('/api/v1/admin/session', options)
       return { rows: [], metrics: [] }
     }

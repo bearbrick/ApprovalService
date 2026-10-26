@@ -39,6 +39,13 @@ internal static class Program
             await PrintingChecks.RunAsync(backendRoot, Check);
             return 0;
         }
+        if (args.FirstOrDefault() == "work-calendar")
+        {
+            await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
+            await NotificationRulesChecks.RunAsync(Check);
+            Console.WriteLine($"工作日历检查全部通过：{passed} 项");
+            return 0;
+        }
         if (args.FirstOrDefault() == "dynamic-conditions")
         {
             await FlowSimulationChecks.RunAsync(Check);
@@ -148,6 +155,8 @@ internal static class Program
         await AdminConsoleChecks.RunAsync(backendRoot, Check);
         await SystemBrandingChecks.RunAsync(backendRoot, Check);
         await PrintingChecks.RunAsync(backendRoot, Check);
+        await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
+        await RoleManagementChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
         await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);

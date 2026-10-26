@@ -285,7 +285,8 @@ export function auditViewData(audit: readonly AdminAudit[]): AdminViewData {
 function auditActionLabel(action: string): string {
   return ({ created: '新增', create: '新增', updated: '修改', update: '修改',
     embedOriginsUpdated: '修改允许嵌入来源', secretsRotated: '轮换密钥',
-    enabledChanged: '启停应用', retried: '手动重发' } as Record<string, string>)[action] ?? action
+    enabledChanged: '启停应用', retried: '手动重发', companyName: '修改单位名称',
+    logoUpload: '上传单位 Logo', logoDelete: '移除单位 Logo' } as Record<string, string>)[action] ?? action
 }
 
 /**
@@ -299,6 +300,7 @@ function auditTargetLabel(target: string): string {
   const kind = target.slice(0, separator)
   const label = ({ person: '人员', department: '部门', membership: '部门归属',
     personBinding: '人员绑定', departmentBinding: '部门绑定', clientApp: '接入应用', callback: '回调',
+    systemBranding: '打印页眉品牌',
     'person-role': '人员角色' } as Record<string, string>)[kind] ?? kind
   return `${label}：${target.slice(separator + 1)}`
 }

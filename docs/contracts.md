@@ -76,6 +76,7 @@
 | `POST /api/v1/admin/org/import`、`/admin/org/bindings`、`GET /api/v1/admin/org/template` | 本地 JWT + 当前组织管理员角色 | 预检查/导入组织、手工绑定、下载模板 |
 | `POST /api/v1/admin/actions/retry` | 本地 JWT + 原动作所属流程的当前流程管理员 | 人工重排达到自动上限的原业务动作 |
 | `GET /api/v1/admin/session`、`/admin/org/directory`、`/admin/apps` | 本地 JWT + 当前组织管理员角色 | 核验管理会话、读取安全组织目录和接入应用摘要 |
+| `GET/PUT /api/v1/admin/system-info`、`GET/POST/DELETE /api/v1/admin/system-info/logo` | 本地 JWT + 当前组织管理员角色 | 查看或修改打印页眉的单位名称与 Logo |
 | `POST /api/v1/admin/apps`、`PUT /admin/apps/{code}/enabled`、`POST /admin/apps/{code}/rotate-secrets` | 本地 JWT + 当前组织管理员角色 | 登记接入应用、启停应用或轮换 API Key 与签名密钥 |
 | `GET/PUT /api/v1/admin/apps/{code}/embed-origins` | 本地 JWT + 当前组织管理员角色 | 读取或设置应用允许嵌入审批中心的完整网站来源 |
 | `GET/PUT /api/v1/admin/apps/{code}/document-settings` | 本地 JWT + 当前组织管理员角色 | 读取或设置第五个 `documentUrl` 签名钩子及独立 `allowedDocumentOrigins` HTTPS 来源，修改需原因并脱敏审计 |
@@ -132,6 +133,8 @@
 `POST /admin/apps` 接受 `{code, name, allowedFlowCodes, canViewAllTasks, callbackUrl?, dataUrl?, validationUrl?, assigneeUrl?, actionUrl?, reason}`。应用编码只含 ASCII 字母、数字、`-`、`_`，最长 128 字符；名称最长 256 字符，出站地址必须满足部署的 HTTPS/显式内网 HTTP 策略。`PUT /admin/apps/{code}/enabled` 接受 `{enabled, reason}` 并返回 204；`POST /admin/apps/{code}/rotate-secrets` 接受 `{reason}`。三种管理操作的原因均须为 2 至 200 字符，实际变更与不含凭据的管理员审计在同一事务提交。创建和轮换只在本次响应返回 `{code, apiKey, signingSecret}`；后续列表和日志均不能再次读取明文。轮换或实际启停使旧嵌入会话永久失效，停用时旧 API Key 不可调用；重新启用不会恢复旧嵌入会话。
 
 `GET /admin/bindings` 返回绑定数组，每项只含 `clientAppCode, kind, externalId, internalId, targetName, method`；目标名称来自当前可信组织主数据，不含电话、邮箱。管理员写入继续使用 `POST /admin/org/bindings`：传 `kind, externalId, internalId, clientAppCode`，人员绑定可由管理员指定内部人员，服务端记录操作者并在换绑时作废旧身份令牌。`GET /admin/audit` 返回最近 200 条组织、接入应用及回调重发变更摘要，字段为 `occurredAt, actorId, action, target, reason`；不返回完整前后快照、联系方式或密钥。其他管理日志待相应写入功能接线。
+
+打印页眉品牌信息的 `GET /admin/system-info` 返回 `{companyName, logoSha256, revision}`，空库为名称空串、摘要空值和修订 0。`PUT` 请求 `{companyName, expectedRevision, reason}`，名称去首尾空白后须为 1–60 字且不能含控制字符。`POST /admin/system-info/logo` 请求 `{contentBase64, expectedRevision, reason}`，只接受完整的 8 位 RGB/RGBA 非隔行 PNG，最多 1 MiB，图片最长边不超过 4096 像素；`DELETE` 请求 `{expectedRevision, reason}`。原因均须为 2–200 字且不能含控制字符。全部写请求在同一事务推进修订并记录操作者、原因、名称和 Logo SHA-256，审计不包含图片正文；过期修订返回 `CONFLICT`。`GET /admin/system-info/logo` 返回带 `nosniff`、`no-store` 和限制性内容安全策略的 PNG，未上传为 404。所有接口仅接受本地组织管理员 JWT；打印功能以后从同一持久设置读取，不使用前端静态图片。
 
 `GET /admin/outbox` 返回最近 200 条待发项摘要，每项为 `eventId, clientAppCode, kind, status, attempts, availableAt, errorCode`，不返回业务正文、回调地址或密钥。`POST /admin/callbacks/{eventId}/retry` 接受 `{reason}`，原因须为 2 至 200 字符；只有回调事件可重排。它保留原事件 ID 和正文、重置待发时间及错误摘要，并在同一事务记录本地管理员和原因。正在有效租约中发送的回调返回冲突。重发记录也进入 `/admin/audit`。
 

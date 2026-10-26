@@ -5,6 +5,7 @@ using ApprovalService.Domain.Integration;
 using ApprovalService.Domain.Notifications;
 using ApprovalService.Domain.Organization;
 using ApprovalService.Domain.Runtime;
+using ApprovalService.Infrastructure.Administration;
 using ApprovalService.Infrastructure.Center;
 using ApprovalService.Infrastructure.Identity;
 using ApprovalService.Infrastructure.Notifications;
@@ -243,6 +244,7 @@ public partial class ApprovalDbContext : DbContext
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        SystemBrandingModelConfiguration.Configure(modelBuilder);
         modelBuilder.Entity<SerialNumberCounterEntity>(entity =>
         {
             entity.ToTable("SerialNumberCounters");

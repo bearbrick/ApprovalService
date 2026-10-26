@@ -38,12 +38,12 @@ export const adminAdapter: AdminDataAdapter = {
    * @inheritdoc
    */
   async loadView(viewKey: string, signal: AbortSignal): Promise<AdminViewData> {
-    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'outbound/queue'].includes(viewKey)) {
+    if (!['overview', 'org/departments', 'org/people', 'apps/list', 'apps/bindings', 'system/logs', 'system/security', 'system/info', 'outbound/queue'].includes(viewKey)) {
       throw new AdminAdapterUnavailableError()
     }
     const token = await adminAccessToken()
     const options = { headers: { Authorization: `Bearer ${token}` }, signal, cache: 'no-store' as RequestCache }
-    if (viewKey === 'overview' || viewKey === 'system/security') {
+    if (viewKey === 'overview' || viewKey === 'system/security' || viewKey === 'system/info') {
       await getJson<{ personId: string }>('/api/v1/admin/session', options)
       return { rows: [], metrics: [] }
     }

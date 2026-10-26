@@ -76,6 +76,16 @@ public static class ApiRoutes
     public const string AdminSession = OpenApiPrefix + "/admin/session";
 
     /// <summary>
+    /// 组织管理员读取或修改打印页眉的单位名称。
+    /// </summary>
+    public const string AdminSystemBranding = OpenApiPrefix + "/admin/system-info";
+
+    /// <summary>
+    /// 组织管理员读取、上传或移除打印页眉的 Logo。
+    /// </summary>
+    public const string AdminSystemLogo = AdminSystemBranding + "/logo";
+
+    /// <summary>
     /// 组织管理员读取部门、人员和所属关系。
     /// </summary>
     public const string AdminDirectory = OpenApiPrefix + "/admin/org/directory";

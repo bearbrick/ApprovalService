@@ -65,6 +65,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddApprovalPersistence(configuration);
         services.AddHostedService<DailyBackupWorker>();
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
+        services.AddScoped<ISystemBrandingRepository, SystemBrandingRepository>();
         services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();

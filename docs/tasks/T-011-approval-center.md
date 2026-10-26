@@ -1,6 +1,6 @@
 # T-011 审批中心（电脑网页）
 
-状态：进行中
+状态：阻塞
 负责人：Codex 2026-10-23
 里程碑：M3
 依赖：T-004、T-005、T-007
@@ -29,6 +29,7 @@
 - `frontend/src/model/mobile.ts`、`frontend/tests/mobile-checks.ts`：中心共享操作类型增加后，最小同步手机端标签与检查，不扩展手机业务界面
 - `frontend/README.md`：记录实际可用的登录和只读中心页面
 - `docs/adr/0016-embed-origin-and-token-handshake.md`、`docs/adr/0017-center-jwt-actions.md`：已确认的内嵌来源及人员会话操作协议
+- `docs/adr/0022-original-business-document-embed.md`：待确认的业务原单临时地址钩子与 iframe 安全协议；确认前不改产品代码。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/ApprovalDbContext.cs`、`backend/src/ApprovalService.Infrastructure/Persistence/Migrations/`：接入应用允许嵌入来源的存储与三库迁移
 - `backend/src/ApprovalService.Engine/Commands/TaskActionAvailability.cs`、`backend/src/ApprovalService.Application/Center/`、`backend/src/ApprovalService.Api/Endpoints/Center/`、`backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`backend/tests/ApprovalService.Backend.Checks/Center*.cs`：纯引擎任务许可、JWT 中心写用例与路由、场景检查
 - 内嵌模式：用嵌入令牌打开，审批完用 postMessage 通知外面
@@ -44,6 +45,7 @@
 - `backend/src/ApprovalService.Contracts/Protocol/Center*.cs`、`docs/contracts.md`：新增中心查询及任务操作协议
 - `docs/architecture.md`：同步查询层安全边界
 - `docs/adr/README.md`：登记已采纳的内嵌与中心操作协议
+- `docs/adr/README.md`：登记原单嵌入提议 ADR 0022；本次只追加索引一行。
 
 ## 验收标准
 
@@ -61,6 +63,7 @@
 
 ## 交接记录
 
+- 2026-10-26 · Codex · 原单嵌入切片按 R13 阻塞，其他已完成中心能力不受影响。用户已同意“签名钩子返回不超过五分钟的一次性只读 HTTPS 地址、按登记来源限制 iframe、失败回退普通详情”，但 ADR 0010 只定义四类钩子，当前发起时 `detailUrl` 不带查看人/过期/一次性，`allowedEmbedOrigins` 约束父页面而非原单子页面，中心投影把 `embed` 回退自动排版且 HTML CSP 未限制 `frame-src`。还必须决定隐藏字段如何由业务原单执行权限，审批服务不能从 URL 验证页面只读或一次性。已在提议 ADR 0022 写出第五钩子、独立 HTTPS 来源名单、请求/响应字段、业务端责任和旧应用回退；待用户确认“需确认的边界”后恢复。此次没有产品代码、依赖或不兼容契约变更，也未合并/推送主分支。与并行委托切片共用 T-011 文件，整合时请保留两边交接并在协议确认后把状态恢复进行中。
 - 2026-10-26 · Codex · 将手写签名切片合入 `f92d9c2` 集成基线：同时保留个人常用意见和签名的注册、设置入口与详情选择；旧签名迁移先撤下，再以已含应用管理员和常用意见的三库快照为基线运行仓库 EF 工具生成 `CenterSignatureAssetsIntegrated`，每库仅新增 `SignatureAssets`。为满足 500 行限制，签名实体映射拆入独立文件。全量 `verify.ps1` 通过：后端 1089、调用端 96、前端 190 项，生产构建通过。未用外置 Chrome 做页面视觉复核；委托分支也将修改 `CenterSettings.vue`，后续集成须同时保留常用意见、签名、委托三个组件。T-011 总任务仍进行中，无新依赖或真实密钥。
 
 - 2026-10-25 · Codex · 手写签名切片完成并在独立分支 `ai/codex/T-011-signatures` 验证：本人独立不可变 PNG 资产限制 2 MiB，核对 PNG 分块 CRC、受限 zlib 像素流和尺寸；嵌入会话只能上传单次资产，跨人员选用/读取被拒；操作必须明确传 `signatureFileId`，统一引擎按发布节点默认关闭的 `signatureRequired` 规则仅限制同意/办理完成/确认已阅，必签任务不提供批量同意，任务和只追加事件冻结资产 ID。桌面与手机详情提供手写画布和明确选择，设计器提供节点开关；独立 `SignatureSettings.vue` 已完成，但为避开并行常用意见分支的 `CenterSettings.vue` 修改，整合时需在设置页追加导入和渲染。三库迁移均用仓库 EF 脚本生成；真实 SQLite/JWT/HTTP 场景验证上传、个人/嵌入权限、伪 PNG/超限、审批事件和图片授权。全量 `verify.ps1` 通过：后端 1062 项、前端 188 项，调用端及端到端检查、生产构建通过。未用浏览器视觉复核；个人设置接线及与常用意见分支的三库迁移快照冲突由主代理在整合时处理，须重新核对三库快照并跑全量验证。无新依赖、无真实密钥。T-011 总任务仍进行中。

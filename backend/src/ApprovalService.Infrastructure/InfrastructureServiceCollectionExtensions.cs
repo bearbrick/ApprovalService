@@ -66,6 +66,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHostedService<DailyBackupWorker>();
         services.AddScoped<IAdminConsoleRepository, AdminConsoleRepository>();
         services.AddScoped<ISystemBrandingRepository, SystemBrandingRepository>();
+        services.AddScoped<IWorkCalendarRepository, WorkCalendarRepository>();
         services.AddScoped<IReportingFactsRepository, ReportingFactsRepository>();
         services.AddSingleton<IReportingWorkbookExporter, ReportingWorkbookExporter>();
         services.AddScoped<IClientAppRepository, ClientAppRepository>();
@@ -97,7 +98,7 @@ public static class InfrastructureServiceCollectionExtensions
         });
         services.AddSingleton<IIntegrationSecretProtector, AesIntegrationSecretProtector>();
         services.AddSingleton(TimeProvider.System);
-        services.AddSingleton(NotificationCalendarSettings.Create(configuration));
+        services.AddSingleton(provider => new WorkCalendarDefaults(NotificationCalendarSettings.Read(provider.GetRequiredService<IConfiguration>())));
         // 绝不跟随业务系统返回的 307/308，以免签名请求正文被转发到未登记的主机。
         services.AddSingleton(new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }));
         services.AddSingleton<SignedHttpOutboundAdapter>();

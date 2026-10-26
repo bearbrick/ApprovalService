@@ -202,7 +202,7 @@ async function rebuild(flow: FlowDefinition): Promise<void> {
     }
     lastCanvasJson = JSON.stringify(flow.canvas)
     if (oldViewbox) canvas.viewbox(oldViewbox)
-    else canvas.zoom('fit-viewport')
+    else fit()
     zoomPercent.value = Math.round(canvas.zoom() * 100)
     syncIssueMarkers()
   } catch (error) {
@@ -328,7 +328,10 @@ function removeSelected(): void {
 function fit(): void {
   if (!modeler) return
   const canvas = service('canvas')
-  canvas.zoom('fit-viewport')
+  // diagram-js 默认把图框靠左上角，顶部节点会贴边甚至被遮住；传入视口中心后再留一圈空白。
+  const center = { x: (stage.value?.clientWidth ?? 0) / 2, y: (stage.value?.clientHeight ?? 0) / 2 }
+  const scale = canvas.zoom('fit-viewport', center)
+  canvas.zoom(scale * .9, center)
   zoomPercent.value = Math.round(canvas.zoom() * 100)
 }
 

@@ -70,7 +70,7 @@
 
 ## 自由画布组件
 
-正式画布组件位于 `src/designer/canvas/BpmnCanvasEditor.vue`，使用固定版本的 `bpmn-js` Modeler 绘制标准 BPMN 常用子集；必须让右下角 bpmn.io 标识保持可见。工作台传入完整 `FlowDefinition`，通过 `inspector` 插槽挂载统一的节点与路线属性面板，并将发布问题高亮到图形；`focusElement(id)` 供问题列表定位。节点与连线由建模器创建、拖动和自动布线，`bpmn-modeler-adapter.ts` 只把图元的 ID、类型、中心坐标与连接关系写回现有审批 JSON，已有审批人规则和字段权限始终保留。工作台通过 `editCommitted(previousDefinition)`、`undo`、`redo` 统一管理撤销历史。现有 JSON 不含连线折点，重新打开草稿时由建模器按节点坐标重新布线；折点持久化需后续扩展流程契约。BPMN 导出仍使用与后端兼容的标准图形加审批扩展，只接受本服务导出的兼容文件。前端发布预检镜像后端校验，正式发布以服务端为准。
+正式画布组件位于 `src/designer/canvas/BpmnCanvasEditor.vue`，使用固定版本的 `bpmn-js` Modeler 绘制标准 BPMN 常用子集；必须让右下角 bpmn.io 标识保持可见。工作台传入完整 `FlowDefinition`，通过 `inspector` 插槽挂载统一的节点与路线属性面板，并将发布问题高亮到图形；`focusElement(id)` 供问题列表定位。节点与连线由建模器创建、拖动和自动布线，`bpmn-modeler-adapter.ts` 只把图元的 ID、类型、中心坐标与连接关系写回现有审批 JSON，已有审批人规则和字段权限始终保留。首次打开和点击“适应画布”时把完整 BPMN 图居中并留白，不让上方分支贴边裁切。工作台通过 `editCommitted(previousDefinition)`、`undo`、`redo` 统一管理撤销历史。现有 JSON 不含连线折点，重新打开草稿时由建模器按节点坐标重新布线；折点持久化需后续扩展流程契约。BPMN 导出仍使用与后端兼容的标准图形加审批扩展，只接受本服务导出的兼容文件。前端发布预检镜像后端校验，正式发布以服务端为准。
 
 ## 命令
 

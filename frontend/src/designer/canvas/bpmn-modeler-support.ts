@@ -11,7 +11,7 @@ export interface ModelerServices {
   /**
    * 图形视口、根元素与问题标记。
    */
-  canvas: { getRootElement(): BpmnDiagramElement; zoom(value?: number | string): number; viewbox(value?: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }; addMarker(id: string, marker: string): void; removeMarker(id: string, marker: string): void; scrollToElement(element: BpmnDiagramElement): void }
+  canvas: { getRootElement(): BpmnDiagramElement; zoom(value?: number | string, center?: { x: number; y: number }): number; viewbox(value?: { x: number; y: number; width: number; height: number }): { x: number; y: number; width: number; height: number }; addMarker(id: string, marker: string): void; removeMarker(id: string, marker: string): void; scrollToElement(element: BpmnDiagramElement): void }
   /**
    * BPMN 图形操作。
    */

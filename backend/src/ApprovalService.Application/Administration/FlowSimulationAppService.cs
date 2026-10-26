@@ -229,7 +229,7 @@ public sealed class FlowSimulationAppService(FlowManagementAppService flows,
                 throw Validation("假操作人、任务或动作不匹配当前待办。");
             }
 
-            command.Operation = new OperationInput { ActorId = task.AssigneeId };
+            command.Operation = new OperationInput { ActorId = task.AssigneeId, Opinion = request.Opinion };
         }
         else if (request.Kind is EngineCommandKinds.ActionSucceeded or EngineCommandKinds.ActionFailed or
             EngineCommandKinds.SubprocessCompleted)

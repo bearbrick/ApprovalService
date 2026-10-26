@@ -20,6 +20,8 @@
 - `frontend/src/designer/workbench/simple-templates.ts`、`workbench-model.ts`、`frontend/tests/workbench-checks.ts`：内置可复制的十类流程模板及静态发布预检。
 - `frontend/src/designer/workbench/integration-snippet.ts`、`frontend/src/pages/DesignerPage.vue`、对应前端检查：生成、展示、复制不嵌入 API Key 的 C# SDK 调用代码。
 - `backend/src/ApprovalService.Application/Administration/FlowSimulation*.cs`、`backend/src/ApprovalService.Api/Endpoints/FlowSimulationEndpoints.cs`、`backend/tests/ApprovalService.Backend.Checks/FlowSimulationChecks.cs`：已确认的内存模拟会话。
+- `backend/tests/ApprovalService.Backend.Checks/FlowTemplateSimulationChecks.cs`、`Fixtures/flow-templates.json`、`frontend/tests/workbench-checks.ts`：对十个正式模板逐一用同一模拟引擎推进，前端核对测试夹具始终等于模板原定义。
+- `backend/src/ApprovalService.Application/Administration/FlowSimulationAppService.cs`：给模拟人工步骤传递可选假意见，以验证节点必填意见规则。
 - `frontend/src/api/flow-simulation.ts`、`frontend/src/designer/workbench/FlowSimulationPanel.vue`、`frontend/src/designer/workbench/simulation-model.ts`、`frontend/tests/simulation-checks.ts`：用现有流程管理员会话在设计器试跑当前草稿和假数据，显示待办、外部等待与事件，不保存真实业务记录。
 - `frontend/README.md`：同步测试模式页面的实际能力与限制。
 - `backend/src/ApprovalService.Domain/Integration/ClientAppEntity.cs`、`IClientAppAdminRepository.cs`、`backend/src/ApprovalService.Application/Integration/ClientAppAdminAppService.cs`、`backend/src/ApprovalService.Infrastructure/Integration/ClientAppAdminRepository.cs`、`backend/src/ApprovalService.Api/Endpoints/ClientAppAdminEndpoints.cs`：已确认的按应用管理员人员 ID 名单与授权查询；本切片不发送测试回调。
@@ -37,6 +39,7 @@
 
 - `backend/src/ApprovalService.Contracts/Protocol/ApiRoutes.cs`：追加测试模式路由常量。
 - `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`：新增测试模式契约。
+- `backend/src/ApprovalService.Contracts/Protocol/FlowSimulationModels.cs`、`docs/contracts.md`、设计书 §designer/§integration：模拟步骤兼容新增可选 `opinion`，不会改变旧请求默认行为。
 - `backend/src/ApprovalService.Application/ApplicationServiceCollectionExtensions.cs`、`backend/src/ApprovalService.Api/Program.cs`、`backend/tests/ApprovalService.Backend.Checks/Program.cs`：只追加服务、端点和检查登记。
 - `docs/contracts.md`、`docs/architecture.md`、`docs/design/approval-service-design.html`、`docs/adr/README.md`：同步已确认的跨部分测试协议。
 - `frontend/src/pages/DesignerPage.vue`、`frontend/tests/checks.ts`：仅登记测试模式面板及对应检查；保持设计器主文件低于 500 行。

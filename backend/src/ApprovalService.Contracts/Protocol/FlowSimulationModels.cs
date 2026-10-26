@@ -70,6 +70,14 @@ public sealed class FlowSimulationStepRequest
     }
 
     /// <summary>
+    /// 当前假人工决定的可选意见；节点必填意见规则仍由同一引擎校验。
+    /// </summary>
+    public string? Opinion
+    {
+        get; set;
+    }
+
+    /// <summary>
     /// 子流程假结果是否成功。
     /// </summary>
     public bool Success { get; set; } = true;

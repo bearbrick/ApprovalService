@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem } from '../model/center.ts'
 import { centerAdapter, CenterAdapterUnavailableError } from '../api/center-adapter.ts'
+import type { CenterActionInput } from '../api/center-actions.ts'
 import { mobileCenterSection } from '../model/mobile.ts'
 import MobileList from './mobile/MobileList.vue'
 import MobileDetail from './mobile/MobileDetail.vue'
@@ -27,6 +28,14 @@ const state = ref<'loading' | 'ready' | 'unavailable' | 'offline' | 'error'>('lo
  * 读取失败的中文信息。
  */
 const error = ref('')
+/**
+ * 手机端命令提交状态与错误。
+ */
+const actionBusy = ref(false)
+/**
+ * 上次手机审批命令的可修正错误。
+ */
+const actionError = ref('')
 /**
  * 仅由已授权适配器返回的列表。
  */
@@ -74,6 +83,26 @@ async function load(): Promise<void> {
 }
 
 /**
+ * 用本人 JWT 提交手机端审批命令，成功后重新读取服务器状态。
+ * @param taskId 已授权的任务 ID。
+ * @param input 当前表单命令。
+ * @returns 操作完成。
+ */
+async function executeAction(taskId: string, input: CenterActionInput): Promise<void> {
+  if (actionBusy.value) return
+  actionBusy.value = true
+  actionError.value = ''
+  try {
+    await centerAdapter.executeAction(taskId, input)
+    await load()
+  } catch (cause) {
+    actionError.value = cause instanceof Error ? cause.message : '审批操作失败，请刷新后重试。'
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+/**
  * 在网络恢复时同步状态并重新读取当前页面。
  */
 function handleOnline(): void {
@@ -99,7 +128,8 @@ onBeforeUnmount(() => { request?.abort(); window.removeEventListener('online', h
 
 <template>
   <div class="mobile-approval-page">
-    <MobileDetail v-if="route.resourceId" :detail="detail" :state="state" :error="error" @reload="load" />
+    <MobileDetail v-if="route.resourceId" :detail="detail" :state="state" :error="error"
+      :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
     <MobileMe v-else-if="route.section === 'me'" />
     <MobileList v-else-if="section" :section="section" :items="items" :state="state" :error="error" @reload="load" />
   </div>

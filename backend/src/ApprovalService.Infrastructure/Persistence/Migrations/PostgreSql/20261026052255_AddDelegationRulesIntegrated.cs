@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
 {
     /// <inheritdoc />
-    public partial class AddDelegationRules : Migration
+    public partial class AddDelegationRulesIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

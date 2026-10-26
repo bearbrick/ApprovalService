@@ -12,10 +12,12 @@ import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runCenterChecks } from './center-checks.ts'
 import { runAdminChecks } from './admin-checks.ts'
+import { runAdminIntegrationWizardChecks } from './admin-integration-wizard-checks.ts'
 import { runFlowManagementChecks } from './flow-management-checks.ts'
 import { runReportChecks } from './report-checks.ts'
 import { runMobileChecks } from './mobile-checks.ts'
 import { runWorkbenchChecks } from './workbench-checks.ts'
+import { runSimulationChecks } from './simulation-checks.ts'
 import { runUiChecks } from './ui-checks.ts'
 import { runCanvasChecks } from './canvas-checks.ts'
 import { checkDocs, sourceFiles } from './docs.ts'
@@ -100,10 +102,12 @@ checkFlowModel()
 runDataChecks(check)
 await runCenterChecks(check)
 await runAdminChecks(check)
+await runAdminIntegrationWizardChecks(check)
 await runFlowManagementChecks(check)
 await runReportChecks(check)
 runMobileChecks(check)
 runWorkbenchChecks(check)
+await runSimulationChecks(check)
 await runHttpChecks(check)
 await runUiChecks(check)
 await runCanvasChecks(check)

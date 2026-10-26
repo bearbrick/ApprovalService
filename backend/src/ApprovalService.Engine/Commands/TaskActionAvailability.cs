@@ -74,7 +74,8 @@ public static class TaskActionAvailability
         if (!string.IsNullOrWhiteSpace(task.CompletionKind) && Permits(configured, task.CompletionKind))
         {
             result.Add(task.CompletionKind);
-            if (task.CompletionKind == EngineCommandKinds.Approve && Permits(configured, OperationKinds.BulkApprove))
+            if (task.CompletionKind == EngineCommandKinds.Approve && node.Approval?.SignatureRequired != true &&
+                Permits(configured, OperationKinds.BulkApprove))
             {
                 result.Add(OperationKinds.BulkApprove);
             }

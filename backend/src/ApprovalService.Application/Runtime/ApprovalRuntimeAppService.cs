@@ -223,6 +223,9 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             Opinion = command.TaskId == task.Id && task.Status != EngineTaskStatuses.Pending &&
                 previousStatuses.TryGetValue(task.Id, out var previous) && previous == EngineTaskStatuses.Pending
                     ? command.Operation?.Opinion : null,
+            SignatureFileId = command.TaskId == task.Id && task.Status != EngineTaskStatuses.Pending &&
+                previousStatuses.TryGetValue(task.Id, out var signaturePrevious) &&
+                signaturePrevious == EngineTaskStatuses.Pending ? command.Operation?.SignatureFileId : null,
             CompletedAt = task.Status != EngineTaskStatuses.Pending &&
                 (!previousStatuses.TryGetValue(task.Id, out var previousStatus) || previousStatus == EngineTaskStatuses.Pending)
                     ? input.Context.OccurredAt

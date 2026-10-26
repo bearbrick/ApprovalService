@@ -62,7 +62,7 @@ export const SECTION_ITEMS: Readonly<Record<WorkspaceKey, readonly NavigationIte
  * 管理页面支持的二级页签。
  */
 export const ADMIN_TABS: Readonly<Record<string, readonly string[]>> = {
-  org: ['departments', 'people', 'roles', 'matrix', 'calendar'], apps: ['list', 'bindings'],
+  org: ['departments', 'people', 'roles', 'matrix', 'calendar'], apps: ['list', 'bindings', 'test'],
   outbound: ['queue', 'hooks'], reports: ['flow', 'node', 'people'],
   system: ['info', 'notifications', 'storage', 'security', 'logs'],
 }
@@ -72,7 +72,7 @@ export const ADMIN_TABS: Readonly<Record<string, readonly string[]>> = {
  */
 export const TAB_TITLES: Readonly<Record<string, string>> = {
   departments: '部门', people: '人员', roles: '角色', matrix: '审批矩阵', calendar: '工作日历',
-  list: '接入应用', bindings: '业务系统绑定', queue: '待发队列', hooks: '钩子配置',
+  list: '接入应用', bindings: '业务系统绑定', test: '测试回调', queue: '待发队列', hooks: '钩子配置',
   flow: '流程统计', node: '节点统计', notifications: '消息配置', storage: '附件与字体',
   info: '系统信息', security: '安全设置', logs: '操作日志', design: '流程设计', fields: '审批数据',
   layout: '详情排版', rules: '流程规则', print: '打印设置', versions: '版本管理',

@@ -80,6 +80,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IActionRetryRepository, ActionRetryRepository>();
         services.AddScoped<IApprovalOpenQueryRepository, ApprovalOpenQueryRepository>();
         services.AddScoped<ICenterQueryRepository, CenterQueryRepository>();
+        services.AddScoped<ISignatureAssetRepository, SignatureAssetRepository>();
         services.AddScoped<ICenterOpinionRepository, CenterOpinionRepository>();
         services.AddScoped<IDelegationRuleRepository, DelegationRuleRepository>();
         services.AddScoped<IApprovalSerialNumberRepository, ApprovalSerialNumberRepository>();

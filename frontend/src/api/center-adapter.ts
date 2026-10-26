@@ -168,6 +168,10 @@ interface CenterWireTask {
    */
   opinion: string | null
   /**
+   * 成功办理时发布节点是否要求本次签名。
+   */
+  signatureRequired?: boolean
+  /**
    * 当前人员在这项任务上的许可命令。
    */
   allowedActions?: string[]
@@ -206,6 +210,10 @@ interface CenterWireEvent {
    * 审批意见。
    */
   opinion: string | null
+  /**
+   * 本次事件冻结的签名 ID。
+   */
+  signatureFileId?: string | null
 }
 
 /**
@@ -435,9 +443,11 @@ export const centerAdapter: CenterDataAdapter = {
     const timeline: CenterTimelineEntry[] = wire.events.map(event => ({
       id: event.eventId, title: event.kind, actor: event.actorId ?? '系统', occurredAt: event.occurredAt,
       opinion: event.opinion ?? '', current: Boolean(event.nodeId && wire.activeNodeIds.includes(event.nodeId)),
+      signatureFileId: event.signatureFileId,
     }))
     const actionTasks = wire.tasks.filter(task => task.allowedActions?.length).map(task => ({
       taskId: task.id, nodeName: task.nodeName,
+      signatureRequired: task.signatureRequired ?? false,
       actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
     }))
     const attachments = wire.attachments ?? []

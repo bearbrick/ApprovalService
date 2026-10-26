@@ -329,6 +329,13 @@ public sealed class CenterTaskResponse
     {
         get; set;
     }
+    /// <summary>
+    /// 当前任务成功办理时冻结的签名资产 ID。
+    /// </summary>
+    public string? SignatureFileId
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 任务到期时间。
@@ -350,6 +357,14 @@ public sealed class CenterTaskResponse
     /// 当前登录人员在此任务上可尝试的命令；提交时引擎仍重新校验。
     /// </summary>
     public IReadOnlyList<string> AllowedActions { get; set; } = [];
+
+    /// <summary>
+    /// 此发布节点在同意、办理完成或确认已阅时是否要求本次手写签名。
+    /// </summary>
+    public bool SignatureRequired
+    {
+        get; set;
+    }
 
 }
 
@@ -404,6 +419,13 @@ public sealed class CenterEventResponse
     /// 操作意见。
     /// </summary>
     public string? Opinion
+    {
+        get; set;
+    }
+    /// <summary>
+    /// 本次操作审计冻结的签名资产 ID。
+    /// </summary>
+    public string? SignatureFileId
     {
         get; set;
     }

@@ -93,6 +93,7 @@ internal static class Program
         await JobChecks.RunAsync(Check);
         OperationChecks.Run(Check);
         DelegationRulesChecks.Run(Check);
+        await CenterSignatureChecks.RunAsync(Check);
         OperationChecksBoundaries.Run(Check);
         ApprovalDataChecks.Run(Check);
         DepartureChecks.Run(Check);
@@ -112,6 +113,7 @@ internal static class Program
         await OrganizationChecks.RunAsync(Check);
         await IdentityEndpointChecks.RunAsync(backendRoot, Check);
         await CenterQueryChecks.RunAsync(backendRoot, Check);
+        await CenterSignatureChecks.RunHttpAsync(backendRoot, Check);
         await CenterOpinionChecks.RunAsync(backendRoot, Check);
         await CenterDelegationChecks.RunAsync(backendRoot, Check);
         await ActionRetryEndpointChecks.RunAsync(backendRoot, Check);

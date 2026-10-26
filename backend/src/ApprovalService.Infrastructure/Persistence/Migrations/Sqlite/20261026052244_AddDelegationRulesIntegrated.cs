@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
+namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 {
     /// <inheritdoc />
-    public partial class AddDelegationRules : Migration
+    public partial class AddDelegationRulesIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,12 +15,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                 name: "DelegationRules",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "nvarchar(32)", maxLength: 32, nullable: false),
-                    PrincipalId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
-                    DelegateId = table.Column<string>(type: "nvarchar(128)", maxLength: 128, nullable: false),
-                    StartsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    EndsAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    FlowCodesJson = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Id = table.Column<string>(type: "TEXT", maxLength: 32, nullable: false),
+                    PrincipalId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    DelegateId = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
+                    StartsAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    EndsAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    FlowCodesJson = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {

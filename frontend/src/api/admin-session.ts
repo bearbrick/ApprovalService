@@ -45,7 +45,7 @@ export interface AdminSession {
   /**
    * 本次登录获准进入的管理范围；报表登录不能进入其他管理页面。
    */
-  scope: 'admin' | 'reports' | 'flows'
+  scope: 'admin' | 'reports' | 'flows' | 'app-test'
 }
 
 /**
@@ -74,7 +74,7 @@ function isTokens(value: unknown): value is AdminTokens {
  * @returns 登录结果；首次登录须先改密。
  */
 export async function loginAdmin(employeeNumber: string, password: string,
-  scope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<AdminSession> {
+  scope: 'admin' | 'reports' | 'flows' | 'app-test' = 'admin'): Promise<AdminSession> {
   const tokens = await requestJson<unknown>('/api/v1/identity/login', {
     method: 'POST', body: { employeeNumber, password }, cache: 'no-store',
   })
@@ -98,7 +98,7 @@ export async function loginAdmin(employeeNumber: string, password: string,
  * @returns 新会话。
  */
 export async function changeAdminPassword(currentPassword: string, newPassword: string,
-  scope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<AdminSession> {
+  scope: 'admin' | 'reports' | 'flows' | 'app-test' = 'admin'): Promise<AdminSession> {
   if (!current) throw new Error('请先登录。')
   const employeeNumber = current.employeeNumber
   await requestJson<void>('/api/v1/identity/change-password', {
@@ -136,10 +136,11 @@ export function logoutAdmin(): void { current = null }
  * @param requiredScope 调用方所需的页面范围。
  * @returns 可使用的访问令牌。
  */
-export async function adminAccessToken(requiredScope: 'admin' | 'reports' | 'flows' = 'admin'): Promise<string> {
+export async function adminAccessToken(requiredScope: 'admin' | 'reports' | 'flows' | 'app-test' = 'admin'): Promise<string> {
   if (!current || current.tokens.mustChangePassword) throw new Error('请先完成管理员登录。')
   if (current.scope === 'reports' && requiredScope !== 'reports') throw new Error('此会话仅可查看报表。')
   if (current.scope === 'flows' && requiredScope !== 'flows') throw new Error('此会话仅可管理流程。')
+  if (current.scope === 'app-test' && requiredScope !== 'app-test') throw new Error('此会话仅可测试已授权应用的回调。')
   if (Date.parse(current.tokens.accessExpiresAt) > Date.now() + 30_000) return current.tokens.accessToken
   const tokens = await requestJson<unknown>('/api/v1/identity/refresh', {
     method: 'POST', body: { refreshToken: current.tokens.refreshToken }, cache: 'no-store',

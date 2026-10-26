@@ -42,6 +42,10 @@ const endsAt = ref('')
  */
 const flowCodes = ref('')
 /**
+ * 在本人已授权待办中搜索标题、编号或业务单号。
+ */
+const taskSearch = ref('')
+/**
  * 可转委托的当前在手任务。
  */
 const tasks = ref<{ id: string, title: string }[]>([])
@@ -138,13 +142,13 @@ async function loadTasks(): Promise<void> {
   if (busy.value || readOnly) return
   busy.value = true; error.value = ''; status.value = ''; tasks.value = []; selectedTaskIds.value = []
   try {
-    const rows = await centerAdapter.loadList('todo', new AbortController().signal)
+    const rows = await centerAdapter.loadList('todo', new AbortController().signal, taskSearch.value.trim())
     const details = await Promise.all(rows.slice(0, 20).map(item =>
       centerAdapter.loadDetail(item.id, new AbortController().signal)))
-    tasks.value = details.flatMap(detail => (detail.actionTasks ?? []).map(task => ({
+    tasks.value = details.flatMap(detail => (detail.delegationTasks ?? []).map(task => ({
       id: task.taskId, title: `${detail.item.title} · ${task.nodeName}`,
     })))
-    if (rows.length > 20) status.value = '当前显示前 20 张待办审批单；其余任务可在详情中查看任务 ID。'
+    if (rows.length > 20) status.value = '当前显示前 20 张待办审批单；可输入标题或业务单号缩小范围。'
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) emit('unauthorized')
     error.value = cause instanceof Error ? cause.message : '待办任务读取失败。'
@@ -182,7 +186,7 @@ onMounted(() => { void reload() })
       <div v-if="rules.length" class="center-delegations-list"><article v-for="rule in rules" :key="rule.id"><div><strong>代理人 {{ rule.delegatePersonId }}</strong><small>{{ localTime(rule.startsAtUtc) }} 至 {{ localTime(rule.endsAtUtc) }} · {{ rule.flowCodes.length ? rule.flowCodes.join('、') : '全部流程' }}</small></div><button v-if="!readOnly" class="btn" type="button" :disabled="busy" @click="remove(rule.id)">删除</button></article></div>
       <p v-else-if="!busy" class="center-settings-muted">尚未设置委托。</p>
       <form v-if="!readOnly" class="center-delegations-form" @submit.prevent="save"><label>代理人内部人员 ID<input v-model="delegatePersonId" required placeholder="由组织管理员维护的人员 ID"></label><label>开始时间<input v-model="startsAt" type="datetime-local" required></label><label>结束时间<input v-model="endsAt" type="datetime-local" required></label><label>流程编码（可选，逗号分隔）<input v-model="flowCodes" placeholder="例如 PURCHASE,EXPENSE"></label><button class="btn btn-primary" type="submit" :disabled="busy">保存委托</button></form>
-      <div v-if="!readOnly" class="center-delegations-existing"><h3>已有待办逐项转委托</h3><p>只转移明确勾选且当前规则已生效的任务。完成过的任务不会受影响。</p><button class="btn" type="button" :disabled="busy" @click="loadTasks">读取当前在手任务</button><div v-if="tasks.length" class="center-delegations-tasks"><label v-for="task in tasks" :key="task.id"><input v-model="selectedTaskIds" type="checkbox" :value="task.id">{{ task.title }}</label></div><button v-if="tasks.length" class="btn btn-primary" type="button" :disabled="busy || !selectedTaskIds.length" @click="transferSelected">转委托所选 {{ selectedTaskIds.length }} 项</button></div>
+      <div v-if="!readOnly" class="center-delegations-existing"><h3>已有待办逐项转委托</h3><p>只转移明确勾选且当前规则已生效的任务。完成过的任务不会受影响。</p><label>搜索在手待办<input v-model="taskSearch" placeholder="标题、编号或业务单号"></label><button class="btn" type="button" :disabled="busy" @click="loadTasks">读取当前在手任务</button><div v-if="tasks.length" class="center-delegations-tasks"><label v-for="task in tasks" :key="task.id"><input v-model="selectedTaskIds" type="checkbox" :value="task.id">{{ task.title }}</label></div><button v-if="tasks.length" class="btn btn-primary" type="button" :disabled="busy || !selectedTaskIds.length" @click="transferSelected">转委托所选 {{ selectedTaskIds.length }} 项</button></div>
     </div>
   </section>
 </template>

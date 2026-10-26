@@ -178,7 +178,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
               { fieldKey: 'secret', columnSpan: 1, detailColumnWidths: {} },
             ] }] },
             attachments: [{ id: 'file-visible', fileName: '票据.pdf', contentType: 'application/pdf', size: 42 }],
-            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, signatureRequired: requireSignature, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] }],
+            tasks: [{ id: 'task-1', nodeId: 'approval', nodeName: '经理审批', assigneeId: 'person-1', status: 'pending', completedAt: null, opinion: null, signatureRequired: requireSignature, allowedActions: allowActions ? ['approve', 'bulkApprove', 'requestSupplement'] : [] },
+              { id: 'task-queued', nodeId: 'approval', nodeName: '后续审批', assigneeId: 'person-1', status: 'queued', completedAt: null, opinion: null, allowedActions: [] }],
             events: [{ eventId: 'event-2', sequence: 2, kind: 'commentAdded', nodeId: 'approval', actorId: 'other', occurredAt: '2026-10-19T11:00:00Z', opinion: null }], activeNodeIds: ['approval'] }
           : { total: 1, skip: 0, take: 100, items: [{ ...summary, isUnread: serverUnread,
             canBulkApprove: allowActions, bulkApprovableTaskIds: allowActions ? ['task-1'] : [] }] }
@@ -231,6 +232,8 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     check('中心只映射服务端许可，并保留可批量同意的实际任务 ID',
       permittedList[0]?.allowsBatchApprove === true && permittedList[0]?.bulkTaskIds?.[0] === 'task-1'
       && permittedDetail.actionTasks?.[0]?.actions.join(',') === 'approve,supplement')
+    check('委托设置可列出本人待办及排队任务，转委托仍由写接口重验',
+      permittedDetail.delegationTasks?.map(task => task.taskId).join(',') === 'task-1,task-queued')
     await centerAdapter.executeAction('task-1', { action: 'approve', opinion: '同意' })
     const batch = await centerAdapter.batchApprove(['task-1'], '同意')
     check('中心写请求携带当前人员 JWT 和任务 ID，批量返回逐项结果',

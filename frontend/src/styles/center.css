@@ -119,6 +119,8 @@
 .center-delegations-existing { display: grid; justify-items: start; gap: 10px; border-top: 1px solid var(--line); padding-top: 16px; }
 .center-delegations-existing h3 { padding: 0; border: 0; background: transparent; }
 .center-delegations-existing p { color: var(--muted); font-size: 12px; }
+.center-delegations-existing > label { display: grid; gap: 5px; font-size: 13px; }
+.center-delegations-existing > label input { min-height: 36px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px; }
 .center-delegations-tasks { display: grid; gap: 7px; }
 .center-delegations-tasks label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .center-login { max-width: 440px; margin: 38px auto; padding: 28px; }

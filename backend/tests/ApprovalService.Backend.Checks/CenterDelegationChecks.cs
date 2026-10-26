@@ -2,8 +2,14 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using ApprovalService.Application.Runtime;
 using ApprovalService.Contracts;
+using ApprovalService.Contracts.Flows;
 using ApprovalService.Contracts.Protocol;
+using ApprovalService.Domain.Center;
+using ApprovalService.Domain.Organization;
+using ApprovalService.Domain.Runtime;
+using ApprovalService.Engine.Commands;
 using ApprovalService.Engine.Execution;
 using ApprovalService.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -62,10 +68,15 @@ internal static class CenterDelegationChecks
                 tokens.Local, input);
             using var foreignList = await SendAsync(http, HttpMethod.Get, CenterRoutes.Delegations,
                 tokens.Stranger);
+            using var unauthorizedAdmin = await SendAsync(http, HttpMethod.Get,
+                CenterRoutes.AdminDelegations.Replace("{principalId}", "stranger", StringComparison.Ordinal),
+                tokens.Local);
             var foreign = await foreignList.Content.ReadFromJsonAsync<List<CenterDelegationResponse>>();
             check("重叠范围由数据库事务拒绝且本人规则不泄露给其他人员",
                 conflict.StatusCode == HttpStatusCode.Conflict && foreignList.StatusCode == HttpStatusCode.OK &&
                 foreign is { Count: 0 });
+            check("普通人员不能使用管理员委托接口查看或修改他人规则",
+                unauthorizedAdmin.StatusCode == HttpStatusCode.Forbidden);
 
             using var ownerTransfer = await SendAsync(http, HttpMethod.Post, CenterRoutes.DelegateTasks,
                 tokens.Local, new CenterDelegateTasksRequest { TaskIds = ["a-todo-task", "missing-task"] });
@@ -113,6 +124,68 @@ internal static class CenterDelegationChecks
             var current = await listAfterDelete.Content.ReadFromJsonAsync<List<CenterDelegationResponse>>();
             check("删除规则只清除未来委托配置，不反向撤销已有任务",
                 removed.StatusCode == HttpStatusCode.NoContent && current is { Count: 0 });
+
+            using (var scope = server.Services.CreateScope())
+            {
+                var provider = scope.ServiceProvider;
+                var factory = provider.GetRequiredService<IDbContextFactory<ApprovalDbContext>>();
+                await using (var db = await factory.CreateDbContextAsync())
+                {
+                    db.People.Add(new PersonEntity
+                    {
+                        Id = "user-n1",
+                        EmployeeNumber = "user-n1",
+                        Name = "新任务原审批人",
+                    });
+                    await db.SaveChangesAsync();
+                }
+                var ruleRepository = provider.GetRequiredService<IDelegationRuleRepository>();
+                await ruleRepository.CreateAsync(new DelegationRuleEntity
+                {
+                    Id = "automatic-start-rule",
+                    PrincipalId = "user-n1",
+                    DelegateId = "first",
+                    StartsAtUtc = now.AddMinutes(-5),
+                    EndsAtUtc = now.AddHours(1),
+                    FlowCodes = ["CENTER"],
+                });
+                FlowExecutionGraph graph;
+                await using (var db = await factory.CreateDbContextAsync())
+                {
+                    var version = await db.FlowVersions.SingleAsync(item => item.Id == "version");
+                    graph = JsonSerializer.Deserialize<FlowExecutionGraph>(version.GraphJson, ApprovalJson.Options)!;
+                }
+                var context = EngineScenarioChecks.Context(graph);
+                context.OccurredAt = now;
+                context.Operations.InitiatorId = "other";
+                var started = await provider.GetRequiredService<IApprovalRuntimeAppService>().ExecuteAsync(
+                    new RuntimeCommandInput
+                    {
+                        Command = new EngineCommand
+                        {
+                            Kind = EngineCommandKinds.Start,
+                            InstanceId = "delegated-start",
+                            RequestId = "delegated-start",
+                        },
+                        Context = context,
+                        StartInstance = new InstanceEntity
+                        {
+                            Id = "delegated-start",
+                            FlowVersionId = "version",
+                            FlowCode = "CENTER",
+                            SerialNo = "SP-DELEGATED",
+                            BusinessKey = "B-DELEGATED",
+                            Title = "委托自动发起",
+                            InitiatorId = "other",
+                            ClientAppCode = "one",
+                        },
+                    });
+                await using var verify = await factory.CreateDbContextAsync();
+                var persisted = await verify.ApprovalTasks.SingleAsync(item => item.InstanceId == "delegated-start");
+                check("新任务到达时运行时自动加载持久规则，代理关系同步写入任务投影",
+                    started.State.Tasks is [{ AssigneeId: "first", DelegatorId: "user-n1" }] &&
+                    persisted.AssigneeId == "first" && persisted.DelegatedForId == "user-n1");
+            }
         }
         finally
         {

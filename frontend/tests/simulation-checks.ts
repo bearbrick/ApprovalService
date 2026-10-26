@@ -1,6 +1,6 @@
 import { loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { deleteFlowSimulation, getFlowSimulation, startFlowSimulation, stepFlowSimulation } from '../src/api/flow-simulation.ts'
-import { buildSimulationInput, simulationExampleData, simulationManualNodes } from '../src/designer/workbench/simulation-model.ts'
+import { buildSimulationInput, parseSimulationFieldValues, simulationEditableFields, simulationExampleData, simulationManualNodes } from '../src/designer/workbench/simulation-model.ts'
 import { flowTemplates } from '../src/designer/workbench/workbench-model.ts'
 
 /**
@@ -22,6 +22,16 @@ export async function runSimulationChecks(check: (name: string, value: boolean) 
   invalid = false
   try { buildSimulationInput(definition, '{}', 'fake-initiator', {}) } catch { invalid = true }
   check('测试模式拒绝缺失的假处理人', invalid)
+  const quality = flowTemplates.find(item => item.code === 'QUALITY_EXCEPTION')!.definition
+  const inspectionFields = simulationEditableFields(quality, 'inspection')
+  check('测试模式仅展示质量复检节点获授权的审批人填写字段',
+    inspectionFields.map(field => field.key).join(',') === 'reworkDecision')
+  check('假填写允许返工分支值并可在再次质检时改为不返工',
+    parseSimulationFieldValues('{"reworkDecision":"yes"}', inspectionFields)?.reworkDecision === 'yes'
+    && parseSimulationFieldValues('{"reworkDecision":"no"}', inspectionFields)?.reworkDecision === 'no')
+  invalid = false
+  try { parseSimulationFieldValues('{"businessAmount":1}', inspectionFields) } catch { invalid = true }
+  check('假填写拒绝当前节点无权编辑的业务字段', invalid)
 
   const originalFetch = globalThis.fetch
   const calls: { path: string; method: string; body: unknown }[] = []
@@ -61,12 +71,15 @@ export async function runSimulationChecks(check: (name: string, value: boolean) 
     const created = await startFlowSimulation(input)
     const refreshed = await getFlowSimulation(created.id)
     const stepped = await stepFlowSimulation(created.id, { kind: created.tasks[0]!.completionKind,
-      taskId: created.tasks[0]!.id, actorId: created.tasks[0]!.assigneeId, opinion: '模拟审批意见' })
+      taskId: created.tasks[0]!.id, actorId: created.tasks[0]!.assigneeId, opinion: '模拟审批意见',
+      fieldValues: { reworkDecision: 'yes' } })
     await deleteFlowSimulation(created.id)
     check('测试模式只经流程管理 JWT 发送假草稿并逐步处理内存会话',
       created.tasks.length === 1 && refreshed.id === 'memory-1' && stepped.status === 'completed'
       && calls.some(call => call.path.endsWith('/steps') && call.method === 'POST')
       && calls.some(call => call.path.endsWith('/steps') && (call.body as { opinion?: string }).opinion === '模拟审批意见')
+      && calls.some(call => call.path.endsWith('/steps')
+        && (call.body as { fieldValues?: { reworkDecision?: string } }).fieldValues?.reworkDecision === 'yes')
       && calls.some(call => call.path.endsWith('/memory-1') && call.method === 'DELETE')
       && !calls.some(call => call.path.includes('/instances') || call.path.includes('callback')))
   } finally {

@@ -127,6 +127,10 @@ export interface SimulationStep {
    */
   opinion?: string
   /**
+   * 当前节点显式可编辑的假审批人字段。
+   */
+  fieldValues?: Record<string, unknown>
+  /**
    * 子流程是否成功。
    */
   success?: boolean

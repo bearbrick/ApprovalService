@@ -187,6 +187,77 @@ export interface AdminOutbox {
 }
 
 /**
+ * 管理工作台只读取报表概览已有的安全聚合字段。
+ */
+export interface AdminOverviewCounts {
+  /**
+   * 公开流程今日发起量。
+   */
+  visibleStartedCount: number
+  /**
+   * 公开流程今日完成量。
+   */
+  visibleCompletedCount: number
+  /**
+   * 公开流程当前人工待办量。
+   */
+  visiblePendingCount: number
+  /**
+   * 公开流程今日到期任务中的逾期量。
+   */
+  visibleOverdueCount: number
+  /**
+   * 保密流程今日匿名发起量。
+   */
+  confidentialStartedCount: number
+  /**
+   * 保密流程今日匿名完成量。
+   */
+  confidentialCompletedCount: number
+}
+
+/**
+ * 将浏览器本地今日换算为服务端要求的 UTC 左闭右开区间。
+ * @param now 当前时间，由调用方传入以便检查跨日边界。
+ * @returns 今日的报表查询参数。
+ */
+export function adminTodayQuery(now: Date): string {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const until = new Date(start)
+  until.setDate(until.getDate() + 1)
+  return `?${new URLSearchParams({ fromUtc: start.toISOString(), untilUtc: until.toISOString() })}`
+}
+
+/**
+ * 用已有报表与队列安全摘要生成真实工作台，不把保密人员或事件正文带入页面。
+ * @param report 已授权的今日报表概览。
+ * @param outbox 已授权的最近待发项，后端至多返回二百条。
+ * @returns 今日指标和最近需关注的安全行。
+ */
+export function overviewViewData(report: AdminOverviewCounts, outbox: readonly AdminOutbox[]): AdminViewData {
+  const attention = outbox.filter(item => item.status === 'needsAttention'
+    || item.status === 'pending' && !!item.errorCode).slice(0, 8)
+  return {
+    metrics: [
+      { key: 'startedToday', label: '今日发起', value: String(report.visibleStartedCount + report.confidentialStartedCount) },
+      { key: 'completedToday', label: '今日完成', value: String(report.visibleCompletedCount + report.confidentialCompletedCount) },
+      { key: 'pendingVisible', label: '当前公开待办', value: String(report.visiblePendingCount) },
+      { key: 'overdueVisibleToday', label: '今日公开逾期', value: String(report.visibleOverdueCount) },
+    ],
+    rows: attention.map(item => ({
+      id: item.eventId,
+      cells: {
+        subject: item.status === 'needsAttention' ? '自动动作待流程管理员处理'
+          : item.kind === 'callback' ? '回调投递重试中' : '待发项重试中',
+        source: item.clientAppCode || '—',
+        availableAt: Number.isFinite(Date.parse(item.availableAt))
+          ? new Date(item.availableAt).toLocaleString('zh-CN') : '—',
+      },
+    })),
+  }
+}
+
+/**
  * 把受保护目录响应映射到部门、人员列表已有的安全列。
  * @param viewKey 当前管理页面编码。
  * @param directory 服务端目录。

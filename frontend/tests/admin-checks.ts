@@ -2,7 +2,7 @@ import { ADMIN_VIEWS, adminCellText, filterAdminRows, resolveAdminView } from '.
 import type { AdminRow } from '../src/model/admin.ts'
 import { ADMIN_TABS } from '../src/model/navigation.ts'
 import { adminAdapter, AdminAdapterUnavailableError } from '../src/api/admin-adapter.ts'
-import { auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData } from '../src/model/admin-data.ts'
+import { adminTodayQuery, auditViewData, bindingsViewData, clientAppsViewData, directoryViewData, outboxViewData, overviewViewData } from '../src/model/admin-data.ts'
 
 /**
  * 检查管理员页面的路径覆盖、安全列与未接入边界。
@@ -51,6 +51,25 @@ export async function runAdminChecks(check: (name: string, value: boolean) => vo
       attempts: 2, availableAt: '2026-10-23T00:00:00Z', errorCode: 'TimeoutException' }]).rows[0]?.cells.kind === '回调'
     && outboxViewData([{ eventId: 'e1', clientAppCode: 'demo', kind: 'callback', status: 'pending',
       attempts: 2, availableAt: '2026-10-23T00:00:00Z', errorCode: 'TimeoutException' }]).rows[0]?.cells.eventId === 'e1')
+  const today = new URLSearchParams(adminTodayQuery(new Date(2026, 9, 26, 18, 30)).slice(1))
+  check('工作台今日使用本地零点到次日零点的 UTC 半开区间',
+    today.get('fromUtc') === new Date(2026, 9, 26).toISOString()
+    && today.get('untilUtc') === new Date(2026, 9, 27).toISOString())
+  const overview = overviewViewData({ visibleStartedCount: 3, confidentialStartedCount: 2,
+    visibleCompletedCount: 1, confidentialCompletedCount: 1, visiblePendingCount: 4, visibleOverdueCount: 2 }, [
+    { eventId: 'action', clientAppCode: 'erp', kind: 'engineEvent', status: 'needsAttention',
+      attempts: 10, availableAt: '2026-10-26T01:00:00Z', errorCode: 'BUSINESS_HOOK_FAILED' },
+    { eventId: 'callback', clientAppCode: 'erp', kind: 'callback', status: 'pending',
+      attempts: 2, availableAt: '2026-10-26T02:00:00Z', errorCode: 'TIMEOUT' },
+    { eventId: 'done', clientAppCode: 'erp', kind: 'callback', status: 'completed',
+      attempts: 1, availableAt: '2026-10-26T00:00:00Z', errorCode: 'OLD_ERROR' },
+  ])
+  check('工作台合并保密匿名数量，仅显示需关注出站项且不泄露错误正文',
+    overview.metrics.find(metric => metric.key === 'startedToday')?.value === '5'
+    && overview.metrics.find(metric => metric.key === 'completedToday')?.value === '2'
+    && overview.metrics.find(metric => metric.key === 'pendingVisible')?.value === '4'
+    && overview.rows.map(row => row.id).join(',') === 'action,callback'
+    && overview.rows.every(row => !Object.keys(row.cells).some(key => /error|payload|secret/i.test(key))))
   let unavailable = false
   try { await adminAdapter.loadView('system/storage', new AbortController().signal) } catch (error) { unavailable = error instanceof AdminAdapterUnavailableError }
   check('未接入的管理页面明确拒绝，不返回虚构统计或密钥', unavailable)

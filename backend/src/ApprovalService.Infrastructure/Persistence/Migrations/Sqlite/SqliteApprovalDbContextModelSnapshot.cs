@@ -17,37 +17,6 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.12");
 
-            modelBuilder.Entity("ApprovalService.Domain.Administration.SystemBrandingEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("CompanyName")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("TEXT");
-
-                    b.Property<byte[]>("LogoBytes")
-                        .HasColumnType("BLOB");
-
-                    b.Property<string>("LogoContentType")
-                        .HasMaxLength(32)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LogoSha256")
-                        .HasMaxLength(64)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("SystemBranding", (string)null);
-                });
-
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
                 {
                     b.Property<string>("Id")

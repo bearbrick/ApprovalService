@@ -127,6 +127,7 @@ app.MapActionRetryEndpoints();
 app.MapAdminConsoleEndpoints();
 app.MapSystemBrandingEndpoints();
 app.MapWorkCalendarEndpoints();
+app.MapRoleManagementEndpoints();
 app.MapClientAppAdminEndpoints();
 app.MapTestCallbackEndpoints();
 app.MapReportingEndpoints();

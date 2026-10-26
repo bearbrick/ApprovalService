@@ -624,6 +624,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
         <h2><span class="n">6</span>审批中心、手机端与提醒</h2>
         <p class="lead">审批人在哪里方便就在哪里审：电脑上的审批中心、手机网页，或者业务系统里内嵌的审批窗口（第 12 节）；以后还有安卓、iOS App。几个入口用的是同一套接口。</p>
         <h3>审批中心</h3>
+        <p>详情的流程图由现有 BPMN 查看器显示已到达路径并高亮当前节点；未来节点和连线条件不会下发给当前查看人。征询回复、减签和同分支退回的目标只列当前任务可选项，提交时引擎再次核验。“我发起的”详情可催办当前审批人，同一步每小时最多一次；页面操作后按服务端待办总数刷新角标。已授权 PDF 附件在本地 <code>blob:</code> 地址预览，原单 iframe 的网络来源仍仅限应用登记的 HTTPS 来源。</p>
         <ul>
           <li>列表：待我处理、我已处理、抄送我的、我发起的（只看进度）；按流程、时间、状态筛选，按标题、编号、字段内容搜索；加急的排前面，未读的加粗。</li>
           <li>列表里直接显示每个流程的<b>摘要字段</b>（如金额、供应商、事由），不点开也能判断；可以勾选多条批量同意。</li>
@@ -969,6 +970,7 @@ footer { margin-top: 48px; font-size: 13px; color: var(--ink-3); }
         <p>初版接口提供 CSV、XLSX 模板与导入前预检查；同一模板可导入部门、人员、所属关系和每个接入应用的外部人员、部门 ID 绑定。文件上传上限 5 MB，Excel 最多 10,000 行。接入应用的 API Key 只能推送和绑定本应用来源的数据；跨来源绑定须由本地组织管理员确认。正式导入与推送在可串行化事务中按当前数据重新校验，每项改动在同一事务留下操作者、来源和前后快照，离职时生成交接提醒。</p>
         <p>流程管理员 ID 统一为内部人员 ID，流程可选一个直接所属部门。当前在职本地组织管理员管理全部流程；持流程管理员角色的在职本地人员仅管理自己直接加入的所属部门流程，不继承上级部门权限。流程上填写的管理员 ID 用于运行期找人，不直接授予设计权限。历史管理员标识只在人员 ID 或工号唯一匹配时自动修正，无法唯一确认的保留待人工处理记录。</p>
         <h3>账号</h3>
+        <p>角色管理已提供本地组织管理员专用目录、创建、名称及成员维护。名称和成员共用递增修订，修改必须填写原因并原子审计；新增成员须在职，禁止移除最后一位已开通账号且在职的组织管理员。组织管理员和流程管理员为内置角色，所有角色的编码创建后固定且首版不提供删除。角色变化后权限从持久数据立即重查。管理接口为 GET/POST /api/v1/admin/roles、GET/PUT /api/v1/admin/roles/{code} 及 GET/PUT /api/v1/admin/roles/{code}/members。</p>
         <p>空库的首位组织管理员由部署人员在服务器本机控制台运行一次性命令开通：输入人员 ID、工号、姓名和临时密码，也可选用已导入的在职人员 ID。人员、需首次改密的账号及组织管理员角色在同一串行化事务中写入；已有管理员角色时命令拒绝再次执行，不开放匿名 HTTP 初始化接口。</p>
         <ul>
           <li>现在独立：人员开通账号后用工号和密码登录审批中心，首次登录要改密码；登录、改密码、权限沿用标签服务的做法。</li>
@@ -1132,9 +1134,10 @@ await approval.ActOnTaskAsync(tasks[0].Id, new ApprovalTaskActionRequest
       <!-- 13 -->
       <section id="api">
         <h2><span class="n">13</span>接口清单</h2>
+        <p>组织角色管理使用 <code>GET/POST /api/v1/admin/roles</code>、<code>GET/PUT /api/v1/admin/roles/{code}</code> 和 <code>GET/PUT /api/v1/admin/roles/{code}/members</code>；仅本地组织管理员可用，修改带预期修订及原因，编码不可改且无删除入口。</p>
         <p>审批中心个人常用意见使用 <code>GET/POST /api/v1/center/opinions</code> 及 <code>PUT/DELETE /api/v1/center/opinions/{id}</code>；只按登录 JWT 人员隔离，本地会话可管理，嵌入会话只读。</p>
         <p>审批中心个人委托使用 <code>GET/POST /api/v1/center/delegations</code>、<code>DELETE /api/v1/center/delegations/{id}</code> 与 <code>POST /api/v1/center/delegations/tasks</code>；组织管理员通过 <code>/api/v1/admin/delegations/{principalId}</code> 下的对应接口代管，已有任务逐项返回结果并保留真实操作者审计。</p>
-        <p>审批中心人员查询与任务操作和业务系统开放接口分开：<code>GET /api/v1/center/instances</code>、<code>GET /api/v1/center/instances/{id}</code>、<code>POST /api/v1/center/tasks/{id}/actions</code> 及 <code>POST /api/v1/center/tasks/batch-approve</code> 只接受已验证登录 JWT，不把 API Key 交给网页；详细筛选、逐任务许可、安全投影和逐项批量结果见契约文档。</p>
+        <p>审批中心人员查询与任务操作和业务系统开放接口分开：<code>GET /api/v1/center/instances</code>、<code>GET /api/v1/center/instances/{id}</code>、<code>POST /api/v1/center/instances/{id}/remind</code>、<code>POST /api/v1/center/tasks/{id}/actions</code> 及 <code>POST /api/v1/center/tasks/batch-approve</code> 只接受已验证登录 JWT，不把 API Key 交给网页；详细筛选、逐任务许可、安全投影和逐项批量结果见契约文档。</p>
         <p class="lead">鉴权、错误格式、请求 ID 和标签服务的开放接口保持一致：请求头带 <code>X-Api-Key</code>，出错返回 <code>{code, message, errors, traceId}</code>。代表人员调用的开放接口只接受当前接入应用已绑定的业务用户 ID；工号用于本地登录或管理员确认绑定。</p>
         <h3>审批服务提供的接口</h3>
         <div class="tw">

@@ -1,10 +1,11 @@
 import { getJson, requestJson } from './http.ts'
-import { batchApproveCenter, executeCenterAction } from './center-actions.ts'
+import { batchApproveCenter, executeCenterAction, remindCenterInstance } from './center-actions.ts'
 import type { CenterActionResult } from './center-actions.ts'
 import type { CenterActionInput, CenterBatchResult } from './center-actions.ts'
 import { centerAccessToken, centerSession } from './center-session.ts'
 import { centerDetailLayout } from './center-layout.ts'
 import { fields, isFieldDefinitions } from './center-fields.ts'
+import { readCenterProgress, readCenterRelatedTargets } from './center-progress.ts'
 import type { CenterWireFieldDefinition } from './center-fields.ts'
 import type { CenterAction, CenterAttachment, CenterDetail, CenterItem, CenterSection, CenterSummaryField, CenterTimelineEntry } from '../model/center.ts'
 
@@ -175,6 +176,10 @@ interface CenterWireTask {
    * 当前人员在这项任务上的许可命令。
    */
   allowedActions?: string[]
+  /**
+   * 当前人员此任务可选择的关联目标。
+   */
+  relatedTargets?: unknown
 }
 
 /**
@@ -253,6 +258,14 @@ interface CenterWireDetail {
    * 当前执行节点。
    */
   activeNodeIds: string[]
+  /**
+   * 当前发起人是否可尝试催办。
+   */
+  canRemind?: boolean
+  /**
+   * 已到达且可安全显示的 BPMN 进度图。
+   */
+  progress?: unknown
 }
 
 /**
@@ -296,6 +309,12 @@ export interface CenterDataAdapter {
    * @returns 与输入顺序一致的结果。
    */
   batchApprove(taskIds: readonly string[], opinion: string): Promise<readonly CenterBatchResult[]>
+  /**
+   * 发起人按服务端限流规则催办一张在途审批单。
+   * @param instanceId 已授权审批单 ID。
+   * @returns 催办完成。
+   */
+  remind(instanceId: string): Promise<void>
 }
 
 /**
@@ -449,6 +468,7 @@ export const centerAdapter: CenterDataAdapter = {
       taskId: task.id, nodeName: task.nodeName,
       signatureRequired: task.signatureRequired ?? false,
       actions: (task.allowedActions ?? []).map(action).filter((code): code is CenterAction => code !== null),
+      relatedTargets: readCenterRelatedTargets(task.relatedTargets),
     }))
     // 设置页只列出本人原指派的未办任务；真正转委托许可仍由服务端重算。
     const delegationTasks = wire.tasks.filter(task => task.assigneeId === personId &&
@@ -458,6 +478,7 @@ export const centerAdapter: CenterDataAdapter = {
     const attachments = wire.attachments ?? []
     const visibleFields = fields(wire.data, wire.fieldDefinitions)
     return { item: item(wire.instance, section, wire.tasks), actionTasks, delegationTasks, fields: visibleFields,
+      canRemind: wire.canRemind === true, progress: readCenterProgress(wire.progress),
       readSequence: wire.events.reduce((maximum, event) => Math.max(maximum, event.sequence), 0),
       layout: centerDetailLayout(wire.layout, visibleFields),
       timeline, attachmentNames: attachments.map(file => file.fileName), attachments }
@@ -473,4 +494,5 @@ export const centerAdapter: CenterDataAdapter = {
   },
   executeAction: executeCenterAction,
   batchApprove: batchApproveCenter,
+  remind: remindCenterInstance,
 }

@@ -71,7 +71,7 @@ watch(() => props.route.hash, () => { menuOpen.value = false; search.value = '' 
     <button class="service-trigger" aria-label="查看服务连接状态" @click="emit('service')"><UiIcon name="info" /><span>{{ serviceLabel }}</span></button>
   </header>
   <aside v-if="route.page !== 'designer'" class="desktop-sidebar" aria-label="工作区导航">
-    <div class="sidebar-title"><h2>{{ workspaceTitle }}</h2><span class="badge">框架阶段</span></div>
+    <div class="sidebar-title"><h2>{{ workspaceTitle }}</h2></div>
     <label class="nav-search"><UiIcon name="search" /><input v-model="search" aria-label="搜索工作区导航" placeholder="搜索功能"></label>
     <nav class="side-navigation" :aria-label="workspaceTitle + '功能'">
       <a v-for="item in filtered" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined"><span>{{ item.title }}</span><UiIcon name="chevron" /></a>

@@ -18,6 +18,7 @@ internal static class CenterActionEndpoints
     {
         app.MapPost(CenterRoutes.TaskActionCatchAll, ExecuteAsync).RequireAuthorization();
         app.MapPost(CenterRoutes.BatchApprove, BatchApproveAsync).RequireAuthorization();
+        app.MapPost(CenterRoutes.Remind, RemindAsync).RequireAuthorization();
         return app;
     }
 
@@ -55,4 +56,20 @@ internal static class CenterActionEndpoints
         CenterBatchApproveRequest input, CenterActionAppService service, CancellationToken cancellationToken) =>
         service.BatchApproveAsync(CenterQueryEndpoints.Scope(http), input,
             http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken);
+
+    /// <summary>
+    /// 仅由已认证发起人催办当前人工节点，频率由统一引擎控制。
+    /// </summary>
+    /// <param name="http">已认证请求。</param>
+    /// <param name="id">审批单 ID。</param>
+    /// <param name="service">中心操作用例。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>成功时无响应体。</returns>
+    private static async Task<IResult> RemindAsync(HttpContext http, string id,
+        CenterActionAppService service, CancellationToken cancellationToken)
+    {
+        await service.RemindAsync(CenterQueryEndpoints.Scope(http), id,
+            http.Response.Headers[HeaderNames.RequestId].ToString(), cancellationToken);
+        return Results.NoContent();
+    }
 }

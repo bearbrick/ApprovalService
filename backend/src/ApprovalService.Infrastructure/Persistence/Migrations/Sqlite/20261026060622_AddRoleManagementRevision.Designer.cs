@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 {
     [DbContext(typeof(SqliteApprovalDbContext))]
-    [Migration("20261026060703_AddWorkCalendar")]
-    partial class AddWorkCalendar
+    [Migration("20261026060622_AddRoleManagementRevision")]
+    partial class AddRoleManagementRevision
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -49,35 +49,6 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                     b.HasKey("Id");
 
                     b.ToTable("SystemBranding", (string)null);
-                });
-
-            modelBuilder.Entity("ApprovalService.Domain.Administration.WorkCalendarEntity", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("OverridesJson")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("Revision")
-                        .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("WorkingEnd")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("WorkingStart")
-                        .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("WorkCalendar", (string)null);
                 });
 
             modelBuilder.Entity("ApprovalService.Domain.Center.CenterOpinionEntity", b =>
@@ -786,6 +757,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Code");
 

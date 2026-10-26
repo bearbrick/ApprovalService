@@ -2,10 +2,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
+namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
 {
     /// <inheritdoc />
-    public partial class AddWorkCalendar : Migration
+    public partial class AddWorkCalendarIntegrated : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -14,11 +14,11 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.SqlServer
                 name: "WorkCalendar",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "nvarchar(16)", maxLength: 16, nullable: false),
-                    Revision = table.Column<long>(type: "bigint", nullable: false),
-                    WorkingStart = table.Column<string>(type: "nvarchar(5)", maxLength: 5, nullable: false),
-                    WorkingEnd = table.Column<string>(type: "nvarchar(5)", maxLength: 5, nullable: false),
-                    OverridesJson = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    Id = table.Column<string>(type: "TEXT", maxLength: 16, nullable: false),
+                    Revision = table.Column<long>(type: "INTEGER", nullable: false),
+                    WorkingStart = table.Column<string>(type: "TEXT", maxLength: 5, nullable: false),
+                    WorkingEnd = table.Column<string>(type: "TEXT", maxLength: 5, nullable: false),
+                    OverridesJson = table.Column<string>(type: "TEXT", nullable: false)
                 },
                 constraints: table =>
                 {

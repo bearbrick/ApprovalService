@@ -73,7 +73,7 @@ internal static class FrontendHostingChecks
                 home.StatusCode == HttpStatusCode.OK && direct.StatusCode == HttpStatusCode.OK &&
                 extra.StatusCode == HttpStatusCode.OK && asset.StatusCode == HttpStatusCode.OK &&
                 assetHtml.StatusCode == HttpStatusCode.OK && unknown.StatusCode == HttpStatusCode.NotFound &&
-                Csp(home) == "frame-ancestors 'none'; frame-src https://documents-two.example https://documents.example" &&
+                Csp(home) == "frame-ancestors 'none'; frame-src blob: https://documents-two.example https://documents.example" &&
                 Csp(direct) == Csp(home) &&
                 Csp(extra) == "frame-ancestors 'none'; frame-src 'none'" &&
                 Csp(asset) == "frame-ancestors 'none'; frame-src 'none'" &&
@@ -87,9 +87,9 @@ internal static class FrontendHostingChecks
             using var missing = await http.GetAsync("/embed/missing");
             check("应用专属 HTML 只允许自身登记来源，未知应用始终拒绝内嵌",
                 first.StatusCode == HttpStatusCode.OK && second.StatusCode == HttpStatusCode.OK &&
-                Csp(first) == "frame-ancestors 'self' https://business.example https://branch.example:8443; frame-src https://documents.example" &&
-                Csp(second) == "frame-ancestors 'self' https://other.example; frame-src https://documents-two.example" &&
-                empty.StatusCode == HttpStatusCode.OK && Csp(empty) == "frame-ancestors 'self'; frame-src 'none'" &&
+                Csp(first) == "frame-ancestors 'self' https://business.example https://branch.example:8443; frame-src blob: https://documents.example" &&
+                Csp(second) == "frame-ancestors 'self' https://other.example; frame-src blob: https://documents-two.example" &&
+                empty.StatusCode == HttpStatusCode.OK && Csp(empty) == "frame-ancestors 'self'; frame-src blob:" &&
                 first.Headers.CacheControl?.NoStore == true && missing.StatusCode == HttpStatusCode.NotFound &&
                 Csp(missing) == "frame-ancestors 'none'; frame-src 'none'");
 
@@ -133,8 +133,8 @@ internal static class FrontendHostingChecks
                     publishedHome.StatusCode == HttpStatusCode.OK &&
                     publishedIndex.StatusCode == HttpStatusCode.OK &&
                     publishedAsset.StatusCode == HttpStatusCode.OK &&
-                    Csp(publishedHome) == "frame-ancestors 'none'; frame-src 'none'" &&
-                    Csp(publishedIndex) == "frame-ancestors 'none'; frame-src 'none'" &&
+                    Csp(publishedHome) == "frame-ancestors 'none'; frame-src blob:" &&
+                    Csp(publishedIndex) == "frame-ancestors 'none'; frame-src blob:" &&
                     Csp(publishedAsset) == "frame-ancestors 'none'; frame-src 'none'");
             }
 

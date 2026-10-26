@@ -25,6 +25,7 @@ import AdminSystemBranding from './admin/AdminSystemBranding.vue'
 import AdminWorkCalendar from './admin/AdminWorkCalendar.vue'
 import AdminReports from './admin/AdminReports.vue'
 import AdminFlows from './admin/AdminFlows.vue'
+import AdminRoles from './admin/AdminRoles.vue'
 import '../styles/admin.css'
 
 /**
@@ -248,7 +249,7 @@ async function load(): Promise<void> {
     return
   }
   // 报表组件独立调用四条受 JWT 保护的接口，不经管理员专属数据适配器。
-  if (view.value.section === 'reports' || view.value.section === 'flows') { state.value = 'ready'; return }
+  if (view.value.section === 'reports' || view.value.section === 'flows' || view.value.key === 'org/roles') { state.value = 'ready'; return }
   const current = new AbortController()
   request = current
   state.value = 'loading'
@@ -284,6 +285,7 @@ onBeforeUnmount(() => request?.abort())
       <section v-else-if="view.key === 'apps/test'" class="admin-panel"><UiEmptyState title="当前会话不能测试应用回调" description="请退出后使用本地应用管理员或组织管理员账号登录。" icon="alert" /></section>
       <AdminReports v-else-if="view.section === 'reports'" :tab="view.tab" @lost="signOut" />
       <AdminFlows v-else-if="view.section === 'flows'" @lost="signOut" />
+      <AdminRoles v-else-if="view.key === 'org/roles'" @lost="signOut" />
       <AdminOverview v-else-if="view.kind === 'overview'" :view="view" :rows="data?.rows ?? []" :metrics="data?.metrics ?? []" :state="state" :error="error" @reload="load" />
       <template v-else><AdminOrganizationImport v-if="importOpen" @close="importOpen = false" @saved="load" /><AdminAccountEditor v-if="accountOpen" @close="accountOpen = false" @saved="load" /><AdminEmbedOriginsEditor v-if="originsOpen && appOptions.length" :apps="appOptions" @close="originsOpen = false" /><AdminDocumentSettingsEditor v-if="documentOpen && appOptions.length" :apps="appOptions" @close="documentOpen = false" /><AdminClientAppEditor v-if="appEditorMode" :key="appEditorMode" :mode="appEditorMode" :apps="appOptions" @close="appEditorMode = null" @saved="load" /><AdminIntegrationWizard v-if="wizardOpen" :restricted="false" @close="wizardOpen = false" @saved="load" /><AdminBindingEditor v-if="bindingOpen" @close="bindingOpen = false" @saved="load" /><AdminCallbackRetryEditor v-if="retryOpen" :event-ids="callbackEventIds" @close="retryOpen = false" @saved="load" /><AdminPasswordEditor v-if="view.key === 'system/security' && state === 'ready'" @changed="passwordChanged" @lost="passwordSessionLost" /><AdminWorkCalendar v-else-if="view.key === 'org/calendar' && state === 'ready'" @lost="signOut" /><AdminSystemBranding v-else-if="view.key === 'system/info' && state === 'ready'" /><AdminTable v-else :view="view" :rows="data?.rows ?? []" :state="state" :error="error" :enabled-actions="enabledActions" @reload="load" @action="handleAction" /><AdminIntervention v-if="view.kind === 'runtime'" /></template>
     </template>

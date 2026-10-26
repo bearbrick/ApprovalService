@@ -120,10 +120,10 @@ internal static class FrontendHosting
     }
 
     /// <summary>
-    /// 只以再次验证过的来源构造子页面策略，空名单完全禁止加载 iframe。
+    /// 只以再次验证过的来源构造业务子页面策略；本地 blob 仅用于已验权的 PDF 预览。
     /// </summary>
     /// <param name="sources">已校验的 HTTPS 来源。</param>
     /// <returns>完整 frame-src 指令。</returns>
     private static string FrameSources(IReadOnlyList<string> sources) =>
-        "frame-src " + (sources.Count == 0 ? "'none'" : string.Join(' ', sources));
+        "frame-src blob:" + (sources.Count == 0 ? string.Empty : " " + string.Join(' ', sources));
 }

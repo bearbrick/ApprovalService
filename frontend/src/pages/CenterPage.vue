@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AppRoute } from '../model/routes.ts'
 import type { CenterDetail, CenterItem, CenterSection } from '../model/center.ts'
 import { centerAdapter } from '../api/center-adapter.ts'
+import { loadCenterTodoCount } from '../api/center-count.ts'
 import type { CenterActionInput } from '../api/center-adapter.ts'
 import { centerSession, exchangeCenterEmbed, loginCenter, logoutCenter } from '../api/center-session.ts'
 import { loadCenterEmbedContext, matchesEmbedTarget, postCenterChange, takeEmbedTokenFromHash } from '../api/center-embed.ts'
@@ -49,6 +50,10 @@ const error = ref('')
  * 详情已显示但本人已读游标未能持久化时的提示。
  */
 const readError = ref('')
+/**
+ * 服务端按当前人员重新计算的待办角标。
+ */
+const todoCount = ref<number | null>(null)
 /**
  * 当前用户有权查看的列表数据。
  */
@@ -119,6 +124,10 @@ const actionBusy = ref(false)
  */
 const actionError = ref('')
 /**
+ * 最近一次成功操作的页面反馈。
+ */
+const actionNotice = ref('')
+/**
  * 最近一次批量办理结果。
  */
 const batchMessage = ref('')
@@ -142,16 +151,21 @@ async function load(): Promise<void> {
   detail.value = null
   error.value = ''
   readError.value = ''
-  if (!signedIn.value || embedding.value) { state.value = 'unavailable'; return }
-  if (props.route.section === 'settings') { state.value = 'unavailable'; return }
+  if (!signedIn.value || embedding.value) { state.value = 'unavailable'; todoCount.value = null; return }
   const current = new AbortController()
   request = current
+  if (props.route.section === 'settings') {
+    state.value = 'unavailable'
+    await refreshTodoCount(current)
+    return
+  }
   state.value = 'loading'
   try {
     if (props.route.resourceId) detail.value = await centerAdapter.loadDetail(props.route.resourceId, current.signal)
     else items.value = await centerAdapter.loadList(section.value, current.signal, searchTerm.value)
     if (request === current && !current.signal.aborted) {
       state.value = 'ready'
+      await refreshTodoCount(current)
       if (props.route.resourceId && detail.value) {
         // 等详情真正进入页面后才显式确认已读，列表查询本身不产生写入。
         await nextTick()
@@ -177,6 +191,20 @@ async function load(): Promise<void> {
     }
     state.value = 'error'
     error.value = cause instanceof Error ? cause.message : '审批中心暂时无法读取数据。'
+  }
+}
+
+/**
+ * 待办数读取失败时清除旧角标，不覆盖已经成功显示的详情。
+ * @param current 本轮读取控制器。
+ * @returns 待办数更新完成。
+ */
+async function refreshTodoCount(current: AbortController): Promise<void> {
+  try {
+    const count = await loadCenterTodoCount(current.signal)
+    if (request === current && !current.signal.aborted) todoCount.value = count
+  } catch {
+    if (request === current && !current.signal.aborted) todoCount.value = null
   }
 }
 
@@ -228,12 +256,35 @@ async function executeAction(taskId: string, input: CenterActionInput): Promise<
   if (actionBusy.value) return
   actionBusy.value = true
   actionError.value = ''
+  actionNotice.value = ''
   try {
     const result = await centerAdapter.executeAction(taskId, input)
     notifyChanged(result.instanceId, result.taskId)
     await load()
+    actionNotice.value = '操作已完成，详情和待办数量已刷新。'
   } catch (cause) {
     actionError.value = cause instanceof Error ? cause.message : '审批操作失败，请刷新后重试。'
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+/**
+ * 发起人催办后读取最新详情和待办角标，频率由后端统一引擎核验。
+ * @returns 催办完成。
+ */
+async function remind(): Promise<void> {
+  const instanceId = detail.value?.item.id
+  if (!instanceId || actionBusy.value || !detail.value?.canRemind) return
+  actionBusy.value = true
+  actionError.value = ''
+  actionNotice.value = ''
+  try {
+    await centerAdapter.remind(instanceId)
+    await load()
+    actionNotice.value = '已催办当前审批人。'
+  } catch (cause) {
+    actionError.value = cause instanceof Error ? cause.message : '催办失败，请稍后重试。'
   } finally {
     actionBusy.value = false
   }
@@ -260,6 +311,7 @@ async function executeBatch(instanceIds: string[], opinion: string): Promise<voi
       if (result.succeeded && result.instanceId) notifyChanged(result.instanceId, result.taskId)
     }
     await load()
+    actionNotice.value = '批量结果已更新，待办数量已刷新。'
     batchMessage.value = `已同意 ${passed} 项；失败 ${failed} 项。${failed ? results.filter(result => !result.succeeded).map(result => `${result.taskId}：${result.message ?? '请刷新后重试'}`).join('；') : ''}`
   } catch (cause) {
     batchMessage.value = cause instanceof Error ? cause.message : '批量同意失败，请刷新后核对。'
@@ -327,6 +379,7 @@ function signOut(): void {
   signedIn.value = false
   items.value = []
   detail.value = null
+  todoCount.value = null
   password.value = ''
 }
 
@@ -351,7 +404,7 @@ onBeforeUnmount(() => { request?.abort(); if (searchTimer) clearTimeout(searchTi
 </script>
 
 <template>
-  <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><button v-if="signedIn" class="btn" type="button" @click="signOut">退出登录</button></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
+  <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><span v-if="signedIn && todoCount !== null" class="center-count-badge">待办 {{ todoCount }}</span><button v-if="signedIn" class="btn" type="button" @click="signOut">退出登录</button></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
   <div class="page-body center-page-body">
     <section v-if="!signedIn" class="center-card center-login">
       <h2>{{ embedding ? '正在验证内嵌身份' : mustChangePassword ? '首次登录请修改密码' : '登录审批中心' }}</h2>
@@ -362,7 +415,7 @@ onBeforeUnmount(() => { request?.abort(); if (searchTimer) clearTimeout(searchTi
     </section>
     <template v-else>
     <nav v-if="!route.resourceId" class="center-tabs" aria-label="审批列表"><a v-for="item in sections" :key="item.key" :href="item.hash" :aria-current="route.section === item.key ? 'page' : undefined">{{ item.title }}</a><a href="#/center/settings" :aria-current="route.section === 'settings' ? 'page' : undefined">个人设置</a></nav>
-    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :read-error="readError" :busy="actionBusy" :action-error="actionError" @reload="load" @execute="executeAction" />
+    <CenterDetailView v-if="route.resourceId" :requested-id="route.resourceId" :detail="detail" :state="state" :error="error" :read-error="readError" :busy="actionBusy" :action-error="actionError" :action-notice="actionNotice" @reload="load" @execute="executeAction" @remind="remind" />
     <CenterSettings v-else-if="route.section === 'settings'" @unauthorized="signOut" />
     <CenterList v-else :section="section" :items="items" :state="state" :error="error" :busy="actionBusy" :batch-message="batchMessage" @reload="load" @batch="executeBatch" @search="search" />
     <p class="workspace-note">审批中心只处理审批与查看进度，不创建或修改业务单据。</p>

@@ -122,3 +122,14 @@ export async function batchApproveCenter(taskIds: readonly string[], opinion: st
   }
   return result.items
 }
+
+/**
+ * 发起人使用本人 JWT 催办当前审批单，服务端负责一小时限流和真实通知。
+ * @param instanceId 已授权审批单 ID。
+ * @returns 服务端确认完成。
+ */
+export async function remindCenterInstance(instanceId: string): Promise<void> {
+  await requestJson<void>(`/api/v1/center/instances/${encodeURIComponent(instanceId)}/remind`, {
+    method: 'POST', headers: await actionHeaders(), cache: 'no-store',
+  })
+}

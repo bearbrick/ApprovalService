@@ -17,7 +17,7 @@
 | `X-Request-Id` | 请求、响应 | 调用方生成的请求 ID，原样返回并记进日志；没传或不合规（超过 64 个字符，或含字母数字和 `- _ . :` 以外的字符）时服务生成一个 32 位的 |
 | `X-Trace-Id` | 响应 | 本次请求的链路 ID，和错误体里的 `traceId` 相同，反馈问题时提供 |
 | `X-Approval-Signature` | 回调与钩子请求、钩子响应 | `sha256=` 加上用接入应用的签名密钥对原始 UTF-8 正文做 HMAC-SHA256 的十六进制小写；钩子双方都验签 |
-| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源；`frame-src` 仅含已启用应用登记的 HTTPS 原单来源，专属入口只含当前应用来源 |
+| `Content-Security-Policy` | 页面响应 | 普通入口和直接静态路径为 `frame-ancestors 'none'`；应用专属入口为 `frame-ancestors 'self'` 加该应用登记来源；`frame-src` 仅含本地已授权附件预览的 `blob:` 及已启用应用登记的 HTTPS 原单来源，专属入口只含当前应用来源 |
 
 ## 错误格式
 
@@ -65,6 +65,7 @@
 | `POST /api/v1/center/signatures`、`GET /api/v1/center/signatures/me`、`GET /api/v1/center/signatures/{id}` | 人员 JWT | 上传本人手写 PNG、查询个人签名及按本人或审批单授权取图；嵌入 JWT 只能上传单次签名 |
 | `GET /api/v1/center/embed-context` | 仅嵌入 JWT | 返回已验证会话所属应用和当前允许的消息目标来源 |
 | `POST /api/v1/center/instances/{id}/document-url` | 本地或嵌入 JWT | 当前人员已授权详情的短时一次性只读业务原单地址；`Cache-Control: no-store` |
+| `POST /api/v1/center/instances/{id}/remind` | 本地或嵌入 JWT | 发起人催办当前待办，复用统一引擎的一小时限流，成功 204；要求 `X-Request-Id` |
 | `GET /`、`GET /embed/{clientAppCode}` | 无 | 同源审批中心 HTML；普通入口禁止被嵌入，专属入口按应用登记来源限制 iframe |
 | `POST /api/v1/identity/login`、`/identity/refresh`、`/embed-tokens/exchange` | 无 | 工号密码登录、刷新令牌轮换、一次性嵌入令牌交换 |
 | `POST /api/v1/identity/change-password` | 本地 JWT | 修改自己的密码；首次登录时只允许调用此接口 |
@@ -186,9 +187,11 @@ JWT 由审批服务签发并绑定内部人员 ID，每次受保护请求都核�
 
 摘要字段为 `id, serialNo, flowCode, flowName, sourceName, businessKey, title, status, clientAppCode, initiatorId, initiatorName, currentStep?, submittedById?, isUrgent, isUnread, startedAt, endedAt?, summary, summaryFieldDefinitions, pendingTaskIds, canBulkApprove, bulkApprovableTaskIds`。`isUnread` 只针对当前 JWT 人员，不返回其他人的读游标；列表纯读。显示名称来自可信人员与接入应用主数据；`currentStep` 为当前人工节点名称，多条并行待办时显示并行环节数量，无人工待办时省略。`pendingTaskIds` 仅说明当前任务关系；`bulkApprovableTaskIds` 只列当前人员可批量同意的实际任务 ID。全部操作提交时仍按最新状态和节点规则重验。`summary` 使用固定发布版本的数据定义及节点隐藏权限裁剪，包含明细列；未定义字段不透传。`summaryFieldDefinitions` 按发布顺序只描述实际返回的字段，每项含 `key, name, type, children`；隐藏字段及隐藏明细列的名称也不返回。
 
-`GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式尚未接入，回退自动排版，不返回嵌入页面编码或地址。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。图布局仍待接入。
+`GET /api/v1/center/instances/{id}` 返回 `{instance, data, fieldDefinitions, layout, attachments, tasks, events, activeNodeIds, canRemind, progress}`。其中 `instance` 使用同一摘要结构；`data` 只包含已发布定义中的可见字段，`fieldDefinitions` 只描述这些可见字段和明细子列。`layout` 为 `{mode:"auto"|"custom", groups:[{title, columns, items:[{fieldKey, columnSpan, detailColumnWidths, moneyUppercase?}]}]}`；自定义模式使用审批单锁定的发布版本，排版项与明细宽度只包含当前人员可见字段，全部隐藏的分组不返回，部分隐藏的分组标题改为通用标题。原单嵌入模式只返回锁定发布版的嵌入页面编码；临时地址须另经当前人员 JWT 的取址接口获得，失败回退已授权普通详情。金额大写由服务端对可见金额计算。`tasks` 为 `{id, nodeId, nodeName, assigneeId, delegatedForId?, status, opinion?, dueAt?, completedAt?, allowedActions}`，`allowedActions` 从固定发布图与当前运行状态按认证人员计算；`events` 为 `{eventId, sequence, kind, nodeId?, actorId?, onBehalfOfId?, opinion?, occurredAt}`；`activeNodeIds` 只提供当前令牌节点，用于高亮。原始运行状态、审计 `fieldValues`、人员解析快照和私人暂存意见不进入响应。详情另返回 `canRemind` 和 `progress`。`canRemind` 只在当前 JWT 人员为发起人且仍有待办时为真；实际限流以写接口为准。`progress` 为 `{nodes:[{id,type,name,x,y,isActive}],edges:[{id,sourceId,targetId}]}`，仅投影已到达与当前节点，连线两端必须可见，不返回未来节点、条件或隐藏业务字段。每项任务另有 `relatedTargets:[{action,id,label}]`，只列当前人员可操作任务的征询、减签和同分支退回目标；提交时仍由引擎重验。
 
 发布图的办理节点若以设计动作 `allowedActions: ["submit"]` 表示“办理提交”，服务端将它解释为运行命令 `handle` 的许可；详情只返回可执行的 `handle`，写接口也只接受该运行命令。这个兼容解释仅适用于 `handling` 节点，不改变其他节点的权限或发布图内容。
+
+`POST /api/v1/center/instances/{id}/remind` 由当前 JWT 人员发起，要求该人员为此审批单发起人、审批单仍运行且有当前待办；嵌入 JWT 仍受应用归属限制。服务端使用统一引擎的催办命令、事件及持久通知队列，同一步一小时最多一次；成功返回 204，其他人员不可代催。
 
 `POST /api/v1/center/instances/{id}/read` 请求 `{seenThroughSequence}`（非负整数，为本次详情时间线实际显示的最大事件序号；没有事件为零），成功返回 204。仅详情已显示的当前人员主动调用；服务端在同一事务重新核对该人员的参与关系、保密范围与嵌入应用，再把（人员、审批单）的持久游标单调推进到不超过当前最大事件序号的已显示序号。因此 GET 详情后新发生的活动不会被误标已读。无权与不存在统一 404。列表和详情 GET 不写游标；游标未保存成功时页面仍展示详情并提示可刷新重试。他人之后产生的新可见审计活动使 `isUnread=true`，本人动作与私人意见草稿不触发未读；完整原始事件和游标均不返回给前端。
 

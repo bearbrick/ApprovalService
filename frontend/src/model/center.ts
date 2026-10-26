@@ -308,12 +308,56 @@ export interface CenterActionTask {
    * 成功办理时服务端发布规则是否要求本次手写签名。
    */
   signatureRequired?: boolean
+  /**
+   * 仅由服务端为当前人员和任务声明的关联目标。
+   */
+  relatedTargets?: readonly CenterRelatedTarget[]
+}
+
+/**
+ * 征询、减签或退回的当前可选目标。
+ */
+export interface CenterRelatedTarget {
+  /**
+   * 适用的引擎操作编码。
+   */
+  action: string
+  /**
+   * 经服务端核验的目标标识。
+   */
+  id: string
+  /**
+   * 目标的安全展示说明。
+   */
+  label: string
+}
+
+/**
+ * 只含已到达节点和当前节点的安全 BPMN 进度图。
+ */
+export interface CenterProgressGraph {
+  /**
+   * 已到达节点及当前高亮状态。
+   */
+  nodes: readonly { id: string, type: string, name: string, x: number, y: number, isActive: boolean }[]
+  /**
+   * 两端均已到达的连线。
+   */
+  edges: readonly { id: string, sourceId: string, targetId: string }[]
 }
 
 /**
  * 审批详情，业务数据始终作为只读快照呈现。
  */
 export interface CenterDetail {
+  /**
+   * 当前发起人是否可以尝试催办。
+   */
+  canRemind?: boolean
+  /**
+   * 已授权安全进度图。
+   */
+  progress?: CenterProgressGraph
   /**
    * 本次详情实际包含的最大活动序号，仅用于确认已读，零表示没有活动。
    */

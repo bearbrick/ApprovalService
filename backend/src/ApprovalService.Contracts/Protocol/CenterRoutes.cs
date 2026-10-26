@@ -34,6 +34,10 @@ public static class CenterRoutes
     /// </summary>
     public const string MarkRead = Instances + "/{id}/read";
     /// <summary>
+    /// 审批发起人按现有引擎频率规则催办当前人工任务。
+    /// </summary>
+    public const string Remind = Instances + "/{id}/remind";
+    /// <summary>
     /// 当前人员的个人常用意见列表与新增入口。
     /// </summary>
     public const string Opinions = "/api/v1/center/opinions";

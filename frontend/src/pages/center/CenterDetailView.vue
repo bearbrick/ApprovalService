@@ -7,6 +7,7 @@ import { fetchCenterFile } from '../../api/center-files.ts'
 import { fetchCenterSignature } from '../../api/center-signatures.ts'
 import SignatureChoice from './SignatureChoice.vue'
 import CenterOriginalDocument from './CenterOriginalDocument.vue'
+import CenterProgressGraph from './CenterProgressGraph.vue'
 import { visibleCenterActions } from '../../model/center.ts'
 import type { CenterAction, CenterAttachment, CenterDetail } from '../../model/center.ts'
 import type { CenterActionInput } from '../../api/center-adapter.ts'
@@ -42,6 +43,10 @@ const props = defineProps<{
    */
   actionError?: string
   /**
+   * 操作成功后服务端刷新完成的提示。
+   */
+  actionNotice?: string
+  /**
    * 详情已显示但已读标记未能保存的提示。
    */
   readError?: string
@@ -59,6 +64,10 @@ const emit = defineEmits<{
    * 当前已许可任务的办理请求。
    */
   execute: [taskId: string, input: CenterActionInput]
+  /**
+   * 发起人请求催办当前任务。
+   */
+  remind: []
 }>()
 
 /**
@@ -83,6 +92,15 @@ const taskId = ref('')
  */
 const actions = computed(() => actionTasks.value.find(task => task.taskId === taskId.value)?.actions ??
   (props.detail ? visibleCenterActions(props.detail.item) : []))
+/**
+ * 服务端仅为当前人员和所选任务声明的关联目标。
+ */
+const relatedTargets = computed(() => actionTasks.value.find(task => task.taskId === taskId.value)?.relatedTargets ?? [])
+/**
+ * 仅展示适用于当前操作的关联目标。
+ */
+const currentTargets = computed(() => relatedTargets.value.filter(target =>
+  target.action === commandByAction[selectedAction.value as CenterAction]))
 /**
  * 当前选择的操作与可选参数。
  */
@@ -207,6 +225,16 @@ function submitAction(): void {
     localError.value = '当前节点成功办理时必须明确选择手写签名。'
     return
   }
+  if (['reply', 'removeSign'].includes(selectedAction.value) &&
+    !currentTargets.value.some(target => target.id === relatedId.value)) {
+    localError.value = '请选择当前可操作的关联目标。'
+    return
+  }
+  if (selectedAction.value === 'return' && targetNodeId.value &&
+    !currentTargets.value.some(target => target.id === targetNodeId.value)) {
+    localError.value = '请选择已到达且允许退回的节点。'
+    return
+  }
   let fieldValues: Record<string, unknown> | undefined
   if (fieldValuesText.value.trim()) {
     try {
@@ -227,6 +255,7 @@ function submitAction(): void {
 }
 
 watch(() => props.requestedId, () => { tab.value = 'data' })
+watch(selectedAction, () => { relatedId.value = ''; targetNodeId.value = ''; mode.value = '' })
 
 /**
  * 图片和 PDF 可以在当前页面预览，其他格式只允许下载。
@@ -312,6 +341,7 @@ onBeforeUnmount(closePreview)
     <div class="center-detail-top"><a class="center-back" href="#/"><UiIcon name="arrow" />返回审批中心</a><button class="btn" type="button" :disabled="state === 'loading'" @click="emit('reload')"><UiIcon name="refresh" />刷新</button></div>
     <template v-if="detail && state === 'ready'">
       <p v-if="readError" role="alert" class="center-login-error">{{ readError }}</p>
+      <p v-if="actionNotice" role="status" class="center-action-notice">{{ actionNotice }}</p>
       <header class="center-detail-title"><span class="center-detail-icon"><UiIcon name="center" /></span><div><h2>{{ detail.item.title }} <span v-if="detail.item.urgent" class="center-urgent">加急</span></h2><p>{{ detail.item.flowName }} · {{ detail.item.serialNo }} · {{ detail.item.status }}</p></div></header>
       <div class="center-detail-grid">
         <div class="center-detail-primary">
@@ -347,7 +377,7 @@ onBeforeUnmount(closePreview)
             <p v-else class="center-blank">这张审批单没有可展示的业务字段。</p>
             </div>
           </section>
-          <section v-if="tab === 'progress'" class="center-card"><h3>审批经过</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }} <span v-if="entry.occurredAt">· {{ entry.occurredAt }}</span></p><blockquote v-if="entry.opinion">{{ entry.opinion }}</blockquote><button v-if="entry.signatureFileId" class="btn" type="button" @click="openSignature(entry.signatureFileId)">查看手写签名</button></li></ol><p v-else class="center-blank">暂无可展示的流程记录。</p></section>
+          <section v-if="tab === 'progress'" class="center-card"><h3>审批经过</h3><CenterProgressGraph v-if="detail.progress" :graph="detail.progress" /><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }} <span v-if="entry.occurredAt">· {{ entry.occurredAt }}</span></p><blockquote v-if="entry.opinion">{{ entry.opinion }}</blockquote><button v-if="entry.signatureFileId" class="btn" type="button" @click="openSignature(entry.signatureFileId)">查看手写签名</button></li></ol><p v-else class="center-blank">暂无可展示的流程记录。</p></section>
           <section class="center-card"><h3>附件</h3>
             <ul v-if="detail.attachments.length" class="center-attachment-list"><li v-for="file in detail.attachments" :key="file.id"><span class="center-attachment-name">{{ file.fileName }}</span><span>{{ Math.max(1, Math.ceil(file.size / 1024)) }} KB</span><button v-if="canPreview(file)" class="btn" type="button" :disabled="Boolean(busyFileId)" @click="openFile(file, true)">预览</button><button class="btn" type="button" :disabled="Boolean(busyFileId)" @click="openFile(file, false)">下载</button></li></ul>
             <p v-else class="center-blank">没有可展示的附件。</p><p v-if="fileError" role="alert" class="center-login-error">{{ fileError }}</p>
@@ -355,6 +385,7 @@ onBeforeUnmount(closePreview)
         </div>
         <aside class="center-detail-side"><section class="center-card"><h3>审批信息</h3><dl class="center-meta"><dt>发起人</dt><dd>{{ detail.item.initiatorName }}</dd><dt>来源系统</dt><dd>{{ detail.item.sourceName }}</dd><dt>业务单号</dt><dd>{{ detail.item.businessKey }}</dd><dt>当前环节</dt><dd>{{ detail.item.currentStep }}</dd><dt>发起时间</dt><dd>{{ detail.item.createdAt }}</dd></dl></section><section class="center-card"><h3>当前进度</h3><ol v-if="detail.timeline.length" class="center-timeline"><li v-for="entry in detail.timeline" :key="entry.id" :class="{ current: entry.current }"><strong>{{ entry.title }}</strong><p>{{ entry.actor }}</p></li></ol><p v-else class="center-blank">暂无进度记录。</p></section></aside>
       </div>
+      <section v-if="detail.canRemind" class="center-card center-remind"><h3>发起人催办</h3><p>当前人工任务仍在办理中；同一步每小时最多催办一次。</p><button class="btn" type="button" :disabled="busy" @click="emit('remind')">催办当前审批人</button><p v-if="actionError" role="alert" class="center-login-error">{{ actionError }}</p></section>
       <form v-if="actionTasks.length" class="center-action-bar" @submit.prevent="submitAction">
         <p>可用操作由服务端按当前任务确认，提交时会再次校验。</p>
         <label v-if="actionTasks.length > 1">办理任务<select v-model="taskId"><option v-for="task in actionTasks" :key="task.taskId" :value="task.taskId">{{ task.nodeName }} · {{ task.taskId }}</option></select></label>
@@ -365,9 +396,9 @@ onBeforeUnmount(closePreview)
           <label>审批意见<textarea v-model="opinion" rows="3" placeholder="根据节点规则填写意见"></textarea></label>
           <SignatureChoice v-if="['approve', 'handle', 'acknowledge', 'reject', 'return'].includes(selectedAction)" v-model="signatureFileId" :required="signatureRequired" />
           <label v-if="['transfer', 'addSign', 'consult', 'copy'].includes(selectedAction)">目标人员 ID<input v-model="targetPersonId" placeholder="审批服务内部人员 ID"></label>
-          <label v-if="selectedAction === 'return'">目标节点 ID<input v-model="targetNodeId" placeholder="退回目标节点"></label>
-          <label v-if="['reply', 'removeSign', 'undoApproval'].includes(selectedAction)">关联 ID<input v-model="relatedId" placeholder="征询或加签关联 ID"></label>
-          <label v-if="['return', 'addSign'].includes(selectedAction)">操作模式<input v-model="mode" placeholder="例如 before、after 或 parallel"></label>
+          <label v-if="selectedAction === 'return'">退回目标<select v-model="targetNodeId"><option value="">退回发起人</option><option v-for="target in currentTargets" :key="target.id" :value="target.id">{{ target.label }}</option></select></label>
+          <label v-if="['reply', 'removeSign'].includes(selectedAction)">关联目标<select v-model="relatedId"><option value="">请选择</option><option v-for="target in currentTargets" :key="target.id" :value="target.id">{{ target.label }}</option></select></label>
+          <label v-if="selectedAction === 'addSign'">加签位置<select v-model="mode"><option value="after">当前人之后</option><option value="before">当前人之前</option><option value="parallel">并行</option></select></label>
           <label>审批人字段（可选 JSON 对象）<textarea v-model="fieldValuesText" rows="2" placeholder="例如：{&quot;reviewNote&quot;:&quot;已核对&quot;}"></textarea></label>
           <p v-if="localError || actionError" role="alert" class="center-login-error">{{ localError || actionError }}</p>
           <button class="btn btn-primary" type="submit" :disabled="busy">{{ busy ? '提交中…' : `确认${actionLabels[selectedAction]}` }}</button>

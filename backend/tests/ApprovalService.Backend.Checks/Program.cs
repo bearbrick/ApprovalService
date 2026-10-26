@@ -93,6 +93,7 @@ internal static class Program
         await JobChecks.RunAsync(Check);
         OperationChecks.Run(Check);
         DelegationRulesChecks.Run(Check);
+        HandlingActionChecks.Run(Check);
         await CenterSignatureChecks.RunAsync(Check);
         OperationChecksBoundaries.Run(Check);
         ApprovalDataChecks.Run(Check);

@@ -88,3 +88,4 @@ Select-String -Path docs/tasks/T-*.md -Pattern '^(状态|负责人)：'
 | [T-067](T-067-work-calendar-admin.md) | 在线工作日历管理 | 待验收 | Codex 2026-10-26 | T-029 |
 | [T-066](T-066-role-management.md) | 组织角色管理 | 待验收 | Codex 2026-10-26 | T-007、T-020 管理基础 |
 | [T-068](T-068-sidebar-stage-badge.md) | 移除工作区过期阶段标记 | 待验收 | Codex 2026-10-26 | T-025 |
+| [T-071](T-071-center-graph-polish.md) | 审批中心 BPMN 进度图精修 | 待验收 | Codex 2026-10-26 | T-011 |

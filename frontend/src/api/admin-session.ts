@@ -117,7 +117,7 @@ export async function changeAdminPassword(currentPassword: string, newPassword: 
  */
 export function canReadAdminSection(session: AdminSession | null, section: string): boolean {
   return !!session && (session.scope === 'admin' || session.scope === 'reports' && section === 'reports'
-    || session.scope === 'flows' && section === 'flows')
+    || session.scope === 'flows' && (section === 'flows' || section === 'runtime'))
 }
 
 /**

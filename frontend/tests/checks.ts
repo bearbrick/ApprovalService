@@ -12,6 +12,7 @@ import { runHttpChecks } from './http-checks.ts'
 import { runDataChecks } from './data-checks.ts'
 import { runCenterChecks } from './center-checks.ts'
 import { runAdminChecks } from './admin-checks.ts'
+import { runInterventionChecks } from './admin-intervention-checks.ts'
 import { runRoleManagementChecks } from './role-management-checks.ts'
 import { runAdminIntegrationWizardChecks } from './admin-integration-wizard-checks.ts'
 import { runFlowManagementChecks } from './flow-management-checks.ts'
@@ -104,6 +105,7 @@ runDataChecks(check)
 await runCenterChecks(check)
 await runAdminChecks(check)
 await runRoleManagementChecks(check)
+runInterventionChecks(check)
 await runAdminIntegrationWizardChecks(check)
 await runFlowManagementChecks(check)
 await runReportChecks(check)

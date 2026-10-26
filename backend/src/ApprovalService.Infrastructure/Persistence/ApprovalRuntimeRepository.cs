@@ -186,10 +186,16 @@ public sealed class ApprovalRuntimeRepository(IDbContextFactory<ApprovalDbContex
             db.InstanceParticipants.AddRange(commit.Participants.Where(item => known.Add((item.PersonId, item.Kind))));
         }
         // 文件关联含条件更新，需要显式事务覆盖实例插入、事件和全部文件；先写实例以满足外键。
-        await using var fileTransaction = commit.FileLinks.Count > 0
-            ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
+        await using var fileTransaction = commit.InterventionActorId is not null
+            ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : commit.FileLinks.Count > 0 ? await db.Database.BeginTransactionAsync(cancellationToken) : null;
         try
         {
+            if (commit.InterventionActorId is not null)
+            {
+                await AdminInterventionAccess.RequireAsync(db, commit.InterventionActorId, commit.Instance.Id,
+                    commit.InterventionTargetId, cancellationToken);
+            }
             // EF Core 在一次 SaveChanges 中为多表写入建立数据库事务，冲突时全部回滚。
             await db.SaveChangesAsync(cancellationToken);
             foreach (var link in commit.FileLinks)

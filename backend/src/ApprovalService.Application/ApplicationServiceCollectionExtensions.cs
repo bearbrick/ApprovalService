@@ -65,6 +65,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<AdminDocumentSettingsAppService>();
         services.AddScoped<ReportingQueryAppService>();
         services.AddScoped<FlowManagementAppService>();
+        services.AddScoped<AdminInterventionAppService>();
         services.AddScoped<FlowSimulationAppService>();
         services.AddScoped<FlowTransferAppService>();
         services.AddScoped<FlowVersionAppService>();

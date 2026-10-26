@@ -34,6 +34,11 @@ internal static class Program
 
         var backendRoot = Fixtures.BackendRoot();
         var repositoryRoot = Directory.GetParent(backendRoot)!.FullName;
+        if (args.FirstOrDefault() == "intervention-http")
+        {
+            await AdminInterventionChecks.RunAsync(backendRoot, Check);
+            return 0;
+        }
         if (args.FirstOrDefault() == "work-calendar")
         {
             await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
@@ -151,6 +156,7 @@ internal static class Program
         await SystemBrandingChecks.RunAsync(backendRoot, Check);
         await WorkCalendarAdminChecks.RunAsync(backendRoot, Check);
         await RoleManagementChecks.RunAsync(backendRoot, Check);
+        await AdminInterventionChecks.RunAsync(backendRoot, Check);
         await ClientAppAdminChecks.RunAsync(backendRoot, Check);
         await TestCallbackChecks.RunAsync(backendRoot, Check);
         await FrontendHostingChecks.RunAsync(backendRoot, Check);

@@ -124,6 +124,11 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
                 ?? throw new InvalidOperationException("已保存的引擎状态为空。");
         }
 
+        if (input.ExpectedInstanceVersion.HasValue && instance.Version != input.ExpectedInstanceVersion.Value &&
+            current?.ProcessedRequestIds.Contains(command.RequestId) != true)
+        {
+            throw new UserFriendlyException(ErrorCodes.Conflict, "审批单已发生变化，请刷新后重新确认干预。");
+        }
         // 每张审批单始终使用发起时锁定版本的执行图，调用方不能替换它。
         input.Context.Graph = JsonSerializer.Deserialize<FlowExecutionGraph>(flowVersion.GraphJson, ApprovalJson.Options)
             ?? throw new InvalidOperationException("已发布的执行图为空。");
@@ -301,6 +306,8 @@ public sealed class ApprovalRuntimeAppService(IApprovalRuntimeRepository reposit
             OutboxItems = outbox,
             Participants = participants,
             FileLinks = input.FileLinks,
+            InterventionActorId = input.InterventionActorId,
+            InterventionTargetId = input.InterventionTargetId,
         }, cancellationToken);
         if (!saved)
         {

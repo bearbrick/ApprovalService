@@ -88,6 +88,11 @@ export async function runCenterChecks(check: (name: string, value: boolean) => v
     { id: 'a', sourceId: 'split', targetId: 'upper' }, { id: 'b', sourceId: 'split', targetId: 'lower' },
     { id: 'c', sourceId: 'upper', targetId: 'join' }, { id: 'd', sourceId: 'lower', targetId: 'join' },
   ] }
+  const branchXml = centerProgressXml(branchGraph)
+  check('BPMN 网关标签显式放在左上方，避开上下分支端口和水平主线',
+    branchXml.includes('<bpmndi:BPMNLabel><dc:Bounds x="-132" y="-70" width="100" height="40" />') &&
+    branchXml.includes('<bpmndi:BPMNLabel><dc:Bounds x="268" y="-70" width="100" height="40" />') &&
+    (branchXml.match(/<bpmndi:BPMNLabel>/g)?.length ?? 0) === 2)
   const branches = progressRoutes(branchGraph)
   check('BPMN 分支从网关上下端口分别展开并在汇合上下端口接入',
     JSON.stringify(branches) === JSON.stringify([

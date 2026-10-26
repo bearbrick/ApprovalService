@@ -71,7 +71,11 @@ export function centerProgressXml(graph: CenterProgressGraph): string {
     const point = positions.get(node.id)
     if (!id || !point) return ''
     const layout = shape(node.type)
-    return `<bpmndi:BPMNShape id="Shape_${id}" bpmnElement="${id}"><dc:Bounds x="${point.x - layout.width / 2}" y="${point.y - layout.height / 2}" width="${layout.width}" height="${layout.height}" /></bpmndi:BPMNShape>`
+    // 网关上下端口用于分支，外置标签放在左上方，避免默认底部文字被竖线穿过。
+    const label = node.type.endsWith('Gateway')
+      ? `<bpmndi:BPMNLabel><dc:Bounds x="${point.x - 132}" y="${point.y - 70}" width="100" height="40" /></bpmndi:BPMNLabel>`
+      : ''
+    return `<bpmndi:BPMNShape id="Shape_${id}" bpmnElement="${id}"><dc:Bounds x="${point.x - layout.width / 2}" y="${point.y - layout.height / 2}" width="${layout.width}" height="${layout.height}" />${label}</bpmndi:BPMNShape>`
   }).join('')
   const diagramEdges = graph.edges.map((edge, index) => {
     const source = graph.nodes.find(node => node.id === edge.sourceId)

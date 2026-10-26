@@ -36,6 +36,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<ActionRetryAppService>();
         services.AddScoped<OpenApprovalQueryAppService>();
         services.AddScoped<CenterQueryAppService>();
+        services.AddScoped<CenterDocumentAppService>();
+        services.AddScoped<DocumentOriginAppService>();
         services.AddScoped<CenterActionAppService>();
         services.AddScoped<SignatureAppService>();
         services.AddScoped<CenterOpinionAppService>();
@@ -57,6 +59,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddScoped<IFileAppService, FileAppService>();
         services.AddScoped<AdminConsoleAppService>();
         services.AddScoped<SystemBrandingAppService>();
+        services.AddScoped<AdminDocumentSettingsAppService>();
         services.AddScoped<ReportingQueryAppService>();
         services.AddScoped<FlowManagementAppService>();
         services.AddScoped<FlowSimulationAppService>();

@@ -24,6 +24,16 @@ public interface ICenterQueryRepository
     Task<CenterRecord?> FindAsync(CenterScope scope, string instanceId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// 解析当前人员在所属应用唯一的外部身份；没有或存在多个绑定时为空。
+    /// </summary>
+    /// <param name="clientAppCode">单据所属应用编码。</param>
+    /// <param name="personId">可信会话人员 ID。</param>
+    /// <param name="cancellationToken">取消信号。</param>
+    /// <returns>唯一外部人员 ID，无法唯一匹配时为空。</returns>
+    Task<string?> ResolveUniqueExternalPersonIdAsync(string clientAppCode, string personId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// 重新核对参与关系和嵌入应用范围后，幂等推进本人的审批单已读游标。
     /// </summary>
     /// <param name="scope">已验证的人员与嵌入应用范围。</param>

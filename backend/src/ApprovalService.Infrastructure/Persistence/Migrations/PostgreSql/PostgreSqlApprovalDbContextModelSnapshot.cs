@@ -343,6 +343,12 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasColumnType("text")
                         .HasDefaultValue("[]");
 
+                    b.Property<string>("AllowedDocumentOriginsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("[]");
+
                     b.Property<string>("AllowedEmbedOriginsJson")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -375,6 +381,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasColumnType("boolean");
 
                     b.Property<string>("DataUrl")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<string>("DocumentUrl")
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 

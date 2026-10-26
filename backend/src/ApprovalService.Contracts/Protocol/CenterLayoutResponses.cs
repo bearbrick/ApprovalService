@@ -1,14 +1,22 @@
 namespace ApprovalService.Contracts.Protocol;
 
 /// <summary>
-/// 当前查看人可见的锁定版本详情排版，嵌入原单尚未接入时使用自动排版。
+/// 当前查看人可见的锁定版本详情排版。
 /// </summary>
 public sealed class CenterDetailLayoutResponse
 {
     /// <summary>
-    /// auto 或 custom。
+    /// auto、custom 或 embed。
     /// </summary>
     public string Mode { get; set; } = "auto";
+
+    /// <summary>
+    /// 嵌入只读原单时的发布版本页面编码，非嵌入布局为空。
+    /// </summary>
+    public string? EmbedPageCode
+    {
+        get; set;
+    }
 
     /// <summary>
     /// 仅包含至少一个可见字段的分组。

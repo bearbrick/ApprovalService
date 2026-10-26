@@ -154,6 +154,10 @@ public static class ApiRoutes
     /// 管理员读取或修改指定接入应用允许嵌入审批中心的网站来源。
     /// </summary>
     public const string AdminAppEmbedOrigins = AdminClientApps + "/{code}/embed-origins";
+    /// <summary>
+    /// 管理员配置某应用的只读原单钩子和 HTTPS 子页面来源。
+    /// </summary>
+    public const string AdminAppDocumentSettings = AdminClientApps + "/{code}/document-settings";
 
     /// <summary>
     /// 组织管理员维护接入应用管理员的内部人员 ID 名单。

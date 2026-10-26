@@ -760,6 +760,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.PostgreSql
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.HasKey("Code");
 
                     b.ToTable("OrganizationRoles", (string)null);

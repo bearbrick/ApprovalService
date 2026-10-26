@@ -755,6 +755,10 @@ namespace ApprovalService.Infrastructure.Persistence.Migrations.Sqlite
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("Code");
 
                     b.ToTable("OrganizationRoles", (string)null);

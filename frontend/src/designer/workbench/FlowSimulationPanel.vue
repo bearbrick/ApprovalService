@@ -36,6 +36,10 @@ const peopleText = ref<Record<string, string>>({})
  */
 const actionResultText = ref('{}')
 /**
+ * 可修改的假审批意见；清空可验证节点的必填校验。
+ */
+const opinionText = ref('模拟审批意见')
+/**
  * 当前服务端内存会话。
  */
 const session = ref<SimulationSession | null>(null)
@@ -119,6 +123,7 @@ async function decide(task: SimulationTask, reject: boolean): Promise<void> {
   try {
     session.value = await stepFlowSimulation(session.value.id, {
       kind: reject ? 'reject' : task.completionKind, taskId: task.id, actorId: task.assigneeId,
+      opinion: opinionText.value,
     })
     notice.value = reject ? '已模拟拒绝。' : '已完成该假任务。'
   } catch (cause) {
@@ -208,7 +213,7 @@ async function close(): Promise<void> {
     </div>
     <div v-else class="simulation-running">
       <div class="session-toolbar"><div><strong>状态：{{ session.status }}</strong><small>流程 {{ session.flowCode }} · 闲置到期 {{ new Date(session.expiresAt).toLocaleString() }}</small></div><div><button type="button" class="btn" :disabled="busy" @click="refresh">刷新</button><button type="button" class="btn" :disabled="busy" @click="close">结束模拟</button></div></div>
-      <div class="simulation-columns"><section><h3>当前假任务 <span>{{ pendingTasks.length }}</span></h3><p v-if="!pendingTasks.length" class="empty-hint">当前没有待处理的人工任务。</p><article v-for="task in pendingTasks" :key="task.id" class="simulation-card"><strong>{{ nodeLabel(task.nodeId) }}</strong><small>假处理人：{{ task.assigneeId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="decide(task, false)">模拟完成</button><button type="button" class="btn" :disabled="busy" @click="decide(task, true)">模拟拒绝</button></div></article></section><section><h3>等待假外部结果 <span>{{ session.waits.length }}</span></h3><p v-if="!session.waits.length" class="empty-hint">当前没有自动动作或子流程等待。</p><label v-if="session.waits.some(wait => wait.kind === 'action')">自动动作假结果 JSON<textarea v-model="actionResultText" spellcheck="false" rows="3" /></label><article v-for="wait in session.waits" :key="wait.tokenId" class="simulation-card"><strong>{{ nodeLabel(wait.nodeId) }}</strong><small>{{ wait.kind === 'subprocess' ? '子流程' : '自动动作' }} · 令牌 {{ wait.tokenId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="resolveWait(wait, true)">假成功</button><button type="button" class="btn" :disabled="busy" @click="resolveWait(wait, false)">假失败</button></div></article></section></div>
+      <div class="simulation-columns"><section><h3>当前假任务 <span>{{ pendingTasks.length }}</span></h3><p v-if="!pendingTasks.length" class="empty-hint">当前没有待处理的人工任务。</p><label v-if="pendingTasks.length">假审批意见<textarea v-model="opinionText" maxlength="1000" rows="2" placeholder="节点要求意见时必填；可清空测试校验" /></label><article v-for="task in pendingTasks" :key="task.id" class="simulation-card"><strong>{{ nodeLabel(task.nodeId) }}</strong><small>假处理人：{{ task.assigneeId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="decide(task, false)">模拟完成</button><button type="button" class="btn" :disabled="busy" @click="decide(task, true)">模拟拒绝</button></div></article></section><section><h3>等待假外部结果 <span>{{ session.waits.length }}</span></h3><p v-if="!session.waits.length" class="empty-hint">当前没有自动动作或子流程等待。</p><label v-if="session.waits.some(wait => wait.kind === 'action')">自动动作假结果 JSON<textarea v-model="actionResultText" spellcheck="false" rows="3" /></label><article v-for="wait in session.waits" :key="wait.tokenId" class="simulation-card"><strong>{{ nodeLabel(wait.nodeId) }}</strong><small>{{ wait.kind === 'subprocess' ? '子流程' : '自动动作' }} · 令牌 {{ wait.tokenId }}</small><div><button type="button" class="btn btn-primary" :disabled="busy" @click="resolveWait(wait, true)">假成功</button><button type="button" class="btn" :disabled="busy" @click="resolveWait(wait, false)">假失败</button></div></article></section></div>
       <section class="simulation-events"><h3>模拟事件</h3><p v-if="!recentEvents.length" class="empty-hint">引擎尚未产生事件。</p><ol v-else><li v-for="(event, index) in recentEvents" :key="index"><strong>{{ event.kind }}</strong><span>{{ event.nodeId ? nodeLabel(event.nodeId) : '流程' }}</span></li></ol></section>
     </div>
     <p v-if="error" class="simulation-error" role="alert">{{ error }}</p><p v-if="notice" class="simulation-notice" role="status">{{ notice }}</p>

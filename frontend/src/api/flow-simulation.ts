@@ -123,6 +123,10 @@ export interface SimulationStep {
    */
   actorId?: string
   /**
+   * 假审批意见；节点要求意见时由引擎校验。
+   */
+  opinion?: string
+  /**
    * 子流程是否成功。
    */
   success?: boolean

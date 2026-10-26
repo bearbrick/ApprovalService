@@ -61,11 +61,12 @@ export async function runSimulationChecks(check: (name: string, value: boolean) 
     const created = await startFlowSimulation(input)
     const refreshed = await getFlowSimulation(created.id)
     const stepped = await stepFlowSimulation(created.id, { kind: created.tasks[0]!.completionKind,
-      taskId: created.tasks[0]!.id, actorId: created.tasks[0]!.assigneeId })
+      taskId: created.tasks[0]!.id, actorId: created.tasks[0]!.assigneeId, opinion: '模拟审批意见' })
     await deleteFlowSimulation(created.id)
     check('测试模式只经流程管理 JWT 发送假草稿并逐步处理内存会话',
       created.tasks.length === 1 && refreshed.id === 'memory-1' && stepped.status === 'completed'
       && calls.some(call => call.path.endsWith('/steps') && call.method === 'POST')
+      && calls.some(call => call.path.endsWith('/steps') && (call.body as { opinion?: string }).opinion === '模拟审批意见')
       && calls.some(call => call.path.endsWith('/memory-1') && call.method === 'DELETE')
       && !calls.some(call => call.path.includes('/instances') || call.path.includes('callback')))
   } finally {

@@ -59,7 +59,7 @@ const reasonValid = computed(() => reason.value.trim().length >= 2 && reason.val
  */
 function showError(error: unknown): void {
   if (!active) return
-  if (error instanceof ApiError && (error.status === 401 || error.status === 403)) { emit('lost'); return }
+  if (error instanceof ApiError && error.status === 401) { emit('lost'); return }
   failed.value = true
   message.value = error instanceof Error ? error.message : '工作日历操作失败，请重试。'
 }

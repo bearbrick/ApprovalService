@@ -1,4 +1,4 @@
-import { adminAccessToken, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
+import { adminAccessToken, verifyAdminSession, adminSession, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { createManagedFlow, exportManagedFlow, getManagedFlow, importManagedFlow,
   listFlowDepartments, listManagedFlows,
   listManagedFlowVersions, previewManagedImport, publishManagedFlow, restoreManagedFlowVersion,
@@ -79,12 +79,13 @@ export async function runFlowManagementChecks(check: (name: string, value: boole
   }
   try {
     const session = await loginAdmin('FM1', 'password', 'flows')
-    check('部门流程管理员登录只核对流程范围且不能进入其他管理页', session.scope === 'flows'
+    check('流程入口使用普通登录，不根据入口固定后续页面范围', session.tokens.personId === 'flow-manager'
       && !seen.some(item => item.path === '/api/v1/admin/session')
-      && canReadAdminSection(session, 'flows') && !canReadAdminSection(session, 'org'))
-    let blockedOtherScope = false
-    try { await adminAccessToken('admin') } catch { blockedOtherScope = true }
-    check('流程范围会话不能调用组织管理员接口', blockedOtherScope)
+      && canReadAdminSection(session, 'flows') && canReadAdminSection(session, 'org'))
+    let deniedManagement = false
+    try { await verifyAdminSession() } catch { deniedManagement = true }
+    check('组织管理权限由服务端拒绝，流程身份仍可继续使用', deniedManagement
+      && adminSession()?.tokens.personId === 'flow-manager' && await adminAccessToken('flows') === 'flow-token')
     const list = await listManagedFlows()
     const departments = await listFlowDepartments()
     check('流程所属部门只从本地 JWT 授权选项读取名称和内部 ID',

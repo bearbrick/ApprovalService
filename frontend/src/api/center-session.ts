@@ -1,173 +1,123 @@
 import { ApiError, requestJson } from './http.ts'
-import { canRestoreTokens, isEmbedEntry, readTabSession, writeTabSession } from './tab-session.ts'
+import { isIdentityTokens, localSession } from './local-session.ts'
+import type { IdentityTokens } from './local-session.ts'
+import { canRestoreTokens, isEmbedEntry } from './tab-session.ts'
 
 /**
- * 登录和嵌入兑换的令牌响应；嵌入会话仅在当前页面内存保存。
+ * 中心登录响应与统一身份结构一致。
  */
-export interface CenterTokens {
-  /**
-   * 当前登录人员的内部标识。
-   */
-
-  personId: string
-  /**
-   * 短期访问令牌。
-   */
-
-  accessToken: string
-  /**
-   * 访问令牌到期时间。
-   */
-
-  accessExpiresAt: string
-  /**
-   * 可轮换的刷新令牌。
-   */
-
-  refreshToken: string
-  /**
-   * 刷新令牌到期时间。
-   */
-
-  refreshExpiresAt: string
-  /**
-   * 首次登录是否需要先改密。
-   */
-
-  mustChangePassword: boolean
-  /**
-   * 嵌入会话允许打开的相对页面。
-   */
-
-  targetPath?: string | null
-}
+export type CenterTokens = IdentityTokens
 
 /**
- * 普通本地登录的标签页缓存键。
+ * 嵌入身份始终只存内存，不能写入或恢复普通登录缓存。
  */
-const storageKey = 'approval.center.session.v1'
-
+let embedded: CenterTokens | null = null
 /**
- * 当前会话；业务系统嵌入入口必须重新兑换，不能恢复普通本地身份。
+ * 一旦进入嵌入兑换流程，失败后也不能回退到普通身份。
  */
-let current: CenterTokens | null = isEmbedEntry() ? null : readTabSession(storageKey, isStoredSession)
-
+let embedMode = isEmbedEntry()
 /**
- * 同一会话共享进行中的刷新请求，防止重复消费刷新令牌。
+ * 嵌入会话的单次续期，与普通身份的续期相互隔离。
  */
 let refreshing: Promise<string> | null = null
-
 /**
- * 只恢复尚未过期、已完成首次改密的普通本地会话。
- * @param value 缓存的候选值。
- * @returns 是否可以恢复。
+ * 退出或重新兑换时废弃先前的迟到响应。
  */
-function isStoredSession(value: unknown): value is CenterTokens {
-  return isTokens(value) && !value.targetPath && !value.mustChangePassword
-    && canRestoreTokens(value.accessExpiresAt, value.refreshExpiresAt)
-}
+let generation = 0
 
 /**
- * 校验身份接口返回的必要字段，避免残缺令牌进入请求头。
- * @param value 待校验响应。
- * @returns 是否为完整令牌响应。
- */
-function isTokens(value: unknown): value is CenterTokens {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
-  const data = value as Record<string, unknown>
-  return ['personId', 'accessToken', 'accessExpiresAt', 'refreshToken', 'refreshExpiresAt']
-    .every(key => typeof data[key] === 'string' && (data[key] as string).length > 0)
-    && typeof data.mustChangePassword === 'boolean'
-}
-
-/**
- * 使用本地工号密码登录。
+ * 建立各普通工作区共用的本地登录。
  * @param employeeNumber 工号。
  * @param password 密码。
- * @returns 登录结果。
+ * @returns 当前令牌。
  */
 export async function loginCenter(employeeNumber: string, password: string): Promise<CenterTokens> {
-  const result = await requestJson<CenterTokens>('/api/v1/identity/login', {
-    method: 'POST', body: { employeeNumber, password }, cache: 'no-store',
-  })
-  if (!isTokens(result)) throw new Error('登录响应不完整，请稍后重试。')
-  current = result
-  writeTabSession(storageKey, result.mustChangePassword ? null : result)
-  return result
+  const identity = await localSession.login(employeeNumber, password)
+  generation++
+  embedded = null
+  refreshing = null
+  embedMode = false
+  return identity.tokens
 }
 
 /**
- * 将一次性嵌入令牌兑换为当前页面会话。
- * @param token 业务系统传入的一次性令牌。
- * @returns 兑换结果。
+ * 兑换独立的嵌入身份，不能覆盖普通登录。
+ * @param token 业务系统提供的一次性令牌。
+ * @returns 嵌入令牌。
  */
 export async function exchangeCenterEmbed(token: string): Promise<CenterTokens> {
-  const result = await requestJson<CenterTokens>('/api/v1/embed-tokens/exchange', {
+  embedMode = true
+  embedded = null
+  refreshing = null
+  const attempt = ++generation
+  const result = await requestJson<unknown>('/api/v1/embed-tokens/exchange', {
     method: 'POST', body: { token }, cache: 'no-store',
   })
-  if (!isTokens(result)) throw new Error('嵌入登录响应不完整，请稍后重试。')
-  current = result
+  if (generation !== attempt) throw new Error('嵌入登录状态已改变，请重新打开。')
+  if (!isIdentityTokens(result) || !result.targetPath) throw new Error('嵌入登录响应不完整，请稍后重试。')
+  embedded = result
   return result
 }
 
 /**
- * 读取当前页面会话，普通本地登录可从当前标签页恢复。
- * @returns 当前会话；未登录时为空。
+ * 普通中心与管理后台共用身份，嵌入入口只读取本次兑换结果。
+ * @returns 当前令牌或空值。
  */
-export function centerSession(): CenterTokens | null { return current }
-
-/**
- * 注销当前页面会话并移除普通本地登录的标签页缓存。
- */
-export function logoutCenter(): void {
-  current = null
-  refreshing = null
-  writeTabSession(storageKey, null)
+export function centerSession(): CenterTokens | null {
+  return embedMode || isEmbedEntry() ? embedded : localSession.session()?.tokens ?? null
 }
 
 /**
- * 在令牌临近过期时轮换访问与刷新令牌。
+ * 普通退出影响全部工作区；嵌入退出仅清理本次嵌入身份。
+ */
+export function logoutCenter(): void {
+  generation++
+  embedded = null
+  refreshing = null
+  if (!embedMode && !isEmbedEntry()) localSession.logout()
+}
+
+/**
+ * 取得中心令牌，普通身份共享单次续期，嵌入身份单独轮换。
  * @returns 可用于请求的访问令牌。
  */
 export async function centerAccessToken(): Promise<string> {
-  if (!current) throw new Error('请先登录审批中心。')
-  if (!canRestoreTokens(current.accessExpiresAt, current.refreshExpiresAt)) {
+  if (!embedMode && !isEmbedEntry()) return localSession.accessToken()
+  const session = embedded
+  if (!session) throw new Error('请从业务系统重新打开审批页面。')
+  if (!canRestoreTokens(session.accessExpiresAt, session.refreshExpiresAt)) {
     logoutCenter()
-    throw new Error('登录已过期，请重新登录。')
+    throw new Error('嵌入登录已过期，请从业务系统重新打开。')
   }
-  if (Date.parse(current.accessExpiresAt) > Date.now() + 30_000) return current.accessToken
+  if (Date.parse(session.accessExpiresAt) > Date.now() + 30_000) return session.accessToken
   if (!refreshing) {
-    const operation = rotateCenterSession(current).finally(() => {
-      if (refreshing === operation) refreshing = null
-    })
+    const operation = rotateEmbedSession(session).finally(() => { if (refreshing === operation) refreshing = null })
     refreshing = operation
   }
   return refreshing
 }
 
 /**
- * 续期并保留本地或嵌入身份边界，退出后的迟到结果不得恢复登录。
- * @param session 发起续期时的会话。
- * @returns 续期后的访问令牌。
+ * 独立轮换嵌入令牌，保留目标路径并拒绝迟到或换人响应。
+ * @param session 发起续期的嵌入身份。
+ * @returns 新访问令牌。
  */
-async function rotateCenterSession(session: CenterTokens): Promise<string> {
+async function rotateEmbedSession(session: CenterTokens): Promise<string> {
   try {
-    const result = await requestJson<CenterTokens>('/api/v1/identity/refresh', {
+    const result = await requestJson<unknown>('/api/v1/identity/refresh', {
       method: 'POST', body: { refreshToken: session.refreshToken }, cache: 'no-store',
     })
-    if (current !== session) throw new Error('登录状态已改变，请重新进入页面。')
-    if (!isTokens(result) || result.personId !== session.personId
+    if (embedded !== session) throw new Error('嵌入登录状态已改变，请重新打开。')
+    if (!isIdentityTokens(result) || result.mustChangePassword || result.personId !== session.personId
       || (result.targetPath != null && result.targetPath !== session.targetPath)
       || !canRestoreTokens(result.accessExpiresAt, result.refreshExpiresAt)) {
       logoutCenter()
-      throw new Error('登录续期响应不完整，请重新登录。')
+      throw new Error('嵌入续期响应不完整，请重新打开。')
     }
-    // 刷新接口保留嵌入 JWT 的应用身份，但不重复返回首次兑换的页面路径。
-    current = { ...result, targetPath: session.targetPath ?? null }
-    if (!current.targetPath && !current.mustChangePassword) writeTabSession(storageKey, current)
+    embedded = { ...result, targetPath: session.targetPath }
     return result.accessToken
   } catch (error) {
-    if (current === session && error instanceof ApiError && [400, 401, 403].includes(error.status)) logoutCenter()
+    if (embedded === session && error instanceof ApiError && [400, 401, 403].includes(error.status)) logoutCenter()
     throw error
   }
 }

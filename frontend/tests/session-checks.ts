@@ -1,8 +1,12 @@
-import type { CenterTokens } from '../src/api/center-session.ts'
+import { ApiError } from '../src/api/http.ts'
+import { createLocalSession, localSession } from '../src/api/local-session.ts'
+import type { IdentityTokens } from '../src/api/local-session.ts'
+import { adminAccessToken, adminSession, loginAdmin, logoutAdmin, verifyAdminSession } from '../src/api/admin-session.ts'
+import { centerAccessToken, centerSession, loginCenter, logoutCenter } from '../src/api/center-session.ts'
 
 /**
- * 以重新装载模块模拟刷新页面，并检查续期、退出和嵌入身份隔离。
- * @param check 统一断言入口。
+ * 检查普通身份跨工作区共享、刷新恢复、单次续期与嵌入隔离。
+ * @param check 统一场景断言。
  * @returns 检查完成。
  */
 export async function runSessionChecks(check: (name: string, value: boolean) => void): Promise<void> {
@@ -16,114 +20,116 @@ export async function runSessionChecks(check: (name: string, value: boolean) => 
     removeItem: (key: string) => { values.delete(key) },
   }
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { sessionStorage: storage, location } })
-  const adminKey = 'approval.admin.session.v1'
-  const centerKey = 'approval.center.session.v1'
-  const tokens: CenterTokens = { personId: 'p1', accessToken: 'old-access', accessExpiresAt: '2000-01-01T00:00:00Z',
+  const key = 'approval.local.session.v1'
+  const tokens: IdentityTokens = { personId: 'p1', accessToken: 'old-access', accessExpiresAt: '2000-01-01T00:00:00Z',
     refreshToken: 'old-refresh', refreshExpiresAt: '2099-01-01T00:00:00Z', mustChangePassword: false }
   const rotated = { ...tokens, accessToken: 'new-access', refreshToken: 'new-refresh', accessExpiresAt: '2099-01-01T00:00:00Z' }
-  let serial = 0
-  /**
-   * 用独立模块实例模拟页面刷新后的会话初始化。
-   * @returns 新的管理会话模块。
-   */
-  async function admin(): Promise<typeof import('../src/api/admin-session.ts')> {
-    return import('../src/api/admin-session.ts?session-check=' + ++serial)
-  }
-  /**
-   * 重新装载审批中心模块，不复用上一个页面的内存变量。
-   * @returns 新的中心会话模块。
-   */
-  async function center(): Promise<typeof import('../src/api/center-session.ts')> {
-    return import('../src/api/center-session.ts?session-check=' + ++serial)
-  }
-  /**
-   * 返回模拟身份接口的 JSON 响应。
-   * @param body 响应数据。
-   * @param status HTTP 状态。
-   * @returns HTTP 响应。
-   */
-  function response(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-  }
+  let release: (response: Response) => void = () => undefined
   try {
-    globalThis.fetch = async () => response(tokens)
-    const first = await admin()
-    await first.loginAdmin('employee', 'never-store-this-password', 'reports')
-    const restored = await admin()
-    check('管理会话刷新后恢复身份和原范围，缓存不保存密码', restored.adminSession()?.tokens.personId === 'p1'
-      && restored.adminSession()?.scope === 'reports' && !values.get(adminKey)?.includes('never-store-this-password'))
-    let denied = false
-    try { await restored.adminAccessToken('admin') } catch { denied = true }
-    check('恢复报表会话不会扩大管理范围', denied)
+    globalThis.fetch = async () => Response.json(tokens)
+    await loginAdmin('employee', 'never-store-this-password', 'flows')
+    check('流程入口登录后审批中心直接使用同一身份，无需第二次登录',
+      centerSession() === adminSession()?.tokens && centerSession()?.personId === 'p1')
+    const restored = createLocalSession()
+    check('刷新后恢复统一身份且不保存密码或前端权限结论', restored.session()?.employeeNumber === 'employee'
+      && restored.session()?.tokens.personId === 'p1' && !values.get(key)?.includes('never-store-this-password')
+      && !values.get(key)?.includes('scope'))
     let calls = 0
-    let release: (value: Response) => void = () => undefined
     globalThis.fetch = async () => { calls++; return new Promise<Response>(resolve => { release = resolve }) }
-    const requests = [restored.adminAccessToken('reports'), restored.adminAccessToken('reports')]
-    release(response(rotated))
-    const result = await Promise.all(requests)
-    check('管理并发续期只消费一次刷新令牌并保存轮换结果', calls === 1 && result.every(item => item === 'new-access')
-      && JSON.parse(values.get(adminKey) ?? '{}').tokens.refreshToken === 'new-refresh')
-    restored.logoutAdmin()
-    check('管理退出后再次刷新仍为未登录', (await admin()).adminSession() === null && !values.has(adminKey))
+    const requests = [adminAccessToken('flows'), centerAccessToken(), adminAccessToken('reports')]
+    release(Response.json(rotated))
+    const results = await Promise.all(requests)
+    check('中心与多个管理模块同时续期只消费一次刷新令牌', calls === 1
+      && results.every(item => item === 'new-access') && centerSession() === adminSession()?.tokens
+      && createLocalSession().session()?.tokens.refreshToken === 'new-refresh')
 
-    values.set(adminKey, '{broken')
-    check('损坏管理缓存安全清除', (await admin()).adminSession() === null && !values.has(adminKey))
-    values.set(adminKey, JSON.stringify({ employeeNumber: 'employee', scope: 'admin', tokens: { ...tokens, refreshExpiresAt: '2000-01-01' } }))
-    check('过期缓存不恢复登录', (await admin()).adminSession() === null && !values.has(adminKey))
+    globalThis.fetch = async () => Response.json({ code: 'FORBIDDEN', message: '没有组织管理权限。' }, { status: 403 })
+    let forbidden = false
+    try { await verifyAdminSession() } catch (cause) { forbidden = cause instanceof ApiError && cause.status === 403 }
+    check('权限核验 403 不注销普通身份，仍可使用审批中心令牌', forbidden
+      && await centerAccessToken() === 'new-access' && values.has(key))
+    logoutAdmin()
+    check('在管理后台退出同时清除中心和刷新恢复身份', centerSession() === null && createLocalSession().session() === null)
 
-    globalThis.fetch = async () => response(tokens)
-    const centerFirst = await center()
-    await centerFirst.loginCenter('employee', 'never-store-this-password')
-    const centerRestored = await center()
-    check('审批中心普通登录刷新后恢复，缓存不保存密码', centerRestored.centerSession()?.personId === 'p1'
-      && !values.get(centerKey)?.includes('never-store-this-password'))
-    calls = 0
-    globalThis.fetch = async () => { calls++; return new Promise<Response>(resolve => { release = resolve }) }
-    const centerRequests = [centerRestored.centerAccessToken(), centerRestored.centerAccessToken()]
-    release(response(rotated))
-    await Promise.all(centerRequests)
-    check('中心并发续期共享一次请求并保存新刷新令牌', calls === 1
-      && JSON.parse(values.get(centerKey) ?? '{}').refreshToken === 'new-refresh')
-    centerRestored.logoutCenter()
-    check('中心退出后刷新不恢复登录', (await center()).centerSession() === null && !values.has(centerKey))
+    globalThis.fetch = async () => Response.json(rotated)
+    await loginCenter('employee', 'password')
+    check('中心登录后管理后台与设计器直接读取同一身份', adminSession()?.tokens === centerSession()
+      && await adminAccessToken('admin') === 'new-access')
+    logoutCenter()
+    check('中心退出同时清除管理身份', adminSession() === null && !values.has(key))
 
-    values.set(adminKey, JSON.stringify({ employeeNumber: 'employee', scope: 'reports', tokens }))
-    const interrupted = await admin()
+    values.set(key, '{broken')
+    check('损坏缓存清除后保持未登录', createLocalSession().session() === null && !values.has(key))
+    values.set(key, JSON.stringify({ employeeNumber: 'employee', tokens: { ...tokens, refreshExpiresAt: '2000-01-01' } }))
+    check('刷新令牌已过期不恢复登录', createLocalSession().session() === null && !values.has(key))
+    values.set('approval.admin.session.v1', JSON.stringify({ employeeNumber: 'employee', scope: 'flows', tokens: rotated }))
+    values.set('approval.center.session.v1', JSON.stringify({ ...rotated, personId: 'old-center-person' }))
+    const migrated = createLocalSession()
+    check('旧版两份缓存只迁移一份普通身份并清除旧键', migrated.session()?.tokens.personId === 'p1'
+      && !values.has('approval.admin.session.v1') && !values.has('approval.center.session.v1'))
+    migrated.logout()
+    check('迁移后退出不会复活旧中心或管理身份', createLocalSession().session() === null)
+
+    const unstable = createLocalSession()
+    globalThis.fetch = async () => Response.json(tokens)
+    await unstable.login('employee', 'password')
+    globalThis.fetch = async () => { throw new Error('临时网络故障') }
+    try { await unstable.accessToken() } catch { /* 预期保留身份用于重试。 */ }
+    check('临时网络失败保留身份和缓存', unstable.session()?.tokens.refreshToken === 'old-refresh' && values.has(key))
+    globalThis.fetch = async () => Response.json(rotated)
+    check('网络恢复后无需密码即可续期', await unstable.accessToken() === 'new-access')
+
+    globalThis.fetch = async () => Response.json(tokens)
+    await unstable.login('employee', 'password')
     globalThis.fetch = async () => new Promise<Response>(resolve => { release = resolve })
-    const pending = interrupted.adminAccessToken('reports').catch(() => 'discarded')
-    interrupted.logoutAdmin()
-    release(response(rotated))
-    check('退出后的管理续期响应不能复活会话', await pending === 'discarded'
-      && interrupted.adminSession() === null && !values.has(adminKey))
+    const pending = unstable.accessToken().catch(() => 'discarded')
+    unstable.logout()
+    release(Response.json(rotated))
+    check('退出后的迟到续期不能复活身份', await pending === 'discarded' && unstable.session() === null && !values.has(key))
+    const pendingLogin = unstable.login('employee', 'password').catch(() => null)
+    unstable.logout()
+    release(Response.json(rotated))
+    check('退出后的迟到登录也不能复活身份', await pendingLogin === null && unstable.session() === null)
 
-    values.set(centerKey, JSON.stringify(tokens))
-    const revoked = await center()
-    globalThis.fetch = async () => response({ code: 'UNAUTHORIZED', message: '登录已失效。' }, 401)
-    try { await revoked.centerAccessToken() } catch { /* 预期失效会话被拒绝。 */ }
-    check('服务端拒绝续期时清除中心缓存', revoked.centerSession() === null && !values.has(centerKey))
+    globalThis.fetch = async () => Response.json(tokens)
+    await unstable.login('employee', 'password')
+    globalThis.fetch = async () => Response.json({ code: 'UNAUTHORIZED', message: '刷新身份已失效。' }, { status: 401 })
+    try { await unstable.accessToken() } catch { /* 服务端撤销后确实需要重新登录。 */ }
+    check('服务端撤销刷新身份后清除统一缓存', unstable.session() === null && !values.has(key))
 
-    values.set(adminKey, JSON.stringify({ employeeNumber: 'employee', scope: 'admin', tokens: rotated }))
-    values.set(centerKey, JSON.stringify(rotated))
+    globalThis.fetch = async () => Response.json({ ...rotated, mustChangePassword: true })
+    await unstable.login('employee', 'temporary-password')
+    let mustChangeDenied = false
+    try { await unstable.accessToken() } catch { mustChangeDenied = true }
+    check('首次改密身份不缓存且不能获取普通业务令牌', mustChangeDenied && !values.has(key))
+    unstable.logout()
+
+    globalThis.fetch = async () => Response.json(rotated)
+    await loginCenter('employee', 'password')
+    const ordinaryCache = values.get(key)
     location.pathname = '/embed/example'
-    check('嵌入入口不继承普通中心或管理登录', (await admin()).adminSession() === null && (await center()).centerSession() === null)
-    values.clear()
-    const embedded = await center()
-    globalThis.fetch = async () => response({ ...tokens, targetPath: '#/center/approvals/example' })
+    const embedded = await import('../src/api/center-session.ts?' + 'unified-embed-check')
+    check('嵌入入口不继承普通身份，管理入口也不可用', embedded.centerSession() === null && adminSession() === null)
+    globalThis.fetch = async () => Response.json({ ...tokens, personId: 'embed-person', targetPath: '#/center/approvals/example' })
     await embedded.exchangeCenterEmbed('one-time-token')
-    globalThis.fetch = async () => response(rotated)
+    globalThis.fetch = async () => Response.json({ ...rotated, personId: 'embed-person' })
     await embedded.centerAccessToken()
-    check('嵌入兑换及续期始终只在内存中，刷新响应不丢失嵌入标记', !values.has(centerKey)
-      && embedded.centerSession()?.targetPath === '#/center/approvals/example'
-      && (await center()).centerSession() === null)
-
+    check('嵌入续期保持目标和人员且不污染普通缓存', embedded.centerSession()?.personId === 'embed-person'
+      && embedded.centerSession()?.targetPath === '#/center/approvals/example' && values.get(key) === ordinaryCache)
+    embedded.logoutCenter()
+    check('嵌入退出不删除普通缓存且不能回退继承', embedded.centerSession() === null && values.get(key) === ordinaryCache)
     location.pathname = '/'
+    check('回到普通页面仍使用原普通身份', adminSession()?.tokens.personId === 'p1')
+    logoutCenter()
+
     Object.defineProperty(window, 'sessionStorage', { get: () => { throw new Error('存储不可用') } })
-    globalThis.fetch = async () => response(rotated)
-    const privateMode = await center()
-    await privateMode.loginCenter('employee', 'password')
-    check('浏览器禁用存储时仍可内存登录并退出', await privateMode.centerAccessToken() === 'new-access')
-    privateMode.logoutCenter()
+    globalThis.fetch = async () => Response.json(rotated)
+    await loginAdmin('employee', 'password')
+    check('禁用浏览器存储时所有普通工作区仍共享内存身份', await centerAccessToken() === 'new-access')
+    logoutCenter()
   } finally {
+    location.pathname = '/'
+    localSession.logout()
     globalThis.fetch = originalFetch
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
     else Reflect.deleteProperty(globalThis, 'window')

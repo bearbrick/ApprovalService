@@ -1,5 +1,5 @@
 import { ApiError } from '../src/api/http.ts'
-import { adminAccessToken, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
+import { adminAccessToken, verifyAdminSession, adminSession, canReadAdminSection, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { downloadAdminReport, loadAdminReports, reportQuery } from '../src/api/admin-reports.ts'
 import type { ReportFilter } from '../src/api/admin-reports.ts'
 import { adminAdapter } from '../src/api/admin-adapter.ts'
@@ -36,7 +36,7 @@ export async function runReportChecks(check: (name: string, value: boolean) => v
       refreshToken: 'refresh-token', refreshExpiresAt: '2099-02-01T00:00:00Z', mustChangePassword: false,
     })
     if (path === '/api/v1/admin/session') return Response.json({ code: 'FORBIDDEN', message: '无权。' }, { status: 403 })
-    if (!path.startsWith('/api/v1/admin/reports/')) throw new Error('不应访问其他管理路由。')
+    if (!path.startsWith('/api/v1/admin/reports/')) return Response.json({ code: 'FORBIDDEN', message: '无组织管理权限。' }, { status: 403 })
     if (new Headers(init?.headers).get('Authorization') !== 'Bearer report-token') throw new Error('缺少人员 JWT。')
     if (denyReport) return Response.json({ code: 'FORBIDDEN', message: '只能查看直接负责部门的报表。' }, { status: 403 })
     if (path.includes('/export')) {
@@ -66,17 +66,13 @@ export async function runReportChecks(check: (name: string, value: boolean) => v
   }
   try {
     const session = await loginAdmin('H1', 'password', 'reports')
-    check('部门负责人报表会话不请求组织管理员接口，且不能进入其他管理页',
-      session.scope === 'reports' && !visited.includes('/api/v1/admin/session') &&
-      canReadAdminSection(session, 'reports') && !canReadAdminSection(session, 'org'))
-    let blockedManagement = false
-    try { await adminAccessToken() } catch { blockedManagement = true }
-    const beforeOtherView = visited.length
+    check('报表入口普通登录不预先要求组织管理员资格', session.tokens.personId === 'head'
+      && !visited.includes('/api/v1/admin/session') && canReadAdminSection(session, 'reports'))
     let rejectedOtherView = false
     try { await adminAdapter.loadView('org/people', new AbortController().signal) }
-    catch { rejectedOtherView = true }
-    check('报表范围令牌不会交给其他管理操作',
-      blockedManagement && rejectedOtherView && visited.length === beforeOtherView)
+    catch (cause) { rejectedOtherView = cause instanceof ApiError && cause.status === 403 }
+    check('报表人员访问组织接口由服务端拒绝且保留登录', rejectedOtherView
+      && adminSession()?.tokens.personId === 'head' && await adminAccessToken('reports') === 'report-token')
     const result = await loadAdminReports(filter, new AbortController().signal)
     check('报表四条真实路由均携带 JWT，保密流程只保留匿名数量',
       visited.filter(path => path.startsWith('/api/v1/admin/reports/')).length === 4 &&
@@ -138,9 +134,9 @@ export async function runReportChecks(check: (name: string, value: boolean) => v
     check('四条接口有一条响应损坏时拒绝整组指标', invalid)
     malformed = false
     let deniedAdmin = false
-    try { await loginAdmin('H1', 'password', 'admin') }
+    try { await verifyAdminSession() }
     catch (cause) { deniedAdmin = cause instanceof ApiError && cause.status === 403 }
-    check('报表负责人不能使用组织管理员登录范围', deniedAdmin && !canReadAdminSection(null, 'org'))
+    check('报表负责人由服务端拒绝组织管理权限，未登录守卫仍有效', deniedAdmin && !canReadAdminSection(null, 'org'))
   } finally {
     logoutAdmin()
     globalThis.fetch = originalFetch

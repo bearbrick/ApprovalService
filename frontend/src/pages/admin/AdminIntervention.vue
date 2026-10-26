@@ -96,7 +96,7 @@ const actionName = computed(() => action.value === 'reassign' ? '改派当前审
 function fail(cause: unknown): void {
   if (controller.signal.aborted) return
   error.value = cause instanceof Error ? cause.message : '操作失败，请稍后重试。'
-  if (cause instanceof ApiError && [401, 403].includes(cause.status ?? 0)) emit('lost')
+  if (cause instanceof ApiError && cause.status === 401) emit('lost')
 }
 
 /**

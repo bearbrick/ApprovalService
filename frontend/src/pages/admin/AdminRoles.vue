@@ -82,7 +82,7 @@ const validReason = computed(() => reason.value.trim().length >= 2 && reason.val
  * @param cause 原始错误。
  */
 function failed(cause: unknown): void {
-  if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) emit('lost')
+  if (cause instanceof ApiError && cause.status === 401) emit('lost')
   message.value = cause instanceof Error ? cause.message : '角色操作失败，请重试。'
 }
 

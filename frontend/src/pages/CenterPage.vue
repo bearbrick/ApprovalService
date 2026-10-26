@@ -407,7 +407,7 @@ onBeforeUnmount(() => { request?.abort(); if (searchTimer) clearTimeout(searchTi
   <header class="page-header center-page-header"><div class="breadcrumb"><a href="#/">审批服务</a><span>/</span><span>{{ route.resourceId ? '审批详情' : route.title }}</span></div><div class="page-title-row"><h1 id="page-title" tabindex="-1">{{ route.resourceId ? '审批详情' : '审批中心' }}</h1><span v-if="signedIn && todoCount !== null" class="center-count-badge">待办 {{ todoCount }}</span><button v-if="signedIn" class="btn" type="button" @click="signOut">退出登录</button></div><p>统一查看待办与审批进度，业务单据由来源系统维护。</p></header>
   <div class="page-body center-page-body">
     <section v-if="!signedIn" class="center-card center-login">
-      <h2>{{ embedding ? '正在验证内嵌身份' : mustChangePassword ? '首次登录请修改密码' : '登录审批中心' }}</h2>
+      <h2>{{ embedding ? '正在验证内嵌身份' : mustChangePassword ? '首次登录请修改密码' : '登录审批服务' }}</h2>
       <p>{{ embedding ? '正在确认一次性令牌及应用来源…' : '使用已开通的工号和密码查看属于自己的审批记录。' }}</p>
       <form v-if="!embedding && !mustChangePassword" @submit.prevent="signIn"><label>工号<input v-model="employeeNumber" autocomplete="username" required></label><label>密码<input v-model="password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '登录中…' : '登录' }}</button></form>
       <form v-else-if="!embedding" @submit.prevent="changeInitialPassword"><label>新密码<input v-model="newPassword" type="password" autocomplete="new-password" required></label><button class="btn btn-primary" type="submit" :disabled="authenticating">{{ authenticating ? '提交中…' : '修改密码' }}</button></form>

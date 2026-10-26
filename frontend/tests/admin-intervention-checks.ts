@@ -39,7 +39,7 @@ export function runInterventionChecks(check: (name: string, value: boolean) => v
   try { buildInterventionCommand({ ...record, status: 'awaitingInitiator' }, 'jump', '', '', 'node', '调整路线') }
   catch { waitingRejected = true }
   check('等待发起人时禁止改派与跳转', waitingRejected)
-  const flowSession = { scope: 'flows' } as AdminSession
-  check('流程管理会话可进干预页但不扩张组织设置权限',
-    canReadAdminSection(flowSession, 'runtime') && !canReadAdminSection(flowSession, 'org'))
+  const flowSession = { tokens: { mustChangePassword: false } } as AdminSession
+  check('普通登录可进入管理页面请求授权，未登录不能进入',
+    canReadAdminSection(flowSession, 'runtime') && !canReadAdminSection(null, 'org'))
 }

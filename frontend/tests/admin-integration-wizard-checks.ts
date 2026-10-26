@@ -1,4 +1,4 @@
-import { adminAccessToken, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
+import { adminSession, loginAdmin, logoutAdmin } from '../src/api/admin-session.ts'
 import { getAppAdministrators, getWizardApps, queueTestCallback, saveAppAdministrators } from '../src/api/admin-integration-wizard.ts'
 
 /**
@@ -8,6 +8,7 @@ import { getAppAdministrators, getWizardApps, queueTestCallback, saveAppAdminist
  */
 export async function runAdminIntegrationWizardChecks(check: (name: string, value: boolean) => void): Promise<void> {
   const originalFetch = globalThis.fetch
+  let organizationAdmin = false
   const visited: Array<{ url: string; method: string; body: string; authorization: string }> = []
   /**
    * 用固定响应记录页面是否误读组织级数据。
@@ -19,6 +20,8 @@ export async function runAdminIntegrationWizardChecks(check: (name: string, valu
     const url = String(input)
     visited.push({ url, method: init?.method ?? 'GET', body: String(init?.body ?? ''),
       authorization: new Headers(init?.headers).get('Authorization') ?? '' })
+    if (url.endsWith('/identity/login')) organizationAdmin = JSON.parse(String(init?.body)).employeeNumber === 'ADMIN'
+    else if (!organizationAdmin && !url.endsWith('/test-callback')) return Response.json({ code: 'FORBIDDEN', message: '无组织管理员权限。' }, { status: 403 })
     const body = url.endsWith('/identity/login') ? {
       personId: 'p1', accessToken: 'local-token', accessExpiresAt: '2099-01-01T00:00:00Z',
       refreshToken: 'refresh-token', refreshExpiresAt: '2099-01-02T00:00:00Z', mustChangePassword: false,
@@ -32,16 +35,15 @@ export async function runAdminIntegrationWizardChecks(check: (name: string, valu
   }
   try {
     await loginAdmin('E1', 'password', 'app-test')
-    let blockedAdmin = false
-    try { await adminAccessToken() } catch { blockedAdmin = true }
     let blockedList = false
     try { await getAppAdministrators('known-app') } catch { blockedList = true }
     const receipt = await queueTestCallback('known-app', '验证验签')
-    check('应用测试登录不读取组织管理员会话和应用列表，只能用已知编码排入测试回调',
-      blockedAdmin && blockedList && receipt.eventId === 'test-123'
-      && visited.length === 2 && visited[1]?.url.endsWith('/apps/known-app/test-callback')
-      && visited[1]?.method === 'POST' && visited[1]?.authorization === 'Bearer local-token'
-      && JSON.parse(visited[1]?.body ?? '{}').reason === '验证验签')
+    const sent = visited.at(-1)
+    check('应用管理员越权读取由服务端拒绝，身份保留并可发送授权应用测试回调',
+      blockedList && adminSession()?.tokens.personId === 'p1' && receipt.eventId === 'test-123'
+      && !visited.some(item => item.url.endsWith('/admin/session') || item.url.endsWith('/admin/apps'))
+      && !!sent?.url.endsWith('/apps/known-app/test-callback') && sent.method === 'POST'
+      && sent.authorization === 'Bearer local-token' && JSON.parse(sent.body).reason === '验证验签')
     logoutAdmin()
     visited.length = 0
     await loginAdmin('ADMIN', 'password', 'admin')
